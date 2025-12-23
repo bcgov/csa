@@ -1,8 +1,8 @@
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { Injectable, Logger } from '@nestjs/common'
-import { Prisma, PrismaClient } from '../generated/prisma/client.js'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
+import { Prisma, PrismaClient } from '../../../generated/prisma/client'
 
 const DB_HOST = process.env.POSTGRES_HOST || 'localhost'
 const DB_USER = process.env.POSTGRES_USER || 'postgres'

@@ -1,8 +1,8 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
+import { PrismaService } from 'src/common/database/prisma.service'
+import { Prisma } from '../../../generated/prisma/client'
 import { UsersService } from './users.service'
-import { PrismaService } from 'src/prisma.service'
-import { Prisma } from '../../generated/prisma/client.js'
 
 describe('UserService', () => {
   let service: UsersService

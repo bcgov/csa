@@ -1,6 +1,7 @@
 {
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
+  "entryFile": "api/main",
   "compilerOptions": {
     "builder": "swc",
     "typeCheck": true,

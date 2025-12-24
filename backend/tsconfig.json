@@ -1,11 +1,11 @@
 {
   "compilerOptions": {
-    "paths": {
-      "src/*": ["./src/*"],
-      "@common/*": ["./src/common/*"],
-      "@api/*": ["./src/api/*"],
-      "*": ["./src/*"]
-    },
+    // "paths": {
+    //   "src/*": ["./src/*"],
+    //   "@common/*": ["./src/common/*"],
+    //   "@api/*": ["./src/api/*"],
+    //   "*": ["./src/*"]
+    // },
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": false,

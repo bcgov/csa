@@ -1,15 +1,15 @@
 import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { Injectable, Logger } from '@nestjs/common'
 import { PrismaPg } from '@prisma/adapter-pg'
+import { Prisma, PrismaClient } from '@prisma/client'
 import { Pool } from 'pg'
-import { Prisma, PrismaClient } from '../../../generated/prisma/client'
 
 const DB_HOST = process.env.POSTGRES_HOST || 'localhost'
 const DB_USER = process.env.POSTGRES_USER || 'postgres'
 const DB_PWD = encodeURIComponent(process.env.POSTGRES_PASSWORD || 'default')
 const DB_PORT = process.env.POSTGRES_PORT || 5432
 const DB_NAME = process.env.POSTGRES_DATABASE || 'postgres'
-const DB_SCHEMA = process.env.POSTGRES_SCHEMA || 'users'
+const DB_SCHEMA = process.env.POSTGRES_SCHEMA || 'csa'
 const PGBOUNCER_URL = process.env.PGBOUNCER_URL
 const dataSourceURL = PGBOUNCER_URL
   ? `${PGBOUNCER_URL}?schema=${DB_SCHEMA}&pgbouncer=true`

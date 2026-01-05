@@ -1,7 +1,7 @@
 import { Controller, Get } from '@nestjs/common'
 import { HealthCheck, HealthCheckService, PrismaHealthIndicator } from '@nestjs/terminus'
+import { PrismaClient } from '@prisma/client'
 import { PrismaService } from 'src/common/database/prisma.service.js'
-import type { PrismaClient } from '../../../generated/prisma/client'
 @Controller('health')
 export class HealthController {
   constructor(

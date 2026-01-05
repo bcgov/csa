@@ -12,7 +12,7 @@
         "GET",
         "DELETE"
       ],
-      "path": "/api/v1/users",
+      "path": "/api/v1/applicants",
       "headers": {
         "Content-Type": "application/json"
       },

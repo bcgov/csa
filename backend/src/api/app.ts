@@ -1,11 +1,11 @@
-import { NestFactory } from '@nestjs/core'
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
-import { ApiModule } from './api.module'
-import { customLogger } from '../common/config/logger.config'
-import type { NestExpressApplication } from '@nestjs/platform-express'
-import helmet from 'helmet'
 import { VersioningType } from '@nestjs/common'
+import { NestFactory } from '@nestjs/core'
+import type { NestExpressApplication } from '@nestjs/platform-express'
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import helmet from 'helmet'
 import { metricsMiddleware } from 'src/common/middleware/prom'
+import { customLogger } from '../common/config/logger.config'
+import { ApiModule } from './api.module'
 
 /**
  *
@@ -25,10 +25,10 @@ export async function bootstrap() {
     prefix: 'v',
   })
   const config = new DocumentBuilder()
-    .setTitle('Users example')
+    .setTitle('Applicants example')
     .setDescription('The user API description')
     .setVersion('1.0')
-    .addTag('users')
+    .addTag('applicants')
     .build()
 
   const document = SwaggerModule.createDocument(app, config)

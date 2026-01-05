@@ -1,77 +1,82 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
 
-import { Prisma } from '../../../generated/prisma/client'
-import { CreateUserDto } from './dto/create-user.dto'
-import { UpdateUserDto } from './dto/update-user.dto'
-import { UserDto } from './dto/user.dto'
+import { ApplicantDto } from './dto/applicant.dto'
+import { CreateApplicantDto } from './dto/create-applicant.dto'
+import { UpdateApplicantDto } from './dto/update-applicant.dto'
 
 @Injectable()
-export class UsersService {
+export class ApplicantsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(user: CreateUserDto): Promise<UserDto> {
-    const savedUser = await this.prisma.users.create({
+  async create(applicant: CreateApplicantDto): Promise<ApplicantDto> {
+    const savedApplicant = await this.prisma.applicants.create({
       data: {
-        name: user.name,
-        email: user.email,
+        last_name: applicant.last_name,
+        given_name: applicant.given_name,
+        csa_status: applicant.csa_status,
       },
     })
 
     return {
-      id: savedUser.id.toNumber(),
-      name: savedUser.name,
-      email: savedUser.email,
+      id: savedApplicant.id,
+      last_name: savedApplicant.last_name,
+      given_name: savedApplicant.given_name,
+      csa_status: savedApplicant.csa_status,
     }
   }
 
-  async findAll(): Promise<UserDto[]> {
-    const users = await this.prisma.users.findMany()
-    return users.flatMap((user) => {
-      const userDto: UserDto = {
-        id: user.id.toNumber(),
-        name: user.name,
-        email: user.email,
+  async findAll(): Promise<ApplicantDto[]> {
+    const applicants = await this.prisma.applicants.findMany()
+    return applicants.flatMap((applicant) => {
+      const ApplicantDto: ApplicantDto = {
+        id: applicant.id,
+        last_name: applicant.last_name,
+        given_name: applicant.given_name,
+        csa_status: applicant.csa_status,
       }
-      return userDto
+      return ApplicantDto
     })
   }
 
-  async findOne(id: number): Promise<UserDto> {
-    const user = await this.prisma.users.findUnique({
+  async findOne(id: number): Promise<ApplicantDto> {
+    const applicant = await this.prisma.applicants.findUnique({
       where: {
-        id: new Prisma.Decimal(id),
+        id: id,
       },
     })
     return {
-      id: user.id.toNumber(),
-      name: user.name,
-      email: user.email,
+      id: applicant.id,
+      last_name: applicant.last_name,
+      given_name: applicant.given_name,
+      csa_status: applicant.csa_status,
     }
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto): Promise<UserDto> {
-    const user = await this.prisma.users.update({
+  async update(id: number, updateApplicantDto: UpdateApplicantDto): Promise<ApplicantDto> {
+    const applicant = await this.prisma.applicants.update({
       where: {
-        id: new Prisma.Decimal(id),
+        id: id,
       },
       data: {
-        name: updateUserDto.name,
-        email: updateUserDto.email,
+        last_name: updateApplicantDto.last_name,
+        given_name: updateApplicantDto.given_name,
+        csa_status: updateApplicantDto.csa_status,
       },
     })
     return {
-      id: user.id.toNumber(),
-      name: user.name,
-      email: user.email,
+      id: applicant.id,
+      last_name: applicant.last_name,
+      given_name: applicant.given_name,
+      csa_status: applicant.csa_status,
     }
   }
 
   async remove(id: number): Promise<{ deleted: boolean; message?: string }> {
     try {
-      await this.prisma.users.delete({
+      await this.prisma.applicants.delete({
         where: {
-          id: new Prisma.Decimal(id),
+          id: id,
         },
       })
       return { deleted: true }
@@ -81,7 +86,7 @@ export class UsersService {
     }
   }
 
-  async searchUsers(
+  async searchApplicants(
     page: number,
     limit: number,
     sort: string, // JSON string to store sort key and sort value, ex: [{"name":"desc"},{"email":"asc"}]
@@ -102,20 +107,20 @@ export class UsersService {
     } catch {
       throw new Error('Invalid query parameters')
     }
-    const users = await this.prisma.users.findMany({
+    const applicants = await this.prisma.applicants.findMany({
       skip: (page - 1) * limit,
       take: parseInt(String(limit)),
       orderBy: sortObj,
       where: this.convertFiltersToPrismaFormat(filterObj),
     })
 
-    const count = await this.prisma.users.count({
+    const count = await this.prisma.applicants.count({
       orderBy: sortObj,
       where: this.convertFiltersToPrismaFormat(filterObj),
     })
 
     return {
-      users,
+      applicants,
       page,
       limit,
       total: count,

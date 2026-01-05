@@ -1,18 +1,18 @@
-import 'dotenv/config'
 import type { MiddlewareConsumer } from '@nestjs/common'
 import { Module, RequestMethod } from '@nestjs/common'
-import { HTTPLoggerMiddleware } from '../common/middleware/req.res.logger'
-import { PrismaService } from 'src/common/database/prisma.service'
 import { ConfigModule } from '@nestjs/config'
-import { UsersModule } from './users/users.module'
-import { AppService } from './app.service'
-import { AppController } from './app.controller'
-import { MetricsController } from './metrics/metrics.controller'
 import { TerminusModule } from '@nestjs/terminus'
+import 'dotenv/config'
+import { PrismaService } from 'src/common/database/prisma.service'
+import { HTTPLoggerMiddleware } from '../common/middleware/req.res.logger'
+import { AppController } from './app.controller'
+import { AppService } from './app.service'
+import { ApplicantsModule } from './applicants/applicants.module'
 import { HealthController } from './health/health.controller'
+import { MetricsController } from './metrics/metrics.controller'
 
 @Module({
-  imports: [ConfigModule.forRoot(), TerminusModule, UsersModule],
+  imports: [ConfigModule.forRoot(), TerminusModule, ApplicantsModule],
   controllers: [AppController, MetricsController, HealthController],
   providers: [AppService, PrismaService],
 })

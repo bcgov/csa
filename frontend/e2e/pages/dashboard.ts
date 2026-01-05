@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test'
-import { baseURL } from '../utils'
 import type { Page } from 'playwright'
+import { baseURL } from '../utils'
 
 export const dashboard_page = async (page: Page) => {
   await page.goto(baseURL)
@@ -8,9 +8,9 @@ export const dashboard_page = async (page: Page) => {
     page.getByRole('link', { name: 'Government of British Columbia' }),
   ).toBeVisible()
   await expect(page.getByText('QuickStart OpenShift')).toBeVisible()
-  await expect(page.getByText('Employee ID')).toBeVisible()
-  await expect(page.getByText('Employee Name')).toBeVisible()
-  await expect(page.getByText('Employee Email')).toBeVisible()
+  await expect(page.getByText('Applicant ID')).toBeVisible()
+  await expect(page.getByText('Applicant Last Name')).toBeVisible()
+  await expect(page.getByText('Employee CS Status')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Home' })).toBeVisible()
   await expect(
     page.getByRole('link', { name: 'About gov.bc.ca' }),

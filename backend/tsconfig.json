@@ -7,6 +7,7 @@
     //   "*": ["./src/*"]
     // },
     "module": "NodeNext",
+    "esModuleInterop": true,
     "moduleResolution": "NodeNext",
     "strict": false,
     "noUncheckedIndexedAccess": true,

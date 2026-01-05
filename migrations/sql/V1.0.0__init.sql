@@ -1,24 +1,17 @@
-CREATE SCHEMA IF NOT EXISTS USERS;
+CREATE SCHEMA IF NOT EXISTS csa;
 
-CREATE SEQUENCE IF NOT EXISTS USERS."USER_SEQ"
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 100;
-
-CREATE TABLE IF NOT EXISTS USERS.USERS
+CREATE TABLE IF NOT EXISTS csa.applicants
 (
-    ID    numeric      not null
-        constraint "USER_PK"
-            primary key DEFAULT nextval('USERS."USER_SEQ"'),
-    NAME  varchar(200) not null,
-    EMAIL varchar(200) not null
+  id         SERIAL PRIMARY KEY,
+  last_name  VARCHAR(100) NOT NULL,
+  given_name VARCHAR(100) NOT NULL,
+  csa_status VARCHAR(50) NOT NULL
 );
-INSERT INTO USERS.USERS (NAME, EMAIL)
-VALUES ('John', 'John.ipsum@test.com'),
-       ('Jane', 'Jane.ipsum@test.com'),
-       ('Jack', 'Jack.ipsum@test.com'),
-       ('Jill', 'Jill.ipsum@test.com'),
-       ('Joe', 'Joe.ipsum@test.com');
+
+INSERT INTO csa.applicants (last_name, given_name, csa_status)
+VALUES ('Doe', 'John', 'eligible'),
+       ('Smith', 'Jane', 'in_pay'),
+       ('Brown', 'Jack', 'eligible'),
+       ('Wilson', 'Jill', 'in_pay'),
+       ('Taylor', 'Joe', 'eligible');
 

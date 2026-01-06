@@ -1,10 +1,10 @@
 import '@bcgov/bc-sans/css/BC_Sans.css'
+import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import * as ReactDOM from 'react-dom/client'
-import { RouterProvider, createRouter } from '@tanstack/react-router'
 
 // Import bootstrap styles
-import '@/scss/styles.scss'
+// import '@/scss/styles.scss'
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen'

@@ -9,7 +9,9 @@
     "test-build": "vite build --mode test",
     "sandbox-build": "vite build --mode sandbox",
     "prod-build": "vite build --mode production",
-    "serve": "vite preview"
+    "serve": "vite preview",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

@@ -1,10 +1,11 @@
-import { createFileRoute } from '@tanstack/react-router'
-import Dashboard from '@/components/Dashboard'
+import App from '@/App';
+import { createFileRoute } from '@tanstack/react-router';
+import '../index.css';
 
 export const Route = createFileRoute('/')({
   component: Index,
 })
 
 function Index() {
-  return <Dashboard />
+  return <App />
 }

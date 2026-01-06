@@ -1,6 +1,13 @@
 {
   "compilerOptions": {
+    // "paths": {
+    //   "src/*": ["./src/*"],
+    //   "@common/*": ["./src/common/*"],
+    //   "@api/*": ["./src/api/*"],
+    //   "*": ["./src/*"]
+    // },
     "module": "NodeNext",
+    "esModuleInterop": true,
     "moduleResolution": "NodeNext",
     "strict": false,
     "noUncheckedIndexedAccess": true,
@@ -15,11 +22,11 @@
     "target": "es2022",
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
     "lib": ["es2022"],
-    "types": ["vitest/globals", "node"]  
+    "baseUrl": "./",
+    "types": ["vitest/globals", "node"]
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "generated/**/*.ts"],
 }

@@ -22,3 +22,6 @@ migrations
 output
 test
 tests
+
+# Local npm config (for dev-specific SSL/proxy settings)
+.npmrc

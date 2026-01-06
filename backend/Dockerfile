@@ -5,6 +5,7 @@ FROM node:24.11.1-slim AS build
 WORKDIR /app
 COPY . ./
 ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
+RUN npx prisma generate
 RUN npm run deploy
 
 # Dependencies
@@ -32,4 +33,4 @@ HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:3000/api
 
 # Nonroot user, limit heap size to 50 MB
 USER nonroot
-CMD ["--max-old-space-size=50", "/app/dist/main"]
+CMD ["--max-old-space-size=50", "/app/dist/api/main"]

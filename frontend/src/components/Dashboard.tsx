@@ -89,7 +89,11 @@ const Dashboard: FC = () => {
           ))}
         </tbody>
       </Table>
-      <ModalComponent show={!!selectedApplicant} onHide={handleClose} applicant={selectedApplicant} />
+      <ModalComponent
+        show={!!selectedApplicant}
+        onHide={handleClose}
+        applicant={selectedApplicant}
+      />
     </div>
   )
 }

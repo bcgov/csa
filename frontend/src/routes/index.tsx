@@ -1,6 +1,6 @@
-import App from '@/App';
-import { createFileRoute } from '@tanstack/react-router';
-import '../index.css';
+import App from '@/App'
+import { createFileRoute } from '@tanstack/react-router'
+import '../index.css'
 
 export const Route = createFileRoute('/')({
   component: Index,

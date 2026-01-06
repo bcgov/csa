@@ -1,6 +1,6 @@
-import { vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
 import Dashboard from '@/components/Dashboard'
+import { render, screen } from '@testing-library/react'
+import { vi } from 'vitest'
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: vi.fn(),
@@ -14,6 +14,6 @@ describe('Dashboard', () => {
       useNavigate: useNavigateMock,
     }))
     render(<Dashboard />)
-    expect(screen.getByText(/Employee ID/i)).toBeInTheDocument()
+    expect(screen.getByText(/Applicant ID/i)).toBeInTheDocument()
   })
 })

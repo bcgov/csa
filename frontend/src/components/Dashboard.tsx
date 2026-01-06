@@ -1,17 +1,17 @@
-import type { FC } from 'react'
-import type { AxiosResponse } from '~/axios'
-import type UserDto from '@/interfaces/UserDto'
-import { useEffect, useState } from 'react'
-import { Table, Modal, Button } from 'react-bootstrap'
 import apiService from '@/service/api-service'
+import type { FC } from 'react'
+import { useEffect, useState } from 'react'
+import { Button, Modal, Table } from 'react-bootstrap'
+import type ApplicantDto from 'src/interfaces/ApplicantDto'
+import type { AxiosResponse } from '~/axios'
 
 type ModalProps = {
   show: boolean
   onHide: () => void
-  user?: UserDto
+  applicant?: ApplicantDto
 }
 
-const ModalComponent: FC<ModalProps> = ({ show, onHide, user }) => {
+const ModalComponent: FC<ModalProps> = ({ show, onHide, applicant }) => {
   return (
     <Modal
       show={show}
@@ -23,7 +23,7 @@ const ModalComponent: FC<ModalProps> = ({ show, onHide, user }) => {
       <Modal.Header closeButton>
         <Modal.Title id="contained-modal-title-vcenter">Row Details</Modal.Title>
       </Modal.Header>
-      <Modal.Body>{JSON.stringify(user)}</Modal.Body>
+      <Modal.Body>{JSON.stringify(applicant)}</Modal.Body>
       <Modal.Footer>
         <Button onClick={onHide}>Close</Button>
       </Modal.Footer>
@@ -33,23 +33,24 @@ const ModalComponent: FC<ModalProps> = ({ show, onHide, user }) => {
 
 const Dashboard: FC = () => {
   const [data, setData] = useState<any>([])
-  const [selectedUser, setSelectedUser] = useState<UserDto | undefined>(undefined)
+  const [selectedApplicant, setSelectedUser] = useState<ApplicantDto | undefined>(undefined)
 
   useEffect(() => {
     apiService
       .getAxiosInstance()
-      .get('/v1/users')
+      .get('/v1/applicants')
       .then((response: AxiosResponse) => {
-        const users: UserDto[] = []
-        for (const user of response.data) {
-          const userDto = {
-            id: user.id,
-            name: user.name,
-            email: user.email,
+        const applicants: ApplicantDto[] = []
+        for (const applicant of response.data) {
+          const applicantDto = {
+            id: applicant.id,
+            last_name: applicant.last_name,
+            given_name: applicant.given_name,
+            csa_status: applicant.csa_status,
           }
-          users.push(userDto)
+          applicants.push(applicantDto)
         }
-        setData(users)
+        setData(applicants)
       })
       .catch((error) => {
         console.error(error)
@@ -65,20 +66,22 @@ const Dashboard: FC = () => {
       <Table striped bordered hover>
         <thead>
           <tr>
-            <th>Employee ID</th>
-            <th>Employee Name</th>
-            <th>Employee Email</th>
+            <th>Applicant ID</th>
+            <th>Applicant Last Name</th>
+            <th>Applicant Given Name</th>
+            <th>Applicant CS Status</th>
             <th />
           </tr>
         </thead>
         <tbody>
-          {data.map((user: UserDto) => (
-            <tr key={user.id}>
-              <td>{user.id}</td>
-              <td>{user.name}</td>
-              <td>{user.email}</td>
+          {data.map((applicant: ApplicantDto) => (
+            <tr key={applicant.id}>
+              <td>{applicant.id}</td>
+              <td>{applicant.last_name}</td>
+              <td>{applicant.given_name}</td>
+              <td>{applicant.csa_status}</td>
               <td className="text-center">
-                <Button variant="secondary" size="sm" onClick={() => setSelectedUser(user)}>
+                <Button variant="secondary" size="sm" onClick={() => setSelectedUser(applicant)}>
                   View Details
                 </Button>
               </td>
@@ -86,7 +89,11 @@ const Dashboard: FC = () => {
           ))}
         </tbody>
       </Table>
-      <ModalComponent show={!!selectedUser} onHide={handleClose} user={selectedUser} />
+      <ModalComponent
+        show={!!selectedApplicant}
+        onHide={handleClose}
+        applicant={selectedApplicant}
+      />
     </div>
   )
 }

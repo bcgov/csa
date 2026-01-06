@@ -1,6 +1,5 @@
 generator client {
-  provider     = "prisma-client"
-  output       = "../generated/prisma"
+  provider     = "prisma-client-js"
   moduleFormat = "cjs"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
@@ -9,13 +8,14 @@ generator client {
 // This file no longer contains the `url` field for the datasource.
 datasource db {
   provider = "postgresql"
-  schemas  = ["users"]
+  schemas  = ["csa"]
 }
 
-model users {
-  id    Decimal @id(map: "USER_PK") @default(dbgenerated("nextval('\"USER_SEQ\"'::regclass)")) @db.Decimal
-  name  String  @db.VarChar(200)
-  email String  @db.VarChar(200)
+model applicants {
+  id         Int     @id @default(autoincrement()) @map("id")
+  last_name  String  @db.VarChar(100)
+  given_name String  @db.VarChar(100)
+  csa_status String  @db.VarChar(50)
 
-  @@schema("users")
+  @@schema("csa")
 }

@@ -1,15 +1,10 @@
 {
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
+  "entryFile": "api/main",
   "compilerOptions": {
     "builder": "swc",
     "typeCheck": true,
-    "assets": [
-      {
-        "include": "../generated/prisma/**/*",
-        "outDir": "dist"
-      }
-    ],
     "watchAssets": true
   }
 }

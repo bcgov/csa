@@ -1,0 +1,149 @@
+name: Promote Existing Image (GitOps PR)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (updates the matching overlay in the GitOps repo)"
+        type: choice
+        required: true
+        options:
+          - dev
+          - test
+          - prod
+      service:
+        description: "Which service(s) to promote"
+        type: choice
+        required: true
+        options:
+          - frontend
+          - backend
+          - both
+      tag:
+        description: "Image tag to promote (e.g. sha-abc1234, dev-abc1234, v1.2.3)"
+        type: string
+        required: true
+
+concurrency:
+  group: promote-${{ github.repository }}-${{ inputs.environment }}-${{ inputs.service }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # GitOps repo (private) that ArgoCD watches
+  GITOPS_REPO: bcgov-c/tenant-gitops-dec59b
+  GITOPS_BASE_BRANCH: main
+
+  # Where your overlays live inside the GitOps repo
+  FRONTEND_OVERLAY: apps/csa-frontend/overlays
+  BACKEND_OVERLAY: apps/csa-backend/overlays
+
+  # Image names referenced in kustomization.yaml
+  FRONTEND_IMAGE: ghcr.io/bcgov/csa-frontend
+  BACKEND_IMAGE: ghcr.io/bcgov/csa-backend
+
+jobs:
+  promote:
+    name: Create GitOps PR to promote image
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.GITOPS_REPO }}
+          ref: ${{ env.GITOPS_BASE_BRANCH }}
+          token: ${{ secrets.GITOPS_PUSH_TOKEN }} # PAT with write access to GitOps repo
+          path: gitops
+
+      - name: Install yq
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Validate inputs and compute paths
+        id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ENV="${{ inputs.environment }}"
+          SVC="${{ inputs.service }}"
+          TAG="${{ inputs.tag }}"
+
+          # Basic sanity
+          [[ "$ENV" =~ ^(dev|test|prod)$ ]] || { echo "Invalid environment: $ENV" ; exit 1; }
+          [[ "$SVC" =~ ^(frontend|backend|both)$ ]] || { echo "Invalid service: $SVC" ; exit 1; }
+          [[ -n "$TAG" ]] || { echo "Tag is required" ; exit 1; }
+
+          echo "env=$ENV" >> "$GITHUB_OUTPUT"
+          echo "svc=$SVC" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          # Branch name for GitOps PR
+          SAFE_TAG="${TAG//\//-}"
+          SAFE_REPO="${GITHUB_REPOSITORY//\//-}"
+          echo "branch=promote/${ENV}/${SAFE_REPO}/${SVC}/${SAFE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Update overlay image tag(s)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENV="${{ steps.vars.outputs.env }}"
+          SVC="${{ steps.vars.outputs.svc }}"
+          TAG="${{ steps.vars.outputs.tag }}"
+          export TAG
+
+          # frontend
+          if [[ "$SVC" == "frontend" || "$SVC" == "both" ]]; then
+            FILE="gitops/${{ env.FRONTEND_OVERLAY }}/${ENV}/kustomization.yaml"
+            if [[ ! -f "$FILE" ]]; then
+              echo "Missing file: $FILE"
+              exit 1
+            fi
+            yq -i '(.images[] | select(.name=="${{ env.FRONTEND_IMAGE }}")).newTag = strenv(TAG)' "$FILE"
+          fi
+
+          # backend
+          if [[ "$SVC" == "backend" || "$SVC" == "both" ]]; then
+            FILE="gitops/${{ env.BACKEND_OVERLAY }}/${ENV}/kustomization.yaml"
+            if [[ ! -f "$FILE" ]]; then
+              echo "Missing file: $FILE"
+              exit 1
+            fi
+            yq -i '(.images[] | select(.name=="${{ env.BACKEND_IMAGE }}")).newTag = strenv(TAG)' "$FILE"
+          fi
+
+      - name: Show diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd gitops
+          git diff --stat
+          git diff
+
+      - name: Create PR in GitOps repo
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITOPS_PUSH_TOKEN }}
+          path: gitops
+          base: ${{ env.GITOPS_BASE_BRANCH }}
+          branch: ${{ steps.vars.outputs.branch }}
+          delete-branch: true
+          commit-message: "Promote ${{ steps.vars.outputs.svc }} to ${{ steps.vars.outputs.env }}: ${{ steps.vars.outputs.tag }}"
+          title: "Promote ${{ steps.vars.outputs.svc }} to ${{ steps.vars.outputs.env }}: ${{ steps.vars.outputs.tag }}"
+          body: |
+            This PR promotes an existing image tag to the GitOps overlays.
+
+            - Environment: `${{ steps.vars.outputs.env }}`
+            - Service(s): `${{ steps.vars.outputs.svc }}`
+            - Tag: `${{ steps.vars.outputs.tag }}`
+
+            Notes:
+            - ArgoCD will deploy after this PR is merged (dev/test may auto-sync; prod can remain manual sync in ArgoCD UI).
+            - This updates only the overlay(s) for the selected environment/service(s).

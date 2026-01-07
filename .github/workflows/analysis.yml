@@ -1,10 +1,19 @@
 name: Analysis
 
 on:
-  push:
-    branches: [main]
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
+    branches: [dev, test, main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/**'
+  push:
+    branches: [dev, test, main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/**'
   schedule:
     - cron: "0 11 * * 0" # 3 AM PST = 12 PM UDT, runs sundays
   workflow_dispatch:
@@ -18,14 +27,17 @@ permissions: {}
 jobs:
   backend-tests:
     name: Backend Tests
-    if: (! github.event.pull_request.draft)
+    #if: (! github.event.pull_request.draft)
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     services:
       postgres:
-        image: postgres
+        image: postgres:15
         env:
           POSTGRES_PASSWORD: default
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -35,8 +47,6 @@ jobs:
           - 5432:5432
     steps:
       - uses: bcgov/action-test-and-analyse@c20d16c26d9b7e6e486f01702880053ed4ebdc91 # v1.5.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_BACKEND }}
         with:
           commands: |
             npm ci
@@ -47,23 +57,22 @@ jobs:
           sonar_args: >
             -Dsonar.exclusions=**/coverage/**,**/node_modules/**,**/*spec.ts
             -Dsonar.organization=bcgov-sonarcloud
-            -Dsonar.projectKey=quickstart-openshift_backend
+            -Dsonar.projectKey=bcgov-csa-backend
             -Dsonar.sources=src
             -Dsonar.tests.inclusions=**/*spec.ts
             -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info
-          sonar_token: ${{ env.SONAR_TOKEN }}
+          sonar_token: ${{ secrets.SONAR_TOKEN }}
           supply_scan: true
           triggers: ('backend/')
 
   frontend-tests:
     name: Frontend Tests
-    if: (! github.event.pull_request.draft)
+    #if: (! github.event.pull_request.draft)
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: bcgov/action-test-and-analyse@c20d16c26d9b7e6e486f01702880053ed4ebdc91 # v1.5.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_FRONTEND }}
         with:
           commands: |
             npm ci
@@ -74,18 +83,18 @@ jobs:
           sonar_args: >
             -Dsonar.exclusions=**/coverage/**,**/node_modules/**,**/*spec.ts
             -Dsonar.organization=bcgov-sonarcloud
-            -Dsonar.projectKey=quickstart-openshift_frontend
+            -Dsonar.projectKey=csa-frontend
             -Dsonar.sources=src
             -Dsonar.tests.inclusions=**/*spec.ts
             -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info
-          sonar_token: ${{ env.SONAR_TOKEN }}
+          sonar_token: ${{ secrets.SONAR_TOKEN }}
           supply_scan: true
           triggers: ('frontend/')
 
   # https://github.com/marketplace/actions/aqua-security-trivy
   trivy:
     name: Trivy Security Scan
-    if: (! github.event.pull_request.draft)
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     continue-on-error: true
     permissions:
       security-events: write
@@ -109,11 +118,14 @@ jobs:
           sarif_file: "trivy-results.sarif"
 
   results:
+    if: always()
     name: Analysis Results
-    needs: [backend-tests, frontend-tests]
-    if: (! github.event.pull_request.draft)
+    needs: [backend-tests, frontend-tests, trivy]
     runs-on: ubuntu-24.04
     steps:
-      - if: contains(needs.*.result, 'failure')||contains(needs.*.result, 'canceled')
-        run: echo "At least one job has failed." && exit 1
+      - if: |
+          needs.backend-tests.result != 'success' ||
+          needs.frontend-tests.result != 'success'
+        run: echo "Backend or Frontend job failed/canceled." && exit 1
       - run: echo "Success!"
+

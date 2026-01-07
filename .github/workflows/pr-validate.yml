@@ -3,12 +3,20 @@ name: PR Validate
 on:
   pull_request:
     types: [edited, opened, synchronize, reopened, ready_for_review]
+    branches: [dev, test, main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/pull_request_template.md"
+      - ".github/workflows/**"
 
 concurrency:
-  group: ${{ github.workflow }}-edit-${{ github.event.number }}
+  group: ${{ github.workflow }}-${{ github.event.number }}
   cancel-in-progress: true
 
-permissions: {}
+permissions: 
+  contents: read
+  pull-requests: write
 
 jobs:
   validate:
@@ -17,10 +25,6 @@ jobs:
     permissions:
       pull-requests: write
     uses: bcgov/quickstart-openshift-helpers/.github/workflows/.pr-validate.yml@d9b3d32fb3f03c4699c2dce83ddfff042cd31a1f # v1.0.0
-    with:
-      markdown_links: |
-        - [Frontend](https://${{ github.event.repository.name }}-${{ github.event.number }}.apps.silver.devops.gov.bc.ca)
-        - [Backend](https://${{ github.event.repository.name }}-${{ github.event.number }}.apps.silver.devops.gov.bc.ca/api)
 
   results:
     name: Validate Results
@@ -28,4 +32,6 @@ jobs:
     needs: [validate]
     runs-on: ubuntu-24.04
     steps:
-      - run: echo "Success!"
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'canceled')
+        run: echo "PR validation failed." && exit 1
+      - run: echo "PR validation passed."

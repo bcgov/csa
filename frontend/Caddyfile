@@ -8,9 +8,9 @@
 	log {
 		output stdout
 		format console
-		## Default to info if LOG_LEVEL not set
-		level {env.LOG_LEVEL:info}
+		level info
 	}
+
 
 	# Enable Coraza WAF
 	coraza_waf {
@@ -29,9 +29,9 @@
 		}
 	}
 	rewrite @spa_router {http.matchers.file.relative}
-	
+
 	# Default BACKEND_URL so Caddy can still start in dev
-	reverse_proxy /api* {$BACKEND_UPSTREAM:csa-backend:3000} {	
+	reverse_proxy /api* {$BACKEND_UPSTREAM:csa-backend:3000} {
 		header_up Host {http.reverse_proxy.upstream.hostport}
 		header_up X-Real-IP {remote_host}
 	}

@@ -1,0 +1,169 @@
+name: Build Image (PR/Branch)
+
+on:
+  push:
+    branches-ignore: [dev, test, main]
+    paths:
+      - "frontend/**"
+      - "backend/**"
+  
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or SHA to build (e.g. feature/my-branch)"
+        required: true
+        type: string
+      service:
+        description: "frontend | backend | both"
+        required: true
+        default: "both"
+        type: choice
+        options: [both, frontend, backend]
+
+
+concurrency:
+  group: build-image-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  ORG: bcgov
+  SERVICE_FRONTEND: csa-frontend
+  SERVICE_BACKEND: csa-backend
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      frontend: ${{ steps.pick.outputs.frontend }}
+      backend: ${{ steps.pick.outputs.backend }}
+      tag: ${{ steps.tag.outputs.tag }}
+      resolved_ref: ${{ steps.ref.outputs.resolved_ref }}
+    steps:
+      - id: ref
+        shell: bash
+        run: |
+          # For workflow_dispatch, build the requested ref. Otherwise build the event ref.
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "resolved_ref=${{ inputs.ref }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "resolved_ref=${{ github.ref }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout (event ref or inputs.ref)
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.ref.outputs.resolved_ref }}
+          fetch-depth: 0
+
+      - id: tag
+        shell: bash
+        run: |
+          SHA="$(git rev-parse --short=7 HEAD)"
+
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            BR="${{ inputs.ref }}"
+            BR="${BR//\//-}"
+            echo "tag=${BR}-${SHA}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # push build
+          BR="${GITHUB_REF_NAME//\//-}"
+          echo "tag=${BR}-${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Detect changed paths (non-manual runs)
+        if: github.event_name != 'workflow_dispatch'
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+            backend:
+              - 'backend/**'
+
+      - name: Choose what to build
+        id: pick
+        shell: bash
+        run: |
+          # Manual run: use user selection (inputs.service)
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            case "${{ inputs.service }}" in
+              both)     echo "frontend=true" >> "$GITHUB_OUTPUT"; echo "backend=true" >> "$GITHUB_OUTPUT" ;;
+              frontend) echo "frontend=true" >> "$GITHUB_OUTPUT"; echo "backend=false" >> "$GITHUB_OUTPUT" ;;
+              backend)  echo "frontend=false" >> "$GITHUB_OUTPUT"; echo "backend=true" >> "$GITHUB_OUTPUT" ;;
+              *) echo "Unknown service input"; exit 1 ;;
+            esac
+            exit 0
+          fi
+
+          # PR/push: use paths-filter result
+          echo "frontend=${{ steps.filter.outputs.frontend }}" >> "$GITHUB_OUTPUT"
+          echo "backend=${{ steps.filter.outputs.backend }}" >> "$GITHUB_OUTPUT"
+
+  build-frontend:
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.frontend == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.detect-changes.outputs.resolved_ref }}
+          fetch-depth: 0
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.SERVICE_FRONTEND }}:${{ needs.detect-changes.outputs.tag }}
+
+  build-backend:
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.detect-changes.outputs.resolved_ref }}
+          fetch-depth: 0
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.SERVICE_BACKEND }}:${{ needs.detect-changes.outputs.tag }}
+
+  summary:
+    needs: [detect-changes, build-frontend, build-backend]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Print summary
+        shell: bash
+        run: |
+          echo "Ref built: ${{ needs.detect-changes.outputs.resolved_ref }}"
+          echo "Image tag: ${{ needs.detect-changes.outputs.tag }}"
+          echo "Frontend built: ${{ needs.detect-changes.outputs.frontend }}"
+          echo "Backend built:  ${{ needs.detect-changes.outputs.backend }}"
+          echo "Frontend image: ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.SERVICE_FRONTEND }}:${{ needs.detect-changes.outputs.tag }}"
+          echo "Backend image:  ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.SERVICE_BACKEND }}:${{ needs.detect-changes.outputs.tag }}"

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "vite",
+    "dev": "vite --host",
     "dev-build": "vite build --mode development",
     "test-build": "vite build --mode test",
     "sandbox-build": "vite build --mode sandbox",

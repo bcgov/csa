@@ -2,9 +2,11 @@
 FROM node:24-slim AS build
 WORKDIR /app
 
+# Install deps (requires package-lock.json to be in sync)
 COPY package*.json ./
 RUN npm ci
 
+# Copy source and build
 COPY . .
 RUN npm run prod-build
 
@@ -16,11 +18,17 @@ RUN xcaddy build \
   --with github.com/corazawaf/coraza-caddy/v2
 
 
-# ---------- Runtime ----------
+# ---------- Runtime (OpenShift) ----------
 FROM caddy:2.10.2-alpine
 
-# Copy custom caddy binary
+# Tools to remove file capabilities (fixes "Operation not permitted" on some OpenShift clusters)
+RUN apk add --no-cache ca-certificates libcap
+
+# Copy custom caddy binary + strip file capabilities (Caddy often ships with cap_net_bind_service)
 COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
+RUN setcap -r /usr/bin/caddy \
+  && apk del libcap \
+  && rm -rf /var/cache/apk/*
 
 # Copy site + config
 COPY --from=build /app/dist /srv
@@ -28,18 +36,20 @@ COPY Caddyfile /etc/caddy/Caddyfile
 COPY coraza.conf /etc/caddy/coraza.conf
 
 # OpenShift random UID compatibility:
-# - OpenShift assigns random UID but GID 0 (root group)
-# - Make writable paths group-writable and group-owned by 0
-RUN chgrp -R 0 /srv /etc/caddy /data /config /tmp && \
-  chmod -R g=u /srv /etc/caddy /data /config /tmp && \
-  chmod 0755 /usr/bin/caddy
+# - OpenShift runs with random UID and typically GID 0
+# - Make runtime dirs group-owned by 0 and group-writable
+RUN mkdir -p /data /config /tmp/coraza \
+  && chgrp -R 0 /srv /etc/caddy /data /config /tmp \
+  && chmod -R g=u /srv /etc/caddy /data /config /tmp \
+  && chmod 0755 /usr/bin/caddy
 
-# Optional: validate Caddyfile syntax at build time
+# Validate/format Caddyfile at build time
 RUN caddy fmt --overwrite /etc/caddy/Caddyfile
 
+# Non-root (OpenShift will often override to a random UID anyway)
 USER 1001
 
 EXPOSE 3000 3001
 
-# IMPORTANT: run explicitly (don’t rely on image entrypoint)
+# Run explicitly (don’t rely on image entrypoint)
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]

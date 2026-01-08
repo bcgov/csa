@@ -1,30 +1,26 @@
-# Build
-FROM node:24.11.1-slim AS build
-
-# Copy, build static files; see .dockerignore for exclusions
+# Build - compile TypeScript
+FROM node:24-slim AS build
 WORKDIR /app
-COPY . ./
-ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
-RUN npx prisma generate
-RUN npm run deploy
+COPY package*.json ./
+RUN npm set strict-ssl false
+RUN npm ci
+COPY . .
+RUN npm run build
 
-# Dependencies
-FROM node:24.11.1-slim AS dependencies
-
-# Copy, build static files; see .dockerignore for exclusions
+# Production Dependencies
+FROM node:24-slim AS dependencies
 WORKDIR /app
-COPY . ./
-ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
-RUN npm ci --ignore-scripts --no-update-notifier --omit=dev
+COPY package*.json ./
+RUN echo "Production Dependencies"
+RUN npm set strict-ssl false
+RUN npm ci --omit=dev
 
-# Deploy using minimal Distroless image
-FROM gcr.io/distroless/nodejs22-debian12:nonroot
+# Production Stage - Copy app and dependencies
+FROM node:24-slim
 ENV NODE_ENV=production
-
-# Copy app and dependencies
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
-COPY --from=build /app/generated ./generated
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/dist ./dist
 
 # Boilerplate, not used in OpenShift/Kubernetes
@@ -32,5 +28,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:3000/api
 
 # Nonroot user, limit heap size to 50 MB
-USER nonroot
-CMD ["--max-old-space-size=50", "/app/dist/api/main"]
+#RUN chown -R 1001:0 /app && chmod -R g=u /app
+USER 1001
+CMD ["node", "--max-old-space-size=50", "dist/api/main"]

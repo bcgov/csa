@@ -81,9 +81,12 @@ jobs:
           [[ "$SVC" =~ ^(frontend|backend|both)$ ]] || { echo "Invalid service: $SVC" ; exit 1; }
           [[ -n "$TAG" ]] || { echo "Tag is required" ; exit 1; }
 
-          echo "env=$ENV" >> "$GITHUB_OUTPUT"
-          echo "svc=$SVC" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          {
+            echo "env=$ENV"
+            echo "svc=$SVC"
+            echo "tag=$TAG"
+          } >> "$GITHUB_OUTPUT"
+          
 
           # Branch name for GitOps PR
           SAFE_TAG="${TAG//\//-}"

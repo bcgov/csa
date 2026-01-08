@@ -8,7 +8,7 @@
 	log {
 		output stdout
 		format console
-		// Default to info if LOG_LEVEL not set
+		## Default to info if LOG_LEVEL not set
 		level {env.LOG_LEVEL:info}
 	}
 

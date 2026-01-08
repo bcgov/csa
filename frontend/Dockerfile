@@ -1,31 +1,45 @@
-# Build
+# ---------- Build static assets ----------
 FROM node:24-slim AS build
 WORKDIR /app
+
 COPY package*.json ./
-RUN npm set strict-ssl false
-RUN npm ci --ignore-scripts
+RUN npm ci
+
 COPY . .
 RUN npm run prod-build
 
-# Caddy to host static files
-FROM caddy:2-alpine
+
+# ---------- Build Caddy with Coraza plugin ----------
+FROM caddy:2.10.2-builder AS caddy-builder
+RUN apk add --no-cache ca-certificates git
+RUN xcaddy build \
+  --with github.com/corazawaf/coraza-caddy/v2
+
+
+# ---------- Runtime ----------
+FROM caddy:2.10.2-alpine
+
+# Copy custom caddy binary
+COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
+
+# Copy site + config
 COPY --from=build /app/dist /srv
 COPY Caddyfile /etc/caddy/Caddyfile
+COPY coraza.conf /etc/caddy/coraza.conf
 
-# Set permissions for static files (OpenShift-compatible)
-# OpenShift uses random UIDs but assigns them to root group (GID 0)
-# Set ownership to user 1001 with root group, and readable permissions
-RUN chown -R 1001:0 /srv && \
-  chmod -R 755 /srv
+# OpenShift random UID compatibility:
+# - OpenShift assigns random UID but GID 0 (root group)
+# - Make writable paths group-writable and group-owned by 0
+RUN chgrp -R 0 /srv /etc/caddy /data /config /tmp && \
+  chmod -R g=u /srv /etc/caddy /data /config /tmp && \
+  chmod 0755 /usr/bin/caddy
 
-# Verify Caddufile Syntax
-RUN caddy fmt /etc/caddy/Caddyfile
+# Optional: validate Caddyfile syntax at build time
+RUN caddy fmt --overwrite /etc/caddy/Caddyfile
 
-# Nonroot user
 USER 1001
 
-# Boilerplate, not used in OpenShift/Kubernetes
 EXPOSE 3000 3001
-HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:3001/health
 
-# CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+# IMPORTANT: run explicitly (don’t rely on image entrypoint)
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]

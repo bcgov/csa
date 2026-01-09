@@ -1,31 +1,55 @@
-# Build
+# ---------- Build static assets ----------
 FROM node:24-slim AS build
 WORKDIR /app
+
+# Install deps (requires package-lock.json to be in sync)
 COPY package*.json ./
-RUN npm set strict-ssl false
-RUN npm ci --ignore-scripts
+RUN npm ci
+
+# Copy source and build
 COPY . .
 RUN npm run prod-build
 
-# Caddy to host static files
-FROM caddy:2-alpine
+
+# ---------- Build Caddy with Coraza plugin ----------
+FROM caddy:2.10.2-builder AS caddy-builder
+RUN apk add --no-cache ca-certificates git
+RUN xcaddy build \
+  --with github.com/corazawaf/coraza-caddy/v2
+
+
+# ---------- Runtime (OpenShift) ----------
+FROM caddy:2.10.2-alpine
+
+# Tools to remove file capabilities (fixes "Operation not permitted" on some OpenShift clusters)
+RUN apk add --no-cache ca-certificates libcap
+
+# Copy custom caddy binary + strip file capabilities (Caddy often ships with cap_net_bind_service)
+COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
+RUN setcap -r /usr/bin/caddy \
+  && apk del libcap \
+  && rm -rf /var/cache/apk/*
+
+# Copy site + config
 COPY --from=build /app/dist /srv
 COPY Caddyfile /etc/caddy/Caddyfile
+COPY coraza.conf /etc/caddy/coraza.conf
 
-# Set permissions for static files (OpenShift-compatible)
-# OpenShift uses random UIDs but assigns them to root group (GID 0)
-# Set ownership to user 1001 with root group, and readable permissions
-RUN chown -R 1001:0 /srv && \
-  chmod -R 755 /srv
+# OpenShift random UID compatibility:
+# - OpenShift runs with random UID and typically GID 0
+# - Make runtime dirs group-owned by 0 and group-writable
+RUN mkdir -p /data /config /tmp/coraza \
+  && chgrp -R 0 /srv /etc/caddy /data /config /tmp \
+  && chmod -R g=u /srv /etc/caddy /data /config /tmp \
+  && chmod 0755 /usr/bin/caddy
 
-# Verify Caddufile Syntax
-RUN caddy fmt /etc/caddy/Caddyfile
+# Validate/format Caddyfile at build time
+RUN caddy fmt --overwrite /etc/caddy/Caddyfile
 
-# Nonroot user
+# Non-root (OpenShift will often override to a random UID anyway)
 USER 1001
 
-# Boilerplate, not used in OpenShift/Kubernetes
 EXPOSE 3000 3001
-HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:3001/health
 
-# CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+# Run explicitly (don’t rely on image entrypoint)
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]

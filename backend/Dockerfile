@@ -23,11 +23,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/dist ./dist
 
-# Boilerplate, not used in OpenShift/Kubernetes
-EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:3000/api
-
 # Nonroot user, limit heap size to 50 MB
-#RUN chown -R 1001:0 /app && chmod -R g=u /app
+RUN chown -R 1001:0 /app && chmod -R g=u /app
 USER 1001
 CMD ["node", "--max-old-space-size=50", "dist/api/main"]

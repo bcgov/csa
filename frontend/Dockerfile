@@ -1,48 +1,55 @@
-# Build
-FROM node:24.11.1-slim AS build
-
-# Copy, build static files; see .dockerignore for exclusions
+# ---------- Build static assets ----------
+FROM node:24-slim AS build
 WORKDIR /app
-COPY . ./
-RUN npm run deploy
 
-# Build custom Caddy with Coraza WAF plugin
-FROM caddy:2.10.2-builder AS builder
-# Install CA certificates for Go module downloads
-RUN apk add --no-cache ca-certificates
+# Install deps (requires package-lock.json to be in sync)
+COPY package*.json ./
+RUN npm ci
+
+# Copy source and build
+COPY . .
+RUN npm run prod-build
+
+
+# ---------- Build Caddy with Coraza plugin ----------
+FROM caddy:2.10.2-builder AS caddy-builder
+RUN apk add --no-cache ca-certificates git
 RUN xcaddy build \
   --with github.com/corazawaf/coraza-caddy/v2
 
-# Deploy using custom Caddy to host static files
+
+# ---------- Runtime (OpenShift) ----------
 FROM caddy:2.10.2-alpine
-RUN apk add --no-cache ca-certificates
 
-# Copy custom Caddy binary with Coraza
-COPY --from=builder /usr/bin/caddy /usr/bin/caddy
+# Tools to remove file capabilities (fixes "Operation not permitted" on some OpenShift clusters)
+RUN apk add --no-cache ca-certificates libcap
 
-# Copy static files, Coraza config, verify Caddyfile formatting
+# Copy custom caddy binary + strip file capabilities (Caddy often ships with cap_net_bind_service)
+COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
+RUN setcap -r /usr/bin/caddy \
+  && apk del libcap \
+  && rm -rf /var/cache/apk/*
+
+# Copy site + config
 COPY --from=build /app/dist /srv
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY coraza.conf /etc/caddy/coraza.conf
 
-# Set permissions for static files (OpenShift-compatible)
-# OpenShift uses random UIDs but assigns them to root group (GID 0)
-# Set ownership to user 1001 with root group, and readable permissions
-RUN chown -R 1001:0 /srv && \
-  chmod -R 755 /srv
+# OpenShift random UID compatibility:
+# - OpenShift runs with random UID and typically GID 0
+# - Make runtime dirs group-owned by 0 and group-writable
+RUN mkdir -p /data /config /tmp/coraza \
+  && chgrp -R 0 /srv /etc/caddy /data /config /tmp \
+  && chmod -R g=u /srv /etc/caddy /data /config /tmp \
+  && chmod 0755 /usr/bin/caddy
 
-# Create directories for Coraza WAF with restricted permissions
-# OpenShift uses random UIDs, so use root group (GID 0) with group write permissions
-# This allows any UID in the root group (which OpenShift assigns to all containers) to access
-RUN mkdir -p /tmp/coraza && \
-  chown -R 1001:0 /tmp/coraza && \
-  chmod -R 770 /tmp/coraza
+# Validate/format Caddyfile at build time
+RUN caddy fmt --overwrite /etc/caddy/Caddyfile
 
-RUN caddy fmt /etc/caddy/Caddyfile
-
-# Boilerplate, not used in OpenShift/Kubernetes
-EXPOSE 3000 3001
-HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:3001/health
-
-# Nonroot user
+# Non-root (OpenShift will often override to a random UID anyway)
 USER 1001
+
+EXPOSE 3000 3001
+
+# Run explicitly (don’t rely on image entrypoint)
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]

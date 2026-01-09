@@ -1,10 +1,13 @@
+import FilterListIcon from '@mui/icons-material/FilterList'
 import {
   AppBar,
   Box,
   Button,
   Checkbox,
   FormControl,
+  IconButton,
   InputAdornment,
+  Menu,
   MenuItem,
   Paper,
   Select,
@@ -20,9 +23,208 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import './App.css'
 import logo from './icons/image.png'
+
+// Sample data for the eligibility table
+const eligibilityData = [
+  {
+    id: 1,
+    childName: 'John Connor',
+    gender: 'Man/Boy',
+    dob: '2022-Jan-18',
+    age: 4,
+    din: '',
+    csaStatus: 'Eligible',
+    statusEffective: '2025-Jan-12',
+    caseNumber: '1-135',
+    caseStatus: 'Open',
+    legacyFile: 'GA128182',
+    lastUpdated: 'yyy-mmm-dd',
+    lastUpdatedBy: 'SYSTEM',
+  },
+  {
+    id: 2,
+    childName: 'Jane Markus',
+    gender: 'Woman/Girl',
+    dob: '2018-May-15',
+    age: 8,
+    din: '12345',
+    csaStatus: 'In Pay',
+    statusEffective: '2024-Aug-05',
+    caseNumber: '1-147',
+    caseStatus: 'Open',
+    legacyFile: 'GA61821',
+    lastUpdated: 'yyy-mmm-dd',
+    lastUpdatedBy: 'User IDIR',
+  },
+  {
+    id: 3,
+    childName: 'Merry Markus',
+    gender: 'Woman/Girl',
+    dob: '2018-May-15',
+    age: 8,
+    din: '14566',
+    csaStatus: 'In Pay - Cancel...',
+    statusEffective: '2024-May-11',
+    caseNumber: '1-166',
+    caseStatus: 'Open',
+    legacyFile: 'GA798379',
+    lastUpdated: 'yyy-mmm-dd',
+    lastUpdatedBy: 'SYSTEM',
+  },
+  {
+    id: 4,
+    childName: 'Jamie Wilson',
+    gender: 'Non Binary',
+    dob: '2023-Sept-14',
+    age: 2,
+    din: '13131',
+    csaStatus: 'Out of Pay',
+    statusEffective: '2024-Dec-15',
+    caseNumber: '1-139',
+    caseStatus: 'Admin Reopen',
+    legacyFile: 'GA73894',
+    lastUpdated: 'yyy-mmm-dd',
+    lastUpdatedBy: 'SYSTEM',
+  },
+  {
+    id: 5,
+    childName: 'Mark S Grey',
+    gender: 'Man/Boy',
+    dob: '2022-Jan-13',
+    age: 4,
+    din: '44112',
+    csaStatus: 'Batch Sent - A...',
+    statusEffective: '2023-Feb-12',
+    caseNumber: '1-118',
+    caseStatus: 'Closed',
+    legacyFile: 'GA686843',
+    lastUpdated: 'yyy-mmm-dd',
+    lastUpdatedBy: 'User IDIR',
+  },
+  {
+    id: 6,
+    childName: 'Jackie Hems',
+    gender: 'Woman/Girl',
+    dob: '2012-Nov-25',
+    age: 13,
+    din: '31123',
+    csaStatus: 'On Hold',
+    statusEffective: '2022-Dec-13',
+    caseNumber: '1-118',
+    caseStatus: 'Open',
+    legacyFile: 'GA236816',
+    cgwrks3: 'CGWRKS3',
+    lastUpdated: 'yyy-mmm-dd',
+    lastUpdatedBy: 'SYSTEM',
+  },
+  {
+    id: 7,
+    childName: 'Brian Kevin Jo...',
+    gender: 'Unknown',
+    dob: '2012-Nov-25',
+    age: 13,
+    din: '81190',
+    csaStatus: 'In Batch - Canc...',
+    statusEffective: '2025-Oct-31',
+    caseNumber: '1-183',
+    caseStatus: 'Open',
+    legacyFile: 'Placeholder fo...',
+    lastUpdated: 'yyy-mmm-dd',
+    lastUpdatedBy: 'SYSTEM',
+  },
+]
+
+// Sample data for batch requests
+const batchRequestsData = [
+  {
+    id: 1,
+    batchId: '1-567',
+    batchDate: '',
+    status: 'Pending',
+    recordCount: 2,
+    createdDate: '2025-Nov-18',
+    systemComments: 'Placeholder for test',
+  },
+  {
+    id: 2,
+    batchId: '1-490',
+    batchDate: '2025-Nov-20',
+    status: 'In Progress',
+    recordCount: 52,
+    createdDate: '2025-Nov-14',
+    systemComments: 'Placeholder for test',
+  },
+  {
+    id: 3,
+    batchId: '1-234',
+    batchDate: '2025-Oct-30',
+    status: 'CRA Processed',
+    recordCount: 78,
+    createdDate: '2025-Oct-28',
+    systemComments: 'Placeholder for test',
+  },
+]
+
+// Sample data for batch details
+const batchDetailsData = [
+  {
+    id: 1,
+    lastName: 'john',
+    middleName: 'Kevin',
+    givenName: 'Brim',
+    transactionType: 'Cancellation',
+    status: 'Placeholder for test',
+    systemComments: 'Placeholder for test',
+  },
+  {
+    id: 2,
+    lastName: 'Oconnor',
+    middleName: 'D',
+    givenName: 'Jack',
+    transactionType: 'Application',
+    status: '',
+    systemComments: '',
+  },
+]
+
+// Sample data for batch history (child-specific)
+const childBatchHistory = [
+  {
+    id: 1,
+    batchId: '1-567',
+    createdDate: '2025-Nov-18',
+    batchDate: '',
+    status: 'Pending',
+    transactionType: 'Cancellation',
+  },
+  {
+    id: 2,
+    batchId: '1-134',
+    createdDate: '2025-Sept-17',
+    batchDate: '2025-Sep-30',
+    status: 'CRA Processed',
+    transactionType: 'Application',
+  },
+  {
+    id: 3,
+    batchId: '1-156',
+    createdDate: '2025-Mar-15',
+    batchDate: '2025-Mar-16',
+    status: 'CRA Processed',
+    transactionType: 'Cancellation',
+  },
+  {
+    id: 4,
+    batchId: '1-165',
+    createdDate: '2024-Apr-15',
+    batchDate: '2024-Apr-21',
+    status: 'Placeholder for text',
+    transactionType: 'Application',
+  },
+]
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -31,151 +233,35 @@ function App() {
   })
   const [selectedTab, setSelectedTab] = useState(0)
   const [selected, setSelected] = useState<number[]>([])
+  const [selectedBatchDetails, setSelectedBatchDetails] = useState<number[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [filterSearchTerm, setFilterSearchTerm] = useState('')
   const [showIdirLogin, setShowIdirLogin] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [selectedChild, setSelectedChild] = useState<number | null>(null)
 
-  // Sample data for the table
-  const eligibilityData = [
-    {
-      id: 1,
-      childName: 'John Connor',
-      gender: 'Man/Boy',
-      dob: '2022-Jan-18',
-      age: 4,
-      din: '',
-      csaStatus: 'Eligible',
-      statusEffective: '2025-Jan-12',
-      caseNumber: '1-135',
-      caseStatus: 'Open',
-      legacyFile: 'GA128182',
-      lastUpdated: 'yyy-mmm-dd',
-      lastUpdatedBy: 'SYSTEM',
-    },
-    {
-      id: 2,
-      childName: 'Jane Markus',
-      gender: 'Woman/Girl',
-      dob: '2018-May-15',
-      age: 8,
-      din: '12345',
-      csaStatus: 'In Pay',
-      statusEffective: '2024-Aug-05',
-      caseNumber: '1-147',
-      caseStatus: 'Open',
-      legacyFile: 'GA61821',
-      lastUpdated: 'yyy-mmm-dd',
-      lastUpdatedBy: 'User IDIR',
-    },
-    {
-      id: 3,
-      childName: 'Merry Markus',
-      gender: 'Woman/Girl',
-      dob: '2018-May-15',
-      age: 8,
-      din: '14566',
-      csaStatus: 'In Pay - Cancel...',
-      statusEffective: '2024-May-11',
-      caseNumber: '1-166',
-      caseStatus: 'Open',
-      legacyFile: 'GA798379',
-      lastUpdated: 'yyy-mmm-dd',
-      lastUpdatedBy: 'SYSTEM',
-    },
-    {
-      id: 4,
-      childName: 'Jamie Wilson',
-      gender: 'Non Binary',
-      dob: '2023-Sept-14',
-      age: 2,
-      din: '13131',
-      csaStatus: 'Out of Pay',
-      statusEffective: '2024-Dec-15',
-      caseNumber: '1-139',
-      caseStatus: 'Admin Reopen',
-      legacyFile: 'GA73894',
-      lastUpdated: 'yyy-mmm-dd',
-      lastUpdatedBy: 'SYSTEM',
-    },
-    {
-      id: 5,
-      childName: 'Mark S Grey',
-      gender: 'Man/Boy',
-      dob: '2022-Jan-13',
-      age: 4,
-      din: '44112',
-      csaStatus: 'Batch Sent - A...',
-      statusEffective: '2023-Feb-12',
-      caseNumber: '1-118',
-      caseStatus: 'Closed',
-      legacyFile: 'GA686843',
-      lastUpdated: 'yyy-mmm-dd',
-      lastUpdatedBy: 'User IDIR',
-    },
-    {
-      id: 6,
-      childName: 'Jackie Hems',
-      gender: 'Woman/Girl',
-      dob: '2012-Nov-25',
-      age: 13,
-      din: '31123',
-      csaStatus: 'On Hold',
-      statusEffective: '2022-Dec-13',
-      caseNumber: '1-118',
-      caseStatus: 'Open',
-      legacyFile: 'GA236816',
-      cgwrks3: 'CGWRKS3',
-      lastUpdated: 'yyy-mmm-dd',
-      lastUpdatedBy: 'SYSTEM',
-    },
-    {
-      id: 7,
-      childName: 'Brian Kevin Jo...',
-      gender: 'Unknown',
-      dob: '2012-Nov-25',
-      age: 13,
-      din: '81190',
-      csaStatus: 'In Batch - Canc...',
-      statusEffective: '2025-Oct-31',
-      caseNumber: '1-183',
-      caseStatus: 'Open',
-      legacyFile: 'Placeholder fo...',
-      lastUpdated: 'yyy-mmm-dd',
-      lastUpdatedBy: 'SYSTEM',
-    },
-  ]
-
-  // Sample data for batch requests
-  const batchRequestsData = [
-    {
-      id: 1,
-      batchId: '1-567',
-      batchDate: '',
-      status: 'Pending',
-      recordCount: 2,
-      createdDate: '2025-Nov-18',
-      systemComments: 'Placeholder for test',
-    },
-    {
-      id: 2,
-      batchId: '1-490',
-      batchDate: '2025-Nov-20',
-      status: 'In Progress',
-      recordCount: 52,
-      createdDate: '2025-Nov-14',
-      systemComments: 'Placeholder for test',
-    },
-    {
-      id: 3,
-      batchId: '1-234',
-      batchDate: '2025-Oct-30',
-      status: 'CRA Processed',
-      recordCount: 78,
-      createdDate: '2025-Oct-28',
-      systemComments: 'Placeholder for test',
-    },
-  ]
+  // Column filter states
+  type FilterAnchor = {
+    element: HTMLElement | null
+    column: string
+  }
+  const [filterAnchor, setFilterAnchor] = useState<FilterAnchor>({ element: null, column: '' })
+  const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({
+    childName: [],
+    gender: [],
+    dob: [],
+    age: [],
+    din: [],
+    csaStatus: [],
+    statusEffective: [],
+    caseNumber: [],
+    caseStatus: [],
+    legacyFile: [],
+    cgwrks3: [],
+    lastUpdated: [],
+    lastUpdatedBy: [],
+  })
 
   const handleLoginFlow = () => {
     setIsLoggedIn(true)
@@ -184,6 +270,62 @@ function App() {
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setSelectedTab(newValue)
   }
+
+  // Filter handling functions
+  const handleFilterClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
+    setFilterAnchor({ element: event.currentTarget, column })
+  }
+
+  const handleFilterClose = () => {
+    setFilterAnchor({ element: null, column: '' })
+    setFilterSearchTerm('')
+  }
+
+  const handleFilterChange = (column: string, value: string) => {
+    setColumnFilters((prev) => {
+      const currentFilters = prev[column] || []
+      const newFilters = currentFilters.includes(value)
+        ? currentFilters.filter((v) => v !== value)
+        : [...currentFilters, value]
+      return { ...prev, [column]: newFilters }
+    })
+  }
+
+  const clearColumnFilter = (column: string) => {
+    setColumnFilters((prev) => ({ ...prev, [column]: [] }))
+  }
+
+  // Get unique values for a column
+  const getUniqueValues = (column: keyof (typeof eligibilityData)[0]) => {
+    const values = eligibilityData.map((row) => row[column])
+    return Array.from(new Set(values)).filter((v) => v !== undefined && v !== '')
+  }
+
+  // Apply filters to data
+  const filteredData = useMemo(() => {
+    return eligibilityData.filter((row) => {
+      // Apply global search
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase()
+        const matchesSearch = Object.values(row).some((value) =>
+          String(value).toLowerCase().includes(searchLower),
+        )
+        if (!matchesSearch) return false
+      }
+
+      // Apply column filters
+      for (const [column, filters] of Object.entries(columnFilters)) {
+        if (filters.length > 0) {
+          const columnValue = String(row[column as keyof typeof row])
+          if (!filters.includes(columnValue)) {
+            return false
+          }
+        }
+      }
+
+      return true
+    })
+  }, [searchTerm, columnFilters])
 
   return (
     <Box
@@ -434,23 +576,208 @@ function App() {
                         <TableCell padding="checkbox">
                           <Checkbox />
                         </TableCell>
-                        <TableCell>Child/Yo...</TableCell>
-                        <TableCell>Gender</TableCell>
-                        <TableCell>DOB</TableCell>
-                        <TableCell>A...</TableCell>
-                        <TableCell>DIN</TableCell>
-                        <TableCell>CSA Stat...</TableCell>
-                        <TableCell>Status Ef...</TableCell>
-                        <TableCell>Cas...</TableCell>
-                        <TableCell>Case Sta...</TableCell>
-                        <TableCell>Legacy F...</TableCell>
-                        <TableCell>Set on H...</TableCell>
-                        <TableCell>Last Upd...</TableCell>
-                        <TableCell>Last Upd...</TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Child Name
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'childName')}
+                              sx={{
+                                padding: 0.5,
+                                color: columnFilters.childName?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Gender
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'gender')}
+                              sx={{
+                                padding: 0.5,
+                                color: columnFilters.gender?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            DOB
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'dob')}
+                              sx={{
+                                padding: 0.5,
+                                color: columnFilters.dob?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Age
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'age')}
+                              sx={{
+                                padding: 0.5,
+                                color: columnFilters.age?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            DIN
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'din')}
+                              sx={{
+                                padding: 0.5,
+                                color: columnFilters.din?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            CSA Status
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'csaStatus')}
+                              sx={{
+                                padding: 0.5,
+                                color: columnFilters.csaStatus?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Status Effective
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'statusEffective')}
+                              sx={{
+                                padding: 0.5,
+                                color:
+                                  columnFilters.statusEffective?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Case No.
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'caseNumber')}
+                              sx={{
+                                padding: 0.5,
+                                color: columnFilters.caseNumber?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Case Status
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'caseStatus')}
+                              sx={{
+                                padding: 0.5,
+                                color: columnFilters.caseStatus?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Legacy File
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'legacyFile')}
+                              sx={{
+                                padding: 0.5,
+                                color: columnFilters.legacyFile?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Set on Hold By
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'cgwrks3')}
+                              sx={{
+                                padding: 0.5,
+                                color: columnFilters.cgwrks3?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Last Updated
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'lastUpdated')}
+                              sx={{
+                                padding: 0.5,
+                                color:
+                                  columnFilters.lastUpdated?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Last Updated By
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'lastUpdatedBy')}
+                              sx={{
+                                padding: 0.5,
+                                color:
+                                  columnFilters.lastUpdatedBy?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {eligibilityData.map((row) => (
+                      {filteredData.map((row) => (
                         <TableRow
                           key={row.id}
                           hover
@@ -468,7 +795,10 @@ function App() {
                               }}
                             />
                           </TableCell>
-                          <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
+                          <TableCell
+                            sx={{ color: '#1976d2', cursor: 'pointer' }}
+                            onClick={() => setSelectedChild(row.id)}
+                          >
                             {row.childName}
                           </TableCell>
                           <TableCell>{row.gender}</TableCell>
@@ -488,6 +818,548 @@ function App() {
                     </TableBody>
                   </Table>
                 </TableContainer>
+
+                {/* Filter Menu */}
+                <Menu
+                  anchorEl={filterAnchor.element}
+                  open={Boolean(filterAnchor.element)}
+                  onClose={handleFilterClose}
+                  PaperProps={{
+                    sx: {
+                      maxHeight: 400,
+                      width: 250,
+                    },
+                  }}
+                >
+                  <Box sx={{ p: 2 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mb: 1,
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        Filter by {filterAnchor.column}
+                      </Typography>
+                      <Button
+                        size="small"
+                        onClick={() => {
+                          clearColumnFilter(filterAnchor.column)
+                          handleFilterClose()
+                        }}
+                        sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                      >
+                        Clear
+                      </Button>
+                    </Box>
+                    {/* Search bar for filtering items */}
+                    <TextField
+                      size="small"
+                      fullWidth
+                      placeholder="Search"
+                      value={filterSearchTerm}
+                      onChange={(e) => setFilterSearchTerm(e.target.value)}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Box component="span" sx={{ fontSize: '18px' }}>
+                              🔍
+                            </Box>
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ mb: 1 }}
+                    />
+                    <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                      {filterAnchor.column &&
+                        getUniqueValues(filterAnchor.column as keyof (typeof eligibilityData)[0])
+                          .sort()
+                          .filter((value) =>
+                            String(value).toLowerCase().includes(filterSearchTerm.toLowerCase()),
+                          )
+                          .map((value) => (
+                            <Box
+                              key={String(value)}
+                              sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                            >
+                              <Checkbox
+                                size="small"
+                                checked={
+                                  columnFilters[filterAnchor.column]?.includes(String(value)) ||
+                                  false
+                                }
+                                onChange={() =>
+                                  handleFilterChange(filterAnchor.column, String(value))
+                                }
+                              />
+                              <Typography variant="body2">{String(value)}</Typography>
+                            </Box>
+                          ))}
+                    </Box>
+                  </Box>
+                </Menu>
+
+                {/* Details Section */}
+                {selectedChild !== null && (
+                  <Box sx={{ mt: 3 }}>
+                    <Paper sx={{ p: 3 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          mb: 3,
+                          borderBottom: '1px solid #e0e0e0',
+                          pb: 2,
+                        }}
+                      >
+                        <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                          Details
+                        </Typography>
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={() => setSelectedChild(null)}
+                          sx={{ textTransform: 'none', color: '#666' }}
+                        >
+                          Close
+                        </Button>
+                      </Box>
+
+                      {(() => {
+                        const childData = eligibilityData.find(
+                          (child) => child.id === selectedChild,
+                        )
+                        if (!childData) return null
+
+                        return (
+                          <Box
+                            sx={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(4, 1fr)',
+                              gap: 3,
+                            }}
+                          >
+                            {/* Child Basic Info Section */}
+                            <Box>
+                              <Typography
+                                variant="subtitle2"
+                                sx={{ fontWeight: 600, mb: 2, color: '#333' }}
+                              >
+                                Child Basic Info
+                              </Typography>
+                              <Box
+                                sx={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'auto 1fr',
+                                  gap: 1,
+                                  rowGap: 1.5,
+                                  backgroundColor: '#f9f9f9',
+                                  p: 2,
+                                  borderRadius: 1,
+                                }}
+                              >
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Person Name
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.childName}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Birth Name
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.childName}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  AKA Last Name
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  John
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Birth Place
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  Victoria, BC, CA
+                                </Typography>
+                              </Box>
+                            </Box>
+
+                            {/* Case Details Section */}
+                            <Box>
+                              <Typography
+                                variant="subtitle2"
+                                sx={{ fontWeight: 600, mb: 2, color: '#333' }}
+                              >
+                                Case Details
+                              </Typography>
+                              <Box
+                                sx={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'auto 1fr',
+                                  gap: 1,
+                                  rowGap: 1.5,
+                                  backgroundColor: '#f9f9f9',
+                                  p: 2,
+                                  borderRadius: 1,
+                                }}
+                              >
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Service Office
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  sx={{ fontWeight: 500, color: '#1976d2', cursor: 'pointer' }}
+                                >
+                                  Open Case
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Case No.
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  sx={{ fontWeight: 500, color: '#1976d2', cursor: 'pointer' }}
+                                >
+                                  {childData.caseNumber}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Assigned to
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  IEIC: CONNECT
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Case Type
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  Child Services
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Case Status
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.caseStatus}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Legal Status Code
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  C88: GCD
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Legacy File No.
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.legacyFile}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Effective Date
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  2025-03-12
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Expiry Date
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  2025-11-16
+                                </Typography>
+                              </Box>
+                            </Box>
+
+                            {/* Placement/Service Info Section */}
+                            <Box>
+                              <Typography
+                                variant="subtitle2"
+                                sx={{ fontWeight: 600, mb: 2, color: '#333' }}
+                              >
+                                Placement/Service Info
+                              </Typography>
+                              <Box
+                                sx={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'auto 1fr',
+                                  gap: 1,
+                                  rowGap: 1.5,
+                                  backgroundColor: '#f9f9f9',
+                                  p: 2,
+                                  borderRadius: 1,
+                                }}
+                              >
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Actual Resource
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  sx={{ fontWeight: 500, color: '#1976d2', cursor: 'pointer' }}
+                                >
+                                  Actual Placement
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Placement/Location No.
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  1-14732
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Actual Start Date
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  2025-11-16
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Type
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  Placement
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Actual End Date
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  NA
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Sub-type
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  Emergency
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Paid/Unpaid
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  NA
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Source
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    component="span"
+                                    sx={{
+                                      backgroundColor: '#e3f2fd',
+                                      color: '#1976d2',
+                                      px: 1,
+                                      py: 0.5,
+                                      borderRadius: 1,
+                                      fontSize: '0.75rem',
+                                    }}
+                                  >
+                                    ICM
+                                  </Typography>
+                                </Typography>
+                              </Box>
+                            </Box>
+
+                            {/* Service Provider and Agreement Details Section */}
+                            <Box>
+                              <Typography
+                                variant="subtitle2"
+                                sx={{ fontWeight: 600, mb: 2, color: '#333' }}
+                              >
+                                Service Provider and Agreement Details
+                              </Typography>
+                              <Box
+                                sx={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'auto 1fr',
+                                  gap: 1,
+                                  rowGap: 1.5,
+                                  backgroundColor: '#f9f9f9',
+                                  p: 2,
+                                  borderRadius: 1,
+                                }}
+                              >
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Actual Agreement
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  sx={{ fontWeight: 500, color: '#1976d2', cursor: 'pointer' }}
+                                >
+                                  Actual Agreement
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Start Date
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  2025-07-01
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Provider
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  2925 POP 1 SP-1
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  End Date
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  2026-08-30
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Provider ID
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  1-17284
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Termination Date
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  NA
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Place of Service
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  NA
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Agreement Type
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  2925 PDS
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  SIEMS PDS 1
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  01040334SP
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Product Type
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  Variable
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </Box>
+                        )
+                      })()}
+                    </Paper>
+                  </Box>
+                )}
+
+                {/* Batch History Section */}
+                {selectedChild !== null && (
+                  <Box sx={{ mt: 3 }}>
+                    <Paper sx={{ p: 3 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          mb: 3,
+                          borderBottom: '1px solid #e0e0e0',
+                          pb: 2,
+                        }}
+                      >
+                        <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                          Batch History
+                        </Typography>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          sx={{
+                            textTransform: 'none',
+                            backgroundColor: '#1976d2',
+                            '&:hover': {
+                              backgroundColor: '#1565c0',
+                            },
+                          }}
+                        >
+                          Remove from Batch
+                        </Button>
+                      </Box>
+
+                      {/* Batch History Table */}
+                      <TableContainer>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                              <TableCell sx={{ fontWeight: 600 }}>Batch ID</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>Created Date</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>Batch Date</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>Transaction Type</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {childBatchHistory.map((row) => (
+                              <TableRow
+                                key={row.id}
+                                hover
+                                sx={{ '&:hover': { backgroundColor: '#f9f9f9' } }}
+                              >
+                                <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
+                                  {row.batchId}
+                                </TableCell>
+                                <TableCell>{row.createdDate}</TableCell>
+                                <TableCell>{row.batchDate}</TableCell>
+                                <TableCell>
+                                  {row.status === 'Pending' && (
+                                    <Box
+                                      component="span"
+                                      sx={{
+                                        backgroundColor: '#fce4ec',
+                                        color: '#c2185b',
+                                        px: 1.5,
+                                        py: 0.5,
+                                        borderRadius: 1,
+                                        fontSize: '0.75rem',
+                                        fontWeight: 500,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                      }}
+                                    >
+                                      Pending
+                                    </Box>
+                                  )}
+                                  {row.status !== 'Pending' && row.status}
+                                </TableCell>
+                                <TableCell>{row.transactionType}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Paper>
+                  </Box>
+                )}
               </Box>
             )}
             {selectedTab === 1 && (
@@ -555,6 +1427,122 @@ function App() {
                     </TableBody>
                   </Table>
                 </TableContainer>
+
+                {/* Batch Details Section */}
+                <Box sx={{ mt: 4 }}>
+                  {/* Batch Details Header */}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      mb: 3,
+                    }}
+                  >
+                    <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                      Batch Details
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                      <TextField
+                        size="small"
+                        placeholder="Search"
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Box component="span" sx={{ fontSize: '18px' }}>
+                                🔍
+                              </Box>
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{ width: '200px' }}
+                      />
+                      <Button
+                        variant="contained"
+                        size="small"
+                        sx={{
+                          backgroundColor: '#1976d2',
+                          '&:hover': { backgroundColor: '#1565c0' },
+                        }}
+                      >
+                        Pre-Defined
+                      </Button>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        sx={{
+                          backgroundColor: '#d32f2f',
+                          '&:hover': { backgroundColor: '#c62828' },
+                        }}
+                      >
+                        Remove from Batch
+                      </Button>
+                    </Box>
+                  </Box>
+
+                  {/* Batch Details Table */}
+                  <TableContainer component={Paper} sx={{ boxShadow: 1 }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                          <TableCell padding="checkbox">
+                            <Checkbox
+                              indeterminate={
+                                selectedBatchDetails.length > 0 &&
+                                selectedBatchDetails.length < batchDetailsData.length
+                              }
+                              checked={
+                                batchDetailsData.length > 0 &&
+                                selectedBatchDetails.length === batchDetailsData.length
+                              }
+                              onChange={() => {
+                                if (selectedBatchDetails.length === batchDetailsData.length) {
+                                  setSelectedBatchDetails([])
+                                } else {
+                                  setSelectedBatchDetails(batchDetailsData.map((row) => row.id))
+                                }
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>Last Name</TableCell>
+                          <TableCell>Middle Name(s)</TableCell>
+                          <TableCell>Given Name(s)</TableCell>
+                          <TableCell>Transaction Type</TableCell>
+                          <TableCell>Status</TableCell>
+                          <TableCell>System Comments</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {batchDetailsData.map((row) => (
+                          <TableRow
+                            key={row.id}
+                            hover
+                            sx={{ '&:hover': { backgroundColor: '#f9f9f9' } }}
+                          >
+                            <TableCell padding="checkbox">
+                              <Checkbox
+                                checked={selectedBatchDetails.includes(row.id)}
+                                onChange={() => {
+                                  setSelectedBatchDetails((prev) =>
+                                    prev.includes(row.id)
+                                      ? prev.filter((id) => id !== row.id)
+                                      : [...prev, row.id],
+                                  )
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>{row.lastName}</TableCell>
+                            <TableCell>{row.middleName}</TableCell>
+                            <TableCell>{row.givenName}</TableCell>
+                            <TableCell>{row.transactionType}</TableCell>
+                            <TableCell>{row.status}</TableCell>
+                            <TableCell>{row.systemComments}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
               </Box>
             )}
           </Box>

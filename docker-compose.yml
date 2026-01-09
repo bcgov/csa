@@ -80,19 +80,32 @@ services:
       backend:
         condition: service_healthy
 
-  caddy:
-    container_name: caddy
-    profiles: ["caddy"]
+  backend-prod:
+    container_name: backend-prod
+    profiles: ["prod"]
+    build: ./backend
+    depends_on:
+      migrations:
+        condition: service_started
+    environment:
+      <<: *postgres-vars
+      NODE_ENV: production
+    ports: ["3001:3000"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api"]
+
+  frontend-prod:
+    container_name: frontend-prod
+    profiles: ["prod"]
     build: ./frontend
     environment:
-      NODE_ENV: development
-      PORT: 3000
-      BACKEND_URL: http://backend:3000
-      LOG_LEVEL: info
-    ports: ["3005:3000"]
-    volumes: ["./frontend/Caddyfile:/etc/caddy/Caddyfile"]
+      BACKEND_URL: http://backend-prod:3000
+      NODE_ENV: production
+      LOG_LEVEL: INFO
+    ports: ["3000:3000"]
+    volumes: ["./frontend:/app", "/app/node_modules"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
     depends_on:
-      backend:
+      backend-prod:
         condition: service_healthy

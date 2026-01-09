@@ -102,7 +102,10 @@ jobs:
   update-gitops:
     needs: [detect-changes, build-frontend, build-backend]
     # Run if either service changed
-    if: needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.backend == 'true'
+    if: >-
+      always() &&
+      (needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.backend == 'true') &&
+      (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success')
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout GitOps repo

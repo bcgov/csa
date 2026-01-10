@@ -7,6 +7,7 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
+      - ".github/workflows/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number }}

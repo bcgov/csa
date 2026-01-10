@@ -4,29 +4,52 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
     branches: [dev, test, main]
-    paths:
-      - 'backend/**'
-      - 'frontend/**'
   push:
     branches: [dev, test, main]
-    paths:
-      - 'backend/**'
-      - 'frontend/**'
   schedule:
-    - cron: "0 11 * * 0" # 3 AM PST = 12 PM UDT, runs sundays
+    - cron: "0 11 * * 0" # Sundays
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions: {}
+# Minimal safe defaults; jobs can add more if needed
+permissions:
+  contents: read
 
 jobs:
+  # ----------------------------
+  # 1) Detect what changed
+  # ----------------------------
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-24.04
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+            workflows:
+              - '.github/workflows/**'
+
+  # ----------------------------
+  # 2) Backend tests (only when backend changed, and not draft)
+  # ----------------------------
   backend-tests:
     name: Backend Tests
-    #if: (! github.event.pull_request.draft)
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    needs: [changes]
+    if: >
+      (github.event_name != 'pull_request' || !github.event.pull_request.draft) &&
+      needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     services:
@@ -44,7 +67,7 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: bcgov/action-test-and-analyse@c20d16c26d9b7e6e486f01702880053ed4ebdc91 # v1.5.0
+      - uses: bcgov/action-test-and-analyse@c20d16c26d9b7e6e486f01702880053ed4ebdc91
         with:
           commands: |
             npm ci
@@ -52,25 +75,22 @@ jobs:
             npm run test:cov
           dir: backend
           node_version: "22"
-          # sonar_args: >
-          #   -Dsonar.exclusions=**/coverage/**,**/node_modules/**,**/*spec.ts
-          #   -Dsonar.organization=bcgov-sonarcloud
-          #   -Dsonar.projectKey=bcgov-csa-backend
-          #   -Dsonar.sources=src
-          #   -Dsonar.tests.inclusions=**/*spec.ts
-          #   -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info
-          # sonar_token: ${{ secrets.SONAR_TOKEN }}
           supply_scan: true
           triggers: ('backend/')
 
+  # ----------------------------
+  # 3) Frontend tests (only when frontend changed, and not draft)
+  # ----------------------------
   frontend-tests:
     name: Frontend Tests
-    #if: (! github.event.pull_request.draft)
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    needs: [changes]
+    if: >
+      (github.event_name != 'pull_request' || !github.event.pull_request.draft) &&
+      needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: bcgov/action-test-and-analyse@c20d16c26d9b7e6e486f01702880053ed4ebdc91 # v1.5.0
+      - uses: bcgov/action-test-and-analyse@c20d16c26d9b7e6e486f01702880053ed4ebdc91
         with:
           commands: |
             npm ci
@@ -78,30 +98,28 @@ jobs:
             npm run test:cov
           dir: frontend
           node_version: "22"
-          # sonar_args: >
-          #   -Dsonar.exclusions=**/coverage/**,**/node_modules/**,**/*spec.ts
-          #   -Dsonar.organization=bcgov-sonarcloud
-          #   -Dsonar.projectKey=bcgov-csa-frontend
-          #   -Dsonar.sources=src
-          #   -Dsonar.tests.inclusions=**/*spec.ts
-          #   -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info
-          # sonar_token: ${{ secrets.SONAR_TOKEN }}
           supply_scan: true
           triggers: ('frontend/')
 
-  # https://github.com/marketplace/actions/aqua-security-trivy
+  # ----------------------------
+  # 4) Trivy (run if either changed; skip on draft)
+  # ----------------------------
   trivy:
     name: Trivy Security Scan
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    needs: [changes]
+    if: >
+      (github.event_name != 'pull_request' || !github.event.pull_request.draft) &&
+      (needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true')
     continue-on-error: true
     permissions:
+      contents: read
       security-events: write
     runs-on: ubuntu-24.04
-    timeout-minutes: 1
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
-      - name: Run Trivy vulnerability scanner in repo mode
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # 0.33.1
+      - name: Run Trivy vulnerability scanner (fs)
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8
         with:
           format: "sarif"
           output: "trivy-results.sarif"
@@ -109,21 +127,33 @@ jobs:
           scan-type: "fs"
           scanners: "vuln,secret,config"
           severity: "CRITICAL,HIGH"
-
-      - name: Upload Trivy scan results to GitHub Security tab
+      - name: Upload Trivy SARIF
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: "trivy-results.sarif"
 
+  # ----------------------------
+  # 5) Always report ONE required check name: "Analysis Results"
+  # ----------------------------
   results:
-    if: always()
     name: Analysis Results
-    needs: [backend-tests, frontend-tests, trivy]
+    if: always()
+    needs: [changes, backend-tests, frontend-tests, trivy]
     runs-on: ubuntu-24.04
     steps:
-      - if: |
-          needs.backend-tests.result != 'success' ||
-          needs.frontend-tests.result != 'success'
-        run: echo "Backend or Frontend job failed/canceled." && exit 1
-      - run: echo "Success!"
+      - name: Gate on failures only (skipped is OK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "backend-tests:  ${{ needs.backend-tests.result }}"
+          echo "frontend-tests: ${{ needs.frontend-tests.result }}"
+          echo "trivy:         ${{ needs.trivy.result }}"
 
+          for r in "${{ needs.backend-tests.result }}" "${{ needs.frontend-tests.result }}" "${{ needs.trivy.result }}"; do
+            if [[ "$r" == "failure" || "$r" == "cancelled" ]]; then
+              echo "One or more jobs failed/cancelled."
+              exit 1
+            fi
+          done
+
+          echo "Success!"

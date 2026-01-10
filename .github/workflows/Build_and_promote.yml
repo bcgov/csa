@@ -6,7 +6,6 @@ on:
     paths:
       - "frontend/**"
       - "backend/**"
-      #- ".github/workflows/**"
   workflow_dispatch:
 
 concurrency:
@@ -37,6 +36,7 @@ jobs:
       - id: env
         shell: bash
         run: |
+          set -euo pipefail
           case "${GITHUB_REF_NAME}" in
             dev)  echo "envname=dev"  >> "$GITHUB_OUTPUT" ;;
             test) echo "envname=test" >> "$GITHUB_OUTPUT" ;;
@@ -47,6 +47,7 @@ jobs:
       - id: tag
         shell: bash
         run: |
+          set -euo pipefail
           ENV="${{ steps.env.outputs.envname }}"
           echo "tag=${ENV}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
@@ -101,8 +102,13 @@ jobs:
 
   update-gitops:
     needs: [detect-changes, build-frontend, build-backend]
-    # Run if either service changed
-    if: needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.backend == 'true'
+    if: >-
+      always() &&
+      (needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.backend == 'true') &&
+      (
+        (needs.detect-changes.outputs.frontend == 'true' && needs.build-frontend.result == 'success') ||
+        (needs.detect-changes.outputs.backend  == 'true' && needs.build-backend.result  == 'success')
+      )
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout GitOps repo
@@ -110,12 +116,13 @@ jobs:
         with:
           repository: bcgov-c/tenant-gitops-dec59b
           ref: main
-          token: ${{ secrets.GITOPS_PUSH_TOKEN }} # PAT (classic or fine-grained) with write access to GitOps repo
+          token: ${{ secrets.GITOPS_PUSH_TOKEN }}
           path: gitops
 
       - name: Install yq
         shell: bash
         run: |
+          set -euo pipefail
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
           yq --version
@@ -126,17 +133,41 @@ jobs:
           set -euo pipefail
           ENV="${{ needs.detect-changes.outputs.envname }}"
           TAG="${{ needs.detect-changes.outputs.tag }}"
-          export TAG
 
-          if [[ "${{ needs.detect-changes.outputs.frontend }}" == "true" ]]; then
-            FILE="gitops/apps/csa-frontend/overlays/${ENV}/kustomization.yaml"
-            yq -i '(.images[] | select(.name=="ghcr.io/bcgov/csa-frontend")).newTag = strenv(TAG)' "$FILE"
+          update_tag () {
+            local file="$1"
+            local image="$2"
+
+            if [[ ! -f "$file" ]]; then
+              echo "ERROR: kustomization not found: $file"
+              exit 1
+            fi
+
+            # Fail if image entry doesn't exist
+            if ! yq e '.images[]? | select(.name=="'"$image"'") | .name' "$file" | grep -q .; then
+              echo "ERROR: image '$image' not found in $file"
+              exit 1
+            fi
+
+            yq -i '(.images[] | select(.name=="'"$image"'")).newTag = "'"$TAG"'"' "$file"
+            echo "Updated $image -> $TAG in $file"
+          }
+
+          if [[ "${{ needs.detect-changes.outputs.frontend }}" == "true" && "${{ needs.build-frontend.result }}" == "success" ]]; then
+            update_tag "gitops/apps/csa-frontend/overlays/${ENV}/kustomization.yaml" "ghcr.io/bcgov/csa-frontend"
           fi
 
-          if [[ "${{ needs.detect-changes.outputs.backend }}" == "true" ]]; then
-            FILE="gitops/apps/csa-backend/overlays/${ENV}/kustomization.yaml"
-            yq -i '(.images[] | select(.name=="ghcr.io/bcgov/csa-backend")).newTag = strenv(TAG)' "$FILE"
+          if [[ "${{ needs.detect-changes.outputs.backend }}" == "true" && "${{ needs.build-backend.result }}" == "success" ]]; then
+            update_tag "gitops/apps/csa-backend/overlays/${ENV}/kustomization.yaml" "ghcr.io/bcgov/csa-backend"
           fi
+
+      - name: Show Git diff (debug)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd gitops
+          git diff --name-only || true
+          git diff || true
 
       - name: Commit & push (dev direct, test/prod PR branch)
         shell: bash
@@ -163,10 +194,9 @@ jobs:
             exit 0
           fi
 
-          # test/prod = create branch first, then commit on that branch
+          # test/prod = create branch then commit & push
           git checkout -b "$BR"
           git add .
           git commit -m "Promote to ${ENV}: ${{ github.repository }} ${TAG}"
           git push -u origin "$BR"
           echo "Created branch $BR in GitOps repo. Open a PR to main."
-   

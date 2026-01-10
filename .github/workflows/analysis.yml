@@ -7,13 +7,11 @@ on:
     paths:
       - 'backend/**'
       - 'frontend/**'
-      # - '.github/workflows/**'
   push:
     branches: [dev, test, main]
     paths:
       - 'backend/**'
       - 'frontend/**'
-      - '.github/workflows/**'
   schedule:
     - cron: "0 11 * * 0" # 3 AM PST = 12 PM UDT, runs sundays
   workflow_dispatch:

@@ -1,22 +1,36 @@
 name: Build & Promote (GitOps)
-
+# ------------------------------------------------------------------------------
+# Triggers
+# ------------------------------------------------------------------------------
+# - Runs automatically on push to dev/test/main when frontend or backend changes
+# - Allows manual execution via workflow_dispatch (useful for recovery/debug)
 on:
   push:
     branches: [dev, test, main]
     paths:
       - "frontend/**"
       - "backend/**"
-      #- ".github/workflows/**"
+      # keep workflows excluded to avoid recursion/noise; enable if you explicitly want that behavior
+      # - ".github/workflows/**"
   workflow_dispatch:
-
+# ------------------------------------------------------------------------------
+# Concurrency
+# ------------------------------------------------------------------------------
+# Prevents multiple runs of this workflow from colliding on the same branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
-
+# ------------------------------------------------------------------------------
+# Permissions
+# ------------------------------------------------------------------------------
+# - contents:read  → checkout code
+# - packages:write → push images to GHCR
 permissions:
   contents: read
   packages: write
-
+# ------------------------------------------------------------------------------
+# Global environment variables
+# ------------------------------------------------------------------------------
 env:
   REGISTRY: ghcr.io
   ORG: bcgov
@@ -24,6 +38,10 @@ env:
   SERVICE_BACKEND: csa-backend
 
 jobs:
+
+  # ============================================================================
+  # Detect what changed + determine environment + compute image tag
+  # ============================================================================
   detect-changes:
     runs-on: ubuntu-24.04
     outputs:
@@ -33,23 +51,32 @@ jobs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v6
-
+      # ------------------------------------------------------------
+      # Map Git branch → deployment environment
+      # ------------------------------------------------------------
       - id: env
         shell: bash
         run: |
+          set -euo pipefail
           case "${GITHUB_REF_NAME}" in
             dev)  echo "envname=dev"  >> "$GITHUB_OUTPUT" ;;
             test) echo "envname=test" >> "$GITHUB_OUTPUT" ;;
             main) echo "envname=prod" >> "$GITHUB_OUTPUT" ;;
             *)    echo "Unsupported branch ${GITHUB_REF_NAME}" ; exit 1 ;;
           esac
-
+      # ------------------------------------------------------------
+      # Compute immutable image tag (env-shortsha)
+      # Example: dev-a1b2c3d
+      # ------------------------------------------------------------
       - id: tag
         shell: bash
         run: |
+          set -euo pipefail
           ENV="${{ steps.env.outputs.envname }}"
           echo "tag=${ENV}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-
+      # ------------------------------------------------------------
+      # Detect which services actually changed
+      # ------------------------------------------------------------
       - id: filter
         uses: dorny/paths-filter@v3
         with:
@@ -58,19 +85,22 @@ jobs:
               - 'frontend/**'
             backend:
               - 'backend/**'
-
+  # ============================================================================
+  # Build & push frontend image (only if frontend changed)
+  # ============================================================================
   build-frontend:
     needs: [detect-changes]
     if: needs.detect-changes.outputs.frontend == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-
+      # Login to GitHub Container Registry
       - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # Build & push frontend image
 
       - uses: docker/build-push-action@v6
         with:
@@ -79,6 +109,9 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.SERVICE_FRONTEND }}:${{ needs.detect-changes.outputs.tag }}
 
+  # ============================================================================
+  # Build & push backend image (only if backend changed)
+  # ============================================================================
   build-backend:
     needs: [detect-changes]
     if: needs.detect-changes.outputs.backend == 'true'
@@ -99,10 +132,24 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.SERVICE_BACKEND }}:${{ needs.detect-changes.outputs.tag }}
 
+  # ============================================================================
+  # Update GitOps repo with new image tag(s)
+  # ============================================================================
   update-gitops:
     needs: [detect-changes, build-frontend, build-backend]
-    # Run if either service changed
-    if: needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.backend == 'true'
+
+    # ------------------------------------------------------------
+    # Run conditions:
+    # - At least one service changed
+    # - AND its corresponding build succeeded
+    # ------------------------------------------------------------
+    if: >-
+      always() &&
+      (needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.backend == 'true') &&
+      (
+        (needs.detect-changes.outputs.frontend == 'true' && needs.build-frontend.result == 'success') ||
+        (needs.detect-changes.outputs.backend  == 'true' && needs.build-backend.result  == 'success')
+      )
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout GitOps repo
@@ -110,15 +157,19 @@ jobs:
         with:
           repository: bcgov-c/tenant-gitops-dec59b
           ref: main
-          token: ${{ secrets.GITOPS_PUSH_TOKEN }} # PAT (classic or fine-grained) with write access to GitOps repo
+          token: ${{ secrets.GITOPS_PUSH_TOKEN }}
           path: gitops
 
       - name: Install yq
         shell: bash
         run: |
+          set -euo pipefail
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
           yq --version
+      # ------------------------------------------------------------
+      # Update kustomize overlay image tags
+      # ------------------------------------------------------------
 
       - name: Update overlay image tag(s)
         shell: bash
@@ -126,17 +177,46 @@ jobs:
           set -euo pipefail
           ENV="${{ needs.detect-changes.outputs.envname }}"
           TAG="${{ needs.detect-changes.outputs.tag }}"
-          export TAG
 
-          if [[ "${{ needs.detect-changes.outputs.frontend }}" == "true" ]]; then
-            FILE="gitops/apps/csa-frontend/overlays/${ENV}/kustomization.yaml"
-            yq -i '(.images[] | select(.name=="ghcr.io/bcgov/csa-frontend")).newTag = strenv(TAG)' "$FILE"
+          update_tag () {
+            local file="$1"
+            local image="$2"
+
+            if [[ ! -f "$file" ]]; then
+              echo "ERROR: kustomization not found: $file"
+              exit 1
+            fi
+
+            # Fail if image entry doesn't exist
+            if ! yq e '.images[]? | select(.name=="'"$image"'") | .name' "$file" | grep -q .; then
+              echo "ERROR: image '$image' not found in $file"
+              exit 1
+            fi
+
+            yq -i '(.images[] | select(.name=="'"$image"'")).newTag = "'"$TAG"'"' "$file"
+            echo "Updated $image -> $TAG in $file"
+          }
+
+          if [[ "${{ needs.detect-changes.outputs.frontend }}" == "true" && "${{ needs.build-frontend.result }}" == "success" ]]; then
+            update_tag "gitops/apps/csa-frontend/overlays/${ENV}/kustomization.yaml" "ghcr.io/bcgov/csa-frontend"
           fi
 
-          if [[ "${{ needs.detect-changes.outputs.backend }}" == "true" ]]; then
-            FILE="gitops/apps/csa-backend/overlays/${ENV}/kustomization.yaml"
-            yq -i '(.images[] | select(.name=="ghcr.io/bcgov/csa-backend")).newTag = strenv(TAG)' "$FILE"
+          if [[ "${{ needs.detect-changes.outputs.backend }}" == "true" && "${{ needs.build-backend.result }}" == "success" ]]; then
+            update_tag "gitops/apps/csa-backend/overlays/${ENV}/kustomization.yaml" "ghcr.io/bcgov/csa-backend"
           fi
+
+      - name: Show Git diff (debug)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd gitops
+          git diff --name-only || true
+          git diff || true
+      # ------------------------------------------------------------
+      # Commit & push changes
+      # - dev  → direct push to GitOps main
+      # - test/prod → branch for PR approval
+      # ------------------------------------------------------------
 
       - name: Commit & push (dev direct, test/prod PR branch)
         shell: bash
@@ -163,10 +243,9 @@ jobs:
             exit 0
           fi
 
-          # test/prod = create branch first, then commit on that branch
+          # test/prod = create branch then commit & push
           git checkout -b "$BR"
           git add .
           git commit -m "Promote to ${ENV}: ${{ github.repository }} ${TAG}"
           git push -u origin "$BR"
           echo "Created branch $BR in GitOps repo. Open a PR to main."
-   

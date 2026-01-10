@@ -101,37 +101,40 @@ jobs:
           supply_scan: true
           triggers: ('frontend/')
 
-  # ----------------------------
-  # 4) Trivy (run if either changed; skip on draft)
+    # ----------------------------
+  # 4) Trivy Security Scan
+  # Required by branch protection
   # ----------------------------
   trivy:
     name: Trivy Security Scan
-    needs: [changes]
-    if: >
-      (github.event_name != 'pull_request' || !github.event.pull_request.draft) &&
-      (needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true')
-    continue-on-error: true
+    # Run on all non-draft PRs and all pushes
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
     permissions:
       contents: read
       security-events: write
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
+
     steps:
-      - uses: actions/checkout@v6
-      - name: Run Trivy vulnerability scanner (fs)
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Run Trivy vulnerability scanner (filesystem)
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8
         with:
-          format: "sarif"
-          output: "trivy-results.sarif"
+          scan-type: fs
+          format: sarif
+          output: trivy-results.sarif
+          scanners: vuln,secret,config
+          severity: CRITICAL,HIGH
           ignore-unfixed: true
-          scan-type: "fs"
-          scanners: "vuln,secret,config"
-          severity: "CRITICAL,HIGH"
-      - name: Upload Trivy SARIF
+
+      - name: Upload Trivy SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: "trivy-results.sarif"
-
+          sarif_file: trivy-results.sarif
   # ----------------------------
   # 5) Always report ONE required check name: "Analysis Results"
   # ----------------------------

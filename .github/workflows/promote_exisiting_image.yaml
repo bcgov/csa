@@ -7,20 +7,14 @@ on:
         description: "Target environment (updates the matching overlay in the GitOps repo)"
         type: choice
         required: true
-        options:
-          - dev
-          - test
-          - prod
+        options: [dev, test, prod]
       service:
         description: "Which service(s) to promote"
         type: choice
         required: true
-        options:
-          - frontend
-          - backend
-          - both
+        options: [frontend, backend, both]
       tag:
-        description: "Image tag to promote (e.g. sha-abc1234, dev-abc1234, v1.2.3)"
+        description: "Image tag to promote (e.g. dev-abc1234, v1.2.3)"
         type: string
         required: true
 
@@ -28,6 +22,7 @@ concurrency:
   group: promote-${{ github.repository }}-${{ inputs.environment }}-${{ inputs.service }}
   cancel-in-progress: false
 
+# Workflow itself doesn't need write perms because we're using a PAT in secrets.
 permissions:
   contents: read
 
@@ -50,14 +45,19 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
+      # 1) Checkout GitOps repo
+      # IMPORTANT: persist-credentials false prevents "Duplicate header: Authorization"
+      # when create-pull-request configures auth again.
       - name: Checkout GitOps repo
         uses: actions/checkout@v6
         with:
           repository: ${{ env.GITOPS_REPO }}
           ref: ${{ env.GITOPS_BASE_BRANCH }}
-          token: ${{ secrets.GITOPS_PUSH_TOKEN }} # PAT with write access to GitOps repo
+          token: ${{ secrets.GITOPS_PUSH_TOKEN }}
           path: gitops
+          persist-credentials: false
 
+      # 2) Install yq
       - name: Install yq
         shell: bash
         run: |
@@ -66,7 +66,8 @@ jobs:
           sudo chmod +x /usr/local/bin/yq
           yq --version
 
-      - name: Validate inputs and compute paths
+      # 3) Validate inputs + compute PR branch name
+      - name: Validate inputs and compute vars
         id: vars
         shell: bash
         run: |
@@ -76,52 +77,63 @@ jobs:
           SVC="${{ inputs.service }}"
           TAG="${{ inputs.tag }}"
 
-          # Basic sanity
           [[ "$ENV" =~ ^(dev|test|prod)$ ]] || { echo "Invalid environment: $ENV" ; exit 1; }
           [[ "$SVC" =~ ^(frontend|backend|both)$ ]] || { echo "Invalid service: $SVC" ; exit 1; }
           [[ -n "$TAG" ]] || { echo "Tag is required" ; exit 1; }
+
+          SAFE_TAG="${TAG//\//-}"
+          SAFE_REPO="${GITHUB_REPOSITORY//\//-}"
 
           {
             echo "env=$ENV"
             echo "svc=$SVC"
             echo "tag=$TAG"
+            echo "branch=promote/${ENV}/${SAFE_REPO}/${SVC}/${SAFE_TAG}"
           } >> "$GITHUB_OUTPUT"
-          
 
-          # Branch name for GitOps PR
-          SAFE_TAG="${TAG//\//-}"
-          SAFE_REPO="${GITHUB_REPOSITORY//\//-}"
-          echo "branch=promote/${ENV}/${SAFE_REPO}/${SVC}/${SAFE_TAG}" >> "$GITHUB_OUTPUT"
-
+      # 4) Update the GitOps overlay(s) using yq, safely
       - name: Update overlay image tag(s)
         shell: bash
         run: |
           set -euo pipefail
+
           ENV="${{ steps.vars.outputs.env }}"
           SVC="${{ steps.vars.outputs.svc }}"
           TAG="${{ steps.vars.outputs.tag }}"
-          export TAG
 
-          # frontend
+          update_tag () {
+            local file="$1"
+            local image="$2"
+
+            if [[ ! -f "$file" ]]; then
+              echo "ERROR: Missing file: $file"
+              exit 1
+            fi
+
+            export IMAGE="$image"
+            export TAG="$TAG"
+
+            # Fail fast if the image entry doesn't exist
+            if ! yq e '.images[]? | select(.name == strenv(IMAGE)) | .name' "$file" | grep -q .; then
+              echo "ERROR: Image '$image' not found in $file"
+              echo "INFO: Current images:"
+              yq e '.images[]?.name' "$file" || true
+              exit 1
+            fi
+
+            yq -i '(.images[] | select(.name == strenv(IMAGE))).newTag = strenv(TAG)' "$file"
+            echo "Updated $image -> $TAG in $file"
+          }
+
           if [[ "$SVC" == "frontend" || "$SVC" == "both" ]]; then
-            FILE="gitops/${{ env.FRONTEND_OVERLAY }}/${ENV}/kustomization.yaml"
-            if [[ ! -f "$FILE" ]]; then
-              echo "Missing file: $FILE"
-              exit 1
-            fi
-            yq -i '(.images[] | select(.name=="${{ env.FRONTEND_IMAGE }}")).newTag = strenv(TAG)' "$FILE"
+            update_tag "gitops/${{ env.FRONTEND_OVERLAY }}/${ENV}/kustomization.yaml" "${{ env.FRONTEND_IMAGE }}"
           fi
 
-          # backend
           if [[ "$SVC" == "backend" || "$SVC" == "both" ]]; then
-            FILE="gitops/${{ env.BACKEND_OVERLAY }}/${ENV}/kustomization.yaml"
-            if [[ ! -f "$FILE" ]]; then
-              echo "Missing file: $FILE"
-              exit 1
-            fi
-            yq -i '(.images[] | select(.name=="${{ env.BACKEND_IMAGE }}")).newTag = strenv(TAG)' "$FILE"
+            update_tag "gitops/${{ env.BACKEND_OVERLAY }}/${ENV}/kustomization.yaml" "${{ env.BACKEND_IMAGE }}"
           fi
 
+      # 5) Show diff for visibility
       - name: Show diff
         shell: bash
         run: |
@@ -130,7 +142,26 @@ jobs:
           git diff --stat
           git diff
 
-      - name: Create PR in GitOps repo
+      - name: Commit & push directly to GitOps main (dev)
+        if: steps.vars.outputs.env == 'dev'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd gitops
+          git config user.email "actions@github.com"
+          git config user.name "github-actions"
+
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "No GitOps changes to commit."
+            exit 0
+          fi
+
+          git add .
+          git commit -m "Promote ${{ steps.vars.outputs.svc }} to dev: ${{ steps.vars.outputs.tag }}"
+          git push origin "${{ env.GITOPS_BASE_BRANCH }}"
+
+      - name: Create PR in GitOps repo (test/prod)
+        if: steps.vars.outputs.env != 'dev'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITOPS_PUSH_TOKEN }}
@@ -146,7 +177,4 @@ jobs:
             - Environment: `${{ steps.vars.outputs.env }}`
             - Service(s): `${{ steps.vars.outputs.svc }}`
             - Tag: `${{ steps.vars.outputs.tag }}`
-
-            Notes:
-            - ArgoCD will deploy after this PR is merged (dev/test may auto-sync; prod can remain manual sync in ArgoCD UI).
-            - This updates only the overlay(s) for the selected environment/service(s).
+      

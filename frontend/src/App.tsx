@@ -901,7 +901,11 @@ function App() {
                           key={row.id}
                           hover
                           onClick={() => setSelectedChild(row.id)}
-                          sx={{ '&:hover': { backgroundColor: '#f9f9f9' }, cursor: 'pointer' }}
+                          sx={{
+                            '&:hover': { backgroundColor: '#f9f9f9' },
+                            cursor: 'pointer',
+                            backgroundColor: selectedChild === row.id ? '#e0e0e0' : 'inherit',
+                          }}
                         >
                           <TableCell padding="checkbox">
                             <Checkbox

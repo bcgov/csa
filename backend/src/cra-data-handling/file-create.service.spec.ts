@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { existsSync, writeFileSync } from 'fs'
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, type Mock } from 'vitest'
 import { FileCreateService } from './file-create.service'
 import { FileTransferClientService } from './file-transfer.service'
 
@@ -107,8 +108,6 @@ describe('FileCreateService', () => {
     )
   })
 })
-
-// File header test case
 
 describe('CRA Header format', () => {
   let service: FileCreateService

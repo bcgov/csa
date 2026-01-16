@@ -138,6 +138,8 @@ export class FileCreateService {
   }
 }
 
-const creator = new FileCreateService(new FileTransferClientService())
+// const creator = new FileCreateService(new FileTransferClientService())
 
-creator.createFile(header, details, trailer)
+console.log('file header', header, 'details', details, 'trailer', trailer)
+
+// creator.createFile(header, details, trailer)

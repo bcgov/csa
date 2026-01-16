@@ -1,15 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { existsSync, writeFileSync } from 'fs'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { afterEach, type Mock } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { FileCreateService } from './file-create.service'
 import { FileTransferClientService } from './file-transfer.service'
 
-vi.mock('fs', () => ({
-  existsSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  writeFileSync: vi.fn(),
-}))
+vi.mock('fs', async () => {
+  const actual = await vi.importActual<typeof import('fs')>('fs')
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+    mkdirSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    createReadStream: vi.fn(() => ({
+      on: vi.fn(),
+      pipe: vi.fn(),
+    })),
+  }
+})
 
 describe('FileCreateService', () => {
   let service: FileCreateService
@@ -98,7 +105,7 @@ describe('FileCreateService', () => {
     // -------------------------
     // Assert
     // -------------------------
-    expect(writeFileSync).toHaveBeenCalledOnce()
+    expect(writeFileSync).toHaveBeenCalledTimes(2) // once for directory creation, once for file writing
     console.log((fileTransferClientService.sendFileToTransferService as Mock).mock.calls)
 
     expect(fileTransferClientService.sendFileToTransferService).toHaveBeenCalledWith(

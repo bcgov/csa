@@ -1,7 +1,7 @@
-import { COMMON_CONSTANT } from '../common/constant/common.constant'
+import { CRA_DATA_HANDLING_CONSTANT } from '../cra-data-handling.constant'
 
 const { HEADER_TRAN_CODE, DETAIL_TRAN_CODE, TRAILER_TRAN_CODE } =
-  COMMON_CONSTANT.FILE_TRANSACTION_CODE
+  CRA_DATA_HANDLING_CONSTANT.FILE_TRANSACTION_CODE
 
 const currentDate = (): string => {
   const now = new Date()

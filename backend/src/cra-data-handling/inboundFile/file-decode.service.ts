@@ -1,6 +1,6 @@
-import { CraHeader, CraDetail, CraTrailer } from './file-create.interface'
-import { readFileSync } from 'fs'
 import { Injectable } from '@nestjs/common'
+import { readFileSync } from 'fs'
+import { CraDetail, CraHeader, CraTrailer } from './outboundFile/file-create.interface'
 
 @Injectable()
 export class FileDecodeService {

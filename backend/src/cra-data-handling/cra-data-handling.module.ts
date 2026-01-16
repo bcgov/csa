@@ -1,10 +1,17 @@
+import { HttpModule } from '@nestjs/axios'
 import { Module } from '@nestjs/common'
 
-import { FileCreateService } from './file-create.service'
-import { FileDecodeService } from './file-decode.service'
-import { FileTransferClientService } from './file-transfer.service'
+import { FileDecodeService } from './inboundFile/file-decode.service'
+import { FileCreateService } from './outboundFile/file-create.service'
+import { FileTransferClientService } from './outboundFile/file-transfer.service'
 @Module({
+  imports: [
+    HttpModule.register({
+      timeout: 60000, // 60 seconds timeout
+      maxRedirects: 5,
+    }),
+  ],
   providers: [FileCreateService, FileDecodeService, FileTransferClientService],
-  // exports: [FileCreateService, FileDecodeService, FileTransferClientService],
+  exports: [FileCreateService, FileDecodeService, FileTransferClientService],
 })
 export class CraDataHandlingModule {}

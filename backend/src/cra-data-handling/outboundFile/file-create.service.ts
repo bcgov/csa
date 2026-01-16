@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common'
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
-import { COMMON_CONSTANT } from 'src/common/constant/common.constant'
+import { SERVER_CONFIG } from 'src/common/config/server.config'
+import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra-data-handling/cra-data-handling.constant'
+import { FILE_MOCK_DATA } from './file-mock-data'
 import { CraDetail, CraHeader, CraTrailer } from './file-create.interface'
 import { FileTransferClientService } from './file-transfer.service'
-import { FILE_MOCK_DATA } from './file-mock-data'
-import { SERVER_CONFIG } from 'src/common/config/server.config'
+import { HttpService } from '@nestjs/axios'
 
 const { header, details, trailer } = FILE_MOCK_DATA
 const { FILE_CREATED_PATH, FILE_CREATION_ENVIROMENT, FILE_TYPE_APPLICATION } = SERVER_CONFIG
-
-const { FILE_NAME_PREFIX, FILE_TRANSACTION_CODE } = COMMON_CONSTANT
+const { FILE_NAME_PREFIX, FILE_TRANSACTION_CODE } = CRA_DATA_HANDLING_CONSTANT
 
 const { HEADER_TRAN_CODE, DETAIL_TRAN_CODE, TRAILER_TRAN_CODE } = FILE_TRANSACTION_CODE
 
@@ -138,8 +138,10 @@ export class FileCreateService {
   }
 }
 
-// const creator = new FileCreateService(new FileTransferClientService())
+// Mock implementation of FileTransferClientService for testing
+
+const creator = new FileCreateService(new FileTransferClientService(new HttpService()))
 
 console.log('file header', header, 'details', details, 'trailer', trailer)
 
-// creator.createFile(header, details, trailer)
+creator.createFile(header, details, trailer)

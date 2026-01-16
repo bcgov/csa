@@ -1,4 +1,4 @@
-export const COMMON_CONSTANT = {
+export const CRA_DATA_HANDLING_CONSTANT = {
   FILE_CREATION_ENVIROMENT: process.env.NODE_ENV === 'production' ? 'PCSAIN' : 'ACSAIN',
   FILE_TYPE_APPLICATION: process.env.NODE_ENV === 'production' ? 'PAPL' : 'AAPL',
   FILE_NAME_PREFIX: 'HT',

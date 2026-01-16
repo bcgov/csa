@@ -10,13 +10,13 @@ import { AppService } from './app.service'
 import { ApplicantsModule } from './applicants/applicants.module'
 import { HealthController } from './health/health.controller'
 import { MetricsController } from './metrics/metrics.controller'
-import { FileCreationService } from 'src/cra-data-handling/fileCreation.service'
-import { FileTransferClientService } from 'src/cra-data-handling/fileTransfer.service'
+import { CraDataHandlingModule } from 'src/cra-data-handling/cra-data-handling.module'
+import '../common/config/server.config'
 
 @Module({
-  imports: [ConfigModule.forRoot(), TerminusModule, ApplicantsModule],
+  imports: [ConfigModule.forRoot(), TerminusModule, ApplicantsModule, CraDataHandlingModule],
   controllers: [AppController, MetricsController, HealthController],
-  providers: [AppService, PrismaService, FileCreationService, FileTransferClientService],
+  providers: [AppService, PrismaService],
 })
 export class ApiModule {
   // let's add a middleware on all routes

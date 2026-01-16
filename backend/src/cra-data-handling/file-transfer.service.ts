@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common'
 import axios from 'axios'
 import * as fs from 'fs'
 import FormData from 'form-data'
-import { COMMON_CONSTANT } from 'src/common/constant/common.constant'
+import { SERVER_CONFIG } from 'src/common/config/server.config'
 
-const { SERVICE_NAME, FTP_BASE_URL } = COMMON_CONSTANT
+const { SERVICE_NAME, FTP_BASE_URL } = SERVER_CONFIG
 
 @Injectable()
 export class FileTransferClientService {

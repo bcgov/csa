@@ -1,4 +1,5 @@
 import FilterListIcon from '@mui/icons-material/FilterList'
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import {
   AppBar,
   Box,
@@ -21,6 +22,7 @@ import {
   Tabs,
   TextField,
   Toolbar,
+  Tooltip,
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
@@ -168,27 +170,128 @@ const batchRequestsData = [
   },
 ]
 
-// Sample data for batch details
-const batchDetailsData = [
-  {
-    id: 1,
-    lastName: 'john',
-    middleName: 'Kevin',
-    givenName: 'Brim',
-    transactionType: 'Cancellation',
-    status: 'Placeholder for test',
-    systemComments: 'Placeholder for test',
-  },
-  {
-    id: 2,
-    lastName: 'Oconnor',
-    middleName: 'D',
-    givenName: 'Jack',
-    transactionType: 'Application',
-    status: '',
-    systemComments: '',
-  },
-]
+// Sample data for batch details - organized by batchId
+const batchDetailsData: Record<
+  number,
+  Array<{
+    id: number
+    lastName: string
+    middleName: string
+    givenName: string
+    transactionType: string
+    status: string
+    systemComments: string
+  }>
+> = {
+  1: [
+    // Batch 1-567
+    {
+      id: 1,
+      lastName: 'john',
+      middleName: 'Kevin',
+      givenName: 'Brim',
+      transactionType: 'Cancellation',
+      status: 'Placeholder for test',
+      systemComments: 'Placeholder for test',
+    },
+    {
+      id: 2,
+      lastName: 'Oconnor',
+      middleName: 'D',
+      givenName: 'Jack',
+      transactionType: 'Application',
+      status: '',
+      systemComments: '',
+    },
+  ],
+  2: [
+    // Batch 1-490
+    {
+      id: 3,
+      lastName: 'Smith',
+      middleName: 'Ann',
+      givenName: 'Mary',
+      transactionType: 'Application',
+      status: 'In Progress',
+      systemComments: 'Processing application',
+    },
+    {
+      id: 4,
+      lastName: 'Johnson',
+      middleName: 'Lee',
+      givenName: 'David',
+      transactionType: 'Cancellation',
+      status: 'In Progress',
+      systemComments: 'Pending review',
+    },
+    {
+      id: 5,
+      lastName: 'Williams',
+      middleName: 'Rose',
+      givenName: 'Emily',
+      transactionType: 'Application',
+      status: 'In Progress',
+      systemComments: 'Documents received',
+    },
+    {
+      id: 6,
+      lastName: 'Brown',
+      middleName: 'James',
+      givenName: 'Michael',
+      transactionType: 'Modification',
+      status: 'In Progress',
+      systemComments: 'Awaiting verification',
+    },
+  ],
+  3: [
+    // Batch 1-234
+    {
+      id: 7,
+      lastName: 'Davis',
+      middleName: 'Marie',
+      givenName: 'Sarah',
+      transactionType: 'Application',
+      status: 'Processed',
+      systemComments: 'CRA confirmed',
+    },
+    {
+      id: 8,
+      lastName: 'Miller',
+      middleName: 'Scott',
+      givenName: 'Robert',
+      transactionType: 'Cancellation',
+      status: 'Processed',
+      systemComments: 'CRA confirmed',
+    },
+    {
+      id: 9,
+      lastName: 'Wilson',
+      middleName: 'Lynn',
+      givenName: 'Jennifer',
+      transactionType: 'Application',
+      status: 'Processed',
+      systemComments: 'CRA confirmed',
+    },
+    {
+      id: 10,
+      lastName: 'Moore',
+      middleName: 'Patrick',
+      givenName: 'Christopher',
+      transactionType: 'Modification',
+      status: 'Processed',
+      systemComments: 'CRA confirmed',
+    },
+    {
+      id: 11,
+      lastName: 'Taylor',
+      middleName: 'Grace',
+      givenName: 'Jessica',
+      transactionType: 'Application',
+      status: 'Processed',
+      systemComments: 'CRA confirmed',
+    },
+  ],
+}
 
 // Sample data for batch history (child-specific)
 const childBatchHistory = [
@@ -240,6 +343,7 @@ function App() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [selectedChild, setSelectedChild] = useState<number | null>(null)
+  const [selectedBatch, setSelectedBatch] = useState<number>(1) // Default to first batch
 
   // Column filter states
   type FilterAnchor = {
@@ -326,6 +430,11 @@ function App() {
       return true
     })
   }, [searchTerm, columnFilters])
+
+  // Get batch details for selected batch
+  const currentBatchDetails = useMemo(() => {
+    return batchDetailsData[selectedBatch] || []
+  }, [selectedBatch])
 
   return (
     <Box
@@ -533,9 +642,19 @@ function App() {
                     mb: 3,
                   }}
                 >
-                  <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                    Eligibility List
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                      Eligibility List
+                    </Typography>
+                    <Tooltip
+                      title="This list shows the master list of records from ICM. You can filter, search, and add children to batches from this view. Please click on the individual rows of the table for more details"
+                      arrow
+                    >
+                      <IconButton size="small" sx={{ padding: 0.5 }}>
+                        <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
                   <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                     <TextField
                       size="small"
@@ -781,12 +900,18 @@ function App() {
                         <TableRow
                           key={row.id}
                           hover
-                          sx={{ '&:hover': { backgroundColor: '#f9f9f9' } }}
+                          onClick={() => setSelectedChild(row.id)}
+                          sx={{
+                            '&:hover': { backgroundColor: '#f9f9f9' },
+                            cursor: 'pointer',
+                            backgroundColor: selectedChild === row.id ? '#e0e0e0' : 'inherit',
+                          }}
                         >
                           <TableCell padding="checkbox">
                             <Checkbox
                               checked={selected.includes(row.id)}
-                              onChange={() => {
+                              onChange={(e) => {
+                                e.stopPropagation()
                                 setSelected((prev) =>
                                   prev.includes(row.id)
                                     ? prev.filter((id) => id !== row.id)
@@ -795,19 +920,14 @@ function App() {
                               }}
                             />
                           </TableCell>
-                          <TableCell
-                            sx={{ color: '#1976d2', cursor: 'pointer' }}
-                            onClick={() => setSelectedChild(row.id)}
-                          >
-                            {row.childName}
-                          </TableCell>
+                          <TableCell>{row.childName}</TableCell>
                           <TableCell>{row.gender}</TableCell>
                           <TableCell>{row.dob}</TableCell>
                           <TableCell>{row.age}</TableCell>
                           <TableCell>{row.din}</TableCell>
                           <TableCell>{row.csaStatus}</TableCell>
                           <TableCell>{row.statusEffective}</TableCell>
-                          <TableCell sx={{ color: '#1976d2' }}>{row.caseNumber}</TableCell>
+                          <TableCell>{row.caseNumber}</TableCell>
                           <TableCell>{row.caseStatus}</TableCell>
                           <TableCell>{row.legacyFile}</TableCell>
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
@@ -915,9 +1035,19 @@ function App() {
                           pb: 2,
                         }}
                       >
-                        <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                          Details
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                            Details
+                          </Typography>
+                          <Tooltip
+                            title="Detailed information about the selected child including basic info, case details, placement information, and service provider details."
+                            arrow
+                          >
+                            <IconButton size="small" sx={{ padding: 0.5 }}>
+                              <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
                         <Button
                           variant="text"
                           size="small"
@@ -1287,9 +1417,19 @@ function App() {
                           pb: 2,
                         }}
                       >
-                        <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                          Batch History
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                            Batch History
+                          </Typography>
+                          <Tooltip
+                            title="Complete history of all batch submissions for the selected child, including batch status and transaction types."
+                            arrow
+                          >
+                            <IconButton size="small" sx={{ padding: 0.5 }}>
+                              <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
                         <Button
                           variant="contained"
                           size="small"
@@ -1412,7 +1552,12 @@ function App() {
                         <TableRow
                           key={row.id}
                           hover
-                          sx={{ '&:hover': { backgroundColor: '#f9f9f9' } }}
+                          onClick={() => setSelectedBatch(row.id)}
+                          sx={{
+                            '&:hover': { backgroundColor: '#f9f9f9' },
+                            cursor: 'pointer',
+                            backgroundColor: selectedBatch === row.id ? '#e3f2fd' : 'inherit',
+                          }}
                         >
                           <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
                             {row.batchId}
@@ -1489,17 +1634,17 @@ function App() {
                             <Checkbox
                               indeterminate={
                                 selectedBatchDetails.length > 0 &&
-                                selectedBatchDetails.length < batchDetailsData.length
+                                selectedBatchDetails.length < currentBatchDetails.length
                               }
                               checked={
-                                batchDetailsData.length > 0 &&
-                                selectedBatchDetails.length === batchDetailsData.length
+                                currentBatchDetails.length > 0 &&
+                                selectedBatchDetails.length === currentBatchDetails.length
                               }
                               onChange={() => {
-                                if (selectedBatchDetails.length === batchDetailsData.length) {
+                                if (selectedBatchDetails.length === currentBatchDetails.length) {
                                   setSelectedBatchDetails([])
                                 } else {
-                                  setSelectedBatchDetails(batchDetailsData.map((row) => row.id))
+                                  setSelectedBatchDetails(currentBatchDetails.map((row) => row.id))
                                 }
                               }}
                             />
@@ -1513,7 +1658,7 @@ function App() {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {batchDetailsData.map((row) => (
+                        {currentBatchDetails.map((row) => (
                           <TableRow
                             key={row.id}
                             hover
@@ -1561,7 +1706,7 @@ function App() {
         }}
       >
         <Typography variant="body2" sx={{ color: '#666', fontSize: '12px' }}>
-          © 2025 Government of British Columbia.
+          © 2026 Government of British Columbia.
         </Typography>
       </Box>
     </Box>

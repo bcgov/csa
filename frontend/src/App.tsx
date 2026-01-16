@@ -25,7 +25,6 @@ import {
   TextField,
   Toolbar,
   Tooltip,
-  Tooltip,
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
@@ -296,128 +295,6 @@ const batchDetailsData: Record<
     },
   ],
 }
-// Sample data for batch details - organized by batchId
-const batchDetailsData: Record<
-  number,
-  Array<{
-    id: number
-    lastName: string
-    middleName: string
-    givenName: string
-    transactionType: string
-    status: string
-    systemComments: string
-  }>
-> = {
-  1: [
-    // Batch 1-567
-    {
-      id: 1,
-      lastName: 'john',
-      middleName: 'Kevin',
-      givenName: 'Brim',
-      transactionType: 'Cancellation',
-      status: 'Placeholder for test',
-      systemComments: 'Placeholder for test',
-    },
-    {
-      id: 2,
-      lastName: 'Oconnor',
-      middleName: 'D',
-      givenName: 'Jack',
-      transactionType: 'Application',
-      status: '',
-      systemComments: '',
-    },
-  ],
-  2: [
-    // Batch 1-490
-    {
-      id: 3,
-      lastName: 'Smith',
-      middleName: 'Ann',
-      givenName: 'Mary',
-      transactionType: 'Application',
-      status: 'In Progress',
-      systemComments: 'Processing application',
-    },
-    {
-      id: 4,
-      lastName: 'Johnson',
-      middleName: 'Lee',
-      givenName: 'David',
-      transactionType: 'Cancellation',
-      status: 'In Progress',
-      systemComments: 'Pending review',
-    },
-    {
-      id: 5,
-      lastName: 'Williams',
-      middleName: 'Rose',
-      givenName: 'Emily',
-      transactionType: 'Application',
-      status: 'In Progress',
-      systemComments: 'Documents received',
-    },
-    {
-      id: 6,
-      lastName: 'Brown',
-      middleName: 'James',
-      givenName: 'Michael',
-      transactionType: 'Modification',
-      status: 'In Progress',
-      systemComments: 'Awaiting verification',
-    },
-  ],
-  3: [
-    // Batch 1-234
-    {
-      id: 7,
-      lastName: 'Davis',
-      middleName: 'Marie',
-      givenName: 'Sarah',
-      transactionType: 'Application',
-      status: 'Processed',
-      systemComments: 'CRA confirmed',
-    },
-    {
-      id: 8,
-      lastName: 'Miller',
-      middleName: 'Scott',
-      givenName: 'Robert',
-      transactionType: 'Cancellation',
-      status: 'Processed',
-      systemComments: 'CRA confirmed',
-    },
-    {
-      id: 9,
-      lastName: 'Wilson',
-      middleName: 'Lynn',
-      givenName: 'Jennifer',
-      transactionType: 'Application',
-      status: 'Processed',
-      systemComments: 'CRA confirmed',
-    },
-    {
-      id: 10,
-      lastName: 'Moore',
-      middleName: 'Patrick',
-      givenName: 'Christopher',
-      transactionType: 'Modification',
-      status: 'Processed',
-      systemComments: 'CRA confirmed',
-    },
-    {
-      id: 11,
-      lastName: 'Taylor',
-      middleName: 'Grace',
-      givenName: 'Jessica',
-      transactionType: 'Application',
-      status: 'Processed',
-      systemComments: 'CRA confirmed',
-    },
-  ],
-}
 
 // Sample data for batch history (child-specific)
 const childBatchHistory = [
@@ -477,7 +354,6 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterSearchTerm, setFilterSearchTerm] = useState('')
   const [selectedChild, setSelectedChild] = useState<number | null>(null)
-  const [selectedBatch, setSelectedBatch] = useState<number>(1) // Default to first batch
   const [selectedBatch, setSelectedBatch] = useState<number>(1) // Default to first batch
 
   // Column filter states

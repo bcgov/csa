@@ -1304,18 +1304,10 @@ function App() {
                             cursor: 'pointer',
                             backgroundColor: selectedChild === row.id ? '#e0e0e0' : 'inherit',
                           }}
-                          onClick={() => setSelectedChild(row.id)}
-                          sx={{
-                            '&:hover': { backgroundColor: '#f9f9f9' },
-                            cursor: 'pointer',
-                            backgroundColor: selectedChild === row.id ? '#e0e0e0' : 'inherit',
-                          }}
                         >
                           <TableCell padding="checkbox">
                             <Checkbox
                               checked={selected.includes(row.id)}
-                              onChange={(e) => {
-                                e.stopPropagation()
                               onChange={(e) => {
                                 e.stopPropagation()
                                 setSelected((prev) =>
@@ -2013,12 +2005,6 @@ function App() {
                             cursor: 'pointer',
                             backgroundColor: selectedBatch === row.id ? '#e3f2fd' : 'inherit',
                           }}
-                          onClick={() => setSelectedBatch(row.id)}
-                          sx={{
-                            '&:hover': { backgroundColor: '#f9f9f9' },
-                            cursor: 'pointer',
-                            backgroundColor: selectedBatch === row.id ? '#e3f2fd' : 'inherit',
-                          }}
                         >
                           <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
                             {row.batchId}
@@ -2096,20 +2082,15 @@ function App() {
                               indeterminate={
                                 selectedBatchDetails.length > 0 &&
                                 selectedBatchDetails.length < currentBatchDetails.length
-                                selectedBatchDetails.length < currentBatchDetails.length
                               }
                               checked={
-                                currentBatchDetails.length > 0 &&
-                                selectedBatchDetails.length === currentBatchDetails.length
                                 currentBatchDetails.length > 0 &&
                                 selectedBatchDetails.length === currentBatchDetails.length
                               }
                               onChange={() => {
                                 if (selectedBatchDetails.length === currentBatchDetails.length) {
-                                if (selectedBatchDetails.length === currentBatchDetails.length) {
                                   setSelectedBatchDetails([])
                                 } else {
-                                  setSelectedBatchDetails(currentBatchDetails.map((row) => row.id))
                                   setSelectedBatchDetails(currentBatchDetails.map((row) => row.id))
                                 }
                               }}
@@ -2124,7 +2105,6 @@ function App() {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {currentBatchDetails.map((row) => (
                         {currentBatchDetails.map((row) => (
                           <TableRow
                             key={row.id}
@@ -2173,8 +2153,7 @@ function App() {
         }}
       >
         <Typography variant="body2" sx={{ color: '#666', fontSize: '12px' }}>
-          © 2026 Government of British Columbia.
-          © 2026 Government of British Columbia.
+          © 2026 Government of British Columbia. © 2026 Government of British Columbia.
         </Typography>
       </Box>
     </Box>

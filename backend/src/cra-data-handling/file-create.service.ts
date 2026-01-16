@@ -47,19 +47,19 @@ export class FileCreateService {
 
     console.log(`File written to ${outputPath}`)
 
-    // const fileTransferResponse = await this.fileTransferClientService.sendFileToTransferService(
-    //   outputPath,
-    //   fileName,
-    //   craUserId,
-    // )
-    // if (fileTransferResponse.statusCode === 226) {
-    //   console.log('File transfer successful')
-    //   // update DB recort csa status and batch status
-    // } else {
-    //   console.error('File transfer failed', fileTransferResponse)
-    //   // Retry or update DB record csa status and batch status
-    // }
-    // console.log('File transfer result:', fileTransferResponse)
+    const fileTransferResponse = await this.fileTransferClientService.sendFileToTransferService(
+      outputPath,
+      fileName,
+      craUserId,
+    )
+    if (fileTransferResponse.statusCode === 226) {
+      console.log('File transfer successful')
+      // update DB recort csa status and batch status
+    } else {
+      console.error('File transfer failed', fileTransferResponse)
+      // Retry or update DB record csa status and batch status
+    }
+    console.log('File transfer result:', fileTransferResponse)
   }
 
   /* ========= HEADER 6133 ========= */

@@ -98,6 +98,7 @@ describe('FileCreateService', () => {
     // Assert
     // -------------------------
     expect(writeFileSync).toHaveBeenCalledOnce()
+    console.log((fileTransferClientService.sendFileToTransferService as Mock).mock.calls)
 
     expect(fileTransferClientService.sendFileToTransferService).toHaveBeenCalledWith(
       expect.any(String), // outputPath

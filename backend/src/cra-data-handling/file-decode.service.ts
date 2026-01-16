@@ -94,7 +94,7 @@ export class FileDecodeService {
 }
 
 // test parsing
-const outputPath = 'output_cra_file.txt'
-const creator = new FileDecodeService()
-const parsed = creator.parseFile(outputPath)
-console.log('parsed file', JSON.stringify(parsed, null, 2))
+// const outputPath = 'output_cra_file.txt'
+// const creator = new FileDecodeService()
+// const parsed = creator.parseFile(outputPath)
+// console.log('parsed file', JSON.stringify(parsed, null, 2))

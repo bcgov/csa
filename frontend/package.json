@@ -12,7 +12,8 @@
     "prod-build": "vite build --mode production",
     "serve": "vite preview",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "lint:fix": "eslint --fix",
+    "lint:fix:all": "eslint . --fix",
     "test": "vitest",
     "test:cov": "vitest --coverage"
   },
@@ -25,6 +26,7 @@
     "@tanstack/react-router": "^1.114.12",
     "@tanstack/router-plugin": "^1.114.27",
     "axios": "^1.7.9",
+    "keycloak-js": "^26.2.2",
     "react": "^19.2.0",
     "react-bootstrap": "^2.10.9",
     "react-dom": "^19.2.0"

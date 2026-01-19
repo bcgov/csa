@@ -1,5 +1,7 @@
 import FilterListIcon from '@mui/icons-material/FilterList'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import {
   AppBar,
   Box,
@@ -26,6 +28,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
+import { useAuth } from './context/AuthContext'
 import './App.css'
 import logo from './icons/image.png'
 
@@ -330,18 +333,26 @@ const childBatchHistory = [
 ]
 
 function App() {
+  // Use Keycloak authentication
+  const { isAuthenticated: keycloakAuthenticated, isLoading, user, login, logout } = useAuth()
+
+  // Local authentication state for IDIR mock login
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    const authToken = localStorage.getItem('authToken')
-    return !!authToken
+    const saved = localStorage.getItem('isLoggedIn')
+    return saved === 'true'
   })
+  const [showIdirLogin, setShowIdirLogin] = useState(false)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+
+  // User is authenticated if either Keycloak or mock login is active
+  const isAuthenticated = keycloakAuthenticated || isLoggedIn
+
   const [selectedTab, setSelectedTab] = useState(0)
   const [selected, setSelected] = useState<number[]>([])
   const [selectedBatchDetails, setSelectedBatchDetails] = useState<number[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterSearchTerm, setFilterSearchTerm] = useState('')
-  const [showIdirLogin, setShowIdirLogin] = useState(false)
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
   const [selectedChild, setSelectedChild] = useState<number | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<number>(1) // Default to first batch
 
@@ -351,6 +362,18 @@ function App() {
     column: string
   }
   const [filterAnchor, setFilterAnchor] = useState<FilterAnchor>({ element: null, column: '' })
+
+  // Sort states
+  type SortAnchor = {
+    element: HTMLElement | null
+    column: string
+  }
+  const [sortAnchor, setSortAnchor] = useState<SortAnchor>({ element: null, column: '' })
+  const [sortConfig, setSortConfig] = useState<{
+    column: string
+    direction: 'asc' | 'desc'
+  } | null>(null)
+
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({
     childName: [],
     gender: [],
@@ -367,12 +390,36 @@ function App() {
     lastUpdatedBy: [],
   })
 
-  const handleLoginFlow = () => {
-    setIsLoggedIn(true)
-  }
-
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setSelectedTab(newValue)
+  }
+
+  // Mock IDIR login handler
+  const handleIdirLogin = () => {
+    // Simple validation - just check if fields are not empty
+    // if (username.trim() && password.trim()) {
+    setIsLoggedIn(true)
+    localStorage.setItem('isLoggedIn', 'true')
+    localStorage.setItem('authToken', `mock-token-${Date.now()}`)
+    localStorage.setItem('username', username)
+    setShowIdirLogin(false)
+    // }
+  }
+
+  // Mock logout handler
+  const handleLogout = () => {
+    if (keycloakAuthenticated) {
+      // Logout from Keycloak
+      logout()
+    } else {
+      // Logout from mock session
+      setIsLoggedIn(false)
+      localStorage.removeItem('isLoggedIn')
+      localStorage.removeItem('authToken')
+      localStorage.removeItem('username')
+      setUsername('')
+      setPassword('')
+    }
   }
 
   // Filter handling functions
@@ -399,15 +446,29 @@ function App() {
     setColumnFilters((prev) => ({ ...prev, [column]: [] }))
   }
 
+  // Sort handling functions
+  const handleSortClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
+    setSortAnchor({ element: event.currentTarget, column })
+  }
+
+  const handleSortClose = () => {
+    setSortAnchor({ element: null, column: '' })
+  }
+
+  const handleSort = (column: string, direction: 'asc' | 'desc') => {
+    setSortConfig({ column, direction })
+    handleSortClose()
+  }
+
   // Get unique values for a column
   const getUniqueValues = (column: keyof (typeof eligibilityData)[0]) => {
     const values = eligibilityData.map((row) => row[column])
     return Array.from(new Set(values)).filter((v) => v !== undefined && v !== '')
   }
 
-  // Apply filters to data
+  // Apply filters and sorting to data
   const filteredData = useMemo(() => {
-    return eligibilityData.filter((row) => {
+    let data = eligibilityData.filter((row) => {
       // Apply global search
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase()
@@ -429,7 +490,36 @@ function App() {
 
       return true
     })
-  }, [searchTerm, columnFilters])
+
+    // Apply sorting
+    if (sortConfig) {
+      data = [...data].sort((a, b) => {
+        const aValue = a[sortConfig.column as keyof typeof a]
+        const bValue = b[sortConfig.column as keyof typeof b]
+
+        // Handle different data types
+        if (aValue === undefined || aValue === '') return 1
+        if (bValue === undefined || bValue === '') return -1
+
+        // Numeric comparison
+        if (typeof aValue === 'number' && typeof bValue === 'number') {
+          return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue
+        }
+
+        // String comparison
+        const aString = String(aValue).toLowerCase()
+        const bString = String(bValue).toLowerCase()
+
+        if (sortConfig.direction === 'asc') {
+          return aString.localeCompare(bString)
+        } else {
+          return bString.localeCompare(aString)
+        }
+      })
+    }
+
+    return data
+  }, [searchTerm, columnFilters, sortConfig])
 
   // Get batch details for selected batch
   const currentBatchDetails = useMemo(() => {
@@ -458,17 +548,62 @@ function App() {
           flexShrink: 0,
         }}
       >
-        <Toolbar sx={{ padding: '8px 24px', justifyContent: 'center' }}>
+        <Toolbar sx={{ padding: '8px 24px', justifyContent: 'center', position: 'relative' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <img src={logo} alt="BC Logo" style={{ height: '40px' }} />
             <Typography variant="h6" component="div" sx={{ color: '#333', fontWeight: 500 }}>
               Children&apos;s Special Allowance
             </Typography>
           </Box>
+          {isAuthenticated && (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                position: 'absolute',
+                right: 24,
+              }}
+            >
+              <Typography variant="body2" sx={{ color: '#666' }}>
+                {user?.username || user?.name || username || 'User'}
+              </Typography>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleLogout}
+                sx={{
+                  textTransform: 'none',
+                  borderColor: '#3b6ea5',
+                  color: '#3b6ea5',
+                  '&:hover': {
+                    borderColor: '#2d5a8a',
+                    backgroundColor: '#f0f4f8',
+                  },
+                }}
+              >
+                Logout
+              </Button>
+            </Box>
+          )}
         </Toolbar>
       </AppBar>
 
-      {!isLoggedIn ? (
+      {isLoading ? (
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            flex: 1,
+            height: '100vh',
+          }}
+        >
+          <Typography variant="h6" sx={{ color: '#666' }}>
+            Loading...
+          </Typography>
+        </Box>
+      ) : !isAuthenticated ? (
         <Box
           sx={{
             textAlign: 'center',
@@ -477,98 +612,159 @@ function App() {
             justifyContent: 'center',
             flex: 1,
             alignItems: 'flex-start',
+            width: '100%',
           }}
         >
-          {!showIdirLogin ? (
-            <Box>
-              {/* <h1>Welcome to CSA</h1> */}
+          <Box sx={{ width: '100%', maxWidth: '800px' }}>
+            {!showIdirLogin ? (
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', marginTop: '20px' }}>
-                <Button variant="contained" color="primary" onClick={handleLoginFlow}>
-                  LOGIN VIA SSO
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={login}
+                  size="large"
+                  sx={{
+                    textTransform: 'uppercase',
+                    backgroundColor: '#1976d2',
+                    '&:hover': {
+                      backgroundColor: '#1565c0',
+                    },
+                  }}
+                >
+                  Login via SSO
                 </Button>
-                <Button variant="contained" color="primary" onClick={() => setShowIdirLogin(true)}>
-                  LOGIN WITH IDIR
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => setShowIdirLogin(true)}
+                  size="large"
+                  sx={{
+                    textTransform: 'uppercase',
+                    backgroundColor: '#1976d2',
+                    '&:hover': {
+                      backgroundColor: '#1565c0',
+                    },
+                  }}
+                >
+                  Login with IDIR
                 </Button>
               </Box>
-            </Box>
-          ) : (
-            <Box
-              sx={{
-                width: '400px',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                overflow: 'hidden',
-                boxShadow: 2,
-              }}
-            >
-              {/* IDIR Login Form Header */}
+            ) : (
               <Box
                 sx={{
-                  backgroundColor: '#3b6ea5',
-                  color: 'white',
-                  padding: '12px 16px',
-                  fontWeight: 500,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  maxWidth: '400px',
+                  margin: '0 auto',
+                  marginTop: '40px',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                 }}
               >
-                Log in with IDIR
-              </Box>
-
-              {/* Login Form Body */}
-              <Box sx={{ padding: '24px' }}>
-                <Box sx={{ mb: 3 }}>
-                  <Typography sx={{ mb: 1, fontSize: '14px', fontWeight: 500 }}>
-                    Username
+                {/* Header */}
+                <Box
+                  sx={{
+                    backgroundColor: '#5b7f95',
+                    color: '#ffffff',
+                    padding: '16px',
+                    textAlign: 'center',
+                  }}
+                >
+                  <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                    Log in with IDIR
                   </Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    placeholder="Example@bc...."
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    variant="outlined"
-                  />
                 </Box>
 
-                <Box sx={{ mb: 3 }}>
-                  <Typography sx={{ mb: 1, fontSize: '14px', fontWeight: 500 }}>
-                    Password
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    type="password"
-                    placeholder="************"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    variant="outlined"
-                  />
-                </Box>
+                {/* Form Content */}
+                <Box sx={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                  <Box>
+                    <Typography
+                      variant="body2"
+                      sx={{ mb: 1, color: '#333', fontWeight: 500, textAlign: 'center' }}
+                    >
+                      Username
+                    </Typography>
+                    <TextField
+                      placeholder="Example@bc..."
+                      variant="outlined"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      fullWidth
+                      size="small"
+                    />
+                  </Box>
 
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                  <Button
-                    variant="outlined"
-                    onClick={() => setShowIdirLogin(false)}
-                    sx={{ textTransform: 'none' }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="contained"
-                    onClick={handleLoginFlow}
+                  <Box>
+                    <Typography
+                      variant="body2"
+                      sx={{ mb: 1, color: '#333', fontWeight: 500, textAlign: 'center' }}
+                    >
+                      Password
+                    </Typography>
+                    <TextField
+                      placeholder="************"
+                      type="password"
+                      variant="outlined"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      fullWidth
+                      size="small"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleIdirLogin()
+                        }
+                      }}
+                    />
+                  </Box>
+
+                  <Box
                     sx={{
-                      textTransform: 'none',
-                      backgroundColor: '#3b6ea5',
-                      '&:hover': {
-                        backgroundColor: '#2d5a8a',
-                      },
+                      display: 'flex',
+                      gap: 2,
+                      justifyContent: 'flex-end',
+                      marginTop: '10px',
                     }}
                   >
-                    Continue
-                  </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        setShowIdirLogin(false)
+                        setUsername('')
+                        setPassword('')
+                      }}
+                      sx={{
+                        textTransform: 'none',
+                        borderColor: '#1976d2',
+                        color: '#1976d2',
+                        '&:hover': {
+                          borderColor: '#1565c0',
+                          backgroundColor: '#f0f4f8',
+                        },
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={handleIdirLogin}
+                      sx={{
+                        textTransform: 'none',
+                        backgroundColor: '#1976d2',
+                        '&:hover': {
+                          backgroundColor: '#1565c0',
+                        },
+                      }}
+                    >
+                      Continue
+                    </Button>
+                  </Box>
                 </Box>
               </Box>
-            </Box>
-          )}
+            )}
+          </Box>
         </Box>
       ) : (
         <Box
@@ -655,6 +851,19 @@ function App() {
                       </IconButton>
                     </Tooltip>
                   </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                      Eligibility List
+                    </Typography>
+                    <Tooltip
+                      title="This list shows the master list of records from ICM. You can filter, search, and add children to batches from this view. Please click on the individual rows of the table for more details"
+                      arrow
+                    >
+                      <IconButton size="small" sx={{ padding: 0.5 }}>
+                        <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
                   <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                     <TextField
                       size="small"
@@ -697,7 +906,12 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Child Name
+                            <span
+                              onClick={(e) => handleSortClick(e, 'childName')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Child Name
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleFilterClick(e, 'childName')}
@@ -712,7 +926,12 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Gender
+                            <span
+                              onClick={(e) => handleSortClick(e, 'gender')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Gender
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleFilterClick(e, 'gender')}
@@ -727,7 +946,12 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            DOB
+                            <span
+                              onClick={(e) => handleSortClick(e, 'dob')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              DOB
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleFilterClick(e, 'dob')}
@@ -742,7 +966,12 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Age
+                            <span
+                              onClick={(e) => handleSortClick(e, 'age')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Age
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleFilterClick(e, 'age')}
@@ -757,7 +986,12 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            DIN
+                            <span
+                              onClick={(e) => handleSortClick(e, 'din')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              DIN
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleFilterClick(e, 'din')}
@@ -772,7 +1006,12 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            CSA Status
+                            <span
+                              onClick={(e) => handleSortClick(e, 'csaStatus')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              CSA Status
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleFilterClick(e, 'csaStatus')}
@@ -787,7 +1026,12 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Status Effective
+                            <span
+                              onClick={(e) => handleSortClick(e, 'statusEffective')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Status Effective
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleFilterClick(e, 'statusEffective')}
@@ -803,7 +1047,12 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Case No.
+                            <span
+                              onClick={(e) => handleSortClick(e, 'caseNumber')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Case No.
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleFilterClick(e, 'caseNumber')}
@@ -818,7 +1067,12 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Case Status
+                            <span
+                              onClick={(e) => handleSortClick(e, 'caseStatus')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Case Status
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleFilterClick(e, 'caseStatus')}
@@ -833,7 +1087,12 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Legacy File
+                            <span
+                              onClick={(e) => handleSortClick(e, 'legacyFile')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Legacy File
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleFilterClick(e, 'legacyFile')}
@@ -848,7 +1107,12 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Set on Hold By
+                            <span
+                              onClick={(e) => handleSortClick(e, 'cgwrks3')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Set on Hold By
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleFilterClick(e, 'cgwrks3')}
@@ -863,7 +1127,12 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Last Updated
+                            <span
+                              onClick={(e) => handleSortClick(e, 'lastUpdated')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Last Updated
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleFilterClick(e, 'lastUpdated')}
@@ -879,7 +1148,12 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Last Updated By
+                            <span
+                              onClick={(e) => handleSortClick(e, 'lastUpdatedBy')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Last Updated By
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleFilterClick(e, 'lastUpdatedBy')}
@@ -921,12 +1195,14 @@ function App() {
                             />
                           </TableCell>
                           <TableCell>{row.childName}</TableCell>
+                          <TableCell>{row.childName}</TableCell>
                           <TableCell>{row.gender}</TableCell>
                           <TableCell>{row.dob}</TableCell>
                           <TableCell>{row.age}</TableCell>
                           <TableCell>{row.din}</TableCell>
                           <TableCell>{row.csaStatus}</TableCell>
                           <TableCell>{row.statusEffective}</TableCell>
+                          <TableCell>{row.caseNumber}</TableCell>
                           <TableCell>{row.caseNumber}</TableCell>
                           <TableCell>{row.caseStatus}</TableCell>
                           <TableCell>{row.legacyFile}</TableCell>
@@ -1021,6 +1297,27 @@ function App() {
                   </Box>
                 </Menu>
 
+                {/* Sort Menu */}
+                <Menu
+                  anchorEl={sortAnchor.element}
+                  open={Boolean(sortAnchor.element)}
+                  onClose={handleSortClose}
+                  PaperProps={{
+                    sx: {
+                      width: 200,
+                    },
+                  }}
+                >
+                  <MenuItem onClick={() => handleSort(sortAnchor.column, 'asc')} sx={{ gap: 1.5 }}>
+                    <ArrowUpwardIcon fontSize="small" />
+                    <Typography variant="body2">Sort Ascending</Typography>
+                  </MenuItem>
+                  <MenuItem onClick={() => handleSort(sortAnchor.column, 'desc')} sx={{ gap: 1.5 }}>
+                    <ArrowDownwardIcon fontSize="small" />
+                    <Typography variant="body2">Sort Descending</Typography>
+                  </MenuItem>
+                </Menu>
+
                 {/* Details Section */}
                 {selectedChild !== null && (
                   <Box sx={{ mt: 3 }}>
@@ -1035,6 +1332,19 @@ function App() {
                           pb: 2,
                         }}
                       >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                            Details
+                          </Typography>
+                          <Tooltip
+                            title="Detailed information about the selected child including basic info, case details, placement information, and service provider details."
+                            arrow
+                          >
+                            <IconButton size="small" sx={{ padding: 0.5 }}>
+                              <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography variant="h6" sx={{ fontWeight: 500 }}>
                             Details
@@ -1430,6 +1740,19 @@ function App() {
                             </IconButton>
                           </Tooltip>
                         </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                            Batch History
+                          </Typography>
+                          <Tooltip
+                            title="Complete history of all batch submissions for the selected child, including batch status and transaction types."
+                            arrow
+                          >
+                            <IconButton size="small" sx={{ padding: 0.5 }}>
+                              <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
                         <Button
                           variant="contained"
                           size="small"
@@ -1706,7 +2029,7 @@ function App() {
         }}
       >
         <Typography variant="body2" sx={{ color: '#666', fontSize: '12px' }}>
-          © 2026 Government of British Columbia.
+          © 2026 Government of British Columbia. © 2026 Government of British Columbia.
         </Typography>
       </Box>
     </Box>

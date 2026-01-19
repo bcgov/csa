@@ -2,6 +2,7 @@ import '@bcgov/bc-sans/css/BC_Sans.css'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import * as ReactDOM from 'react-dom/client'
+import { AuthProvider } from './context/AuthContext'
 
 // Import bootstrap styles
 // import '@/scss/styles.scss'
@@ -21,6 +22,8 @@ declare module '@tanstack/react-router' {
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
   </StrictMode>,
 )

@@ -19,6 +19,12 @@
 		`
 	}
 
+	# Serve runtime config from mounted ConfigMap
+	handle /config.json {
+		root * /runtime-config
+		file_server
+	}
+
 	root * /srv
 	encode zstd gzip
 	file_server

@@ -34,11 +34,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         keycloakInstance
           .init({
             onLoad: 'check-sso',
-            silentCheckSsoRedirectUri:
-              window.location.origin + '/silent-check-sso.html',
+            silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
             pkceMethod: 'S256',
-            redirectUri:
-              'https://csa-frontend-dec59b-dev.apps.silver.devops.gov.bc.ca/',
+            redirectUri: 'https://csa-frontend-dec59b-dev.apps.silver.devops.gov.bc.ca/',
             // redirectUri: window.location.origin + '/',
           })
           .then((authenticated) => {
@@ -50,8 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 name: keycloakInstance.tokenParsed.name,
                 email: keycloakInstance.tokenParsed.email,
                 username: keycloakInstance.tokenParsed.preferred_username,
-                roles:
-                  keycloakInstance.tokenParsed.realm_access?.roles || [],
+                roles: keycloakInstance.tokenParsed.realm_access?.roles || [],
               })
 
               // Store token in localStorage

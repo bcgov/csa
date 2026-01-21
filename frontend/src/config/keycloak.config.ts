@@ -6,9 +6,7 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
   try {
     const response = await fetch('/config.json')
     if (!response.ok) {
-      throw new Error(
-        `Failed to load /config.json: ${response.status} ${response.statusText}`,
-      )
+      throw new Error(`Failed to load /config.json: ${response.status} ${response.statusText}`)
     }
 
     const config = await response.json()
@@ -68,4 +66,3 @@ async function initializeKeycloak(): Promise<Keycloak> {
 }
 
 export { getRuntimeConfig, initializeKeycloak }
-

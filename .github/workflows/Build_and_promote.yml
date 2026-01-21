@@ -7,6 +7,13 @@ on:
       - "frontend/**"
       - "backend/**"
   workflow_dispatch:
+    inputs:
+      target_env:
+        description: "Target env for manual runs (feature branches default to dev)"
+        type: choice
+        required: false
+        options: [dev, test, prod]
+        default: dev
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -37,6 +44,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          # Manual runs (workflow_dispatch): allow feature branches by using selected env (default dev)
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            case "${{ inputs.target_env }}" in
+              dev)  echo "envname=dev"  >> "$GITHUB_OUTPUT" ;;
+              test) echo "envname=test" >> "$GITHUB_OUTPUT" ;;
+              prod) echo "envname=prod" >> "$GITHUB_OUTPUT" ;;
+              *)    echo "Invalid target_env"; exit 1 ;;
+            esac
+            exit 0
+          fi
+
+          # Push runs: env derived from branch
           case "${GITHUB_REF_NAME}" in
             dev)  echo "envname=dev"  >> "$GITHUB_OUTPUT" ;;
             test) echo "envname=test" >> "$GITHUB_OUTPUT" ;;
@@ -170,7 +190,7 @@ jobs:
 
   build-frontend:
     needs: [detect-changes]
-    if: needs.detect-changes.outputs.frontend == 'true'
+    if: github.event_name == 'push' && needs.detect-changes.outputs.frontend == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -190,7 +210,7 @@ jobs:
 
   build-backend:
     needs: [detect-changes]
-    if: needs.detect-changes.outputs.backend == 'true'
+    if: github.event_name == 'push' && needs.detect-changes.outputs.backend == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -211,6 +231,7 @@ jobs:
   update-gitops:
     needs: [detect-changes, build-frontend, build-backend]
     if: >-
+      github.event_name == 'push' &&
       always() &&
       (needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.backend == 'true') &&
       (

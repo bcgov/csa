@@ -67,5 +67,5 @@ async function initializeKeycloak(): Promise<Keycloak> {
   return keycloakInstance
 }
 
-export { initializeKeycloak, getRuntimeConfig }
+export { getRuntimeConfig, initializeKeycloak }
 

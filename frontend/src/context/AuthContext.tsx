@@ -1,6 +1,6 @@
+import type Keycloak from 'keycloak-js'
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { initializeKeycloak } from '../config/keycloak.config'
-import type Keycloak from 'keycloak-js'
 
 interface AuthContextType {
   isAuthenticated: boolean

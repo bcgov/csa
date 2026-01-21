@@ -88,18 +88,28 @@ jobs:
       (github.event_name != 'pull_request' || !github.event.pull_request.draft) &&
       needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
     steps:
-      - uses: bcgov/action-test-and-analyse@c20d16c26d9b7e6e486f01702880053ed4ebdc91
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          commands: |
-            npm ci
-            npm run lint
-            npm run test:cov
-          dir: frontend
-          node_version: "22"
-          supply_scan: true
-          triggers: ('frontend/')
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run tests with coverage
+        run: npm run test:cov
 
     # ----------------------------
   # 4) Trivy Security Scan

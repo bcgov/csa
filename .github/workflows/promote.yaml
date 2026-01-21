@@ -304,7 +304,10 @@ jobs:
           if [[ "$ENV" == "dev" ]]; then
             git add .
             git commit -m "Promote to dev: ${{ github.repository }} ${TAG}"
+
+            git remote set-url origin "https://x-access-token:${{ secrets.GITOPS_PUSH_TOKEN }}@github.com/${{ env.GITOPS_REPO }}.git"
             git push origin "${{ env.GITOPS_BASE_BRANCH }}"
+
             echo "Pushed dev promotion directly to GitOps main."
             exit 0
           fi

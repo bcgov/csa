@@ -2,16 +2,16 @@ import apiService from '@/service/api-service'
 import type { FC } from 'react'
 import { useEffect, useState } from 'react'
 import { Button, Modal, Table } from 'react-bootstrap'
-import type ApplicantDto from 'src/interfaces/ApplicantDto'
+import type ContactDto from 'src/interfaces/ContactDto'
 import type { AxiosResponse } from '~/axios'
 
 type ModalProps = {
   show: boolean
   onHide: () => void
-  applicant?: ApplicantDto
+  contact?: ContactDto
 }
 
-const ModalComponent: FC<ModalProps> = ({ show, onHide, applicant }) => {
+const ModalComponent: FC<ModalProps> = ({ show, onHide, contact }) => {
   return (
     <Modal
       show={show}
@@ -23,7 +23,7 @@ const ModalComponent: FC<ModalProps> = ({ show, onHide, applicant }) => {
       <Modal.Header closeButton>
         <Modal.Title id="contained-modal-title-vcenter">Row Details</Modal.Title>
       </Modal.Header>
-      <Modal.Body>{JSON.stringify(applicant)}</Modal.Body>
+      <Modal.Body>{JSON.stringify(contact)}</Modal.Body>
       <Modal.Footer>
         <Button onClick={onHide}>Close</Button>
       </Modal.Footer>
@@ -33,24 +33,24 @@ const ModalComponent: FC<ModalProps> = ({ show, onHide, applicant }) => {
 
 const Dashboard: FC = () => {
   const [data, setData] = useState<any>([])
-  const [selectedApplicant, setSelectedUser] = useState<ApplicantDto | undefined>(undefined)
+  const [selectedContact, setSelectedUser] = useState<ContactDto | undefined>(undefined)
 
   useEffect(() => {
     apiService
       .getAxiosInstance()
-      .get('/v1/applicants')
+      .get('/contacts')
       .then((response: AxiosResponse) => {
-        const applicants: ApplicantDto[] = []
-        for (const applicant of response.data) {
-          const applicantDto = {
-            id: applicant.id,
-            last_name: applicant.last_name,
-            given_name: applicant.given_name,
-            csa_status: applicant.csa_status,
+        const contacts: ContactDto[] = []
+        for (const contact of response.data) {
+          const contactDto = {
+            id: contact.id,
+            last_name: contact.last_name,
+            given_names: contact.given_names,
+            csa_status: contact.csa_status,
           }
-          applicants.push(applicantDto)
+          contacts.push(contactDto)
         }
-        setData(applicants)
+        setData(contacts)
       })
       .catch((error) => {
         console.error(error)
@@ -66,22 +66,22 @@ const Dashboard: FC = () => {
       <Table striped bordered hover>
         <thead>
           <tr>
-            <th>Applicant ID</th>
-            <th>Applicant Last Name</th>
-            <th>Applicant Given Name</th>
-            <th>Applicant CS Status</th>
+            <th>Contact ID</th>
+            <th>Contact Last Name</th>
+            <th>Contact Given Name</th>
+            <th>Contact CS Status</th>
             <th />
           </tr>
         </thead>
         <tbody>
-          {data.map((applicant: ApplicantDto) => (
-            <tr key={applicant.id}>
-              <td>{applicant.id}</td>
-              <td>{applicant.last_name}</td>
-              <td>{applicant.given_name}</td>
-              <td>{applicant.csa_status}</td>
+          {data.map((contact: ContactDto) => (
+            <tr key={contact.id}>
+              <td>{contact.id}</td>
+              <td>{contact.last_name}</td>
+              <td>{contact.given_names}</td>
+              <td>{contact.csa_status}</td>
               <td className="text-center">
-                <Button variant="secondary" size="sm" onClick={() => setSelectedUser(applicant)}>
+                <Button variant="secondary" size="sm" onClick={() => setSelectedUser(contact)}>
                   View Details
                 </Button>
               </td>
@@ -89,11 +89,7 @@ const Dashboard: FC = () => {
           ))}
         </tbody>
       </Table>
-      <ModalComponent
-        show={!!selectedApplicant}
-        onHide={handleClose}
-        applicant={selectedApplicant}
-      />
+      <ModalComponent show={!!selectedContact} onHide={handleClose} contact={selectedContact} />
     </div>
   )
 }

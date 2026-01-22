@@ -191,3 +191,5 @@ If you're deploying to BC Government infrastructure:
 - [Keycloak Documentation](https://www.keycloak.org/documentation)
 - [Keycloak JavaScript Adapter](https://www.keycloak.org/docs/latest/securing_apps/#_javascript_adapter)
 - [BC Government SSO](https://github.com/bcgov/sso-keycloak)
+
+This section added to test CI

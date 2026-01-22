@@ -1,4 +1,3 @@
-import { VersioningType } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
@@ -20,16 +19,7 @@ export async function bootstrap() {
   app.use(metricsMiddleware)
   app.enableShutdownHooks()
   app.setGlobalPrefix('api')
-  app.enableVersioning({
-    type: VersioningType.URI,
-    prefix: 'v',
-  })
-  const config = new DocumentBuilder()
-    .setTitle('Applicants example')
-    .setDescription('The user API description')
-    .setVersion('1.0')
-    .addTag('applicants')
-    .build()
+  const config = new DocumentBuilder().setTitle('CSA API').setDescription('CSA BACKEND API').build()
 
   const document = SwaggerModule.createDocument(app, config)
   SwaggerModule.setup('/api/docs', app, document)

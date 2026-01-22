@@ -1,7 +1,7 @@
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import {
   AppBar,
   Box,
@@ -28,8 +28,8 @@ import {
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
-import { useAuth } from './context/AuthContext'
 import './App.css'
+import { useAuth } from './context/AuthContext'
 import logo from './icons/image.png'
 
 // Sample data for the eligibility table
@@ -851,19 +851,6 @@ function App() {
                       </IconButton>
                     </Tooltip>
                   </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                      Eligibility List
-                    </Typography>
-                    <Tooltip
-                      title="This list shows the master list of records from ICM. You can filter, search, and add children to batches from this view. Please click on the individual rows of the table for more details"
-                      arrow
-                    >
-                      <IconButton size="small" sx={{ padding: 0.5 }}>
-                        <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
                   <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                     <TextField
                       size="small"
@@ -1195,14 +1182,12 @@ function App() {
                             />
                           </TableCell>
                           <TableCell>{row.childName}</TableCell>
-                          <TableCell>{row.childName}</TableCell>
                           <TableCell>{row.gender}</TableCell>
                           <TableCell>{row.dob}</TableCell>
                           <TableCell>{row.age}</TableCell>
                           <TableCell>{row.din}</TableCell>
                           <TableCell>{row.csaStatus}</TableCell>
                           <TableCell>{row.statusEffective}</TableCell>
-                          <TableCell>{row.caseNumber}</TableCell>
                           <TableCell>{row.caseNumber}</TableCell>
                           <TableCell>{row.caseStatus}</TableCell>
                           <TableCell>{row.legacyFile}</TableCell>
@@ -1740,19 +1725,6 @@ function App() {
                             </IconButton>
                           </Tooltip>
                         </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                            Batch History
-                          </Typography>
-                          <Tooltip
-                            title="Complete history of all batch submissions for the selected child, including batch status and transaction types."
-                            arrow
-                          >
-                            <IconButton size="small" sx={{ padding: 0.5 }}>
-                              <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
                         <Button
                           variant="contained"
                           size="small"
@@ -2029,7 +2001,7 @@ function App() {
         }}
       >
         <Typography variant="body2" sx={{ color: '#666', fontSize: '12px' }}>
-          © 2026 Government of British Columbia. © 2026 Government of British Columbia.
+          © 2026 Government of British Columbia.
         </Typography>
       </Box>
     </Box>

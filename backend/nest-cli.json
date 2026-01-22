@@ -5,6 +5,13 @@
   "compilerOptions": {
     "builder": "swc",
     "typeCheck": true,
-    "watchAssets": true
+    "watchAssets": true,
+    "assets": [
+      {
+        "include": "src/api/mock/data/**/*",
+        "outDir": "dist/api/mock/data",
+        "watchAssets": true
+      }
+    ]
   }
 }

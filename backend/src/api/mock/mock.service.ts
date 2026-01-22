@@ -25,6 +25,7 @@ export class MockService {
   }
 
   listFiles(): string[] {
+    console.log({ directory: this.dataDir })
     if (!existsSync(this.dataDir)) {
       return []
     }

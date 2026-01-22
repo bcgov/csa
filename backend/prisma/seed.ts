@@ -1,8 +1,22 @@
 // seed.ts
 import { faker } from '@faker-js/faker'
+import { PrismaPg } from '@prisma/adapter-pg'
 import { Prisma, PrismaClient } from '@prisma/client'
+import 'dotenv/config'
 
-const prisma = new PrismaClient()
+const DB_HOST = process.env.POSTGRES_HOST || 'localhost'
+const DB_USER = process.env.POSTGRES_USER || 'postgres'
+const DB_PWD = encodeURIComponent(process.env.POSTGRES_PASSWORD || 'default')
+const DB_PORT = process.env.POSTGRES_PORT || 5432
+const DB_NAME = process.env.POSTGRES_DATABASE || 'postgres'
+const DB_SCHEMA = process.env.POSTGRES_SCHEMA || 'csa'
+
+const connectionString =
+  process.env.DATABASE_URL ||
+  `postgresql://${DB_USER}:${DB_PWD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?schema=${DB_SCHEMA}`
+
+const adapter = new PrismaPg({ connectionString })
+const prisma = new PrismaClient({ adapter })
 
 const CONTACT_COUNT = 20
 
@@ -84,80 +98,83 @@ async function seedContacts() {
     const sourceOrder = faker.helpers.arrayElement(SOURCES)
 
     return {
-      last_name: faker.person.lastName(),
-      given_names: givenNames, // NOT NULL
-      middle_name: middle, // NOT NULL
-      aka_last_name: faker.person.lastName(),
-      aka_first_name: faker.person.firstName(),
+      lastName: faker.person.lastName(),
+      givenNames: givenNames, // NOT NULL
+      middleName: middle, // NOT NULL
+      akaLastName: faker.person.lastName(),
+      akaFirstName: faker.person.firstName(),
 
-      person_id_icm: faker.string.alphanumeric(10).toUpperCase(),
-      person_id_ims: faker.string.alphanumeric(10).toUpperCase(),
+      personIdIcm: faker.string.alphanumeric(10).toUpperCase(),
+      personIdIms: faker.string.alphanumeric(10).toUpperCase(),
 
       gender: faker.helpers.arrayElement(GENDERS),
-      date_of_birth: birthDate,
+      dateOfBirth: birthDate,
       age,
 
-      case_number: faker.string.alphanumeric(8).toUpperCase(), // NOT NULL
-      legacy_file_number: faker.string.alphanumeric(12).toUpperCase(),
-      case_type: faker.helpers.arrayElement(CASE_TYPES), // NOT NULL
-      case_status: faker.helpers.arrayElement(CASE_STATUSES), // NOT NULL
-      case_load: faker.string.alphanumeric(6).toUpperCase(), // NOT NULL
-      service_office: faker.company.name(),
-      assigned_to: faker.person.fullName(),
+      caseNumber: faker.string.alphanumeric(8).toUpperCase(), // NOT NULL
+      legacyFileNumber: faker.string.alphanumeric(12).toUpperCase(),
+      caseType: faker.helpers.arrayElement(CASE_TYPES), // NOT NULL
+      caseStatus: faker.helpers.arrayElement(CASE_STATUSES), // NOT NULL
+      caseLoad: faker.string.alphanumeric(6).toUpperCase(), // NOT NULL
+      serviceOffice: faker.company.name(),
+      assignedTo: faker.person.fullName(),
 
-      csa_status: faker.helpers.arrayElement(CSA_STATUSES),
-      csa_status_effective_date: csaStatusEffective, // TIMESTAMP
-      csa_sent_date: csaSentDate, // TIMESTAMP
+      csaStatus: faker.helpers.arrayElement(CSA_STATUSES),
+      csaStatusEffectiveDate: csaStatusEffective, // TIMESTAMP
+      csaSentDate: csaSentDate, // TIMESTAMP
 
       din: faker.string.alphanumeric(9).toUpperCase(),
-      effective_legal_status: faker.helpers.arrayElement(['Permanent', 'Temporary', 'Pending']),
-      effective_date: effectiveDate,
-      expiry_date: expiryDate,
-      enroll_for_csa: faker.helpers.arrayElement(YES_NO),
-      mis_legal_authority_code: `MLA-${faker.string.alphanumeric(3).toUpperCase()}`,
-      legal_authority_code: `LA-${faker.string.alphanumeric(3).toUpperCase()}`,
+      effectiveLegalStatus: faker.helpers.arrayElement(['Permanent', 'Temporary', 'Pending']),
+      effectiveDate: effectiveDate,
+      expiryDate: expiryDate,
+      enrollForCsa: faker.helpers.arrayElement(YES_NO),
+      misLegalAuthorityCode: `MLA-${faker.string.alphanumeric(3).toUpperCase()}`,
+      legalAuthorityCode: `LA-${faker.string.alphanumeric(3).toUpperCase()}`,
 
-      birth_city: faker.location.city(),
-      birth_province: faker.location.state({ abbreviated: true }),
-      birth_country: faker.location.country(),
+      birthCity: faker.location.city(),
+      birthProvince: faker.location.state({ abbreviated: true }),
+      birthCountry: faker.location.country(),
 
-      placement_location: faker.location.city(),
-      location_type: faker.helpers.arrayElement(LOCATION_TYPES),
-      location_sub_type: faker.helpers.arrayElement(LOCATION_SUB_TYPES),
-      placement_status: faker.helpers.arrayElement(PLACEMENT_STATUSES),
-      actual_start_date: actualStartDate,
-      actual_end_date: actualEndDate ?? null,
-      paid_unpaid: faker.helpers.arrayElement(['Paid', 'Unpaid']),
-      interrupted_placement: faker.helpers.arrayElement(YES_NO),
-      source_placement: faker.helpers.arrayElement(SOURCES),
+      placementLocation: faker.location.city(),
+      locationType: faker.helpers.arrayElement(LOCATION_TYPES),
+      locationSubType: faker.helpers.arrayElement(LOCATION_SUB_TYPES),
+      placementStatus: faker.helpers.arrayElement(PLACEMENT_STATUSES),
+      actualStartDate: actualStartDate,
+      actualEndDate: actualEndDate ?? null,
+      paidUnpaid: faker.helpers.arrayElement(['Paid', 'Unpaid']),
+      interruptedPlacement: faker.helpers.arrayElement(YES_NO),
+      sourcePlacement: faker.helpers.arrayElement(SOURCES),
 
-      service_provider_name: faker.company.name(),
-      provider_id: faker.string.alphanumeric(8).toUpperCase(),
-      place_of_service_name: faker.company.name(),
+      serviceProviderName: faker.company.name(),
+      providerId: faker.string.alphanumeric(8).toUpperCase(),
+      placeOfServiceName: faker.company.name(),
 
-      agreement_type: faker.helpers.arrayElement(AGREEMENT_TYPES),
-      agreement_status: faker.helpers.arrayElement(AGREEMENT_STATUSES),
-      agreement_start_date: agreementStart,
-      agreement_end_date: agreementEnd ?? null,
-      termination_date: terminationDate ?? null,
-      mcfd_contract: faker.string.alphanumeric(10).toUpperCase(),
+      agreementType: faker.helpers.arrayElement(AGREEMENT_TYPES),
+      agreementStatus: faker.helpers.arrayElement(AGREEMENT_STATUSES),
+      agreementStartDate: agreementStart,
+      agreementEndDate: agreementEnd ?? null,
+      terminationDate: terminationDate ?? null,
+      mcfdContract: faker.string.alphanumeric(10).toUpperCase(),
 
-      order_number: faker.string.alphanumeric(8).toUpperCase(),
-      order_type: faker.helpers.arrayElement(ORDER_TYPES),
-      order_status: faker.helpers.arrayElement(ORDER_STATUSES),
-      order_amount: orderAmount, // NUMERIC(22,7)
-      order_effective_start_date: orderEffectiveStartDate,
+      orderNumber: faker.string.alphanumeric(8).toUpperCase(),
+      orderType: faker.helpers.arrayElement(ORDER_TYPES),
+      orderStatus: faker.helpers.arrayElement(ORDER_STATUSES),
+      orderAmount: orderAmount, // NUMERIC(22,7)
+      orderEffectiveStartDate: orderEffectiveStartDate,
       product: faker.helpers.arrayElement(PRODUCTS),
-      source_order: sourceOrder, // NOT NULL
+      sourceOrder: sourceOrder, // NOT NULL
 
-      created_at: now,
-      created_by: 'seed',
-      last_updated_at: now,
-      last_updated_by: 'seed',
+      createdAt: now,
+      createdBy: 'seed',
+      lastUpdatedAt: now,
+      lastUpdatedBy: 'seed',
     }
   })
+  // clear existing data first
+  await prisma.contact.deleteMany()
+  console.log('Cleared exising contacts')
 
-  await prisma.contacts.createMany({ data: contacts })
+  await prisma.contact.createMany({ data: contacts })
   console.log(`Seeded ${CONTACT_COUNT} contacts.`)
 }
 

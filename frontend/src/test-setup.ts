@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll } from 'vitest'
 
-const applicants = [
+const contacts = [
   {
     id: 1,
     name: 'first post title',
@@ -13,8 +13,8 @@ const applicants = [
 ]
 
 export const restHandlers = [
-  http.get('http://localhost:3000/api/v1/applicants', () => {
-    return new HttpResponse(JSON.stringify(applicants), {
+  http.get('http://localhost:3000/api/contacts', () => {
+    return new HttpResponse(JSON.stringify(contacts), {
       status: 200,
     })
   }),

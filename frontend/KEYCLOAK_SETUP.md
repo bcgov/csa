@@ -22,6 +22,7 @@ VITE_KEYCLOAK_CLIENT_ID=csa-frontend
 ```
 
 **For BC Government SSO:**
+
 ```env
 VITE_KEYCLOAK_URL=https://loginproxy.gov.bc.ca/auth
 # or
@@ -36,6 +37,7 @@ VITE_KEYCLOAK_CLIENT_ID=csa-frontend
 You need to configure a Keycloak client with the following settings:
 
 #### Client Settings:
+
 - **Client ID**: `csa-frontend` (or your preferred client ID)
 - **Client Protocol**: `openid-connect`
 - **Access Type**: `public`
@@ -44,16 +46,21 @@ You need to configure a Keycloak client with the following settings:
 - **Implicit Flow Enabled**: `OFF`
 
 #### Valid Redirect URIs:
+
 Add these redirect URIs (adjust based on your environment):
+
 - Development: `http://localhost:5173/*`
 - Production: `https://your-production-domain.com/*`
 
 #### Web Origins:
+
 Add these web origins:
+
 - Development: `http://localhost:5173`
 - Production: `https://your-production-domain.com`
 
 #### Valid Post Logout Redirect URIs:
+
 - Development: `http://localhost:5173`
 - Production: `https://your-production-domain.com`
 
@@ -104,6 +111,7 @@ function MyComponent() {
 ### 7. Available User Information
 
 The `user` object from `useAuth()` contains:
+
 - `name` - Full name of the user
 - `email` - Email address
 - `username` - Username (typically IDIR)
@@ -127,16 +135,19 @@ The `user` object from `useAuth()` contains:
 ### 10. Troubleshooting
 
 #### Login redirect loop
+
 - Check that redirect URIs are properly configured in Keycloak
 - Verify the Keycloak URL is correct
 - Check browser console for errors
 
 #### Token refresh fails
+
 - Verify token lifespan settings in Keycloak
 - Check network connectivity
 - Review Keycloak server logs
 
 #### User information not available
+
 - Verify that user attributes are mapped in Keycloak client
 - Check that realm_access roles are properly configured
 - Review token claims in browser developer tools
@@ -144,6 +155,7 @@ The `user` object from `useAuth()` contains:
 ### 11. Development vs Production
 
 **Development (.env.local):**
+
 ```env
 VITE_KEYCLOAK_URL=http://localhost:8080/auth
 VITE_KEYCLOAK_REALM=dev-realm
@@ -151,6 +163,7 @@ VITE_KEYCLOAK_CLIENT_ID=csa-frontend-dev
 ```
 
 **Production (.env.production):**
+
 ```env
 VITE_KEYCLOAK_URL=https://sso.production.com/auth
 VITE_KEYCLOAK_REALM=production-realm
@@ -191,5 +204,3 @@ If you're deploying to BC Government infrastructure:
 - [Keycloak Documentation](https://www.keycloak.org/documentation)
 - [Keycloak JavaScript Adapter](https://www.keycloak.org/docs/latest/securing_apps/#_javascript_adapter)
 - [BC Government SSO](https://github.com/bcgov/sso-keycloak)
-
-This section added to test CI

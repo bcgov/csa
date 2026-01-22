@@ -7,12 +7,19 @@ import { PrismaService } from 'src/common/database/prisma.service'
 import { HTTPLoggerMiddleware } from '../common/middleware/req.res.logger'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
-import { ApplicantsModule } from './applicants/applicants.module'
+import { ContactsModule } from './contacts/contacts.module'
 import { HealthController } from './health/health.controller'
 import { MetricsController } from './metrics/metrics.controller'
+import { MockModule } from './mock/mock.module'
 
+const enableMockApi = process.env.ENABLE_MOCK_API === 'true'
 @Module({
-  imports: [ConfigModule.forRoot(), TerminusModule, ApplicantsModule],
+  imports: [
+    ConfigModule.forRoot(),
+    TerminusModule,
+    ContactsModule,
+    ...(enableMockApi ? [MockModule] : []),
+  ],
   controllers: [AppController, MetricsController, HealthController],
   providers: [AppService, PrismaService],
 })

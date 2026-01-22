@@ -8,8 +8,7 @@
     "watchAssets": true,
     "assets": [
       {
-        "include": "src/api/mock/data/**/*",
-        "outDir": "dist/api/mock/data",
+        "include": "api/mock/data/**/*.json",
         "watchAssets": true
       }
     ]

@@ -11,7 +11,7 @@
         "GET",
         "DELETE"
       ],
-      "path": "/api/v1/user/",
+      "path": "/api/user/",
       "headers": {
         "Content-Type": "application/json",
         "accept": "application/json"

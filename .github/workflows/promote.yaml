@@ -1,0 +1,322 @@
+name: Promote (Build Images + Update GitOps)
+
+on:
+  push:
+    branches: [dev, test, main]
+    paths:
+      - "frontend/**"
+      - "backend/**"
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (dev/test/prod)"
+        type: choice
+        required: true
+        options: [dev, test, prod]
+
+      service:
+        description: "Which service(s) to promote"
+        type: choice
+        required: true
+        options: [frontend, backend, both]
+
+      tag:
+        description: "Image tag to promote (manual runs). If empty and build_images=true, defaults to <env>-<branch>-<sha7>."
+        type: string
+        required: false
+
+      build_images:
+        description: "Build & push images (false = promote existing tag only; requires tag)"
+        type: boolean
+        required: false
+        default: true
+
+concurrency:
+  group: promote-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  ORG: bcgov
+  SERVICE_FRONTEND: csa-frontend
+  SERVICE_BACKEND: csa-backend
+
+  # GitOps repo ArgoCD watches
+  GITOPS_REPO: bcgov-c/tenant-gitops-dec59b
+  GITOPS_BASE_BRANCH: main
+
+  # Overlays inside GitOps repo
+  FRONTEND_OVERLAY: apps/csa-frontend/overlays
+  BACKEND_OVERLAY: apps/csa-backend/overlays
+
+  # Image names referenced in kustomization.yaml
+  FRONTEND_IMAGE: ghcr.io/bcgov/csa-frontend
+  BACKEND_IMAGE: ghcr.io/bcgov/csa-backend
+
+jobs:
+  detect:
+    name: Determine env/tag/services
+    runs-on: ubuntu-24.04
+    outputs:
+      envname: ${{ steps.vars.outputs.envname }}
+      tag: ${{ steps.vars.outputs.tag }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+      svc: ${{ steps.vars.outputs.svc }}
+      build_images: ${{ steps.vars.outputs.build_images }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+            backend:
+              - 'backend/**'
+
+      - id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ENVNAME=""
+          SVC=""
+          BUILD_IMAGES="true"
+
+          # --- push (normal promotions) ---
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            case "${GITHUB_REF_NAME}" in
+              dev)  ENVNAME="dev"  ;;
+              test) ENVNAME="test" ;;
+              main) ENVNAME="prod" ;;
+              *) echo "Unsupported branch for promotion: ${GITHUB_REF_NAME}" ; exit 1 ;;
+            esac
+
+            FE="${{ steps.filter.outputs.frontend }}"
+            BE="${{ steps.filter.outputs.backend }}"
+            if [[ "$FE" == "true" && "$BE" == "true" ]]; then
+              SVC="both"
+            elif [[ "$FE" == "true" ]]; then
+              SVC="frontend"
+            elif [[ "$BE" == "true" ]]; then
+              SVC="backend"
+            else
+              SVC="none"
+            fi
+
+            TAG="${ENVNAME}-${GITHUB_SHA::7}"
+            BUILD_IMAGES="true"
+
+            {
+              echo "envname=$ENVNAME"
+              echo "svc=$SVC"
+              echo "tag=$TAG"
+              echo "build_images=$BUILD_IMAGES"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # --- workflow_dispatch (manual build/promotion) ---
+          ENVNAME="${{ inputs.environment }}"
+          SVC="${{ inputs.service }}"
+          TAG_IN="${{ inputs.tag }}"
+          BUILD_IMAGES="${{ inputs.build_images }}"
+
+          [[ "$ENVNAME" =~ ^(dev|test|prod)$ ]] || { echo "Invalid environment: $ENVNAME"; exit 1; }
+          [[ "$SVC" =~ ^(frontend|backend|both)$ ]] || { echo "Invalid service: $SVC"; exit 1; }
+
+          # Enforce: if build_images=false, tag MUST be provided (we're promoting an existing image)
+          if [[ "$BUILD_IMAGES" != "true" && -z "$TAG_IN" ]]; then
+            echo "ERROR: build_images=false requires a tag input (promoting existing image)."
+            exit 1
+          fi
+
+          # Branch name of this workflow run (chosen in Actions UI)
+          BRANCH="${GITHUB_REF_NAME}"
+          SAFE_BRANCH="$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_.-]+/-/g' | sed -E 's/^-+|-+$//g')"
+
+          if [[ -n "$TAG_IN" ]]; then
+            TAG="$TAG_IN"
+          else
+            # Default only when we're building
+            TAG="${ENVNAME}-${SAFE_BRANCH}-${GITHUB_SHA::7}"
+          fi
+
+          {
+            echo "envname=$ENVNAME"
+            echo "svc=$SVC"
+            echo "tag=$TAG"
+            echo "build_images=$BUILD_IMAGES"
+          } >> "$GITHUB_OUTPUT"
+
+  build-frontend:
+    name: Build & Push Frontend Image
+    needs: [detect]
+    if: >-
+      (needs.detect.outputs.svc == 'frontend' || needs.detect.outputs.svc == 'both') &&
+      (
+        github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && needs.detect.outputs.build_images == 'true')
+      )
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.SERVICE_FRONTEND }}:${{ needs.detect.outputs.tag }}
+
+  build-backend:
+    name: Build & Push Backend Image
+    needs: [detect]
+    if: >-
+      (needs.detect.outputs.svc == 'backend' || needs.detect.outputs.svc == 'both') &&
+      (
+        github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && needs.detect.outputs.build_images == 'true')
+      )
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.SERVICE_BACKEND }}:${{ needs.detect.outputs.tag }}
+
+  update-gitops:
+    name: Update GitOps overlays
+    needs: [detect, build-frontend, build-backend]
+    if: >-
+      always() &&
+      needs.detect.outputs.svc != 'none' &&
+      (
+        (github.event_name == 'workflow_dispatch' && needs.detect.outputs.build_images != 'true') ||
+
+        (needs.detect.outputs.svc == 'frontend' && needs.build-frontend.result == 'success') ||
+        (needs.detect.outputs.svc == 'backend'  && needs.build-backend.result  == 'success') ||
+        (needs.detect.outputs.svc == 'both'     && needs.build-frontend.result == 'success' && needs.build-backend.result == 'success')
+      )
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITOPS_REPO }}
+          ref: ${{ env.GITOPS_BASE_BRANCH }}
+          token: ${{ secrets.GITOPS_PUSH_TOKEN }}
+          path: gitops
+          persist-credentials: false
+
+      - name: Install yq
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Update overlay image tag(s)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENV="${{ needs.detect.outputs.envname }}"
+          TAG="${{ needs.detect.outputs.tag }}"
+          SVC="${{ needs.detect.outputs.svc }}"
+
+          update_tag () {
+            local file="$1"
+            local image="$2"
+
+            if [[ ! -f "$file" ]]; then
+              echo "ERROR: Missing kustomization: $file"
+              exit 1
+            fi
+
+            if ! yq e '.images[]? | select(.name=="'"$image"'") | .name' "$file" | grep -q .; then
+              echo "ERROR: image '$image' not found in $file"
+              echo "INFO: current images:"
+              yq e '.images[]?.name' "$file" || true
+              exit 1
+            fi
+
+            yq -i '(.images[] | select(.name=="'"$image"'")).newTag = "'"$TAG"'"' "$file"
+            echo "Updated $image -> $TAG in $file"
+          }
+
+          if [[ "$SVC" == "frontend" || "$SVC" == "both" ]]; then
+            update_tag "gitops/${{ env.FRONTEND_OVERLAY }}/${ENV}/kustomization.yaml" "${{ env.FRONTEND_IMAGE }}"
+          fi
+
+          if [[ "$SVC" == "backend" || "$SVC" == "both" ]]; then
+            update_tag "gitops/${{ env.BACKEND_OVERLAY }}/${ENV}/kustomization.yaml" "${{ env.BACKEND_IMAGE }}"
+          fi
+
+      - name: Show Git diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd gitops
+          git diff --stat
+          git diff
+
+      - name: Commit & push (dev direct, test/prod PR branch)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd gitops
+          git config user.email "actions@github.com"
+          git config user.name "github-actions"
+
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "No GitOps changes to commit."
+            exit 0
+          fi
+
+          ENV="${{ needs.detect.outputs.envname }}"
+          TAG="${{ needs.detect.outputs.tag }}"
+          BR="promote/${ENV}/${{ github.repository }}-${TAG}"
+
+          if [[ "$ENV" == "dev" ]]; then
+            git add .
+            git commit -m "Promote to dev: ${{ github.repository }} ${TAG}"
+
+            git remote set-url origin "https://x-access-token:${{ secrets.GITOPS_PUSH_TOKEN }}@github.com/${{ env.GITOPS_REPO }}.git"
+            git push origin "${{ env.GITOPS_BASE_BRANCH }}"
+
+            echo "Pushed dev promotion directly to GitOps main."
+            exit 0
+          fi
+
+          git checkout -b "$BR"
+          git add .
+          git commit -m "Promote to ${ENV}: ${{ github.repository }} ${TAG}"
+
+          git remote set-url origin "https://x-access-token:${{ secrets.GITOPS_PUSH_TOKEN }}@github.com/${{ env.GITOPS_REPO }}.git"
+          git push -u origin "$BR"
+
+          echo "Created branch $BR in GitOps repo. Open a PR to ${GITOPS_BASE_BRANCH}."

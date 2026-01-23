@@ -161,6 +161,7 @@ async function seedContacts() {
       orderEffectiveStartDate: orderEffectiveStartDate,
       product: faker.helpers.arrayElement(PRODUCTS),
       sourceOrder: sourceOrder, // NOT NULL
+      icmIntegrationStatus: faker.datatype.boolean(), // NOT NULL
 
       createdAt: now,
       createdBy: 'seed',

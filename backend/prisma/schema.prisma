@@ -25,6 +25,7 @@ model Contact {
   caseStatus                 String    @map("case_status")
   caseLoad                   String    @map("case_load")
   sourceOrder                String    @map("source_order")
+  icmIntegrationStatus       Boolean   @map("icm_integration_status")
   createdAt                  DateTime  @map("created_at")
   createdBy                  String    @map("created_by")
   lastUpdatedAt              DateTime  @map("last_updated_at")

@@ -10,20 +10,17 @@ describe('ContactsService', () => {
   let service: ContactsService
   let prisma: PrismaService
 
-  // --- camelCase fixtures to match Prisma + DTO ---
   const savedContact1 = {
     id: 1,
     lastName: 'Doe',
     givenNames: 'John',
     csaStatus: 'eligible',
-    orderAmount: null,
   }
   const savedContact2 = {
     id: 2,
     lastName: 'Smith',
     givenNames: 'Jane',
     csaStatus: 'in_pay',
-    orderAmount: null,
   }
 
   const oneContact = {
@@ -31,21 +28,18 @@ describe('ContactsService', () => {
     lastName: 'Doe',
     givenNames: 'John',
     csaStatus: 'eligible',
-    orderAmount: null,
   }
   const updatedContact = {
     id: 1,
     lastName: 'Doe',
     givenNames: 'John',
     csaStatus: 'in_pay',
-    orderAmount: null,
   }
   const twoContact = {
     id: 2,
     lastName: 'Smith',
     givenNames: 'Jane',
     csaStatus: 'in_pay',
-    orderAmount: null,
   }
 
   const userArray = [oneContact, twoContact]
@@ -81,9 +75,44 @@ describe('ContactsService', () => {
   })
 
   describe('findAll', () => {
-    it('should return an array of contacts', async () => {
-      const contacts = await service.findAll()
-      expect(contacts).toEqual(userArray)
+    it('should return paginated contacts with default parameters', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
+      const result = await service.findAll()
+      expect(result).toEqual({
+        data: userArray,
+        page: 1,
+        limit: 10,
+        total: 2,
+        totalPages: 1,
+      })
+    })
+
+    it('should use custom page and limit values', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(100)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([])
+
+      const result = await service.findAll(3, 25)
+
+      expect(result.page).toBe(3)
+      expect(result.limit).toBe(25)
+      expect(result.totalPages).toBe(4)
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 50,
+        take: 25,
+      })
+    })
+
+    it('should cap limit at 200', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(500)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([])
+
+      const result = await service.findAll(1, 300)
+
+      expect(result.limit).toBe(200)
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 200,
+      })
     })
   })
 

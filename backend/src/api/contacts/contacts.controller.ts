@@ -1,5 +1,6 @@
 import { Controller, Get, HttpException, Param, Query } from '@nestjs/common'
-import { ApiTags } from '@nestjs/swagger'
+import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { ContactsService } from './contacts.service'
 import { ContactDto } from './dto/contact.dto'
 
@@ -9,8 +10,26 @@ export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
 
   @Get()
-  findAll(): Promise<ContactDto[]> {
-    return this.contactsService.findAll()
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10, max: 200)',
+  })
+  @ApiResponse({ status: 200, description: 'Paginated list of contacts' })
+  findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ): Promise<PaginatedResponse<ContactDto>> {
+    const pageNum = page ? parseInt(page, 10) : 1
+    const limitNum = limit ? parseInt(limit, 10) : 10
+    return this.contactsService.findAll(pageNum, limitNum)
   }
 
   @Get('search') // it must be ahead of the below Get(":id") to avoid conflict

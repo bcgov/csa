@@ -1,15 +1,15 @@
 // seed.ts
 import { faker } from '@faker-js/faker'
 import { PrismaPg } from '@prisma/adapter-pg'
-import { Prisma, PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import 'dotenv/config'
 
-const DB_HOST = process.env.POSTGRES_HOST || 'localhost'
-const DB_USER = process.env.POSTGRES_USER || 'postgres'
-const DB_PWD = encodeURIComponent(process.env.POSTGRES_PASSWORD || 'default')
-const DB_PORT = process.env.POSTGRES_PORT || 5432
-const DB_NAME = process.env.POSTGRES_DATABASE || 'postgres'
-const DB_SCHEMA = process.env.POSTGRES_SCHEMA || 'csa'
+const DB_HOST = process.env.POSTGRES_HOST
+const DB_USER = process.env.POSTGRES_USER
+const DB_PWD = encodeURIComponent(process.env.POSTGRES_PASSWORD)
+const DB_PORT = process.env.POSTGRES_PORT
+const DB_NAME = process.env.POSTGRES_DATABASE
+const DB_SCHEMA = process.env.POSTGRES_SCHEMA
 
 const connectionString =
   process.env.DATABASE_URL ||
@@ -91,9 +91,7 @@ async function seedContacts() {
     })
 
     const orderEffectiveStartDate = faker.date.past({ years: 1 })
-    const amount = faker.number.float({ min: 100, max: 10000, fractionDigits: 7 })
-    const amountStr = amount.toFixed(7)
-    const orderAmount = new Prisma.Decimal(amountStr) // Decimal(22,7)
+    const orderAmount = faker.number.float({ min: 100, max: 10000, fractionDigits: 7 }).toFixed(7)
 
     const sourceOrder = faker.helpers.arrayElement(SOURCES)
 
@@ -159,10 +157,11 @@ async function seedContacts() {
       orderNumber: faker.string.alphanumeric(8).toUpperCase(),
       orderType: faker.helpers.arrayElement(ORDER_TYPES),
       orderStatus: faker.helpers.arrayElement(ORDER_STATUSES),
-      orderAmount: orderAmount, // NUMERIC(22,7)
+      orderAmount: orderAmount,
       orderEffectiveStartDate: orderEffectiveStartDate,
       product: faker.helpers.arrayElement(PRODUCTS),
       sourceOrder: sourceOrder, // NOT NULL
+      icmIntegrationStatus: faker.datatype.boolean(), // NOT NULL
 
       createdAt: now,
       createdBy: 'seed',

@@ -41,6 +41,9 @@ export class ContactDto {
   @ApiProperty({ description: 'Source of the order data' })
   sourceOrder: string
 
+  @ApiProperty({ description: 'Indicates whether to update ICM' })
+  icmIntegrationStatus: boolean
+
   @ApiProperty({ description: 'Record creation timestamp' })
   createdAt: Date
 

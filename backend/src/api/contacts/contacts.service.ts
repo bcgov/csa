@@ -2,23 +2,33 @@ import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
 
 import { NotFoundException } from '@nestjs/common'
+import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { ContactDto } from './dto/contact.dto'
 
 @Injectable()
 export class ContactsService {
   constructor(private prisma: PrismaService) {}
 
-  private formatAmount(amount: any): string | null {
-    return amount == null ? null : amount.toFixed(7)
-  }
+  async findAll(page: number = 1, limit: number = 10): Promise<PaginatedResponse<ContactDto>> {
+    if (limit > 200) {
+      limit = 200
+    }
 
-  async findAll(): Promise<ContactDto[]> {
-    const contacts = await this.prisma.contact.findMany()
+    const [data, total] = await Promise.all([
+      this.prisma.contact.findMany({
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.contact.count(),
+    ])
 
-    return contacts.map((c) => ({
-      ...c,
-      orderAmount: this.formatAmount(c.orderAmount),
-    }))
+    return {
+      data,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    }
   }
 
   async findOne(id: number): Promise<ContactDto> {
@@ -30,11 +40,7 @@ export class ContactsService {
       throw new NotFoundException(`Contact ${id} not found`)
     }
 
-    // Prisma returns Decimal for orderAmount; convert to string with fixed 7 decimals
-    return {
-      ...contact,
-      orderAmount: this.formatAmount(contact.orderAmount),
-    }
+    return contact
   }
 
   async searchContacts(
@@ -53,7 +59,6 @@ export class ContactsService {
     try {
       sortObj = JSON.parse(sort)
       const parsedFilter = JSON.parse(filter)
-      // Ensure filterObj is an array
       filterObj = Array.isArray(parsedFilter) ? parsedFilter : []
     } catch {
       throw new Error('Invalid query parameters')

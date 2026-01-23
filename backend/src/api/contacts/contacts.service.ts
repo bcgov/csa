@@ -58,7 +58,7 @@ export class ContactsService {
     let filterObj: Array<{ key: string; operation: string; value: unknown }> = []
     try {
       sortObj = JSON.parse(sort)
-      const parsedFilter = JSON.parse(filter) // Ensure filterObj is an array
+      const parsedFilter = JSON.parse(filter)
       filterObj = Array.isArray(parsedFilter) ? parsedFilter : []
     } catch {
       throw new Error('Invalid query parameters')

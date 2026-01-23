@@ -136,7 +136,6 @@ describe('ContactsController', () => {
     }) // Test with invalid query parameters
 
     it('given invalid query parameters_should return a 400 status code with an error message', async () => {
-      // Make a GET request with invalid query parameters and expect a 400 status code and an error message
       return request(app.getHttpServer())
         .get('/contacts/search')
         .query({
@@ -150,7 +149,6 @@ describe('ContactsController', () => {
         })
     })
     it('given sort and filter as invalid query parameters_should return a 400 status code with an error message', async () => {
-      // Make a GET request with invalid query parameters and expect a 400 status code and an error message
       vi.spyOn(contactsService, 'searchContacts').mockImplementation(async () => {
         throw new HttpException('Invalid query parameters', 400)
       })

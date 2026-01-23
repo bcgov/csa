@@ -8,7 +8,7 @@ import { ContactsService } from './contacts.service'
 
 describe('ContactsService', () => {
   let service: ContactsService
-  let prisma: PrismaService // --- camelCase fixtures to match Prisma + DTO ---
+  let prisma: PrismaService
 
   const savedContact1 = {
     id: 1,

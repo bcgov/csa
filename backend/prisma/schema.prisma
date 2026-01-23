@@ -71,7 +71,7 @@ model Contact {
   orderNumber                String?   @map("order_number")
   orderType                  String?   @map("order_type")
   orderStatus                String?   @map("order_status")
-  orderAmount                Decimal?  @db.Decimal(22, 7) @map("order_amount")
+  orderAmount                String?   @map("order_amount")
   orderEffectiveStartDate    DateTime? @db.Date @map("order_effective_start_date")
   product                    String?   @map("product")
 

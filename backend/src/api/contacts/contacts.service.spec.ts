@@ -10,14 +10,14 @@ describe('ContactsService', () => {
   const savedContact1 = {
     id: 1,
     lastName: 'Doe',
-    givenNames: 'John',
+    firstName: 'John',
     csaStatus: 'eligible',
     orderAmount: null,
   }
   const savedContact2 = {
     id: 2,
     lastName: 'Smith',
-    givenNames: 'Jane',
+    firstName: 'Jane',
     csaStatus: 'in_pay',
     orderAmount: null,
   }
@@ -25,14 +25,21 @@ describe('ContactsService', () => {
   const oneContact = {
     id: 1,
     lastName: 'Doe',
-    givenNames: 'John',
+    firstName: 'John',
     csaStatus: 'eligible',
+    orderAmount: null,
+  }
+  const updatedContact = {
+    id: 1,
+    lastName: 'Doe',
+    firstName: 'John',
+    csaStatus: 'in_pay',
     orderAmount: null,
   }
   const twoContact = {
     id: 2,
     lastName: 'Smith',
-    givenNames: 'Jane',
+    firstName: 'Jane',
     csaStatus: 'in_pay',
     orderAmount: null,
   }
@@ -47,9 +54,13 @@ describe('ContactsService', () => {
         {
           provide: PrismaService,
           useValue: {
+            // IMPORTANT: singular "contact" to match prisma.contact
             contact: {
               findMany: vi.fn().mockResolvedValue(savedContactArray),
               findUnique: vi.fn().mockResolvedValue(savedContact1),
+              create: vi.fn().mockResolvedValue(savedContact1),
+              update: vi.fn().mockResolvedValue(updatedContact),
+              delete: vi.fn().mockResolvedValue(true),
               count: vi.fn(),
             },
             $queryRaw: vi.fn(),
@@ -135,12 +146,12 @@ describe('ContactsService', () => {
       vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
       vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
 
-      await service.findAll(1, 10, '[{"givenNames":"desc"}]')
+      await service.findAll(1, 10, '[{"firstName":"desc"}]')
 
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: [{ givenNames: 'desc' }],
+        orderBy: [{ firstName: 'desc' }],
         where: {},
       })
     })
@@ -159,35 +170,18 @@ describe('ContactsService', () => {
       })
     })
 
-    it('should ignore invalid sort field', async () => {
-      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
-      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
-
-      await service.findAll(1, 10, '[{"invalidField":"asc"}]')
-
-      expect(prisma.contact.findMany).toHaveBeenCalledWith({
-        skip: 0,
-        take: 10,
-        orderBy: undefined,
-        where: {},
-      })
+    it('should throw error on invalid sort field', async () => {
+      await expect(service.findAll(1, 10, '[{"invalidField":"asc"}]')).rejects.toThrow(
+        'Invalid sort field: invalidField',
+      )
     })
 
-    it('should ignore invalid filter field', async () => {
-      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
-      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
+    it('should throw error on invalid filter field', async () => {
+      await expect(
+        service.findAll(1, 10, undefined, '[{"key":"invalidField","op":"eq","value":"value"}]'),
+      ).rejects.toThrow('Invalid filter field: invalidField')
+    }) // New comprehensive tests for flexible filter/sort
 
-      await service.findAll(1, 10, undefined, '[{"key":"invalidField","op":"eq","value":"value"}]')
-
-      expect(prisma.contact.findMany).toHaveBeenCalledWith({
-        skip: 0,
-        take: 10,
-        orderBy: undefined,
-        where: {},
-      })
-    })
-
-    // JSON parsing tests
     it('should throw BadRequestException on invalid sort JSON', async () => {
       await expect(service.findAll(1, 10, 'not-valid-json')).rejects.toThrow(
         'Invalid JSON format for sort parameter',
@@ -200,17 +194,16 @@ describe('ContactsService', () => {
       )
     })
 
-    // Multi-field tests
     it('should handle multiple sort fields in correct order', async () => {
       vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
       vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
 
-      await service.findAll(1, 10, '[{"lastName":"desc"},{"givenNames":"asc"}]')
+      await service.findAll(1, 10, '[{"lastName":"desc"},{"firstName":"asc"}]')
 
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: [{ lastName: 'desc' }, { givenNames: 'asc' }],
+        orderBy: [{ lastName: 'desc' }, { firstName: 'asc' }],
         where: {},
       })
     })
@@ -279,9 +272,8 @@ describe('ContactsService', () => {
           ],
         },
       })
-    })
+    }) // Filter operation tests
 
-    // Filter operation tests
     it('should handle eq operation', async () => {
       vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
       vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
@@ -458,9 +450,8 @@ describe('ContactsService', () => {
         orderBy: undefined,
         where: { NOT: { OR: [{ din: null }, { din: '' }] } },
       })
-    })
+    }) // Edge cases
 
-    // Edge cases
     it('should handle empty filter array', async () => {
       vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
       vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
@@ -495,23 +486,15 @@ describe('ContactsService', () => {
       })
     })
 
-    it('should filter out invalid fields silently', async () => {
-      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
-      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
-
-      await service.findAll(
-        1,
-        10,
-        undefined,
-        '[{"key":"invalidField","op":"eq","value":"test"},{"key":"lastName","op":"like","value":"Doe"}]',
-      )
-
-      expect(prisma.contact.findMany).toHaveBeenCalledWith({
-        skip: 0,
-        take: 10,
-        orderBy: undefined,
-        where: { lastName: { contains: 'Doe', mode: 'insensitive' } },
-      })
+    it('should throw error when filter contains invalid field even with valid ones', async () => {
+      await expect(
+        service.findAll(
+          1,
+          10,
+          undefined,
+          '[{"key":"invalidField","op":"eq","value":"test"},{"key":"lastName","op":"like","value":"Doe"}]',
+        ),
+      ).rejects.toThrow('Invalid filter field: invalidField')
     })
   })
 
@@ -524,8 +507,8 @@ describe('ContactsService', () => {
   describe('fullTextSearch', () => {
     it('should return paginated results for a search query', async () => {
       const mockResults = [
-        { id: 1, lastName: 'Doe', givenNames: 'John' },
-        { id: 2, lastName: 'Doe', givenNames: 'Jane' },
+        { id: 1, lastName: 'Doe', firstName: 'John' },
+        { id: 2, lastName: 'Doe', firstName: 'Jane' },
       ]
       vi.spyOn(prisma, '$queryRaw')
         .mockResolvedValueOnce(mockResults)
@@ -570,13 +553,56 @@ describe('ContactsService', () => {
 
     it('should handle multi-word search queries', async () => {
       vi.spyOn(prisma, '$queryRaw')
-        .mockResolvedValueOnce([{ id: 1, lastName: 'Doe', givenNames: 'John' }])
+        .mockResolvedValueOnce([{ id: 1, lastName: 'Doe', firstName: 'John' }])
         .mockResolvedValueOnce([{ count: BigInt(1) }])
 
       const result = await service.fullTextSearch('john doe', 1, 10)
 
       expect(result.data).toHaveLength(1)
       expect(prisma.$queryRaw).toHaveBeenCalled()
+    })
+  })
+
+  describe('Validation errors (filter/sort)', () => {
+    beforeEach(() => {
+      vi.spyOn((prisma as any).contact, 'findMany').mockResolvedValue([])
+      vi.spyOn((prisma as any).contact, 'count').mockResolvedValue(0)
+    })
+
+    it('should throw error for invalid filter field', async () => {
+      await expect(
+        service.findAll(1, 10, undefined, '[{"key":"invalidField","op":"eq","value":"test"}]'),
+      ).rejects.toThrow('Invalid filter field: invalidField')
+    })
+
+    it('should throw error for invalid filter operation', async () => {
+      await expect(
+        service.findAll(1, 10, undefined, '[{"key":"lastName","op":"invalidOp","value":"test"}]'),
+      ).rejects.toThrow('Invalid filter operation: invalidOp')
+    })
+
+    it('should throw error for invalid sort field', async () => {
+      await expect(service.findAll(1, 10, '[{"invalidField":"asc"}]', undefined)).rejects.toThrow(
+        'Invalid sort field: invalidField',
+      )
+    })
+
+    it('should throw error for invalid sort direction', async () => {
+      await expect(
+        service.findAll(1, 10, '[{"lastName":"invalidDirection"}]', undefined),
+      ).rejects.toThrow('Invalid sort direction: invalidDirection')
+    })
+
+    it('should throw error for malformed filter JSON', async () => {
+      await expect(service.findAll(1, 10, undefined, '{invalid json}')).rejects.toThrow(
+        'Invalid JSON format for filter parameter',
+      )
+    })
+
+    it('should throw error for malformed sort JSON', async () => {
+      await expect(service.findAll(1, 10, '{invalid json}', undefined)).rejects.toThrow(
+        'Invalid JSON format for sort parameter',
+      )
     })
   })
 })

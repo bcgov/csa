@@ -1,11 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
-import { PrismaService } from 'src/common/database/prisma.service'
-
-import { NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
+import { PrismaService } from 'src/common/database/prisma.service'
 import { ALLOWED_FILTER_SORT_FIELDS } from './constants'
 import { ContactDto } from './dto/contact.dto'
 import { FilterCondition, FilterItem } from './interfaces'
+
 @Injectable()
 export class ContactsService {
   constructor(private prisma: PrismaService) {}
@@ -20,7 +19,6 @@ export class ContactsService {
       limit = 200
     }
 
-    // Parse and validate sort parameter
     let orderBy: Array<Record<string, 'asc' | 'desc'>> | undefined
     if (sort) {
       try {
@@ -30,25 +28,34 @@ export class ContactsService {
           for (const sortItem of sortArray) {
             const field = Object.keys(sortItem)[0]
             const direction = sortItem[field]
+
             if (
-              ALLOWED_FILTER_SORT_FIELDS.includes(
+              !ALLOWED_FILTER_SORT_FIELDS.includes(
                 field as (typeof ALLOWED_FILTER_SORT_FIELDS)[number],
-              ) &&
-              (direction === 'asc' || direction === 'desc')
+              )
             ) {
-              orderBy.push({ [field]: direction })
+              throw new BadRequestException(
+                `Invalid sort field: ${field}. Allowed fields: ${ALLOWED_FILTER_SORT_FIELDS.join(', ')}`,
+              )
             }
-          }
-          if (orderBy.length === 0) {
-            orderBy = undefined
+
+            if (direction !== 'asc' && direction !== 'desc') {
+              throw new BadRequestException(
+                `Invalid sort direction: ${direction}. Allowed values: asc, desc`,
+              )
+            }
+
+            orderBy.push({ [field]: direction })
           }
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof BadRequestException) {
+          throw error
+        }
         throw new BadRequestException('Invalid JSON format for sort parameter')
       }
     }
 
-    // Parse and validate filter parameter
     let where: Record<string, unknown> = {}
     if (filter) {
       let filterArray: unknown
@@ -85,7 +92,6 @@ export class ContactsService {
     const andConditions: Array<Record<string, unknown>> = []
 
     for (const condition of filters) {
-      // Check if it's an OR condition
       if ('OR' in condition) {
         if (!Array.isArray(condition.OR) || condition.OR.length === 0) {
           throw new BadRequestException('OR condition must contain at least one filter item')
@@ -93,19 +99,12 @@ export class ContactsService {
         const orConditions: Array<Record<string, unknown>> = []
         for (const item of condition.OR) {
           const prismaCondition = this.convertSingleFilterToPrisma(item)
-          if (prismaCondition) {
-            orConditions.push(prismaCondition)
-          }
+          orConditions.push(prismaCondition)
         }
-        if (orConditions.length > 0) {
-          andConditions.push({ OR: orConditions })
-        }
+        andConditions.push({ OR: orConditions })
       } else {
-        // Regular filter item
         const prismaCondition = this.convertSingleFilterToPrisma(condition)
-        if (prismaCondition) {
-          andConditions.push(prismaCondition)
-        }
+        andConditions.push(prismaCondition)
       }
     }
 
@@ -120,12 +119,13 @@ export class ContactsService {
     return { AND: andConditions }
   }
 
-  private convertSingleFilterToPrisma(filter: FilterItem): Record<string, unknown> | null {
+  private convertSingleFilterToPrisma(filter: FilterItem): Record<string, unknown> {
     const { key, op, value } = filter
 
-    // Validate field is allowed
     if (!ALLOWED_FILTER_SORT_FIELDS.includes(key as (typeof ALLOWED_FILTER_SORT_FIELDS)[number])) {
-      return null
+      throw new BadRequestException(
+        `Invalid filter field: ${key}. Allowed fields: ${ALLOWED_FILTER_SORT_FIELDS.join(', ')}`,
+      )
     }
 
     switch (op) {
@@ -156,7 +156,9 @@ export class ContactsService {
       case 'notblank':
         return { NOT: { OR: [{ [key]: null }, { [key]: '' }] } }
       default:
-        return null
+        throw new BadRequestException(
+          `Invalid filter operation: ${op}. Allowed operations: eq, neq, like, gt, gte, lt, lte, in, notin, isnull, notnull, isblank, notblank`,
+        )
     }
   }
 
@@ -186,36 +188,36 @@ export class ContactsService {
 
     const data = await this.prisma.$queryRaw<ContactDto[]>`
       SELECT id, last_name as "lastName", given_names as "givenNames", middle_name as "middleName",
-             aka_last_name as "akaLastName", aka_first_name as "akaFirstName",
-             person_id_icm as "personIdIcm", person_id_ims as "personIdIms",
-             gender, date_of_birth as "dateOfBirth", age,
-             case_number as "caseNumber", legacy_file_number as "legacyFileNumber",
-             case_type as "caseType", case_status as "caseStatus", case_load as "caseLoad",
-             service_office as "serviceOffice", assigned_to as "assignedTo",
-             csa_status as "csaStatus", csa_status_effective_date as "csaStatusEffectiveDate",
-             csa_sent_date as "csaSentDate", din, effective_legal_status as "effectiveLegalStatus",
-             effective_date as "effectiveDate", expiry_date as "expiryDate",
-             enroll_for_csa as "enrollForCsa", mis_legal_authority_code as "misLegalAuthorityCode",
-             legal_authority_code as "legalAuthorityCode", birth_city as "birthCity",
-             birth_province as "birthProvince", birth_country as "birthCountry",
-             placement_location as "placementLocation", location_type as "locationType",
-             location_sub_type as "locationSubType", placement_status as "placementStatus",
-             actual_start_date as "actualStartDate", actual_end_date as "actualEndDate",
-             paid_unpaid as "paidUnpaid", interrupted_placement as "interruptedPlacement",
-             source_placement as "sourcePlacement", service_provider_name as "serviceProviderName",
-             provider_id as "providerId", place_of_service_name as "placeOfServiceName",
-             agreement_type as "agreementType", agreement_status as "agreementStatus",
-             agreement_start_date as "agreementStartDate", agreement_end_date as "agreementEndDate",
-             termination_date as "terminationDate", mcfd_contract as "mcfdContract",
-             order_number as "orderNumber", order_type as "orderType", order_status as "orderStatus",
-             order_amount as "orderAmount", order_effective_start_date as "orderEffectiveStartDate",
-             product, source_order as "sourceOrder",
-             created_at as "createdAt", created_by as "createdBy",
-             last_updated_at as "lastUpdatedAt", last_updated_by as "lastUpdatedBy"
-      FROM csa.contacts
-      WHERE search_vector @@ to_tsquery('english', ${searchQuery})
-      ORDER BY ts_rank(search_vector, to_tsquery('english', ${searchQuery})) DESC
-      LIMIT ${limit} OFFSET ${offset}
+        aka_last_name as "akaLastName", aka_first_name as "akaFirstName",
+        person_id_icm as "personIdIcm", person_id_ims as "personIdIms",
+        gender, date_of_birth as "dateOfBirth", age,
+        case_number as "caseNumber", legacy_file_number as "legacyFileNumber",
+        case_type as "caseType", case_status as "caseStatus", case_load as "caseLoad",
+        service_office as "serviceOffice", assigned_to as "assignedTo",
+        csa_status as "csaStatus", csa_status_effective_date as "csaStatusEffectiveDate",
+        csa_sent_date as "csaSentDate", din, effective_legal_status as "effectiveLegalStatus",
+        effective_date as "effectiveDate", expiry_date as "expiryDate",
+        enroll_for_csa as "enrollForCsa", mis_legal_authority_code as "misLegalAuthorityCode",
+        legal_authority_code as "legalAuthorityCode", birth_city as "birthCity",
+        birth_province as "birthProvince", birth_country as "birthCountry",
+        placement_location as "placementLocation", location_type as "locationType",
+        location_sub_type as "locationSubType", placement_status as "placementStatus",
+        actual_start_date as "actualStartDate", actual_end_date as "actualEndDate",
+        paid_unpaid as "paidUnpaid", interrupted_placement as "interruptedPlacement",
+        source_placement as "sourcePlacement", service_provider_name as "serviceProviderName",
+        provider_id as "providerId", place_of_service_name as "placeOfServiceName",
+        agreement_type as "agreementType", agreement_status as "agreementStatus",
+        agreement_start_date as "agreementStartDate", agreement_end_date as "agreementEndDate",
+        termination_date as "terminationDate", mcfd_contract as "mcfdContract",
+        order_number as "orderNumber", order_type as "orderType", order_status as "orderStatus",
+        order_amount as "orderAmount", order_effective_start_date as "orderEffectiveStartDate",
+        product, source_order as "sourceOrder",
+        created_at as "createdAt", created_by as "createdBy",
+        last_updated_at as "lastUpdatedAt", last_updated_by as "lastUpdatedBy"
+    FROM csa.contacts
+    WHERE search_vector @@ to_tsquery('english', ${searchQuery})
+    ORDER BY ts_rank(search_vector, to_tsquery('english', ${searchQuery})) DESC
+    LIMIT ${limit} OFFSET ${offset}
     `
 
     const countResult = await this.prisma.$queryRaw<[{ count: bigint }]>`

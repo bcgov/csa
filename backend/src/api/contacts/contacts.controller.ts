@@ -27,7 +27,7 @@ export class ContactsController {
     required: false,
     type: String,
     description:
-      'JSON array of sort objects: [{"field":"asc|desc"}]. Example: [{"lastName":"desc"},{"givenNames":"asc"}]',
+      'JSON array of sort objects: [{"field":"asc|desc"}]. Example: [{"lastName":"desc"},{"firstName":"asc"}]',
   })
   @ApiQuery({
     name: 'filter',
@@ -76,6 +76,9 @@ export class ContactsController {
   ): Promise<PaginatedResponse<ContactDto>> {
     if (!q || q.trim() === '') {
       throw new HttpException('Search query is required', 400)
+    }
+    if (q.trim().length < 2) {
+      throw new HttpException('Search query must be at least 2 characters', 400)
     }
     const pageNum = page ? parseInt(page, 10) : 1
     const limitNum = limit ? parseInt(limit, 10) : 10

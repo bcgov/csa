@@ -12,8 +12,8 @@ describe('ContactsController', () => {
   let app: INestApplication
 
   const mockContacts = [
-    { id: 1, lastName: 'Doe', givenNames: 'John', csaStatus: 'eligible' },
-    { id: 2, lastName: 'Smith', givenNames: 'Jane', csaStatus: 'in_pay' },
+    { id: 1, lastName: 'Doe', fisrtNames: 'John', csaStatus: 'eligible' },
+    { id: 2, lastName: 'Smith', fisrtNames: 'Jane', csaStatus: 'in_pay' },
   ]
 
   const mockPaginatedResponse = {
@@ -128,6 +128,13 @@ describe('ContactsController', () => {
 
     it('should return 400 when query is empty', async () => {
       await request(app.getHttpServer()).get('/contacts/search?q=').expect(400)
+    })
+
+    it('should return 400 when query is less than 2 characters', async () => {
+      return request(app.getHttpServer())
+        .get('/contacts/search?q=a')
+        .expect(400)
+        .expect({ statusCode: 400, message: 'Search query must be at least 2 characters' })
     })
   })
 })

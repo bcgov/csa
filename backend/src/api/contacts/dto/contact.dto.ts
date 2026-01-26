@@ -9,7 +9,7 @@ export class ContactDto {
   lastName: string
 
   @ApiProperty({ description: 'The given names of the contact' })
-  givenNames: string
+  firstName: string
 
   @ApiProperty({ description: 'The middle name of the contact' })
   middleName: string

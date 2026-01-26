@@ -2,7 +2,7 @@ export const ALLOWED_FILTER_SORT_FIELDS = [
   'id',
   'lastName',
   'middleName',
-  'givenNames',
+  'firstName',
   'dateOfBirth',
   'age',
   'din',

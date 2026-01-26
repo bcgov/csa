@@ -336,6 +336,13 @@ function App() {
   // Use Keycloak authentication
   const { isAuthenticated: keycloakAuthenticated, isLoading, user, login, logout } = useAuth()
 
+  // Log Keycloak authentication token (for testing in deployed version)
+  console.log('=== KEYCLOAK AUTH TOKEN ===')
+  console.log('Auth Token from localStorage:', localStorage.getItem('authToken'))
+  console.log('Keycloak Authenticated:', keycloakAuthenticated)
+  console.log('User Info:', user)
+  console.log('==========================')
+
   // Local authentication state for IDIR mock login
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     const saved = localStorage.getItem('isLoggedIn')
@@ -400,14 +407,22 @@ function App() {
     // if (username.trim() && password.trim()) {
     setIsLoggedIn(true)
     localStorage.setItem('isLoggedIn', 'true')
-    localStorage.setItem('authToken', `mock-token-${Date.now()}`)
+    const mockToken = `mock-token-${Date.now()}`
+    localStorage.setItem('authToken', mockToken)
     localStorage.setItem('username', username)
+    console.log('=== MOCK LOGIN - AUTH TOKEN SET ===')
+    console.log('Mock Token:', mockToken)
+    console.log('===================================')
     setShowIdirLogin(false)
     // }
   }
 
   // Mock logout handler
   const handleLogout = () => {
+    console.log('=== LOGOUT - CLEARING AUTH TOKEN ===')
+    console.log('Token before logout:', localStorage.getItem('authToken'))
+    console.log('====================================')
+
     if (keycloakAuthenticated) {
       // Logout from Keycloak
       logout()

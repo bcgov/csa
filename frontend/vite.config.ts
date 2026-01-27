@@ -55,6 +55,10 @@ export default defineConfig({
         },
       },
     },
+    // Disable module preload polyfill to avoid inline scripts
+    modulePreload: {
+      polyfill: false,
+    },
   },
   css: {
     preprocessorOptions: {

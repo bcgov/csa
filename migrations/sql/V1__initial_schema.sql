@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS csa.batches (
     system_comments TEXT
 );
 
-CREATE TABLE IF NOT EXISTS contact_batch_details (
+CREATE TABLE IF NOT EXISTS csa.contact_batch_details (
   id                SERIAL PRIMARY KEY,
   contact_id        INTEGER     NOT NULL,
   batch_id          INTEGER     NOT NULL,
@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS csa.job_runs (
   completed_at TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS transfer_files (
+CREATE TABLE IF NOT EXISTS csa.transfer_files (
   id                 SERIAL PRIMARY KEY,
   batch_id           INTEGER,
   destination_id     TEXT        NOT NULL,

@@ -18,10 +18,29 @@ const connectionString =
 const adapter = new PrismaPg({ connectionString })
 const prisma = new PrismaClient({ adapter })
 
-const CONTACT_COUNT = 20
+// Get contact count from CLI argument or default to 20
+const CONTACT_COUNT = parseInt(process.argv[2] || '20', 10)
 
 // TODO: update these values based on the functional document
-const CSA_STATUSES = ['active', 'pending', 'inactive'] as const
+const CSA_STATUSES = [
+  'on_hold',
+  'not_eligible_out_of_pay',
+  'eligible',
+  'eligible_tbd',
+  'in_batch_application',
+  'application_refused',
+  'batch_sent_application',
+  'in_pay',
+  'age_out',
+  'not_eligible_in_pay',
+  'not_eligible_ip_tbd',
+  'in_batch_cancellation',
+  'cancellation_refused_cra',
+  'batch_sent_cancellation',
+] as const
+const BATCH_STATUSES = ['pending', 'in_progress', 'processed_with_errors', 'error'] as const
+const CONTACT_BATCH_STATUSES = ['pending', 'in_progress', 'processed', 'error'] as const
+const TRANSACTION_TYPES = ['application', 'cancellation'] as const
 const GENDERS = ['Male', 'Female', 'Other', 'Unknown'] as const
 const CASE_TYPES = ['Type A', 'Type B', 'Type C'] as const
 const CASE_STATUSES = ['Open', 'Closed', 'Pending'] as const
@@ -67,9 +86,8 @@ async function seedContacts() {
   const contacts = Array.from({ length: CONTACT_COUNT }, () => {
     const birthDate = faker.date.birthdate({ min: 1, max: 20, mode: 'age' })
     const age = new Date().getFullYear() - birthDate.getFullYear()
-    const first = faker.person.firstName()
+    const firstName = faker.person.firstName()
     const middle = faker.person.middleName()
-    const givenNames = `${first} ${middle}`
 
     const effectiveDate = faker.date.past({ years: 2 })
     const expiryDate = ensureAfter(effectiveDate, 730) // DATE after effective_date
@@ -97,7 +115,7 @@ async function seedContacts() {
 
     return {
       lastName: faker.person.lastName(),
-      givenNames: givenNames, // NOT NULL
+      firstName, // NOT NULL
       middleName: middle, // NOT NULL
       akaLastName: faker.person.lastName(),
       akaFirstName: faker.person.firstName(),
@@ -177,12 +195,95 @@ async function seedContacts() {
   console.log(`Seeded ${CONTACT_COUNT} contacts.`)
 }
 
+async function seedBatches() {
+  console.log('Seeding 6 batches...')
+  const now = new Date()
+
+  const batches = []
+
+  // Create 6 batches - only 1 pending, rest can be in_progress or other statuses
+  const batchStatuses: (typeof BATCH_STATUSES)[number][] = [
+    'pending', // Only 1 pending
+    'in_progress',
+    'in_progress',
+    'in_progress',
+    'processed_with_errors',
+    'error',
+  ]
+
+  for (let i = 0; i < 6; i++) {
+    const batchDate = addDays(now, -30 + i * 5) // Spread batches over ~30 days
+    batches.push({
+      batchDate,
+      status: batchStatuses[i],
+      recordCount: faker.number.int({ min: 5, max: 50 }),
+      createdAt: batchDate,
+      systemComments: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.5 }),
+    })
+  }
+
+  // Clear existing data first
+  await prisma.batch.deleteMany()
+  console.log('Cleared existing batches')
+
+  await prisma.batch.createMany({ data: batches })
+  console.log('Seeded 6 batches.')
+}
+
+async function seedContactBatchDetails() {
+  console.log('Seeding contact batch details...')
+  const now = new Date()
+
+  // Get all contacts and batches
+  const contacts = await prisma.contact.findMany()
+  const batches = await prisma.batch.findMany()
+
+  if (contacts.length === 0 || batches.length === 0) {
+    console.log('No contacts or batches found. Skipping contact batch details.')
+    return
+  }
+
+  const contactBatchDetails = []
+
+  // Link contacts to batches - each contact can be in multiple batches
+  for (const contact of contacts) {
+    // Random number of batches per contact (1-3)
+    const numBatches = faker.number.int({ min: 1, max: 3 })
+    const selectedBatches = faker.helpers.arrayElements(batches, numBatches)
+
+    for (const batch of selectedBatches) {
+      contactBatchDetails.push({
+        contactId: contact.id,
+        batchId: batch.id,
+        transactionType: faker.helpers.arrayElement(TRANSACTION_TYPES),
+        status: faker.helpers.arrayElement(CONTACT_BATCH_STATUSES),
+        systemComments: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.3 }),
+        createdAt: batch.createdAt,
+        createdBy: 'seed',
+        lastUpdatedAt: now,
+        lastUpdatedBy: 'seed',
+      })
+    }
+  }
+
+  // Clear existing data first
+  await prisma.contactBatchDetail.deleteMany()
+  console.log('Cleared existing contact batch details')
+
+  await prisma.contactBatchDetail.createMany({ data: contactBatchDetails })
+  console.log(`Seeded ${contactBatchDetails.length} contact batch details.`)
+}
+
 async function main() {
   if (process.env.NODE_ENV === 'production') {
     console.error('Seed script should not run in production.')
     process.exit(1)
   }
+  console.log(`Starting seed with ${CONTACT_COUNT} contacts...`)
   await seedContacts()
+  await seedBatches()
+  await seedContactBatchDetails()
+  console.log('Seeding completed successfully!')
 }
 
 main()

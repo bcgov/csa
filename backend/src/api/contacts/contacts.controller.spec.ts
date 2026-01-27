@@ -1,35 +1,54 @@
 import type { INestApplication } from '@nestjs/common'
-import { HttpException } from '@nestjs/common'
+import { NotFoundException } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import type { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
-import { PrismaService } from 'src/common/database/prisma.service'
 import request from 'supertest'
 import { ContactsController } from './contacts.controller'
 import { ContactsService } from './contacts.service'
-import type { ContactDto } from './dto/contact.dto'
 
 describe('ContactsController', () => {
   let controller: ContactsController
-  let contactsService: ContactsService
+  let service: ContactsService
   let app: INestApplication
+
+  const mockContacts = [
+    { id: 1, lastName: 'Doe', fisrtNames: 'John', csaStatus: 'eligible' },
+    { id: 2, lastName: 'Smith', fisrtNames: 'Jane', csaStatus: 'in_pay' },
+  ]
+
+  const mockPaginatedResponse = {
+    data: mockContacts,
+    page: 1,
+    limit: 10,
+    total: 2,
+    totalPages: 1,
+  }
+
+  const mockContactsService = {
+    findAll: vi.fn().mockResolvedValue(mockPaginatedResponse),
+    findOne: vi.fn().mockResolvedValue(mockContacts[0]),
+    fullTextSearch: vi.fn().mockResolvedValue(mockPaginatedResponse),
+  }
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ContactsController],
       providers: [
-        ContactsService,
         {
-          provide: PrismaService,
-          useValue: {},
+          provide: ContactsService,
+          useValue: mockContactsService,
         },
       ],
     }).compile()
-    contactsService = module.get<ContactsService>(ContactsService)
+
     controller = module.get<ContactsController>(ContactsController)
+    service = module.get<ContactsService>(ContactsService)
     app = module.createNestApplication()
     await app.init()
-  }) // Close the app after each test
+
+    vi.clearAllMocks()
+  })
+
   afterEach(async () => {
     await app.close()
   })
@@ -40,131 +59,82 @@ describe('ContactsController', () => {
 
   describe('findAll', () => {
     it('should return paginated contacts with default parameters', async () => {
-      const result: PaginatedResponse<ContactDto> = {
-        data: [
-          { id: 1, lastName: 'Alice', givenNames: 'Mac', csaStatus: 'eligible' } as ContactDto,
-        ],
-        page: 1,
-        limit: 10,
-        total: 1,
-        totalPages: 1,
-      }
-      const spy = vi.spyOn(contactsService, 'findAll').mockResolvedValue(result)
-
-      await controller.findAll()
-
-      expect(spy).toHaveBeenCalledWith(1, 10)
+      const result = await controller.findAll()
+      expect(result).toEqual(mockPaginatedResponse)
+      expect(service.findAll).toHaveBeenCalledWith(1, 10, undefined, undefined)
     })
 
     it('should parse and pass custom page and limit to service', async () => {
-      const result: PaginatedResponse<ContactDto> = {
-        data: [],
-        page: 3,
-        limit: 25,
-        total: 100,
-        totalPages: 4,
-      }
-      const spy = vi.spyOn(contactsService, 'findAll').mockResolvedValue(result)
-
-      await controller.findAll('3', '25')
-
-      expect(spy).toHaveBeenCalledWith(3, 25)
+      await controller.findAll('2', '20')
+      expect(service.findAll).toHaveBeenCalledWith(2, 20, undefined, undefined)
     })
 
     it('should handle pagination via HTTP request', async () => {
-      const result: PaginatedResponse<ContactDto> = {
-        data: [],
-        page: 2,
-        limit: 15,
-        total: 50,
-        totalPages: 4,
-      }
-      vi.spyOn(contactsService, 'findAll').mockResolvedValue(result)
-
-      return request(app.getHttpServer())
-        .get('/contacts?page=2&limit=15')
+      const response = await request(app.getHttpServer())
+        .get('/contacts?page=2&limit=20')
         .expect(200)
-        .expect(result)
+
+      expect(response.body).toEqual(mockPaginatedResponse)
+      expect(service.findAll).toHaveBeenCalledWith(2, 20, undefined, undefined)
+    })
+
+    it('should pass sort and filter to service', async () => {
+      const sort = '[{"lastName":"desc"}]'
+      const filter = '[{"key":"csaStatus","op":"eq","value":"eligible"}]'
+
+      await controller.findAll('1', '10', sort, filter)
+      expect(service.findAll).toHaveBeenCalledWith(1, 10, sort, filter)
+    })
+
+    it('should handle only sort parameter', async () => {
+      const sort = '[{"lastName":"asc"}]'
+
+      await controller.findAll('1', '10', sort)
+      expect(service.findAll).toHaveBeenCalledWith(1, 10, sort, undefined)
     })
   })
+
   describe('findOne', () => {
     it('should return a user object', async () => {
-      const result = {
-        id: 1,
-        lastName: 'john',
-        givenNames: 'Doe',
-        csaStatus: 'in_pay',
-      } as ContactDto
-      vi.spyOn(contactsService, 'findOne').mockResolvedValue(result)
-      expect(await controller.findOne('1')).toBe(result)
+      const result = await controller.findOne('1')
+      expect(result).toEqual(mockContacts[0])
     })
+
     it('should throw error if user not found', async () => {
-      vi.spyOn(contactsService, 'findOne').mockResolvedValue(undefined as any)
-
-      await expect(controller.findOne('1')).rejects.toThrow(HttpException)
-      await expect(controller.findOne('1')).rejects.toThrow('User not found.')
+      mockContactsService.findOne.mockRejectedValueOnce(
+        new NotFoundException('Contact 999 not found'),
+      )
+      await expect(controller.findOne('999')).rejects.toThrow(NotFoundException)
     })
-  }) // Test the GET /contacts/search endpoint
+  })
+
   describe('GET /contacts/search', () => {
-    // Test with valid query parameters
-    it('given valid query parameters_should return an array of users with pagination metadata', async () => {
-      // Mock the contactsService.searchContacts method to return a sample result
-      const result = {
-        users: [
-          { id: 1, name: 'Alice', email: 'alice@example.com' },
-          { id: 2, name: 'Adam', email: 'Adam@example.com' },
-        ],
-        page: 1,
-        limit: 10,
-        sort: '{"name":"ASC"}',
-        filter: '[{"key":"name","operation":"like","value":"A"}]',
-        total: 2,
-        totalPages: 1,
-      }
-      vi.spyOn(contactsService, 'searchContacts').mockImplementation(async () => result) // Make a GET request with query parameters and expect a 200 status code and the result object
+    it('should return paginated search results', async () => {
+      const response = await request(app.getHttpServer()).get('/contacts/search?q=doe').expect(200)
 
-      return request(app.getHttpServer())
-        .get('/contacts/search')
-        .query({
-          page: 1,
-          limit: 10,
-          sort: '{"name":"ASC"}',
-          filter: '[{"key":"name","operation":"like","value":"A"}]',
-        })
-        .expect(200)
-        .expect(result)
-    }) // Test with invalid query parameters
-
-    it('given invalid query parameters_should return a 400 status code with an error message', async () => {
-      return request(app.getHttpServer())
-        .get('/contacts/search')
-        .query({
-          page: 'invalid',
-          limit: 'invalid',
-        })
-        .expect(400)
-        .expect({
-          statusCode: 400,
-          message: 'Invalid query parameters',
-        })
+      expect(response.body).toEqual(mockPaginatedResponse)
+      expect(service.fullTextSearch).toHaveBeenCalledWith('doe', 1, 10)
     })
-    it('given sort and filter as invalid query parameters_should return a 400 status code with an error message', async () => {
-      vi.spyOn(contactsService, 'searchContacts').mockImplementation(async () => {
-        throw new HttpException('Invalid query parameters', 400)
-      })
+
+    it('should handle pagination parameters', async () => {
+      await request(app.getHttpServer()).get('/contacts/search?q=doe&page=2&limit=20').expect(200)
+
+      expect(service.fullTextSearch).toHaveBeenCalledWith('doe', 2, 20)
+    })
+
+    it('should return 400 when query is missing', async () => {
+      await request(app.getHttpServer()).get('/contacts/search').expect(400)
+    })
+
+    it('should return 400 when query is empty', async () => {
+      await request(app.getHttpServer()).get('/contacts/search?q=').expect(400)
+    })
+
+    it('should return 400 when query is less than 2 characters', async () => {
       return request(app.getHttpServer())
-        .get('/contacts/search')
-        .query({
-          page: 1,
-          limit: 10,
-          sort: 'invalid',
-          filter: 'invalid',
-        })
+        .get('/contacts/search?q=a')
         .expect(400)
-        .expect({
-          statusCode: 400,
-          message: 'Invalid query parameters',
-        })
+        .expect({ statusCode: 400, message: 'Search query must be at least 2 characters' })
     })
   })
 })

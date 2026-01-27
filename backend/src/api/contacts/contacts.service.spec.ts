@@ -1,10 +1,7 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import { Prisma } from '@prisma/client'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { ContactsService } from './contacts.service'
-
-// Using Vitest (vi) – make sure you run tests with Vitest and have its globals configured
 
 describe('ContactsService', () => {
   let service: ContactsService
@@ -13,33 +10,38 @@ describe('ContactsService', () => {
   const savedContact1 = {
     id: 1,
     lastName: 'Doe',
-    givenNames: 'John',
+    firstName: 'John',
     csaStatus: 'eligible',
+    orderAmount: null,
   }
   const savedContact2 = {
     id: 2,
     lastName: 'Smith',
-    givenNames: 'Jane',
+    firstName: 'Jane',
     csaStatus: 'in_pay',
+    orderAmount: null,
   }
 
   const oneContact = {
     id: 1,
     lastName: 'Doe',
-    givenNames: 'John',
+    firstName: 'John',
     csaStatus: 'eligible',
+    orderAmount: null,
   }
   const updatedContact = {
     id: 1,
     lastName: 'Doe',
-    givenNames: 'John',
+    firstName: 'John',
     csaStatus: 'in_pay',
+    orderAmount: null,
   }
   const twoContact = {
     id: 2,
     lastName: 'Smith',
-    givenNames: 'Jane',
+    firstName: 'Jane',
     csaStatus: 'in_pay',
+    orderAmount: null,
   }
 
   const userArray = [oneContact, twoContact]
@@ -61,6 +63,7 @@ describe('ContactsService', () => {
               delete: vi.fn().mockResolvedValue(true),
               count: vi.fn(),
             },
+            $queryRaw: vi.fn(),
           },
         },
       ],
@@ -99,6 +102,8 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 50,
         take: 25,
+        orderBy: undefined,
+        where: {},
       })
     })
 
@@ -112,7 +117,384 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 200,
+        orderBy: undefined,
+        where: {},
       })
+    })
+
+    it('should filter by a single column', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      const result = await service.findAll(
+        1,
+        10,
+        '[{"lastName":"asc"}]',
+        '[{"key":"lastName","op":"like","value":"Doe"}]',
+      )
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: [{ lastName: 'asc' }],
+        where: { lastName: { contains: 'Doe', mode: 'insensitive' } },
+      })
+      expect(result.data).toEqual([savedContact1])
+    })
+
+    it('should sort descending', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
+
+      await service.findAll(1, 10, '[{"firstName":"desc"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: [{ firstName: 'desc' }],
+        where: {},
+      })
+    })
+
+    it('should handle filter without sort', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(1, 10, undefined, '[{"key":"din","op":"like","value":"ABC"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: { din: { contains: 'ABC', mode: 'insensitive' } },
+      })
+    })
+
+    it('should throw error on invalid sort field', async () => {
+      await expect(service.findAll(1, 10, '[{"invalidField":"asc"}]')).rejects.toThrow(
+        'Invalid sort field: invalidField',
+      )
+    })
+
+    it('should throw error on invalid filter field', async () => {
+      await expect(
+        service.findAll(1, 10, undefined, '[{"key":"invalidField","op":"eq","value":"value"}]'),
+      ).rejects.toThrow('Invalid filter field: invalidField')
+    }) // New comprehensive tests for flexible filter/sort
+
+    it('should throw BadRequestException on invalid sort JSON', async () => {
+      await expect(service.findAll(1, 10, 'not-valid-json')).rejects.toThrow(
+        'Invalid JSON format for sort parameter',
+      )
+    })
+
+    it('should throw BadRequestException on invalid filter JSON', async () => {
+      await expect(service.findAll(1, 10, undefined, 'not-valid-json')).rejects.toThrow(
+        'Invalid JSON format for filter parameter',
+      )
+    })
+
+    it('should handle multiple sort fields in correct order', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
+
+      await service.findAll(1, 10, '[{"lastName":"desc"},{"firstName":"asc"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: [{ lastName: 'desc' }, { firstName: 'asc' }],
+        where: {},
+      })
+    })
+
+    it('should handle multiple filters with AND logic', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(
+        1,
+        10,
+        undefined,
+        '[{"key":"lastName","op":"like","value":"Doe"},{"key":"age","op":"gte","value":18}]',
+      )
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: {
+          AND: [{ lastName: { contains: 'Doe', mode: 'insensitive' } }, { age: { gte: 18 } }],
+        },
+      })
+    })
+
+    it('should handle OR logic within filters', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
+
+      await service.findAll(
+        1,
+        10,
+        undefined,
+        '[{"OR":[{"key":"csaStatus","op":"eq","value":"eligible"},{"key":"csaStatus","op":"eq","value":"in_pay"}]}]',
+      )
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: {
+          OR: [{ csaStatus: { equals: 'eligible' } }, { csaStatus: { equals: 'in_pay' } }],
+        },
+      })
+    })
+
+    it('should handle combined AND + OR logic', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(
+        1,
+        10,
+        undefined,
+        '[{"key":"lastName","op":"like","value":"Doe"},{"OR":[{"key":"csaStatus","op":"eq","value":"eligible"},{"key":"csaStatus","op":"eq","value":"in_pay"}]}]',
+      )
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: {
+          AND: [
+            { lastName: { contains: 'Doe', mode: 'insensitive' } },
+            { OR: [{ csaStatus: { equals: 'eligible' } }, { csaStatus: { equals: 'in_pay' } }] },
+          ],
+        },
+      })
+    }) // Filter operation tests
+
+    it('should handle eq operation', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(1, 10, undefined, '[{"key":"csaStatus","op":"eq","value":"eligible"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: { csaStatus: { equals: 'eligible' } },
+      })
+    })
+
+    it('should handle neq operation', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(1, 10, undefined, '[{"key":"csaStatus","op":"neq","value":"deleted"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: { csaStatus: { not: { equals: 'deleted' } } },
+      })
+    })
+
+    it('should handle gt operation', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(1, 10, undefined, '[{"key":"age","op":"gt","value":18}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: { age: { gt: 18 } },
+      })
+    })
+
+    it('should handle gte operation', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(1, 10, undefined, '[{"key":"age","op":"gte","value":18}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: { age: { gte: 18 } },
+      })
+    })
+
+    it('should handle lt operation', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(1, 10, undefined, '[{"key":"age","op":"lt","value":65}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: { age: { lt: 65 } },
+      })
+    })
+
+    it('should handle lte operation', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(1, 10, undefined, '[{"key":"age","op":"lte","value":65}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: { age: { lte: 65 } },
+      })
+    })
+
+    it('should handle in operation', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
+
+      await service.findAll(
+        1,
+        10,
+        undefined,
+        '[{"key":"csaStatus","op":"in","value":["eligible","in_pay"]}]',
+      )
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: { csaStatus: { in: ['eligible', 'in_pay'] } },
+      })
+    })
+
+    it('should handle notin operation', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(
+        1,
+        10,
+        undefined,
+        '[{"key":"csaStatus","op":"notin","value":["deleted","archived"]}]',
+      )
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: { csaStatus: { not: { in: ['deleted', 'archived'] } } },
+      })
+    })
+
+    it('should handle isnull operation', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(1, 10, undefined, '[{"key":"din","op":"isnull"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: { din: null },
+      })
+    })
+
+    it('should handle notnull operation', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(1, 10, undefined, '[{"key":"din","op":"notnull"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: { din: { not: null } },
+      })
+    })
+
+    it('should handle isblank operation', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(1, 10, undefined, '[{"key":"din","op":"isblank"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: { OR: [{ din: null }, { din: '' }] },
+      })
+    })
+
+    it('should handle notblank operation', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(1, 10, undefined, '[{"key":"din","op":"notblank"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: { NOT: { OR: [{ din: null }, { din: '' }] } },
+      })
+    }) // Edge cases
+
+    it('should handle empty filter array', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
+
+      await service.findAll(1, 10, undefined, '[]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: {},
+      })
+    })
+
+    it('should throw BadRequestException on empty OR array', async () => {
+      await expect(service.findAll(1, 10, undefined, '[{"OR":[]}]')).rejects.toThrow(
+        'OR condition must contain at least one filter item',
+      )
+    })
+
+    it('should handle empty sort array', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
+
+      await service.findAll(1, 10, '[]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: {},
+      })
+    })
+
+    it('should throw error when filter contains invalid field even with valid ones', async () => {
+      await expect(
+        service.findAll(
+          1,
+          10,
+          undefined,
+          '[{"key":"invalidField","op":"eq","value":"test"},{"key":"lastName","op":"like","value":"Doe"}]',
+        ),
+      ).rejects.toThrow('Invalid filter field: invalidField')
     })
   })
 
@@ -122,59 +504,36 @@ describe('ContactsService', () => {
     })
   })
 
-  describe('searchContacts', () => {
-    it('should return a list of contacts with pagination and filtering', async () => {
-      const page = 1
-      const limit = 10
-      const sortObject: Prisma.SortOrder = 'asc'
-      const sort: any = `[{ "name": "${sortObject}" }]`
-      const filter: any = '[{ "name": { "equals": "Peter" } }]'
+  describe('fullTextSearch', () => {
+    it('should return paginated results for a search query', async () => {
+      const mockResults = [
+        { id: 1, lastName: 'Doe', firstName: 'John' },
+        { id: 2, lastName: 'Doe', firstName: 'Jane' },
+      ]
+      vi.spyOn(prisma, '$queryRaw')
+        .mockResolvedValueOnce(mockResults)
+        .mockResolvedValueOnce([{ count: BigInt(2) }])
 
-      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([])
-      vi.spyOn(prisma.contact, 'count').mockResolvedValue(0)
-
-      const result = await service.searchContacts(page, limit, sort, filter)
-
-      expect(result).toEqual({
-        contacts: [],
-        page,
-        limit,
-        total: 0,
-        totalPages: 0,
-      })
-    })
-
-    it('given no page should default to page 1', async () => {
-      const limit = 10
-      const sortObject: Prisma.SortOrder = 'asc'
-      const sort: any = `[{ "name": "${sortObject}" }]`
-      const filter: any = '[{ "name": { "equals": "Peter" } }]'
-
-      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([])
-      vi.spyOn(prisma.contact, 'count').mockResolvedValue(0)
-      const result = await service.searchContacts(null as any, limit, sort, filter)
+      const result = await service.fullTextSearch('doe', 1, 10)
 
       expect(result).toEqual({
-        contacts: [],
+        data: mockResults,
         page: 1,
-        limit,
-        total: 0,
-        totalPages: 0,
+        limit: 10,
+        total: 2,
+        totalPages: 1,
       })
     })
 
-    it('given no limit should default to limit 10', async () => {
-      const page = 1
-      const sortObject: Prisma.SortOrder = 'asc'
-      const sort: any = `[{ "name": "${sortObject}" }]`
-      const filter: any = '[{ "name": { "equals": "Peter" } }]'
+    it('should handle empty search results', async () => {
+      vi.spyOn(prisma, '$queryRaw')
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ count: BigInt(0) }])
 
-      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([])
-      vi.spyOn(prisma.contact, 'count').mockResolvedValue(0)
-      const result = await service.searchContacts(page, null as any, sort, filter)
+      const result = await service.fullTextSearch('nonexistent', 1, 10)
 
       expect(result).toEqual({
-        contacts: [],
+        data: [],
         page: 1,
         limit: 10,
         total: 0,
@@ -182,68 +541,68 @@ describe('ContactsService', () => {
       })
     })
 
-    it('given limit > 200 should default to limit 10', async () => {
-      const page = 1
-      const limit = 201
-      const sortObject: Prisma.SortOrder = 'asc'
-      const sort: any = `[{ "name": "${sortObject}" }]`
-      const filter: any = '[{ "name": { "equals": "Peter" } }]'
+    it('should cap limit at 200', async () => {
+      vi.spyOn(prisma, '$queryRaw')
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ count: BigInt(0) }])
 
-      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([])
-      vi.spyOn(prisma.contact, 'count').mockResolvedValue(0)
-      const result = await service.searchContacts(page, limit, sort, filter)
+      const result = await service.fullTextSearch('test', 1, 500)
 
-      expect(result).toEqual({
-        contacts: [],
-        page: 1,
-        limit: 10,
-        total: 0,
-        totalPages: 0,
-      })
+      expect(result.limit).toBe(200)
     })
 
-    it('given invalid JSON should throw error', async () => {
-      const page = 1
-      const limit = 201
-      const sortObject: Prisma.SortOrder = 'asc'
-      const sort: any = `[{ "name" "${sortObject}" }]` // malformed
-      const filter: any = '[{ "name": { "equals": "Peter" } }]'
+    it('should handle multi-word search queries', async () => {
+      vi.spyOn(prisma, '$queryRaw')
+        .mockResolvedValueOnce([{ id: 1, lastName: 'Doe', firstName: 'John' }])
+        .mockResolvedValueOnce([{ count: BigInt(1) }])
 
-      await expect(service.searchContacts(page, limit, sort, filter)).rejects.toEqual(
-        new Error('Invalid query parameters'),
-      )
+      const result = await service.fullTextSearch('john doe', 1, 10)
+
+      expect(result.data).toHaveLength(1)
+      expect(prisma.$queryRaw).toHaveBeenCalled()
     })
   })
 
-  describe('convertFiltersToPrismaFormat', () => {
-    it("should convert input filters to prisma's filter format", () => {
-      const inputFilter = [
-        { key: 'a', operation: 'like', value: '1' },
-        { key: 'b', operation: 'eq', value: '2' },
-        { key: 'c', operation: 'neq', value: '3' },
-        { key: 'd', operation: 'gt', value: '4' },
-        { key: 'e', operation: 'gte', value: '5' },
-        { key: 'f', operation: 'lt', value: '6' },
-        { key: 'g', operation: 'lte', value: '7' },
-        { key: 'h', operation: 'in', value: ['8'] },
-        { key: 'i', operation: 'notin', value: ['9'] },
-        { key: 'j', operation: 'isnull', value: '10' },
-      ]
+  describe('Validation errors (filter/sort)', () => {
+    beforeEach(() => {
+      vi.spyOn((prisma as any).contact, 'findMany').mockResolvedValue([])
+      vi.spyOn((prisma as any).contact, 'count').mockResolvedValue(0)
+    })
 
-      const expectedOutput = {
-        a: { contains: '1' },
-        b: { equals: '2' },
-        c: { not: { equals: '3' } },
-        d: { gt: '4' },
-        e: { gte: '5' },
-        f: { lt: '6' },
-        g: { lte: '7' },
-        h: { in: ['8'] },
-        i: { not: { in: ['9'] } },
-        j: { equals: null },
-      }
+    it('should throw error for invalid filter field', async () => {
+      await expect(
+        service.findAll(1, 10, undefined, '[{"key":"invalidField","op":"eq","value":"test"}]'),
+      ).rejects.toThrow('Invalid filter field: invalidField')
+    })
 
-      expect(service.convertFiltersToPrismaFormat(inputFilter)).toStrictEqual(expectedOutput)
+    it('should throw error for invalid filter operation', async () => {
+      await expect(
+        service.findAll(1, 10, undefined, '[{"key":"lastName","op":"invalidOp","value":"test"}]'),
+      ).rejects.toThrow('Invalid filter operation: invalidOp')
+    })
+
+    it('should throw error for invalid sort field', async () => {
+      await expect(service.findAll(1, 10, '[{"invalidField":"asc"}]', undefined)).rejects.toThrow(
+        'Invalid sort field: invalidField',
+      )
+    })
+
+    it('should throw error for invalid sort direction', async () => {
+      await expect(
+        service.findAll(1, 10, '[{"lastName":"invalidDirection"}]', undefined),
+      ).rejects.toThrow('Invalid sort direction: invalidDirection')
+    })
+
+    it('should throw error for malformed filter JSON', async () => {
+      await expect(service.findAll(1, 10, undefined, '{invalid json}')).rejects.toThrow(
+        'Invalid JSON format for filter parameter',
+      )
+    })
+
+    it('should throw error for malformed sort JSON', async () => {
+      await expect(service.findAll(1, 10, '{invalid json}', undefined)).rejects.toThrow(
+        'Invalid JSON format for sort parameter',
+      )
     })
   })
 })

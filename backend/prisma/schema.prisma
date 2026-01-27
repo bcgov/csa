@@ -8,7 +8,7 @@ generator client {
 // This file no longer contains the `url` field for the datasource.
 datasource db {
   provider = "postgresql"
-  schemas  = ["csa"]
+  schemas  = ["csa","public"]
 }
 
 model applicants {
@@ -18,4 +18,27 @@ model applicants {
   csa_status String  @db.VarChar(50)
 
   @@schema("csa")
+}
+
+
+model master_table {
+  id                         Int      @id @default(autoincrement())
+  last_name                  String?  @db.VarChar(40)
+  given_name                 String?  @db.VarChar(40)
+  middle_name                String?  @db.VarChar(40)
+  aka_last_name              String?  @db.VarChar(40)
+  aka_first_name             String?  @db.VarChar(40)
+  person_id_icm              String?  @db.VarChar(30)
+  person_id_ims              String?  @db.VarChar(30)
+  gender                     String?  @db.VarChar(30)
+  date_of_birth              DateTime?
+  age                        Int?
+  case_number                String?  @db.VarChar(30)
+  case_type                  String?  @db.VarChar(30)
+  case_status                String?  @db.VarChar(30)
+  csa_status                 String?  @db.VarChar(30)
+  created_at                 DateTime @default(now())
+
+  @@map("master_table")
+  @@schema("public")
 }

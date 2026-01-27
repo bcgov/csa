@@ -12,9 +12,10 @@ import { HealthController } from './health/health.controller'
 import { MetricsController } from './metrics/metrics.controller'
 import { CraDataHandlingModule } from 'src/cra-data-handling/cra-data-handling.module'
 import '../common/config/server.config'
+import { DataSyncModule } from 'src/data-sync/data-sync.module' 
 
 @Module({
-  imports: [ConfigModule.forRoot(), TerminusModule, ApplicantsModule, CraDataHandlingModule],
+  imports: [ConfigModule.forRoot(), TerminusModule, ApplicantsModule, CraDataHandlingModule, DataSyncModule],
   controllers: [AppController, MetricsController, HealthController],
   providers: [AppService, PrismaService],
 })

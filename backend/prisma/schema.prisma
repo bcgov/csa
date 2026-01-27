@@ -14,7 +14,7 @@ model Contact {
 
   // Required (NOT NULL)
   lastName                   String    @map("last_name")
-  givenNames                 String    @map("given_names")
+  firstName                  String    @map("first_name")
   middleName                 String    @map("middle_name")
   akaLastName                String    @map("aka_last_name")
   akaFirstName               String    @map("aka_first_name")

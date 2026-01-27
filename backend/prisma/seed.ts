@@ -67,9 +67,8 @@ async function seedContacts() {
   const contacts = Array.from({ length: CONTACT_COUNT }, () => {
     const birthDate = faker.date.birthdate({ min: 1, max: 20, mode: 'age' })
     const age = new Date().getFullYear() - birthDate.getFullYear()
-    const first = faker.person.firstName()
+    const firstName = faker.person.firstName()
     const middle = faker.person.middleName()
-    const givenNames = `${first} ${middle}`
 
     const effectiveDate = faker.date.past({ years: 2 })
     const expiryDate = ensureAfter(effectiveDate, 730) // DATE after effective_date
@@ -97,7 +96,7 @@ async function seedContacts() {
 
     return {
       lastName: faker.person.lastName(),
-      givenNames: givenNames, // NOT NULL
+      firstName, // NOT NULL
       middleName: middle, // NOT NULL
       akaLastName: faker.person.lastName(),
       akaFirstName: faker.person.firstName(),

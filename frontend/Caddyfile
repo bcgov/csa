@@ -4,6 +4,7 @@
 	admin 0.0.0.0:3003
 	order coraza_waf first
 }
+
 :3000 {
 	log {
 		output stdout
@@ -11,52 +12,85 @@
 		level info
 	}
 
-
-	# Enable Coraza WAF
+	# -------------------------------
+	# Coraza WAF
+	# -------------------------------
 	coraza_waf {
 		directives `
 		Include /etc/caddy/coraza.conf
 		`
 	}
 
-	root * /srv
-	encode zstd gzip
-	file_server
-	@spa_router {
-		not path /api*
-		file {
-			try_files {path} /index.html
+	# -------------------------------
+	# Runtime config (ConfigMap)
+	# EXACT match to prevent SPA rewrite
+	# -------------------------------
+
+  @config path /config.json
+  handle @config {
+	  root * /runtime-config
+	  file_server
+  }
+
+	# -------------------------------
+	# Backend API
+	# -------------------------------
+	handle /api* {
+		reverse_proxy {$BACKEND_UPSTREAM:csa-backend:3000} {
+			header_up Host {http.reverse_proxy.upstream.hostport}
+			header_up X-Real-IP {remote_host}
 		}
 	}
-	rewrite @spa_router {http.matchers.file.relative}
 
-	# Default BACKEND_URL so Caddy can still start in dev
-	reverse_proxy /api* {$BACKEND_UPSTREAM:csa-backend:3000} {
-		header_up Host {http.reverse_proxy.upstream.hostport}
-		header_up X-Real-IP {remote_host}
+	# -------------------------------
+	# Static SPA assets
+	# -------------------------------
+	root * /srv
+	encode zstd gzip
+
+	# SPA fallback: only rewrite if
+	# - not API
+	# - not config.json
+	# - not a real file
+	@spa {
+		not path /api* /config.json
+		not file
 	}
+	rewrite @spa /index.html
+
+	file_server
+
+	# -------------------------------
+	# Security headers
+	# -------------------------------
 	header {
 		-Server
 		X-Frame-Options "SAMEORIGIN"
 		X-XSS-Protection "1;mode=block"
-		Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate"
 		X-Content-Type-Options "nosniff"
-		Strict-Transport-Security "max-age=31536000"
-		Content-Security-Policy "default-src 'self' https://*.gov.bc.ca;
-			script-src 'self'  https://*.gov.bc.ca ;
-			style-src 'self' https://fonts.googleapis.com https://use.fontawesome.com 'unsafe-inline';
-			font-src 'self' https://fonts.gstatic.com;
-			img-src 'self' data: https://fonts.googleapis.com https://www.w3.org https://*.gov.bc.ca https://*.tile.openstreetmap.org;
-			frame-ancestors 'self';
-			form-action 'self';
-			block-all-mixed-content;
-			connect-src 'self' https://*.gov.bc.ca wss://*.gov.bc.ca;"
 		Referrer-Policy "same-origin"
 		Permissions-Policy "fullscreen=(self), camera=(), microphone=()"
 		Cross-Origin-Resource-Policy "cross-origin"
 		Cross-Origin-Opener-Policy "unsafe-none"
+		Strict-Transport-Security "max-age=31536000"
+		Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate"
+
+		# CSP — allows Keycloak iframe + redirects
+		Content-Security-Policy "
+			default-src 'self' https://*.gov.bc.ca;
+			script-src 'self' https://*.gov.bc.ca 'unsafe-inline';
+			style-src 'self' https://fonts.googleapis.com https://use.fontawesome.com 'unsafe-inline';
+			font-src 'self' https://fonts.gstatic.com;
+			img-src 'self' data: https://fonts.googleapis.com https://www.w3.org https://*.gov.bc.ca https://*.tile.openstreetmap.org;
+			frame-src 'self' https://loginproxy.gov.bc.ca https://dev.loginproxy.gov.bc.ca https://*.gov.bc.ca;
+			frame-ancestors 'self';
+			form-action 'self';
+			connect-src 'self' https://*.gov.bc.ca wss://*.gov.bc.ca;
+			block-all-mixed-content;
+		"
 	}
 }
+
 :3001 {
 	handle /health {
 		respond "OK"

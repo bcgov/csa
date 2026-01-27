@@ -14,6 +14,6 @@ describe('Dashboard', () => {
       useNavigate: useNavigateMock,
     }))
     render(<Dashboard />)
-    expect(screen.getByText(/Applicant ID/i)).toBeInTheDocument()
+    expect(screen.getByText(/Contact ID/i)).toBeInTheDocument()
   })
 })

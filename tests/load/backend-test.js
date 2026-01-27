@@ -22,7 +22,7 @@ function checkStatus(response, checkName, statusCode = 200) {
 
 
 export default function() {
-  let url = `${__ENV.BACKEND_URL}/v1/users`;
+  let url = `${__ENV.BACKEND_URL}/contacts`;
   let params = {
     headers: {
       "Content-Type": "application/json"

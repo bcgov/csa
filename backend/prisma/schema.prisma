@@ -1,23 +1,83 @@
 generator client {
-  provider     = "prisma-client-js"
-  moduleFormat = "cjs"
+  provider      = "prisma-client-js"
+  moduleFormat  = "cjs"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
-// NOTE: The datasource URL is now configured in prisma.config.ts (Prisma 7+).
-// This file no longer contains the `url` field for the datasource.
 datasource db {
   provider = "postgresql"
   schemas  = ["csa","public"]
 }
 
-model applicants {
-  id         Int     @id @default(autoincrement()) @map("id")
-  last_name  String  @db.VarChar(100)
-  given_name String  @db.VarChar(100)
-  csa_status String  @db.VarChar(50)
+model Contact {
+  id                         Int       @id @default(autoincrement())
+
+  // Required (NOT NULL)
+  lastName                   String    @map("last_name")
+  givenNames                 String    @map("given_names")
+  middleName                 String    @map("middle_name")
+  akaLastName                String    @map("aka_last_name")
+  akaFirstName               String    @map("aka_first_name")
+  personIdIcm                String    @map("person_id_icm")
+  personIdIms                String    @map("person_id_ims")
+  caseNumber                 String    @map("case_number")
+  caseType                   String    @map("case_type")
+  caseStatus                 String    @map("case_status")
+  caseLoad                   String    @map("case_load")
+  sourceOrder                String    @map("source_order")
+  icmIntegrationStatus       Boolean   @map("icm_integration_status")
+  createdAt                  DateTime  @map("created_at")
+  createdBy                  String    @map("created_by")
+  lastUpdatedAt              DateTime  @map("last_updated_at")
+  lastUpdatedBy              String    @map("last_updated_by")
+
+  // Optional (nullable in SQL)
+  gender                     String?   @map("gender")
+  dateOfBirth                DateTime? @db.Date @map("date_of_birth")
+  age                        Int?      @map("age")
+  legacyFileNumber           String?   @map("legacy_file_number")
+  serviceOffice              String?   @map("service_office")
+  assignedTo                 String?   @map("assigned_to")
+  csaStatus                  String?   @map("csa_status")
+  csaStatusEffectiveDate     DateTime? @map("csa_status_effective_date")
+  csaSentDate                DateTime? @map("csa_sent_date")
+  din                        String?   @map("din")
+  effectiveLegalStatus       String?   @map("effective_legal_status")
+  effectiveDate              DateTime? @map("effective_date")
+  expiryDate                 DateTime? @db.Date @map("expiry_date")
+  enrollForCsa               String?   @map("enroll_for_csa")
+  misLegalAuthorityCode      String?   @map("mis_legal_authority_code")
+  legalAuthorityCode         String?   @map("legal_authority_code")
+  birthCity                  String?   @map("birth_city")
+  birthProvince              String?   @map("birth_province")
+  birthCountry               String?   @map("birth_country")
+  placementLocation          String?   @map("placement_location")
+  locationType               String?   @map("location_type")
+  locationSubType            String?   @map("location_sub_type")
+  placementStatus            String?   @map("placement_status")
+  actualStartDate            DateTime? @map("actual_start_date")
+  actualEndDate              DateTime? @map("actual_end_date")
+  paidUnpaid                 String?   @map("paid_unpaid")
+  interruptedPlacement       String?   @map("interrupted_placement")
+  sourcePlacement            String?   @map("source_placement")
+  serviceProviderName        String?   @map("service_provider_name")
+  providerId                 String?   @map("provider_id")
+  placeOfServiceName         String?   @map("place_of_service_name")
+  agreementType              String?   @map("agreement_type")
+  agreementStatus            String?   @map("agreement_status")
+  agreementStartDate         DateTime? @map("agreement_start_date")
+  agreementEndDate           DateTime? @map("agreement_end_date")
+  terminationDate            DateTime? @map("termination_date")
+  mcfdContract               String?   @map("mcfd_contract")
+  orderNumber                String?   @map("order_number")
+  orderType                  String?   @map("order_type")
+  orderStatus                String?   @map("order_status")
+  orderAmount                String?   @map("order_amount")
+  orderEffectiveStartDate    DateTime? @db.Date @map("order_effective_start_date")
+  product                    String?   @map("product")
 
   @@schema("csa")
+  @@map("contacts")
 }
 
 

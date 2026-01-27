@@ -2,12 +2,12 @@ import { Injectable } from '@nestjs/common'
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { SERVER_CONFIG } from 'src/common/config/server.config'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra-data-handling/cra-data-handling.constant'
-import { FILE_MOCK_DATA } from './file-mock-data'
+// import { FILE_MOCK_DATA } from './file-mock-data'
 import { CraDetail, CraHeader, CraTrailer } from './file-create.interface'
 import { FileTransferClientService } from './file-transfer.service'
-import { HttpService } from '@nestjs/axios'
+// import { HttpService } from '@nestjs/axios'
 
-const { header, details, trailer } = FILE_MOCK_DATA
+// const { header, details, trailer } = FILE_MOCK_DATA
 const { FILE_CREATED_PATH, FILE_CREATION_ENVIROMENT, FILE_TYPE_APPLICATION } = SERVER_CONFIG
 const { FILE_NAME_PREFIX, FILE_TRANSACTION_CODE } = CRA_DATA_HANDLING_CONSTANT
 
@@ -47,19 +47,19 @@ export class FileCreateService {
 
     console.log(`File written to ${outputPath}`)
 
-    // const fileTransferResponse = await this.fileTransferClientService.sendFileToTransferService(
-    //   outputPath,
-    //   fileName,
-    //   craUserId,
-    // )
-    // if (fileTransferResponse.statusCode === 226) {
-    //   console.log('File transfer successful')
-    //   // update DB recort csa status and batch status
-    // } else {
-    //   console.error('File transfer failed', fileTransferResponse)
-    //   // Retry or update DB record csa status and batch status
-    // }
-    // console.log('File transfer result:', fileTransferResponse)
+    const fileTransferResponse = await this.fileTransferClientService.sendFileToTransferService(
+      outputPath,
+      fileName,
+      craUserId,
+    )
+    if (fileTransferResponse.statusCode === 226) {
+      console.log('File transfer successful')
+      // update DB recort csa status and batch status
+    } else {
+      console.error('File transfer failed', fileTransferResponse)
+      // Retry or update DB record csa status and batch status
+    }
+    console.log('File transfer result:', fileTransferResponse)
   }
 
   /* ========= HEADER 6133 ========= */

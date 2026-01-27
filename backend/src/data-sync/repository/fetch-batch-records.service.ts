@@ -14,7 +14,7 @@ export class FetchBatchRecordsService {
       orderBy: { id: 'asc' },
     })
 
-    console.log(dbResult[0]);
+    console.log(dbResult[0])
 
     this.logger.log(`Fetched ${dbResult.length} records`, JSON.stringify(dbResult[0], null, 2))
     return dbResult

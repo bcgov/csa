@@ -18,7 +18,8 @@ const dataSourceURL = PGBOUNCER_URL
 @Injectable()
 class PrismaService
   extends PrismaClient<Prisma.PrismaClientOptions, 'query'>
-  implements OnModuleInit, OnModuleDestroy {
+  implements OnModuleInit, OnModuleDestroy
+{
   private logger = new Logger('PRISMA')
   private static instance: PrismaService
   private pool: Pool

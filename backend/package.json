@@ -18,8 +18,7 @@
     "make-badges:ci": "npm run make-badges -- --ci",
     "test": "vitest --dir src",
     "test:cov": "prisma generate && vitest run --coverage",
-    "test:e2e": "vitest --dir test",
-    "file:create":"ts-node src/cra-data-handling/outboundFile/file-create.service.ts"
+    "test:e2e": "vitest --dir test"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",

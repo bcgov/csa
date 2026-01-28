@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS csa.contacts (
   aka_last_name               TEXT        NOT NULL,
   aka_first_name              TEXT        NOT NULL,
   person_id_icm               TEXT        NOT NULL,
-  person_id_ims               TEXT        NOT NULL,
+  person_id_mis               TEXT        NOT NULL,
   gender                      TEXT,
   date_of_birth               DATE,
   age                         INTEGER,

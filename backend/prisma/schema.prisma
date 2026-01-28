@@ -19,7 +19,7 @@ model Contact {
   akaLastName                String    @map("aka_last_name")
   akaFirstName               String    @map("aka_first_name")
   personIdIcm                String    @map("person_id_icm")
-  personIdIms                String    @map("person_id_ims")
+  personIdMis                String    @map("person_id_mis")
   caseNumber                 String    @map("case_number")
   caseType                   String    @map("case_type")
   caseStatus                 String    @map("case_status")
@@ -136,4 +136,27 @@ model TransferFile {
 
   @@schema("csa")
   @@map("transfer_files")
+}
+
+model JobRun {
+  id            Int       @id @default(autoincrement())
+  jobType       String    @map("job_type")
+  status        String
+  parentJobId   Int?      @map("parent_job_id")
+  jobTrigger    String    @map("job_trigger")
+  retryCount    Int       @default(0) @map("retry_count")
+  error         String?
+  metadata      Json      @default("{}") @db.JsonB
+  createdAt     DateTime  @default(now()) @map("created_at")
+  startedAt     DateTime  @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+
+  parentJob     JobRun?   @relation("ChildJobs", fields: [parentJobId], references: [id])
+  childJobs     JobRun[]  @relation("ChildJobs")
+
+  @@index([status])
+  @@index([parentJobId])
+  @@index([jobType, status])
+  @@schema("csa")
+  @@map("job_runs")
 }

@@ -9,7 +9,7 @@ import { JobContext } from 'src/jobs/interfaces/job.interface'
 export class RunEligibilityHandler extends BaseJob {
   readonly jobType = JobType.RUN_ELIGIBILITY
 
-  async execute(context: JobContext): Promise<JobResult> {
+  async execute(_context: JobContext): Promise<JobResult> {
     // TODO: Implement eligibility logic
 
     this.logger.log('RUN_ELIGIBILITY stub - not yet implemented')

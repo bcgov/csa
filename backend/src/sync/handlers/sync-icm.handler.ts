@@ -9,7 +9,7 @@ import { JobContext } from 'src/jobs/interfaces/job.interface'
 export class SyncIcmHandler extends BaseJob {
   readonly jobType = JobType.SYNC_ICM
 
-  async execute(context: JobContext): Promise<JobResult> {
+  async execute(_context: JobContext): Promise<JobResult> {
     // TODO: Implement ICM sync logic
 
     this.logger.log('SYNC_ICM stub - not yet implemented')

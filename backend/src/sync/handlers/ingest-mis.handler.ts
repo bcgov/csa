@@ -14,7 +14,7 @@ export class IngestMisHandler extends BaseJob {
     super()
   }
 
-  async execute(context: JobContext): Promise<JobResult> {
+  async execute(_context: JobContext): Promise<JobResult> {
     // TODO: Implement MIS ingestion logic
 
     this.logger.log('INGEST_MIS stub - not yet implemented')

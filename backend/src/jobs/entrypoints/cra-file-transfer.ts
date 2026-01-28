@@ -8,7 +8,7 @@ import { JobRunner } from '../job-runner.service'
 
 // Generates and sends CRA file
 async function bootstrap() {
-  const logger = new Logger('CraFileTransferJob')
+  const logger = new Logger('CRAFileTransferJob')
 
   try {
     logger.log('Bootstrapping CRA file transfer job...')

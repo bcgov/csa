@@ -12,7 +12,7 @@ import { JobContext } from 'src/jobs/interfaces/job.interface'
 export class SendCraFileHandler extends BaseJob {
   readonly jobType = JobType.SEND_CRA_FILE
 
-  async execute(context: JobContext): Promise<JobResult> {
+  async execute(_context: JobContext): Promise<JobResult> {
     // TODO: Implement CRA file generation and transfer
     // 1. Query eligible contacts
     // 2. Format data according to CRA specifications

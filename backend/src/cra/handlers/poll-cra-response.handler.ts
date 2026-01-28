@@ -12,7 +12,7 @@ import { JobContext } from 'src/jobs/interfaces/job.interface'
 export class PollCraResponseHandler extends BaseJob {
   readonly jobType = JobType.POLL_CRA_RESPONSE
 
-  async execute(context: JobContext): Promise<JobResult> {
+  async execute(_context: JobContext): Promise<JobResult> {
     // TODO: Implement CRA response polling
     // 1. Poll CRA endpoint for response files
     // 2. Download new response files

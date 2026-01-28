@@ -18,7 +18,7 @@ export class RetryFailedHandler extends BaseJob {
     super()
   }
 
-  async execute(context: JobContext): Promise<JobResult> {
+  async execute(_context: JobContext): Promise<JobResult> {
     try {
       // This handles both stuck job detection and retry logic
       await this.jobRunner.processFailedJobs()

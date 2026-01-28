@@ -8,7 +8,7 @@ import { JobRunner } from '../job-runner.service'
 
 // Polls for and processes CRA response files
 async function bootstrap() {
-  const logger = new Logger('CraResponsePollJob')
+  const logger = new Logger('CRAResponsePollJob')
 
   try {
     logger.log('Bootstrapping CRA response poll job...')

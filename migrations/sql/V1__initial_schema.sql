@@ -93,14 +93,22 @@ CREATE TABLE IF NOT EXISTS csa.contact_batch_details (
 );
 
 CREATE TABLE IF NOT EXISTS csa.job_runs (
-  id           SERIAL PRIMARY KEY,
-  type         TEXT        NOT NULL,
-  status       TEXT        NOT NULL,
-  retry_count  INTEGER,
-  last_error   TEXT,
-  created_at   TIMESTAMP   NOT NULL,
-  completed_at TIMESTAMP
+  id             SERIAL PRIMARY KEY,
+  job_type       TEXT        NOT NULL,
+  status         TEXT        NOT NULL,
+  parent_job_id  INTEGER     REFERENCES csa.job_runs(id),
+  job_trigger    TEXT        NOT NULL,
+  retry_count    INTEGER     DEFAULT 0,
+  error          TEXT,
+  metadata       JSONB       DEFAULT '{}'::jsonb,
+  created_at     TIMESTAMP   NOT NULL DEFAULT NOW(),
+  started_at     TIMESTAMP   NOT NULL,
+  completed_at   TIMESTAMP
 );
+
+CREATE INDEX idx_job_runs_status ON csa.job_runs(status);
+CREATE INDEX idx_job_runs_parent ON csa.job_runs(parent_job_id);
+CREATE INDEX idx_job_runs_type_status ON csa.job_runs(job_type, status);
 
 CREATE TABLE IF NOT EXISTS csa.transfer_files (
   id                 SERIAL PRIMARY KEY,

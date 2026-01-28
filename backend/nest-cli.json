@@ -1,7 +1,6 @@
 {
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
-  "entryFile": "api/main",
   "compilerOptions": {
     "builder": "swc",
     "typeCheck": true,
@@ -12,5 +11,52 @@
         "watchAssets": true
       }
     ]
+  },
+  "projects": {
+    "api": {
+      "type": "application",
+      "root": "src",
+      "entryFile": "api/main",
+      "sourceRoot": "src",
+      "compilerOptions": {
+        "tsConfigPath": "tsconfig.build.json"
+      }
+    },
+    "data-ingestion": {
+      "type": "application",
+      "root": "src",
+      "entryFile": "jobs/entrypoints/data-ingestion",
+      "sourceRoot": "src",
+      "compilerOptions": {
+        "tsConfigPath": "tsconfig.build.json"
+      }
+    },
+    "cra-file-transfer": {
+      "type": "application",
+      "root": "src",
+      "entryFile": "jobs/entrypoints/cra-file-transfer",
+      "sourceRoot": "src",
+      "compilerOptions": {
+        "tsConfigPath": "tsconfig.build.json"
+      }
+    },
+    "cra-response-poll": {
+      "type": "application",
+      "root": "src",
+      "entryFile": "jobs/entrypoints/cra-response-poll",
+      "sourceRoot": "src",
+      "compilerOptions": {
+        "tsConfigPath": "tsconfig.build.json"
+      }
+    },
+    "retry-failed": {
+      "type": "application",
+      "root": "src",
+      "entryFile": "jobs/entrypoints/retry-failed",
+      "sourceRoot": "src",
+      "compilerOptions": {
+        "tsConfigPath": "tsconfig.build.json"
+      }
+    }
   }
 }

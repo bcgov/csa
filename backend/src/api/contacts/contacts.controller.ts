@@ -22,27 +22,67 @@ export class ContactsController {
     type: Number,
     description: 'Items per page (default: 10, max: 200)',
   })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    type: String,
+    description:
+      'JSON array of sort objects: [{"field":"asc|desc"}]. Example: [{"lastName":"desc"},{"firstName":"asc"}]',
+  })
+  @ApiQuery({
+    name: 'filter',
+    required: false,
+    type: String,
+    description:
+      'JSON array of filter conditions: [{"key":"field","op":"operation","value":"val"}]. Operations: eq, neq, like, gt, gte, lt, lte, in, notin, isnull, notnull, isblank, notblank. Supports OR logic: {"OR":[...]}',
+  })
   @ApiResponse({ status: 200, description: 'Paginated list of contacts' })
   findAll(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('sort') sort?: string,
+    @Query('filter') filter?: string,
   ): Promise<PaginatedResponse<ContactDto>> {
     const pageNum = page ? parseInt(page, 10) : 1
     const limitNum = limit ? parseInt(limit, 10) : 10
-    return this.contactsService.findAll(pageNum, limitNum)
+    return this.contactsService.findAll(pageNum, limitNum, sort, filter)
   }
 
-  @Get('search') // it must be ahead of the below Get(":id") to avoid conflict
+  @Get('search') // must be ahead of Get(":id") to avoid conflict
+  @ApiQuery({
+    name: 'q',
+    required: true,
+    type: String,
+    description: 'Search query for full-text search',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10, max: 200)',
+  })
+  @ApiResponse({ status: 200, description: 'Paginated search results' })
+  @ApiResponse({ status: 400, description: 'Search query is required' })
   async searchContacts(
-    @Query('page') page: number,
-    @Query('limit') limit: number,
-    @Query('sort') sort: string, // JSON string to store sort key and sort value, ex: {name: "ASC"}
-    @Query('filter') filter: string, // JSON array for key, operation and value, ex: [{key: "name", operation: "like", value: "Peter"}]
-  ) {
-    if (isNaN(page) || isNaN(limit)) {
-      throw new HttpException('Invalid query parameters', 400)
+    @Query('q') q: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ): Promise<PaginatedResponse<ContactDto>> {
+    if (!q || q.trim() === '') {
+      throw new HttpException('Search query is required', 400)
     }
-    return this.contactsService.searchContacts(page, limit, sort, filter)
+    if (q.trim().length < 2) {
+      throw new HttpException('Search query must be at least 2 characters', 400)
+    }
+    const pageNum = page ? parseInt(page, 10) : 1
+    const limitNum = limit ? parseInt(limit, 10) : 10
+    return this.contactsService.fullTextSearch(q, pageNum, limitNum)
   }
 
   @Get(':id')

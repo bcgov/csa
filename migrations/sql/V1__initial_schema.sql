@@ -3,7 +3,7 @@ CREATE SCHEMA IF NOT EXISTS csa;
 CREATE TABLE IF NOT EXISTS csa.contacts (
   id                          SERIAL PRIMARY KEY,
   last_name                   TEXT        NOT NULL,
-  given_names                 TEXT        NOT NULL,
+  first_name                  TEXT        NOT NULL,
   middle_name                 TEXT        NOT NULL,
   aka_last_name               TEXT        NOT NULL,
   aka_first_name              TEXT        NOT NULL,
@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS csa.contacts (
   gender                      TEXT,
   date_of_birth               DATE,
   age                         INTEGER,
+  csa_age                     INTEGER,
   case_number                 TEXT        NOT NULL,
   legacy_file_number          TEXT,
   case_type                   TEXT        NOT NULL,
@@ -57,6 +58,8 @@ CREATE TABLE IF NOT EXISTS csa.contacts (
   order_effective_start_date  DATE,
   product                     TEXT,
   source_order                TEXT        NOT NULL,
+  resume_status               TEXT,
+  hold_by                     TEXT,
   icm_integration_status      BOOLEAN     NOT NULL,
   created_at                  TIMESTAMP   NOT NULL,
   created_by                  TEXT        NOT NULL,
@@ -73,7 +76,7 @@ CREATE TABLE IF NOT EXISTS csa.batches (
     system_comments TEXT
 );
 
-CREATE TABLE IF NOT EXISTS contact_batch_details (
+CREATE TABLE IF NOT EXISTS csa.contact_batch_details (
   id                SERIAL PRIMARY KEY,
   contact_id        INTEGER     NOT NULL,
   batch_id          INTEGER     NOT NULL,
@@ -99,7 +102,7 @@ CREATE TABLE IF NOT EXISTS csa.job_runs (
   completed_at TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS transfer_files (
+CREATE TABLE IF NOT EXISTS csa.transfer_files (
   id                 SERIAL PRIMARY KEY,
   batch_id           INTEGER,
   destination_id     TEXT        NOT NULL,

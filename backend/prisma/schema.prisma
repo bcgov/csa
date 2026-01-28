@@ -14,7 +14,7 @@ model Contact {
 
   // Required (NOT NULL)
   lastName                   String    @map("last_name")
-  givenNames                 String    @map("given_names")
+  firstName                  String    @map("first_name")
   middleName                 String    @map("middle_name")
   akaLastName                String    @map("aka_last_name")
   akaFirstName               String    @map("aka_first_name")
@@ -76,29 +76,64 @@ model Contact {
   orderEffectiveStartDate    DateTime? @db.Date @map("order_effective_start_date")
   product                    String?   @map("product")
 
+  // Relations
+  contactBatchDetails        ContactBatchDetail[]
+
   @@schema("csa")
   @@map("contacts")
 }
 
+model Batch {
+  id                    Int                    @id @default(autoincrement())
+  batchDate             DateTime               @db.Date @map("batch_date")
+  status                String
+  recordCount           Int                    @map("record_count")
+  createdAt             DateTime               @map("created_at")
+  systemComments        String?                @map("system_comments")
 
-model master_table {
-  id                         Int      @id @default(autoincrement())
-  last_name                  String?  @db.VarChar(40)
-  given_name                 String?  @db.VarChar(40)
-  middle_name                String?  @db.VarChar(40)
-  aka_last_name              String?  @db.VarChar(40)
-  aka_first_name             String?  @db.VarChar(40)
-  person_id_icm              String?  @db.VarChar(30)
-  person_id_ims              String?  @db.VarChar(30)
-  gender                     String?  @db.VarChar(30)
-  date_of_birth              DateTime?
-  age                        Int?
-  case_number                String?  @db.VarChar(30)
-  case_type                  String?  @db.VarChar(30)
-  case_status                String?  @db.VarChar(30)
-  csa_status                 String?  @db.VarChar(30)
-  created_at                 DateTime @default(now())
+  // Relations
+  contactBatchDetails   ContactBatchDetail[]
+  transferFiles         TransferFile[]
 
-  @@map("master_table")
-  @@schema("public")
+  @@schema("csa")
+  @@map("batches")
+}
+
+model ContactBatchDetail {
+  id              Int       @id @default(autoincrement())
+  contactId       Int       @map("contact_id")
+  batchId         Int       @map("batch_id")
+  transactionType String    @map("transaction_type")
+  systemComments  String?   @map("system_comments")
+  createdAt       DateTime  @map("created_at")
+  createdBy       String    @map("created_by")
+  lastUpdatedAt   DateTime  @map("last_updated_at")
+  lastUpdatedBy   String    @map("last_updated_by")
+  status          String?
+
+  // Relations
+  contact         Contact   @relation(fields: [contactId], references: [id])
+  batch           Batch     @relation(fields: [batchId], references: [id])
+
+  @@unique([contactId, batchId], name: "contact_batch_unique")
+  @@schema("csa")
+  @@map("contact_batch_details")
+}
+
+model TransferFile {
+  id                Int       @id @default(autoincrement())
+  batchId           Int?      @map("batch_id")
+  destinationId     String    @map("destination_id")
+  direction         String
+  fileName          String    @map("file_name")
+  fileSize          String?   @map("file_size")
+  deliveredAt       DateTime? @map("delivered_at")
+  downloadedAt      DateTime? @map("downloaded_at")
+  referenceNumbers  Int[]     @map("reference_numbers")
+
+  // Relations
+  batch             Batch?    @relation(fields: [batchId], references: [id])
+
+  @@schema("csa")
+  @@map("transfer_files")
 }

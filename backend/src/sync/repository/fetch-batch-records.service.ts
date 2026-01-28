@@ -10,14 +10,14 @@ export class FetchBatchRecordsService {
   async fetchBatchRecords() {
     this.logger.log('Fetching batch records from master_table')
 
-    const dbResult = await this.prismaService.master_table.findMany({
-      orderBy: { id: 'asc' },
-    })
+    // const dbResult = await this.prismaService.master_table.findMany({
+    //   orderBy: { id: 'asc' },
+    // })
 
-    console.log(dbResult[0])
+    // console.log(dbResult[0])
 
-    this.logger.log(`Fetched ${dbResult.length} records`, JSON.stringify(dbResult[0], null, 2))
-    return dbResult
+    // this.logger.log(`Fetched ${dbResult.length} records`, JSON.stringify(dbResult[0], null, 2))
+    // return dbResult
   }
 }
 

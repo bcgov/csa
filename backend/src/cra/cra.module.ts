@@ -1,9 +1,9 @@
 import { HttpModule } from '@nestjs/axios'
 import { Module } from '@nestjs/common'
 
-import { FileDecodeService } from './inboundFile/file-decode.service'
-import { FileCreateService } from './outboundFile/file-create.service'
-import { FileTransferClientService } from './outboundFile/file-transfer.service'
+import { FileDecodeService } from './inbound-file/file-decode.service'
+import { FileCreateService } from './outbound-file/file-create.service'
+import { FileTransferClientService } from './outbound-file/file-transfer.service'
 @Module({
   imports: [
     HttpModule.register({

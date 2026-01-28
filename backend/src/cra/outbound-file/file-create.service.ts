@@ -1,13 +1,14 @@
+import { Logger } from '@nestjs/common'
+import { HttpService } from '@nestjs/axios'
 import { Injectable } from '@nestjs/common'
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { SERVER_CONFIG } from 'src/common/config/server.config'
-import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra-data-handling/cra-data-handling.constant'
-// import { FILE_MOCK_DATA } from './file-mock-data'
+import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 import { CraDetail, CraHeader, CraTrailer } from './file-create.interface'
+import { FILE_MOCK_DATA } from './file-mock-data'
 import { FileTransferClientService } from './file-transfer.service'
-// import { HttpService } from '@nestjs/axios'
 
-// const { header, details, trailer } = FILE_MOCK_DATA
+const { header, details, trailer } = FILE_MOCK_DATA
 const { FILE_CREATED_PATH, FILE_CREATION_ENVIROMENT, FILE_TYPE_APPLICATION } = SERVER_CONFIG
 const { FILE_NAME_PREFIX, FILE_TRANSACTION_CODE } = CRA_DATA_HANDLING_CONSTANT
 
@@ -16,6 +17,7 @@ const { HEADER_TRAN_CODE, DETAIL_TRAN_CODE, TRAILER_TRAN_CODE } = FILE_TRANSACTI
 @Injectable()
 export class FileCreateService {
   /* ========= PUBLIC ENTRY ========= */
+  logger = new Logger(FileCreateService.name)
   constructor(private fileTransferClientService: FileTransferClientService) {}
   async createFile(
     header: CraHeader,
@@ -32,9 +34,6 @@ export class FileCreateService {
     }
 
     lines.push(this.buildTrailer(trailer))
-
-    console.log('file content', lines.join('\n'))
-
     const fileExists = existsSync(FILE_CREATED_PATH)
     if (!fileExists) {
       mkdirSync(FILE_CREATED_PATH, { recursive: true })
@@ -42,24 +41,23 @@ export class FileCreateService {
     const fileName = this.createfileName(craUserId)
     const outputPath = FILE_CREATED_PATH + fileName
 
-    console.log('outputPath', outputPath)
     writeFileSync(outputPath, lines.join('\n'), 'utf8')
 
-    console.log(`File written to ${outputPath}`)
+    this.logger.log(`File Created Successfuly===============> : ${outputPath}`)
 
-    const fileTransferResponse = await this.fileTransferClientService.sendFileToTransferService(
-      outputPath,
-      fileName,
-      craUserId,
-    )
-    if (fileTransferResponse.statusCode === 226) {
-      console.log('File transfer successful')
-      // update DB recort csa status and batch status
-    } else {
-      console.error('File transfer failed', fileTransferResponse)
-      // Retry or update DB record csa status and batch status
-    }
-    console.log('File transfer result:', fileTransferResponse)
+    // const fileTransferResponse = await this.fileTransferClientService.sendFileToTransferService(
+    //   outputPath,
+    //   fileName,
+    //   craUserId,
+    // )
+    // if (fileTransferResponse.statusCode === 226) {
+    //   console.log('File transfer successful')
+    //   // update DB recort csa status and batch status
+    // } else {
+    //   console.error('File transfer failed', fileTransferResponse)
+    //   // Retry or update DB record csa status and batch status
+    // }
+    // console.log('File transfer result:', fileTransferResponse)
   }
 
   /* ========= HEADER 6133 ========= */
@@ -140,8 +138,8 @@ export class FileCreateService {
 
 // Mock implementation of FileTransferClientService for testing
 
-// const creator = new FileCreateService(new FileTransferClientService(new HttpService()))
+const creator = new FileCreateService(new FileTransferClientService(new HttpService()))
 
 // console.log('file header', header, 'details', details, 'trailer', trailer)
 
-// creator.createFile(header, details, trailer)
+creator.createFile(header, details, trailer)

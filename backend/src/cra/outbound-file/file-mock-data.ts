@@ -1,4 +1,4 @@
-import { CRA_DATA_HANDLING_CONSTANT } from '../cra-data-handling.constant'
+import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 
 const { HEADER_TRAN_CODE, DETAIL_TRAN_CODE, TRAILER_TRAN_CODE } =
   CRA_DATA_HANDLING_CONSTANT.FILE_TRANSACTION_CODE

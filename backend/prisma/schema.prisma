@@ -19,7 +19,7 @@ model Contact {
   akaLastName                String    @map("aka_last_name")
   akaFirstName               String    @map("aka_first_name")
   personIdIcm                String    @map("person_id_icm")
-  personIdIms                String    @map("person_id_ims")
+  personIdMis                String    @map("person_id_mis")
   caseNumber                 String    @map("case_number")
   caseType                   String    @map("case_type")
   caseStatus                 String    @map("case_status")

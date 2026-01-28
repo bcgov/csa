@@ -24,7 +24,7 @@ export class ContactDto {
   personIdIcm: string
 
   @ApiProperty({ description: 'IMS person identifier' })
-  personIdIms: string
+  personIdMis: string
 
   @ApiProperty({ description: 'Primary case number associated with the contact' })
   caseNumber: string

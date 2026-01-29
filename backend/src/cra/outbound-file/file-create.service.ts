@@ -18,7 +18,7 @@ const { HEADER_TRAN_CODE, DETAIL_TRAN_CODE, TRAILER_TRAN_CODE } = FILE_TRANSACTI
 export class FileCreateService {
   /* ========= PUBLIC ENTRY ========= */
   logger = new Logger(FileCreateService.name)
-  constructor(private fileTransferClientService: FileTransferClientService) {}
+  constructor(private fileTransferClientService: FileTransferClientService) { }
   async createFile(
     header: CraHeader,
     details: CraDetail[],
@@ -64,10 +64,12 @@ export class FileCreateService {
   private buildHeader(h: CraHeader): string {
     return (
       this.padRight(HEADER_TRAN_CODE, 4) +
-      this.padRight(h.version, 5) +
+      this.padRight(h.versionNum, 5) +
       this.padRight(h.processDate, 8) +
       this.padRight(h.businessNum, 15) +
-      this.padLeftZero(h.recordCount, 8)
+      this.padLeftZero(h.recordCount || 0, 8),
+      this.padRight(h.filler, 25)
+
     )
   }
 
@@ -94,9 +96,11 @@ export class FileCreateService {
       this.padRight(d.prevRecipSurName, 30) +
       this.padRight(d.appStartDate, 8) +
       this.padRight(d.newBornCode, 1) +
+      // this.padRight(d.filler2 || '', 10) +
       this.padRight(d.cancelEndDate, 8) +
       this.padRight(d.cancelReasonCode, 2) +
       this.padRight(d.ccraDinNum, 9)
+      // this.padRight(d.filler3 || '', 15)
     )
   }
 
@@ -104,16 +108,17 @@ export class FileCreateService {
   private buildTrailer(t: CraTrailer): string {
     return (
       this.padRight(TRAILER_TRAN_CODE, 4) +
-      this.padRight(t.version, 5) +
+      this.padRight(t.versionNum, 5) +
       this.padRight(t.processDate, 8) +
       this.padRight(t.businessNum, 15) +
-      this.padLeftZero(t.recordCount, 8)
+      this.padLeftZero(t.recordCount + 2, 8),
+      this.padRight(t.filler, 25)
     )
   }
 
   /* ========= HELPERS ========= */
-  private padRight(value: string, length: number): string {
-    return (value ?? '').padEnd(length, ' ')
+  private padRight(value: string | number, length: number): string {
+    return String(value ?? '').padEnd(length, ' ')
   }
 
   private padLeftZero(value: number, length: number): string {

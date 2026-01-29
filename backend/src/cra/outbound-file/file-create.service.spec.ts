@@ -44,23 +44,24 @@ describe('FileCreateService', () => {
   })
 
   it('should create file and send it to transfer service successfully', async () => {
-    ;(existsSync as unknown as Mock).mockReturnValue(true)
-    ;(fileTransferClientService.sendFileToTransferService as Mock).mockResolvedValue({
-      statusCode: 226,
-      message: 'Success',
-    })
+    ; (existsSync as unknown as Mock).mockReturnValue(true)
+      ; (fileTransferClientService.sendFileToTransferService as Mock).mockResolvedValue({
+        statusCode: 226,
+        message: 'Success',
+      })
 
     const header = {
-      tranCode: '6133',
-      version: 'V00.0',
+      tranCode: 6133,
+      versionNum: 'V00.0',
       processDate: '20260101',
       businessNum: '885633354RA0001',
       recordCount: 1,
+      filler: ''
     }
 
     const details = [
       {
-        tranCode: '6134',
+        tranCode: 6134,
         referenceNum: 'REF001',
         businessNum: '885633354RA0001',
         tranType: '2',
@@ -87,11 +88,12 @@ describe('FileCreateService', () => {
     ]
 
     const trailer = {
-      tranCode: '6135',
-      version: 'V00.0',
+      tranCode: 6135,
+      versionNum: 'V00.0',
       processDate: '20260101',
       businessNum: '885633354RA0001',
       recordCount: 1,
+      filler: ''
     }
 
     await service.createFile(header, details, trailer, 'testuser')
@@ -109,7 +111,7 @@ describe('CRA Header format', () => {
   it('should build header in correct CRA sequence and length', () => {
     const header = {
       tranCode: '6133',
-      version: '001',
+      versionNum: '001',
       processDate: '20260115',
       businessNum: '885633354RA0001',
       recordCount: 12,
@@ -180,28 +182,28 @@ describe('CRA Detail format', () => {
     // Exact total length (CRA spec)
     expect(result.length).toBe(
       4 +
-        20 +
-        15 +
-        1 +
-        30 +
-        1 +
-        30 +
-        30 +
-        30 +
-        8 +
-        1 +
-        28 +
-        2 +
-        2 +
-        9 +
-        6 +
-        30 +
-        30 +
-        8 +
-        1 +
-        8 +
-        2 +
-        9,
+      20 +
+      15 +
+      1 +
+      30 +
+      1 +
+      30 +
+      30 +
+      30 +
+      8 +
+      1 +
+      28 +
+      2 +
+      2 +
+      9 +
+      6 +
+      30 +
+      30 +
+      8 +
+      1 +
+      8 +
+      2 +
+      9,
     )
   })
 })
@@ -216,7 +218,7 @@ describe('CRA Trailer format', () => {
 
   it('should pad record count with leading zeros', () => {
     const trailer = {
-      version: '001',
+      versionNum: '001',
       processDate: '20260115',
       businessNum: '885633354RA0001',
       recordCount: 5,

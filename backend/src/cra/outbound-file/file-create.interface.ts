@@ -3,50 +3,54 @@
 //   APPLICATION = '2',
 // }
 
-export interface CraHeader {
-  tranCode: string // 6133
-  version: string // V00.0
-  processDate: string // YYYYMMDD
-  businessNum: string // 15
-  recordCount: number // header = 6133V00.020260110885633354RA000100000002
+export interface CraHeader { // header = 6133V00.020260110885633354RA000100000002
+  tranCode: number // 9(04) 6133
+  versionNum: string // V00.0
+  processDate: string // X(8) YYYYMMDD
+  businessNum: string // X(15)
+  recordCount: number // 9(08) It includes header, tailer and details count
+  filler: string    // 25 space
 }
 export interface CraDetail {
-  tranCode: string // Record type (detail)
-  referenceNum: string // Ministry file reference ID
-  businessNum: string // CRA business number
+  tranCode: number // 9(04) 6134 Record type (detail)
+  referenceNum: string // X(20) Ministry file reference ID
+  businessNum: string //X(15) CRA business number
   tranType: string // 1 = Cancellation, 2 = Application
 
-  childGivenName: string // Child first name
-  childInitial: string // Child middle initial
-  childSurName: string // Child last name
+  childGivenName: string // X(30) Child first name
+  childInitial: string // X(1) first char of middle name
+  childSurName: string // X(30) Child last name
 
-  childGivenNameAka: string // Child alternate first name
-  childSurNameAka: string // Child alternate last name
+  childGivenNameAka: string // X(30) Child alternate first name
+  childSurNameAka: string // X(30) Child alternate last name
 
-  childBirthDate: string // Child birth date (YYYYMMDD)
-  childSex: string // Child gender code
-  childBirthCity: string // Child birth city
-  childBirthProv: string // Child birth province code
-  childBirthCountry: string // Child birth country code
+  childBirthDate: string // X(8) Child birth date (YYYYMMDD)
+  childSex: string //X(1) [ M ,F ] Child gender code
+  childBirthCity: string //  X(28) Child birth city
+  childBirthProv: string // X(2) Child birth province code ON = Ontario
+  childBirthCountry: string // X(2) Child birth country code CA = Canada
 
-  prevRecipSin: string // Social Insurance Number (SIN) of the previous benefit recipient
-  filler1: string // Blank filler field used only to keep CRA file format aligned
-  prevRecipGivenName: string // Previous recipient first name
-  prevRecipSurName: string // Previous recipient last name
+  prevRecipSin: string // X(9) Social Insurance Number (SIN) of the previous benefit recipient
+  filler1: string // X(6) Blank filler field used only to keep CRA file format aligned
+  prevRecipGivenName: string // X(30) Previous recipient first name
+  prevRecipSurName: string // X(30) Previous recipient last name
 
-  appStartDate: string // Benefit start date
-  newBornCode: string // Newborn indicator (Y/N)
+  appStartDate: string // 9(08) Benefit start date
+  newBornCode: string // X(1) Newborn indicator (Y/N)
+  // FILLER2
 
-  cancelEndDate: string // Cancellation end date
-  cancelReasonCode: string // Cancellation reason code
+  cancelEndDate: string // X(8) Cancellation end date
+  cancelReasonCode: string // X(2) Cancellation reason code
 
-  ccraDinNum: string // CRA document ID number
+  ccraDinNum: string // 9(9) CRA document ID number
+  // FILLER3
 }
 
 export interface CraTrailer {
-  tranCode: string
-  version: string
+  tranCode: number
+  versionNum: string
   processDate: string
   businessNum: string
-  recordCount: number
+  recordCount: number,
+  filler: string
 }

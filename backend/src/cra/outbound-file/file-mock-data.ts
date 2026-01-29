@@ -50,19 +50,21 @@ export const FILE_MOCK_DATA = {
   // DATA FOR TESTING PURPOSES
   header: {
     tranCode: HEADER_TRAN_CODE,
-    version: '1.1.0',
+    versionNum: '1.1.0',
     processDate: currentDate(), // YYYYMMDD
     businessNum: '885633354RA0001', // 15 chars
     recordCount: 0, // must match detail records
+    filler: ''
   },
   // 6133V00.020260110885633354RA000100000002
   details: details,
 
   trailer: {
     tranCode: TRAILER_TRAN_CODE,
-    version: '1.1.0',
+    versionNum: '1.1.0',
     processDate: currentDate(),
     businessNum: '885633354RA0001',
     recordCount: details.length,
+    filler: ''
   },
 }

@@ -189,7 +189,7 @@ export class ContactsService {
     const data = await this.prisma.$queryRaw<ContactDto[]>`
       SELECT id, last_name as "lastName", given_names as "givenNames", middle_name as "middleName",
         aka_last_name as "akaLastName", aka_first_name as "akaFirstName",
-        person_id_icm as "personIdIcm", person_id_ims as "personIdIms",
+        person_id_icm as "personIdIcm", person_id_mis as "personIdMis",
         gender, date_of_birth as "dateOfBirth", age,
         case_number as "caseNumber", legacy_file_number as "legacyFileNumber",
         case_type as "caseType", case_status as "caseStatus", case_load as "caseLoad",

@@ -121,7 +121,7 @@ async function seedContacts() {
       akaFirstName: faker.person.firstName(),
 
       personIdIcm: faker.string.alphanumeric(10).toUpperCase(),
-      personIdIms: faker.string.alphanumeric(10).toUpperCase(),
+      personIdMis: faker.string.alphanumeric(10).toUpperCase(),
 
       gender: faker.helpers.arrayElement(GENDERS),
       dateOfBirth: birthDate,

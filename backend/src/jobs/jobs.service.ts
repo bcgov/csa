@@ -1,0 +1,138 @@
+import { Injectable } from '@nestjs/common'
+import { PrismaService } from 'src/common/database/prisma.service'
+import { JobStatus } from './enums/job-status.enum'
+import { JobTrigger } from './enums/job-trigger.enum'
+import { JobType } from './enums/job-type.enum'
+
+export interface CreateJobDto {
+  jobType: JobType
+  jobTrigger: JobTrigger
+  parentJobId?: number
+  metadata?: Record<string, unknown>
+}
+
+@Injectable()
+export class JobsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async createJob(dto: CreateJobDto) {
+    const now = new Date()
+    return this.prisma.jobRun.create({
+      data: {
+        jobType: dto.jobType,
+        jobTrigger: dto.jobTrigger,
+        parentJobId: dto.parentJobId,
+        status: JobStatus.RUNNING,
+        retryCount: 0,
+        metadata: (dto.metadata ?? {}) as any,
+        createdAt: now,
+        startedAt: now,
+      },
+    })
+  }
+
+  async getJob(id: number) {
+    return this.prisma.jobRun.findUnique({
+      where: { id },
+      include: { childJobs: true, parentJob: true },
+    })
+  }
+
+  async markSuccess(id: number, metadata?: Record<string, unknown>) {
+    return this.prisma.jobRun.update({
+      where: { id },
+      data: {
+        status: JobStatus.SUCCESS,
+        completedAt: new Date(),
+        ...(metadata && { metadata: metadata as any }),
+      },
+    })
+  }
+
+  async markFailed(id: number, error: string) {
+    return this.prisma.jobRun.update({
+      where: { id },
+      data: {
+        status: JobStatus.FAILED,
+        error,
+        retryCount: { increment: 1 },
+        completedAt: new Date(),
+      },
+    })
+  }
+
+  async getFailedJobs() {
+    return this.prisma.jobRun.findMany({
+      where: {
+        status: JobStatus.FAILED,
+      },
+      select: {
+        id: true,
+        jobType: true,
+        jobTrigger: true,
+        retryCount: true,
+        metadata: true,
+        parentJobId: true,
+      },
+      orderBy: {
+        completedAt: 'asc',
+      },
+    })
+  }
+
+  //TODO: define when a job is stuck
+  //stuckThresholdMinutes
+  async getStuckRunningJobs(stuckThresholdMinutes: number = 60) {
+    const threshold = new Date(Date.now() - stuckThresholdMinutes * 60 * 1000)
+    return this.prisma.jobRun.findMany({
+      where: {
+        status: JobStatus.RUNNING,
+        startedAt: {
+          lt: threshold,
+        },
+      },
+    })
+  }
+
+  async markStuckJobsAsFailed(stuckThresholdMinutes: number = 60) {
+    const threshold = new Date(Date.now() - stuckThresholdMinutes * 60 * 1000)
+    return this.prisma.jobRun.updateMany({
+      where: {
+        status: JobStatus.RUNNING,
+        startedAt: {
+          lt: threshold,
+        },
+      },
+      data: {
+        status: JobStatus.FAILED,
+        error: 'Job timed out (stuck)',
+        completedAt: new Date(),
+      },
+    })
+  }
+
+  async getChildJobs(parentJobId: number) {
+    return this.prisma.jobRun.findMany({
+      where: { parentJobId },
+      orderBy: { createdAt: 'asc' },
+    })
+  }
+
+  async getLastSuccessfulJob(jobType: JobType) {
+    return this.prisma.jobRun.findFirst({
+      where: {
+        jobType,
+        status: JobStatus.SUCCESS,
+      },
+      orderBy: {
+        completedAt: 'desc',
+      },
+    })
+  }
+
+  // Get the completion timestamp of the last successful job of a given type
+  async getLastSuccessTimestamp(jobType: JobType): Promise<Date | null> {
+    const lastJob = await this.getLastSuccessfulJob(jobType)
+    return lastJob?.completedAt ?? null
+  }
+}

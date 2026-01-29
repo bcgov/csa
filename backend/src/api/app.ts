@@ -18,7 +18,9 @@ export async function bootstrap() {
   app.set('trust proxy', 1)
   app.use(metricsMiddleware)
   app.enableShutdownHooks()
-  app.setGlobalPrefix('api')
+  app.setGlobalPrefix('api', {
+    exclude: ['health', 'health/live', 'health/ready'],
+  })
   const config = new DocumentBuilder().setTitle('CSA API').setDescription('CSA BACKEND API').build()
 
   const document = SwaggerModule.createDocument(app, config)

@@ -3,6 +3,12 @@ import { faker } from '@faker-js/faker'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
 import 'dotenv/config'
+import {
+  BATCH_STATUSES,
+  CONTACT_BATCH_STATUSES,
+  CSA_STATUSES,
+  TRANSACTION_TYPES,
+} from '../src/api/contacts/constants'
 
 const DB_HOST = process.env.POSTGRES_HOST
 const DB_USER = process.env.POSTGRES_USER
@@ -21,26 +27,6 @@ const prisma = new PrismaClient({ adapter })
 // Get contact count from CLI argument or default to 20
 const CONTACT_COUNT = parseInt(process.argv[2] || '20', 10)
 
-// TODO: update these values based on the functional document
-const CSA_STATUSES = [
-  'on_hold',
-  'not_eligible_out_of_pay',
-  'eligible',
-  'eligible_tbd',
-  'in_batch_application',
-  'application_refused',
-  'batch_sent_application',
-  'in_pay',
-  'age_out',
-  'not_eligible_in_pay',
-  'not_eligible_ip_tbd',
-  'in_batch_cancellation',
-  'cancellation_refused_cra',
-  'batch_sent_cancellation',
-] as const
-const BATCH_STATUSES = ['pending', 'in_progress', 'processed_with_errors', 'error'] as const
-const CONTACT_BATCH_STATUSES = ['pending', 'in_progress', 'processed', 'error'] as const
-const TRANSACTION_TYPES = ['application', 'cancellation'] as const
 const GENDERS = ['Male', 'Female', 'Other', 'Unknown'] as const
 const CASE_TYPES = ['Type A', 'Type B', 'Type C'] as const
 const CASE_STATUSES = ['Open', 'Closed', 'Pending'] as const
@@ -135,7 +121,7 @@ async function seedContacts() {
       serviceOffice: faker.company.name(),
       assignedTo: faker.person.fullName(),
 
-      csaStatus: faker.helpers.arrayElement(CSA_STATUSES),
+      csaStatus: faker.helpers.arrayElement(Object.values(CSA_STATUSES)),
       csaStatusEffectiveDate: csaStatusEffective, // TIMESTAMP
       csaSentDate: csaSentDate, // TIMESTAMP
 
@@ -202,13 +188,13 @@ async function seedBatches() {
   const batches = []
 
   // Create 6 batches - only 1 pending, rest can be in_progress or other statuses
-  const batchStatuses: (typeof BATCH_STATUSES)[number][] = [
-    'pending', // Only 1 pending
-    'in_progress',
-    'in_progress',
-    'in_progress',
-    'processed_with_errors',
-    'error',
+  const batchStatuses = [
+    BATCH_STATUSES.PENDING, // Only 1 pending
+    BATCH_STATUSES.IN_PROGRESS,
+    BATCH_STATUSES.IN_PROGRESS,
+    BATCH_STATUSES.IN_PROGRESS,
+    BATCH_STATUSES.PROCESSED_WITH_ERRORS,
+    BATCH_STATUSES.ERROR,
   ]
 
   for (let i = 0; i < 6; i++) {
@@ -255,8 +241,8 @@ async function seedContactBatchDetails() {
       contactBatchDetails.push({
         contactId: contact.id,
         batchId: batch.id,
-        transactionType: faker.helpers.arrayElement(TRANSACTION_TYPES),
-        status: faker.helpers.arrayElement(CONTACT_BATCH_STATUSES),
+        transactionType: faker.helpers.arrayElement(Object.values(TRANSACTION_TYPES)),
+        status: faker.helpers.arrayElement(Object.values(CONTACT_BATCH_STATUSES)),
         systemComments: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.3 }),
         createdAt: batch.createdAt,
         createdBy: 'seed',

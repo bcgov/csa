@@ -192,7 +192,7 @@ export class ContactsService {
     const searchQuery = query.trim().split(/\s+/).join(' & ')
 
     const data = await this.prisma.$queryRaw<ContactDto[]>`
-      SELECT id, last_name as "lastName", given_names as "givenNames", middle_name as "middleName",
+      SELECT id, last_name as "lastName", first_name as "firstName", middle_name as "middleName",
         aka_last_name as "akaLastName", aka_first_name as "akaFirstName",
         person_id_icm as "personIdIcm", person_id_mis as "personIdMis",
         gender, date_of_birth as "dateOfBirth", age,

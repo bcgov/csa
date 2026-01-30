@@ -18,9 +18,12 @@ export interface FilterItem {
   op: FilterOperation
   value?: unknown // Optional for isnull, notnull, isblank, notblank
 }
-
 export interface OrCondition {
   OR: FilterItem[]
 }
-
 export type FilterCondition = FilterItem | OrCondition
+
+export interface BulkOperationResponse {
+  success: number[]
+  skipped: Array<{ id: number; reason: string }>
+}

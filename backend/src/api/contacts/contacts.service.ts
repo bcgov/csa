@@ -1,9 +1,14 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { ALLOWED_FILTER_SORT_FIELDS } from './constants'
+import {
+  ALLOWED_FILTER_SORT_FIELDS,
+  BATCH_STATUSES,
+  BULK_OPERATION_SKIP_REASONS,
+  CSA_STATUSES,
+} from './constants'
 import { ContactDto } from './dto/contact.dto'
-import { FilterCondition, FilterItem } from './interfaces'
+import { BulkOperationResponse, FilterCondition, FilterItem } from './interfaces'
 
 @Injectable()
 export class ContactsService {
@@ -187,7 +192,7 @@ export class ContactsService {
     const searchQuery = query.trim().split(/\s+/).join(' & ')
 
     const data = await this.prisma.$queryRaw<ContactDto[]>`
-      SELECT id, last_name as "lastName", given_names as "givenNames", middle_name as "middleName",
+      SELECT id, last_name as "lastName", first_name as "firstName", middle_name as "middleName",
         aka_last_name as "akaLastName", aka_first_name as "akaFirstName",
         person_id_icm as "personIdIcm", person_id_mis as "personIdMis",
         gender, date_of_birth as "dateOfBirth", age,
@@ -233,5 +238,104 @@ export class ContactsService {
       total,
       totalPages: Math.ceil(total / limit),
     }
+  }
+
+  async holdContacts(contactIds: number[], userId: string): Promise<BulkOperationResponse> {
+    const result: BulkOperationResponse = {
+      success: [],
+      skipped: [],
+    }
+
+    // Get all contacts
+    const contacts = await this.prisma.contact.findMany({
+      where: { id: { in: contactIds } },
+    })
+    const contactMap = new Map(contacts.map((c) => [c.id, c]))
+
+    // Find contacts in pending batch
+    const inPendingBatch = await this.prisma.contactBatchDetail.findMany({
+      where: {
+        contactId: { in: contactIds },
+        batch: { status: BATCH_STATUSES.PENDING },
+      },
+      select: { contactId: true },
+    })
+    const inPendingBatchIds = new Set(inPendingBatch.map((c) => c.contactId))
+
+    // Categorize contacts
+    const toHold: number[] = []
+    for (const id of contactIds) {
+      const contact = contactMap.get(id)
+      if (!contact) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
+      } else if (contact.csaStatus === CSA_STATUSES.ON_HOLD) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.ALREADY_ON_HOLD })
+      } else if (inPendingBatchIds.has(id)) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.IN_PENDING_BATCH })
+      } else {
+        toHold.push(id)
+      }
+    }
+
+    // Update valid contacts and preserve original csa_status in resumeStatus
+    for (const id of toHold) {
+      const contact = contactMap.get(id)!
+      await this.prisma.contact.update({
+        where: { id },
+        data: {
+          resumeStatus: contact.csaStatus,
+          csaStatus: CSA_STATUSES.ON_HOLD,
+          holdBy: userId,
+          lastUpdatedAt: new Date(),
+          lastUpdatedBy: userId,
+        },
+      })
+      result.success.push(id)
+    }
+
+    return result
+  }
+
+  async resumeContacts(contactIds: number[], userId: string): Promise<BulkOperationResponse> {
+    const result: BulkOperationResponse = {
+      success: [],
+      skipped: [],
+    }
+
+    // Get all contacts
+    const contacts = await this.prisma.contact.findMany({
+      where: { id: { in: contactIds } },
+    })
+    const contactMap = new Map(contacts.map((c) => [c.id, c]))
+
+    // Categorize contacts
+    const toResume: Array<{ id: number; resumeStatus: string }> = []
+    for (const id of contactIds) {
+      const contact = contactMap.get(id)
+      if (!contact) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
+      } else if (contact.csaStatus !== CSA_STATUSES.ON_HOLD) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_ON_HOLD })
+      } else {
+        toResume.push({ id, resumeStatus: contact.resumeStatus! })
+      }
+    }
+
+    // Update valid contacts
+    for (const { id, resumeStatus } of toResume) {
+      await this.prisma.contact.update({
+        where: { id },
+        data: {
+          csaStatus: resumeStatus,
+          resumeStatus: null,
+          holdBy: null,
+          lastUpdatedAt: new Date(),
+          lastUpdatedBy: userId,
+        },
+      })
+      result.success.push(id)
+    }
+
+    return result
   }
 }

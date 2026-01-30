@@ -54,16 +54,19 @@ describe('ContactsService', () => {
         {
           provide: PrismaService,
           useValue: {
-            // IMPORTANT: singular "contact" to match prisma.contact
             contact: {
-              findMany: vi.fn().mockResolvedValue(savedContactArray),
-              findUnique: vi.fn().mockResolvedValue(savedContact1),
-              create: vi.fn().mockResolvedValue(savedContact1),
-              update: vi.fn().mockResolvedValue(updatedContact),
+              findMany: vi.fn().mockResolvedValue(savedContactArray as any),
+              findUnique: vi.fn().mockResolvedValue(savedContact1 as any),
+              create: vi.fn().mockResolvedValue(savedContact1 as any),
+              update: vi.fn().mockResolvedValue(updatedContact as any),
               delete: vi.fn().mockResolvedValue(true),
               count: vi.fn(),
             },
+            contactBatchDetail: {
+              findMany: vi.fn().mockResolvedValue([]),
+            },
             $queryRaw: vi.fn(),
+            $transaction: vi.fn(),
           },
         },
       ],
@@ -603,6 +606,140 @@ describe('ContactsService', () => {
       await expect(service.findAll(1, 10, '{invalid json}', undefined)).rejects.toThrow(
         'Invalid JSON format for sort parameter',
       )
+    })
+  })
+
+  describe('holdContacts (bulk)', () => {
+    it('should put multiple contacts on hold', async () => {
+      const contact1 = { id: 1, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+      const contact2 = { id: 2, csaStatus: 'in_pay', holdBy: null, resumeStatus: null }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1, contact2] as any)
+      vi.spyOn(prisma.contactBatchDetail, 'findMany').mockResolvedValue([])
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.holdContacts([1, 2], 'user1')
+
+      expect(result.success).toEqual([1, 2])
+      expect(result.skipped).toEqual([])
+      expect(updateSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it('should skip not found contacts', async () => {
+      const contact1 = { id: 1, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1] as any)
+      vi.spyOn(prisma.contactBatchDetail, 'findMany').mockResolvedValue([])
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.holdContacts([1, 999], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(result.skipped).toEqual([{ id: 999, reason: 'not_found' }])
+    })
+
+    it('should skip already on hold contacts', async () => {
+      const contact1 = { id: 1, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+      const contact2 = { id: 2, csaStatus: 'on_hold', holdBy: 'user1', resumeStatus: 'eligible' }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1, contact2] as any)
+      vi.spyOn(prisma.contactBatchDetail, 'findMany').mockResolvedValue([])
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.holdContacts([1, 2], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(result.skipped).toEqual([{ id: 2, reason: 'already_on_hold' }])
+    })
+
+    it('should skip contacts in pending batch', async () => {
+      const contact1 = { id: 1, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+      const contact2 = { id: 2, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1, contact2] as any)
+      vi.spyOn(prisma.contactBatchDetail, 'findMany').mockResolvedValue([{ contactId: 2 }] as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.holdContacts([1, 2], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(result.skipped).toEqual([{ id: 2, reason: 'in_pending_batch' }])
+    })
+
+    it('should handle mixed results', async () => {
+      const contact1 = { id: 1, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+      const contact2 = { id: 2, csaStatus: 'on_hold', holdBy: 'user1', resumeStatus: 'eligible' }
+      const contact3 = { id: 3, csaStatus: 'in_pay', holdBy: null, resumeStatus: null }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1, contact2, contact3] as any)
+      vi.spyOn(prisma.contactBatchDetail, 'findMany').mockResolvedValue([{ contactId: 3 }] as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.holdContacts([1, 2, 3, 999], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(result.skipped).toEqual([
+        { id: 2, reason: 'already_on_hold' },
+        { id: 3, reason: 'in_pending_batch' },
+        { id: 999, reason: 'not_found' },
+      ])
+    })
+  })
+
+  describe('resumeContacts (bulk)', () => {
+    it('should resume multiple contacts from hold', async () => {
+      const contact1 = { id: 1, csaStatus: 'on_hold', holdBy: 'user1', resumeStatus: 'eligible' }
+      const contact2 = { id: 2, csaStatus: 'on_hold', holdBy: 'user1', resumeStatus: 'in_pay' }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1, contact2] as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.resumeContacts([1, 2], 'user1')
+
+      expect(result.success).toEqual([1, 2])
+      expect(result.skipped).toEqual([])
+      expect(updateSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it('should skip not found contacts', async () => {
+      const contact1 = { id: 1, csaStatus: 'on_hold', holdBy: 'user1', resumeStatus: 'eligible' }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1] as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.resumeContacts([1, 999], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(result.skipped).toEqual([{ id: 999, reason: 'not_found' }])
+    })
+
+    it('should skip contacts not on hold', async () => {
+      const contact1 = { id: 1, csaStatus: 'on_hold', holdBy: 'user1', resumeStatus: 'eligible' }
+      const contact2 = { id: 2, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1, contact2] as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.resumeContacts([1, 2], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(result.skipped).toEqual([{ id: 2, reason: 'not_on_hold' }])
+    })
+
+    it('should handle mixed results', async () => {
+      const contact1 = { id: 1, csaStatus: 'on_hold', holdBy: 'user1', resumeStatus: 'eligible' }
+      const contact2 = { id: 2, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1, contact2] as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.resumeContacts([1, 2, 999], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(result.skipped).toEqual([
+        { id: 2, reason: 'not_on_hold' },
+        { id: 999, reason: 'not_found' },
+      ])
     })
   })
 })

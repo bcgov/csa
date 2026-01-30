@@ -75,6 +75,8 @@ model Contact {
   orderAmount                String?   @map("order_amount")
   orderEffectiveStartDate    DateTime? @db.Date @map("order_effective_start_date")
   product                    String?   @map("product")
+  holdBy                     String?   @map("hold_by")
+  resumeStatus  String?      @map("resume_status")
 
   // Relations
   contactBatchDetails        ContactBatchDetail[]

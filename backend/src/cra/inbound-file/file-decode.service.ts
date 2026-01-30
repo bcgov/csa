@@ -13,10 +13,11 @@ export class FileDecodeService {
   private parseHeader(line: string): CraHeader {
     return {
       tranCode: this.slice(line, 0, 4), // 6133
-      version: this.slice(line, 4, 5),
+      versionNum: this.slice(line, 4, 5),
       processDate: this.slice(line, 9, 8),
       businessNum: this.slice(line, 17, 15),
       recordCount: parseInt(this.slice(line, 32, 8), 10),
+      filler: this.slice(line, 57, 25),
     }
   }
   private parseDetail(line: string): CraDetail {
@@ -58,10 +59,11 @@ export class FileDecodeService {
   private parseTrailer(line: string): CraTrailer {
     return {
       tranCode: this.slice(line, 0, 4), // 6135
-      version: this.slice(line, 4, 5),
+      versionNum: this.slice(line, 4, 5),
       processDate: this.slice(line, 9, 8),
       businessNum: this.slice(line, 17, 15),
       recordCount: parseInt(this.slice(line, 32, 8), 10),
+      filler: this.slice(line, 57, 25),
     }
   }
 

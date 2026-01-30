@@ -1,8 +1,6 @@
-const { PORT, SERVICE_NAME, FTP_BASE_URL, FILE_CREATED_PATH, NODE_ENV } = process.env
+const { FTP_BASE_URL, FILE_CREATED_PATH, NODE_ENV } = process.env
 
 const server_config = {
-  PORT,
-  SERVICE_NAME,
   FTP_BASE_URL,
   FILE_CREATED_PATH,
   NODE_ENV,
@@ -16,8 +14,7 @@ for (const key in server_config) {
 }
 
 export const SERVER_CONFIG = {
-  SERVICE_NAME: SERVICE_NAME || 'csa-backend',
-  FTP_BASE_URL: FTP_BASE_URL || 'http://localhost:4000/api/transfers',
+  FTP_BASE_URL: FTP_BASE_URL || 'http://localhost:4000',
   FILE_CREATED_PATH: FILE_CREATED_PATH || './temp/',
   FILE_CREATION_ENVIROMENT: NODE_ENV === 'production' ? 'PCSAIN' : 'ACSAIN',
   FILE_TYPE_APPLICATION: NODE_ENV === 'production' ? 'PAPL' : 'AAPL',

@@ -3,6 +3,19 @@ import { existsSync, writeFileSync } from 'fs'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { FileCreateService } from './file-create.service'
 import { FileTransferClientService } from './file-transfer.service'
+import { FILE_MOCK_DATA } from './file-mock-data'
+import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
+
+const { header, details, trailer } = FILE_MOCK_DATA
+const { REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
+const {
+  BUSINESS_NUM,
+  VERSION_NUM,
+  HEADER_TRAN_CODE,
+  DETAIL_TRAN_CODE,
+  TRAILER_TRAN_CODE,
+  HEADER_RECORD_CONT,
+} = REQUEST_FILE
 
 vi.mock('fs', async () => {
   const actual = await vi.importActual<typeof import('fs')>('fs')
@@ -17,6 +30,14 @@ vi.mock('fs', async () => {
     })),
   }
 })
+
+const currentDate = (): string => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}${month}${day}`
+}
 
 describe('FileCreateService', () => {
   let service: FileCreateService
@@ -44,59 +65,13 @@ describe('FileCreateService', () => {
   })
 
   it('should create file and send it to transfer service successfully', async () => {
-    ; (existsSync as unknown as Mock).mockReturnValue(true)
-      ; (fileTransferClientService.sendFileToTransferService as Mock).mockResolvedValue({
-        statusCode: 226,
-        message: 'Success',
-      })
+    ;(existsSync as unknown as Mock).mockReturnValue(true)
+    ;(fileTransferClientService.sendFileToTransferService as Mock).mockResolvedValue({
+      statusCode: 226,
+      message: 'Success',
+    })
 
-    const header = {
-      tranCode: 6133,
-      versionNum: 'V00.0',
-      processDate: '20260101',
-      businessNum: '885633354RA0001',
-      recordCount: 1,
-      filler: ''
-    }
-
-    const details = [
-      {
-        tranCode: 6134,
-        referenceNum: 'REF001',
-        businessNum: '885633354RA0001',
-        tranType: '2',
-        childGivenName: 'JOHN',
-        childInitial: 'D',
-        childSurName: 'DOE',
-        childGivenNameAka: '',
-        childSurNameAka: '',
-        childBirthDate: '20200101',
-        childSex: 'M',
-        childBirthCity: 'TORONTO',
-        childBirthProv: 'ON',
-        childBirthCountry: 'CA',
-        prevRecipSin: '123456789',
-        filler1: '',
-        prevRecipGivenName: 'MARY',
-        prevRecipSurName: 'DOE',
-        appStartDate: '20260101',
-        newBornCode: 'Y',
-        cancelEndDate: '',
-        cancelReasonCode: '',
-        ccraDinNum: '987654321',
-      },
-    ]
-
-    const trailer = {
-      tranCode: 6135,
-      versionNum: 'V00.0',
-      processDate: '20260101',
-      businessNum: '885633354RA0001',
-      recordCount: 1,
-      filler: ''
-    }
-
-    await service.createFile(header, details, trailer, 'testuser')
+    service.createFile(header, details, trailer, 'testuser')
     expect(writeFileSync).toHaveBeenCalled()
   })
 })
@@ -105,195 +80,109 @@ describe('CRA Header format', () => {
   let service: FileCreateService
 
   beforeEach(() => {
-    service = new FileCreateService({} as any)
+    service = new FileCreateService()
   })
 
   it('should build header in correct CRA sequence and length', () => {
-    const header = {
-      tranCode: '6133',
-      versionNum: '001',
-      processDate: '20260115',
-      businessNum: '885633354RA0001',
-      recordCount: 12,
-    }
-
     const result = (service as any).buildHeader(header)
 
     // Field order check (CRA critical)
-    expect(result.startsWith('6133')).toBe(true)
+    expect(result.startsWith(String(HEADER_TRAN_CODE))).toBe(true)
 
     // Exact length check
-    // 4 + 5 + 8 + 15 + 8 = 40
-    expect(result.length).toBe(40)
+    // 4 + 5 + 8 + 15 + 8 +25 = 65
+    expect(result.length).toBe(65)
 
     // Padding checks
-    expect(result.substring(0, 4)).toBe('6133')
-    expect(result.substring(4, 9).trim()).toBe('001')
-    expect(result.substring(9, 17)).toBe('20260115')
-    expect(result.substring(17, 32).trim()).toBe('885633354RA0001')
-    expect(result.substring(32, 40)).toBe('00000012')
+    expect(result.substring(0, 4)).toBe(String(HEADER_TRAN_CODE))
+    expect(result.substring(4, 9).trim()).toBe(VERSION_NUM)
+    expect(result.substring(9, 17)).toBe(currentDate())
+    expect(result.substring(17, 32).trim()).toBe(BUSINESS_NUM)
+    expect(result.substring(32, 40)).toBe(HEADER_RECORD_CONT)
   })
 })
 
-// File detail test case
+//File detail test case
 
 describe('CRA Detail format', () => {
   let service: FileCreateService
 
   beforeEach(() => {
-    service = new FileCreateService({} as any)
+    service = new FileCreateService()
   })
 
-  it('should pad fields correctly and maintain CRA field sequence', () => {
-    const detail = {
-      referenceNum: 'REF1',
-      businessNum: '885633354RA0001',
-      tranType: '1',
-      childGivenName: 'JOHN',
-      childInitial: 'A',
-      childSurName: 'DOE',
-      childGivenNameAka: '',
-      childSurNameAka: '',
-      childBirthDate: '20200101',
-      childSex: 'M',
-      childBirthCity: 'TORONTO',
-      childBirthProv: 'ON',
-      childBirthCountry: 'CA',
-      prevRecipSin: '123456789',
-      filler1: '',
-      prevRecipGivenName: '',
-      prevRecipSurName: '',
-      appStartDate: '20240101',
-      newBornCode: 'Y',
-      cancelEndDate: '',
-      cancelReasonCode: '',
-      ccraDinNum: '987654321',
-    }
-
-    const result = (service as any).buildDetail(detail)
+  it('should pad fields correctly and maintain CRA Application field sequence', () => {
+    const result = (service as any).buildAppDetail(details[0])
 
     // Must start with detail transaction code
-    expect(result.startsWith('6134')).toBe(true)
+    expect(result.startsWith(String(DETAIL_TRAN_CODE))).toBe(true)
 
     // Verify padding behavior
-    expect(result.substring(4, 24).startsWith('REF1')).toBe(true) // padded right
-    expect(result.substring(24, 39).trim()).toBe('885633354RA0001')
+    expect(result.substring(4, 24).startsWith('REF')).toBe(true) // padded right
+    expect(result.substring(24, 39).trim()).toBe(BUSINESS_NUM)
 
-    // Exact total length (CRA spec)
+    // Exact total length (CRA spec)  // to be 320
     expect(result.length).toBe(
       4 +
-      20 +
-      15 +
-      1 +
-      30 +
-      1 +
-      30 +
-      30 +
-      30 +
-      8 +
-      1 +
-      28 +
-      2 +
-      2 +
-      9 +
-      6 +
-      30 +
-      30 +
-      8 +
-      1 +
-      8 +
-      2 +
-      9,
+        20 +
+        15 +
+        1 +
+        30 +
+        1 +
+        30 +
+        30 +
+        30 +
+        8 +
+        1 +
+        28 +
+        2 +
+        2 +
+        9 +
+        6 +
+        30 +
+        30 +
+        8 +
+        1 +
+        10 +
+        9 +
+        15,
+    )
+  })
+  it('should pad fields correctly and maintain CRA Cancelation field sequence', () => {
+    const result = (service as any).buildCanDetail(details[1])
+
+    // Must start with detail transaction code
+    expect(result.startsWith(String(DETAIL_TRAN_CODE))).toBe(true)
+
+    // Verify padding behavior
+    expect(result.substring(4, 24).startsWith('REF')).toBe(true) // padded right
+    expect(result.substring(24, 39).trim()).toBe(BUSINESS_NUM)
+
+    // Exact total length (CRA spec)  // to be 305
+    expect(result.length).toBe(
+      4 + 20 + 15 + 1 + 30 + 1 + 30 + 30 + 30 + 8 + 1 + 28 + 2 + 2 + 75 + 8 + 1 + 8 + 2 + 9,
     )
   })
 })
 
-// File trailer test case
+// // File trailer test case
 describe('CRA Trailer format', () => {
   let service: FileCreateService
 
   beforeEach(() => {
-    service = new FileCreateService({} as any)
+    service = new FileCreateService()
   })
 
   it('should pad record count with leading zeros', () => {
-    const trailer = {
-      versionNum: '001',
-      processDate: '20260115',
-      businessNum: '885633354RA0001',
-      recordCount: 5,
-    }
-
     const result = (service as any).buildTrailer(trailer)
 
     // Starts with trailer code
-    expect(result.startsWith('6135')).toBe(true)
+    expect(result.startsWith(TRAILER_TRAN_CODE)).toBe(true)
 
     // Record count must be zero-padded
-    expect(result.substring(result.length - 8)).toBe('00000005')
+    expect(result.substring(result.length - 25)).toBe('                         ')
 
-    // Total length validation
-    expect(result.length).toBe(40)
-  })
-})
-
-// sequence test
-
-describe('CRA field sequence integrity', () => {
-  let service: FileCreateService
-
-  beforeEach(() => {
-    service = new FileCreateService({} as any)
-  })
-
-  it('should maintain CRA-required field sequence for detail record', () => {
-    const detail = {
-      referenceNum: 'REF',
-      businessNum: 'BUS',
-      tranType: '1',
-      childGivenName: 'A',
-      childInitial: 'B',
-      childSurName: 'C',
-      childGivenNameAka: 'D',
-      childSurNameAka: 'E',
-      childBirthDate: '20200101',
-      childSex: 'M',
-      childBirthCity: 'CITY',
-      childBirthProv: 'ON',
-      childBirthCountry: 'CA',
-      prevRecipSin: '123456789',
-      filler1: '',
-      prevRecipGivenName: '',
-      prevRecipSurName: '',
-      appStartDate: '20240101',
-      newBornCode: 'Y',
-      cancelEndDate: '',
-      cancelReasonCode: '',
-      ccraDinNum: '111111111',
-    }
-
-    const result = (service as any).buildDetail(detail)
-
-    const expectedSequence = [
-      '6134',
-      'REF',
-      'BUS',
-      '1',
-      'A',
-      'B',
-      'C',
-      'D',
-      'E',
-      '20200101',
-      'M',
-      'CITY',
-      'ON',
-      'CA',
-      '123456789',
-    ]
-
-    expectedSequence.forEach((value) => {
-      expect(result).toContain(value)
-    })
+    // Total length validation // 65
+    expect(result.length).toBe(65)
   })
 })

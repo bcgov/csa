@@ -4,15 +4,13 @@ import { ConfigModule } from '@nestjs/config'
 import { TerminusModule } from '@nestjs/terminus'
 import 'dotenv/config'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { CraDataHandlingModule } from 'src/cra/cra.module'
-import '../common/config/server.config'
 import { HTTPLoggerMiddleware } from '../common/middleware/req.res.logger'
+import '../cra/cra.config'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { ContactsModule } from './contacts/contacts.module'
 import { HealthController } from './health/health.controller'
 import { MetricsController } from './metrics/metrics.controller'
-// import { DataSyncModule } from 'src/data-sync/data-sync.module'
 import { MockModule } from './mock/mock.module'
 
 const enableMockApi = process.env.ENABLE_MOCK_API === 'true'
@@ -22,7 +20,6 @@ const enableMockApi = process.env.ENABLE_MOCK_API === 'true'
     TerminusModule,
     ContactsModule,
     ...(enableMockApi ? [MockModule] : []),
-    CraDataHandlingModule,
   ],
   controllers: [AppController, MetricsController, HealthController],
   providers: [AppService, PrismaService],

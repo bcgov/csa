@@ -1,38 +1,31 @@
-import { HttpModule } from '@nestjs/axios'
-// import { FileDecodeService } from './inbound-file/file-decode.service'
-// import { FileCreateService } from './outbound-file/file-create.service'
-// import { FileTransferClientService } from './outbound-file/file-transfer.service'
+import 'dotenv/config'
 import { Module, OnModuleInit } from '@nestjs/common'
 import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
 import { PollCraResponseHandler } from './handlers/poll-cra-response.handler'
 import { SendCraFileHandler } from './handlers/send-cra-file.handler'
-
-// @Module({
-//   imports: [
-//     HttpModule.register({
-//       timeout: 60000, // 60 seconds timeout
-//       maxRedirects: 5,
-//     }),
-//   ],
-//   providers: [FileCreateService, FileTransferClientService],
-//   exports: [FileCreateService, FileDecodeService, FileTransferClientService],
-// })
-// export class CraDataHandlingModule { }
-
+import { HttpModule } from '@nestjs/axios'
+import { FileCreateService } from './outbound-file/file-create.service'
+import { FileTransferClientService } from './outbound-file/file-transfer.service'
 
 /*
  * Generates and sends files to CRA
  * Polls and process response files from CRA
  */
 @Module({
-  imports: [JobsModule,
+  imports: [
+    JobsModule,
     HttpModule.register({
       timeout: 60000, // 60 seconds timeout
-      maxRedirects: 5,
-    })
+      // maxRedirects: 5,
+    }),
   ],
-  providers: [SendCraFileHandler, PollCraResponseHandler],
+  providers: [
+    SendCraFileHandler,
+    PollCraResponseHandler,
+    FileCreateService,
+    FileTransferClientService,
+  ],
   exports: [SendCraFileHandler, PollCraResponseHandler],
 })
 export class CraModule implements OnModuleInit {
@@ -40,7 +33,7 @@ export class CraModule implements OnModuleInit {
     private readonly registry: JobRegistry,
     private readonly sendCraFileHandler: SendCraFileHandler,
     private readonly pollCraResponseHandler: PollCraResponseHandler,
-  ) { }
+  ) {}
 
   onModuleInit() {
     // Register CRA-related job handlers

@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
-import { firstValueFrom, retry, catchError } from 'rxjs'
+import { SERVER_CONFIG } from 'src/cra/cra.config'
 import fs from 'fs'
 import FormData from 'form-data'
-import { SERVER_CONFIG } from 'src/common/config/server.config'
+import { catchError, firstValueFrom } from 'rxjs'
 
-const { SERVICE_NAME, FTP_BASE_URL } = SERVER_CONFIG
+const { FTP_BASE_URL } = SERVER_CONFIG
 
 @Injectable()
 export class FileTransferClientService {
@@ -16,22 +16,22 @@ export class FileTransferClientService {
   async sendFileToTransferService(
     filePath: string,
     fileName: string,
-    craUserId: string = 'testuser',
+    destinationId: string,
   ): Promise<any> {
     const formData = new FormData()
     formData.append('file', fs.createReadStream(filePath), fileName)
+    formData.append('destinationId', destinationId)
+    formData.append('fileName', fileName)
 
     try {
+      const url = FTP_BASE_URL + '/api/transfers'
       const response$ = this.httpService
-        .post(FTP_BASE_URL, formData, {
+        .post(url, formData, {
           headers: {
             ...formData.getHeaders(),
-            userid: craUserId,
-            servicename: SERVICE_NAME,
           },
         })
         .pipe(
-          retry(3), // 🔁 Retry 3 times (network/5xx)
           catchError((error) => {
             this.logger.error(`File transfer failed for ${fileName}`, error?.message)
             throw error

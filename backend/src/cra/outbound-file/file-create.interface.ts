@@ -3,19 +3,20 @@
 //   APPLICATION = '2',
 // }
 
-export interface CraHeader { // header = 6133V00.020260110885633354RA000100000002
-  tranCode: number // 9(04) 6133
+export interface CraHeader {
+  // header = 6133V00.020260110885633354RA000100000002
+  tranCode: number | string // 9(04) 6133
   versionNum: string // V00.0
   processDate: string // X(8) YYYYMMDD
   businessNum: string // X(15)
   recordCount: number // 9(08) It includes header, tailer and details count
-  filler: string    // 25 space
+  filler: string // 25 space
 }
 export interface CraDetail {
-  tranCode: number // 9(04) 6134 Record type (detail)
+  tranCode: number | string // 9(04) 6134 Record type (detail)
   referenceNum: string // X(20) Ministry file reference ID
   businessNum: string //X(15) CRA business number
-  tranType: string // 1 = Cancellation, 2 = Application
+  tranType: number // 9(1) 1 = Cancellation, 2 = Application
 
   childGivenName: string // X(30) Child first name
   childInitial: string // X(1) first char of middle name
@@ -38,19 +39,20 @@ export interface CraDetail {
   appStartDate: string // 9(08) Benefit start date
   newBornCode: string // X(1) Newborn indicator (Y/N)
   // FILLER2
-
+  filler2: string // X(10)
   cancelEndDate: string // X(8) Cancellation end date
   cancelReasonCode: string // X(2) Cancellation reason code
 
   ccraDinNum: string // 9(9) CRA document ID number
   // FILLER3
+  filler3: string // X(15)
 }
 
 export interface CraTrailer {
-  tranCode: number
+  tranCode: number | string
   versionNum: string
   processDate: string
   businessNum: string
-  recordCount: number,
+  recordCount: number
   filler: string
 }

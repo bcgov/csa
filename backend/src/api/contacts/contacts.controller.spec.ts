@@ -28,6 +28,8 @@ describe('ContactsController', () => {
     findAll: vi.fn().mockResolvedValue(mockPaginatedResponse),
     findOne: vi.fn().mockResolvedValue(mockContacts[0]),
     fullTextSearch: vi.fn().mockResolvedValue(mockPaginatedResponse),
+    resumeContacts: vi.fn(),
+    holdContacts: vi.fn(),
   }
 
   beforeEach(async () => {
@@ -147,7 +149,7 @@ describe('ContactsController', () => {
           { id: 999, reason: 'not_found' },
         ],
       }
-      vi.spyOn(contactsService, 'holdContacts').mockResolvedValue(result)
+      vi.spyOn(service, 'holdContacts').mockResolvedValue(result)
 
       return request(app.getHttpServer())
         .post('/contacts/hold')
@@ -158,7 +160,7 @@ describe('ContactsController', () => {
 
     it('should call service with correct parameters', async () => {
       const result = { success: [1], skipped: [] }
-      const spy = vi.spyOn(contactsService, 'holdContacts').mockResolvedValue(result)
+      const spy = vi.spyOn(service, 'holdContacts').mockResolvedValue(result)
 
       await request(app.getHttpServer())
         .post('/contacts/hold')
@@ -178,7 +180,7 @@ describe('ContactsController', () => {
           { id: 999, reason: 'not_found' },
         ],
       }
-      vi.spyOn(contactsService, 'resumeContacts').mockResolvedValue(result)
+      vi.spyOn(service, 'resumeContacts').mockResolvedValue(result)
 
       return request(app.getHttpServer())
         .post('/contacts/resume')
@@ -189,7 +191,7 @@ describe('ContactsController', () => {
 
     it('should call service with correct parameters', async () => {
       const result = { success: [1], skipped: [] }
-      const spy = vi.spyOn(contactsService, 'resumeContacts').mockResolvedValue(result)
+      const spy = vi.spyOn(service, 'resumeContacts').mockResolvedValue(result)
 
       await request(app.getHttpServer())
         .post('/contacts/resume')

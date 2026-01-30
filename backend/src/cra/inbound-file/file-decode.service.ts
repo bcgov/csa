@@ -20,13 +20,13 @@ export class FileDecodeService {
       filler: this.slice(line, 57, 25),
     }
   }
-  private parseDetail(line: string): CraDetail {
+  private parseDetail(line: string): any {
     return {
-      tranCode: '6134',
+      tranCode: 6134,
 
       referenceNum: this.slice(line, 4, 20),
       businessNum: this.slice(line, 24, 15),
-      tranType: this.slice(line, 39, 1) as '1' | '2',
+      tranType: parseInt(this.slice(line, 39, 1)),
 
       childGivenName: this.slice(line, 40, 30),
       childInitial: this.slice(line, 70, 1),

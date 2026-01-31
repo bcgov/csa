@@ -30,6 +30,7 @@ describe('ContactsController', () => {
     fullTextSearch: vi.fn().mockResolvedValue(mockPaginatedResponse),
     resumeContacts: vi.fn(),
     holdContacts: vi.fn(),
+    findContactBatches: vi.fn(),
   }
 
   beforeEach(async () => {
@@ -199,6 +200,26 @@ describe('ContactsController', () => {
         .expect(201)
 
       expect(spy).toHaveBeenCalledWith([1, 2, 3], 'system')
+    })
+  })
+
+  describe('GET /contacts/:id/batches', () => {
+    it('should return batch details for a contact', async () => {
+      const batchDetails = [
+        {
+          id: 1,
+          contactId: 1,
+          batchId: 5,
+          transactionType: 'application',
+          batch: { id: 5, batchDate: '2026-01-15', status: 'processed' },
+        },
+      ]
+      vi.spyOn(service, 'findContactBatches').mockResolvedValue(batchDetails as any)
+
+      return request(app.getHttpServer())
+        .get('/contacts/1/batches')
+        .expect(200)
+        .expect(batchDetails)
     })
   })
 })

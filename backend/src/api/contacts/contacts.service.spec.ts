@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
@@ -740,6 +741,45 @@ describe('ContactsService', () => {
         { id: 2, reason: 'not_on_hold' },
         { id: 999, reason: 'not_found' },
       ])
+    })
+  })
+
+  describe('findContactBatches', () => {
+    it('should return batch details for a contact', async () => {
+      const contact = { id: 1, firstName: 'John', lastName: 'Doe' }
+      const batchDetails = [
+        {
+          id: 1,
+          contactId: 1,
+          batchId: 5,
+          transactionType: 'application',
+          status: 'processed',
+          batch: { id: 5, batchDate: new Date('2026-01-15'), status: 'processed' },
+        },
+      ]
+
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      vi.spyOn(prisma.contactBatchDetail, 'findMany').mockResolvedValue(batchDetails as any)
+
+      const result = await service.findContactBatches(1)
+
+      expect(result).toEqual(batchDetails)
+      expect(prisma.contactBatchDetail.findMany).toHaveBeenCalledWith({
+        where: { contactId: 1 },
+        include: {
+          batch: {
+            select: { id: true, batchDate: true, status: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+    })
+
+    it('should throw NotFoundException if contact not found', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(null)
+
+      await expect(service.findContactBatches(999)).rejects.toThrow(NotFoundException)
+      await expect(service.findContactBatches(999)).rejects.toThrow('Contact 999 not found')
     })
   })
 })

@@ -66,4 +66,5 @@ export const BULK_OPERATION_SKIP_REASONS = {
   ALREADY_ON_HOLD: 'already_on_hold',
   IN_PENDING_BATCH: 'in_pending_batch',
   NOT_ON_HOLD: 'not_on_hold',
+  ALREADY_IN_BATCH: 'already_in_batch',
 } as const

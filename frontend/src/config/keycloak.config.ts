@@ -31,11 +31,13 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
       VITE_KEYCLOAK_URL: keycloakConfig.url,
       VITE_KEYCLOAK_REALM: keycloakConfig.realm,
       VITE_KEYCLOAK_CLIENT_ID: keycloakConfig.clientId,
+      VITE_API_BASE_URL: config.apiBaseUrl || '/api', // Load API base URL from config
     }
 
     // Cache the config
     window.__RUNTIME_CONFIG__ = runtimeConfig
     console.log('Keycloak configuration loaded successfully from /config.json')
+    console.log('API base URL:', runtimeConfig.VITE_API_BASE_URL)
 
     return runtimeConfig
   } catch (error) {

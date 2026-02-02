@@ -122,4 +122,11 @@ export class ContactsController {
     const userId = 'system'
     return this.contactsService.resumeContacts(body.contactIds, userId)
   }
+
+  @Get(':id/batches')
+  @ApiResponse({ status: 200, description: 'List of batch details for this contact' })
+  @ApiResponse({ status: 404, description: 'Contact not found' })
+  async findContactBatches(@Param('id') id: string) {
+    return this.contactsService.findContactBatches(+id)
+  }
 }

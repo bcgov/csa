@@ -338,4 +338,28 @@ export class ContactsService {
 
     return result
   }
+
+  async findContactBatches(contactId: number) {
+    const contact = await this.prisma.contact.findUnique({
+      where: { id: contactId },
+    })
+    if (!contact) {
+      throw new NotFoundException(`Contact ${contactId} not found`)
+    }
+
+    // Return all batch details with nested batch info
+    return this.prisma.contactBatchDetail.findMany({
+      where: { contactId },
+      include: {
+        batch: {
+          select: {
+            id: true,
+            batchDate: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+  }
 }

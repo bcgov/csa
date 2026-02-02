@@ -6,6 +6,7 @@ on:
     paths:
       - "frontend/**"
       - "backend/**"
+      - "migrations/**"
   workflow_dispatch:
     inputs:
       target_env:
@@ -28,6 +29,7 @@ jobs:
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
+      migrations: ${{ steps.filter.outputs.migrations }}
       envname: ${{ steps.env.outputs.envname }}
       tag: ${{ steps.tag.outputs.tag }}
     steps:
@@ -72,6 +74,8 @@ jobs:
               - 'frontend/**'
             backend:
               - 'backend/**'
+            migrations:
+              - 'migrations/**'
 
   coverage-summary:
     name: Coverage Summary (report-only)
@@ -128,6 +132,36 @@ jobs:
             echo "No backend test:coverage script yet."
           fi
         continue-on-error: true
+
+      # ---------- Migrations ----------
+      - name: Migrations - validate folder + Docker build (no push)
+        if: needs.detect-changes.outputs.migrations == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Validating migrations/ structure..."
+          test -d migrations
+          test -d migrations/sql
+
+          # If you use Dockerfile (recommended)
+          if [[ -f migrations/Dockerfile ]]; then
+            echo "Found migrations/Dockerfile. Building image (no push)..."
+            docker build -f migrations/Dockerfile -t csa-flyway:ci ./migrations
+          else
+            echo "No migrations/Dockerfile found. Skipping docker build."
+            echo "If migrations are intended to ship as an image, add migrations/Dockerfile."
+          fi
+
+          # Optional: sanity check SQL files exist
+          sql_count=$(find migrations/sql -type f \( -name '*.sql' -o -name '*.SQL' \) | wc -l | tr -d ' ')
+          if [[ "$sql_count" -eq 0 ]]; then
+            echo "No .sql files found under migrations/sql. Is that expected?"
+            exit 1
+          fi
+          echo "Found $sql_count SQL migration file(s)."
+
+
 
       # ---------- Find cobertura XML (only if generated) ----------
       - name: Find cobertura coverage files

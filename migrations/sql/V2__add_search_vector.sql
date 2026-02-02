@@ -17,5 +17,6 @@ GENERATED ALWAYS AS (
   )
 ) STORED;
 
--- Create GIN index for fast full-text search (optimized for 200K+ rows)
 CREATE INDEX idx_contacts_search_vector ON csa.contacts USING GIN (search_vector);
+
+CREATE UNIQUE INDEX batches_pending_unique ON csa.batches (status) WHERE status = 'pending';

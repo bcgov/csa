@@ -1,5 +1,6 @@
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import CloseIcon from '@mui/icons-material/Close'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import {
@@ -12,6 +13,7 @@ import {
   InputAdornment,
   Menu,
   MenuItem,
+  Pagination,
   Paper,
   Select,
   Tab,
@@ -27,16 +29,19 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { useAuth } from './context/AuthContext'
 import logo from './icons/image.png'
+import { fullTextSearchContacts, getAllContacts, type Contact } from './service/contacts-service'
 
 // Sample data for the eligibility table
 const eligibilityData = [
   {
     id: 1,
-    childName: 'John Connor',
+    firstName: 'John',
+    middleName: '',
+    lastName: 'Connor',
     gender: 'Man/Boy',
     dob: '2022-Jan-18',
     age: 4,
@@ -51,7 +56,9 @@ const eligibilityData = [
   },
   {
     id: 2,
-    childName: 'Jane Markus',
+    firstName: 'Jane',
+    middleName: '',
+    lastName: 'Markus',
     gender: 'Woman/Girl',
     dob: '2018-May-15',
     age: 8,
@@ -66,7 +73,9 @@ const eligibilityData = [
   },
   {
     id: 3,
-    childName: 'Merry Markus',
+    firstName: 'Merry',
+    middleName: '',
+    lastName: 'Markus',
     gender: 'Woman/Girl',
     dob: '2018-May-15',
     age: 8,
@@ -81,7 +90,9 @@ const eligibilityData = [
   },
   {
     id: 4,
-    childName: 'Jamie Wilson',
+    firstName: 'Jamie',
+    middleName: '',
+    lastName: 'Wilson',
     gender: 'Non Binary',
     dob: '2023-Sept-14',
     age: 2,
@@ -96,7 +107,9 @@ const eligibilityData = [
   },
   {
     id: 5,
-    childName: 'Mark S Grey',
+    firstName: 'Mark',
+    middleName: 'S',
+    lastName: 'Grey',
     gender: 'Man/Boy',
     dob: '2022-Jan-13',
     age: 4,
@@ -111,7 +124,9 @@ const eligibilityData = [
   },
   {
     id: 6,
-    childName: 'Jackie Hems',
+    firstName: 'Jackie',
+    middleName: '',
+    lastName: 'Hems',
     gender: 'Woman/Girl',
     dob: '2012-Nov-25',
     age: 13,
@@ -127,7 +142,9 @@ const eligibilityData = [
   },
   {
     id: 7,
-    childName: 'Brian Kevin Jo...',
+    firstName: 'Brian',
+    middleName: 'Kevin',
+    lastName: 'Jo...',
     gender: 'Unknown',
     dob: '2012-Nov-25',
     age: 13,
@@ -360,8 +377,43 @@ function App() {
   const [selectedBatchDetails, setSelectedBatchDetails] = useState<number[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterSearchTerm, setFilterSearchTerm] = useState('')
+  const [isColumnFilterActive, setIsColumnFilterActive] = useState(false)
   const [selectedChild, setSelectedChild] = useState<number | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<number>(1) // Default to first batch
+
+  // Pre-defined filter state
+  const [preDefinedFilter, setPreDefinedFilter] = useState('All Records')
+
+  // Contacts API state
+  const [contacts, setContacts] = useState<Contact[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalRecords, setTotalRecords] = useState(0)
+  const [loadingContacts, setLoadingContacts] = useState(false)
+  const [contactsError, setContactsError] = useState<string | null>(null)
+  const recordsPerPage = 10
+  const [isSearchActive, setIsSearchActive] = useState(false)
+
+  // Map frontend column names to backend field names
+  const columnToFieldMapping: Record<string, string> = useMemo(
+    () => ({
+      firstName: 'firstName',
+      middleName: 'middleName',
+      lastName: 'lastName',
+      gender: 'gender',
+      dob: 'dateOfBirth',
+      age: 'age',
+      din: 'din',
+      csaStatus: 'csaStatus',
+      statusEffective: 'csaStatusEffectiveDate',
+      caseNumber: 'caseNumber',
+      caseStatus: 'caseStatus',
+      legacyFile: 'legacyFileNumber',
+      lastUpdated: 'lastUpdatedAt',
+      lastUpdatedBy: 'lastUpdatedBy',
+    }),
+    [],
+  )
 
   // Column filter states
   type FilterAnchor = {
@@ -381,8 +433,63 @@ function App() {
     direction: 'asc' | 'desc'
   } | null>(null)
 
+  // Batch History search and filter states
+  const [batchHistorySearchTerm, setBatchHistorySearchTerm] = useState('')
+  const [batchHistoryColumnFilters, setBatchHistoryColumnFilters] = useState<
+    Record<string, string[]>
+  >({
+    batchId: [],
+    createdDate: [],
+    batchDate: [],
+    status: [],
+    transactionType: [],
+  })
+  const [batchHistoryFilterAnchor, setBatchHistoryFilterAnchor] = useState<FilterAnchor>({
+    element: null,
+    column: '',
+  })
+  const [batchHistoryFilterSearchTerm, setBatchHistoryFilterSearchTerm] = useState('')
+
+  // Batch Requests search and filter states
+  const [batchRequestsSearchTerm, setBatchRequestsSearchTerm] = useState('')
+  const [batchRequestsColumnFilters, setBatchRequestsColumnFilters] = useState<
+    Record<string, string[]>
+  >({
+    batchId: [],
+    batchDate: [],
+    status: [],
+    recordCount: [],
+    createdDate: [],
+    systemComments: [],
+  })
+  const [batchRequestsFilterAnchor, setBatchRequestsFilterAnchor] = useState<FilterAnchor>({
+    element: null,
+    column: '',
+  })
+  const [batchRequestsFilterSearchTerm, setBatchRequestsFilterSearchTerm] = useState('')
+
+  // Batch Details search and filter states
+  const [batchDetailsSearchTerm, setBatchDetailsSearchTerm] = useState('')
+  const [batchDetailsColumnFilters, setBatchDetailsColumnFilters] = useState<
+    Record<string, string[]>
+  >({
+    lastName: [],
+    middleName: [],
+    givenName: [],
+    transactionType: [],
+    status: [],
+    systemComments: [],
+  })
+  const [batchDetailsFilterAnchor, setBatchDetailsFilterAnchor] = useState<FilterAnchor>({
+    element: null,
+    column: '',
+  })
+  const [batchDetailsFilterSearchTerm, setBatchDetailsFilterSearchTerm] = useState('')
+
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({
-    childName: [],
+    firstName: [],
+    middleName: [],
+    lastName: [],
     gender: [],
     dob: [],
     age: [],
@@ -396,6 +503,325 @@ function App() {
     lastUpdated: [],
     lastUpdatedBy: [],
   })
+
+  // Helper function to get pre-defined filter configuration
+  const getPreDefinedFilterConfig = useCallback((filterName: string): any => {
+    if (filterName === 'Pending User review/action') {
+      return [
+        {
+          OR: [
+            { key: 'csaStatus', op: 'eq', value: 'On Hold' },
+            { key: 'csaStatus', op: 'eq', value: 'Eligible - TBD' },
+            { key: 'csaStatus', op: 'eq', value: 'Not Eligible - IP - TBD' },
+            { key: 'csaStatus', op: 'eq', value: 'Eligible' },
+            { key: 'csaStatus', op: 'eq', value: 'Not Eligible - In Pay' },
+          ],
+        },
+      ]
+    } else if (filterName === 'All children On Hold from CSA') {
+      return [{ key: 'csaStatus', op: 'eq', value: 'on hold' }]
+    } else if (filterName === 'Children In Pay') {
+      return [{ key: 'csaStatus', op: 'eq', value: 'In Pay' }]
+    } else if (filterName === 'Children Out of Pay') {
+      return [
+        {
+          OR: [
+            { key: 'csaStatus', op: 'eq', value: 'Not Eligible' },
+            { key: 'csaStatus', op: 'eq', value: 'Out of Pay' },
+          ],
+        },
+        { key: 'din', op: 'notblank', value: '' },
+      ]
+    } else if (filterName === 'CRA Refused CSA List') {
+      return [
+        {
+          OR: [
+            { key: 'csaStatus', op: 'eq', value: 'Application Refused - CRA' },
+            { key: 'csaStatus', op: 'eq', value: 'Cancellation Refused - CRA' },
+          ],
+        },
+      ]
+    } else if (filterName === 'Children within a batch') {
+      return [
+        {
+          OR: [
+            { key: 'csaStatus', op: 'eq', value: 'In Batch - Application' },
+            { key: 'csaStatus', op: 'eq', value: 'Batch Sent - Application' },
+            { key: 'csaStatus', op: 'eq', value: 'In Batch - Cancellation' },
+            { key: 'csaStatus', op: 'eq', value: 'Batch Sent - Cancellation' },
+          ],
+        },
+      ]
+    } else if (filterName === 'Children over 18 years (never eligible)') {
+      return [{ key: 'csaStatus', op: 'eq', value: 'Over 18' }]
+    }
+    return undefined
+  }, [])
+
+  // Function to fetch contacts from backend
+  const fetchContacts = useCallback(
+    async (page: number) => {
+      setLoadingContacts(true)
+      setContactsError(null)
+      setIsSearchActive(false)
+      try {
+        let filter: any = undefined
+
+        // Apply filter based on selected pre-defined filter
+        if (preDefinedFilter === 'Pending User review/action') {
+          // csaStatus = 'On Hold' OR 'Eligible - TBD' OR 'Not Eligible - IP - TBD' OR 'Eligible' OR 'Not Eligible - In Pay'
+          filter = [
+            {
+              OR: [
+                { key: 'csaStatus', op: 'eq', value: 'On Hold' },
+                { key: 'csaStatus', op: 'eq', value: 'Eligible - TBD' },
+                { key: 'csaStatus', op: 'eq', value: 'Not Eligible - IP - TBD' },
+                { key: 'csaStatus', op: 'eq', value: 'Eligible' },
+                { key: 'csaStatus', op: 'eq', value: 'Not Eligible - In Pay' },
+              ],
+            },
+          ]
+        } else if (preDefinedFilter === 'All children On Hold from CSA') {
+          filter = [{ key: 'csaStatus', op: 'eq', value: 'on hold' }]
+        } else if (preDefinedFilter === 'Children In Pay') {
+          filter = [{ key: 'csaStatus', op: 'eq', value: 'In Pay' }]
+        } else if (preDefinedFilter === 'Children Out of Pay') {
+          // (csaStatus = 'Not Eligible' OR csaStatus = 'Out of Pay') AND din is not blank
+          filter = [
+            {
+              OR: [
+                { key: 'csaStatus', op: 'eq', value: 'Not Eligible' },
+                { key: 'csaStatus', op: 'eq', value: 'Out of Pay' },
+              ],
+            },
+            { key: 'din', op: 'notblank', value: '' },
+          ]
+        } else if (preDefinedFilter === 'CRA Refused CSA List') {
+          // csaStatus = 'Application Refused - CRA' OR csaStatus = 'Cancellation Refused - CRA'
+          filter = [
+            {
+              OR: [
+                { key: 'csaStatus', op: 'eq', value: 'Application Refused - CRA' },
+                { key: 'csaStatus', op: 'eq', value: 'Cancellation Refused - CRA' },
+              ],
+            },
+          ]
+        } else if (preDefinedFilter === 'Children within a batch') {
+          // csaStatus = 'In Batch - Application' OR 'Batch Sent - Application' OR 'In Batch - Cancellation' OR 'Batch Sent - Cancellation'
+          filter = [
+            {
+              OR: [
+                { key: 'csaStatus', op: 'eq', value: 'In Batch - Application' },
+                { key: 'csaStatus', op: 'eq', value: 'Batch Sent - Application' },
+                { key: 'csaStatus', op: 'eq', value: 'In Batch - Cancellation' },
+                { key: 'csaStatus', op: 'eq', value: 'Batch Sent - Cancellation' },
+              ],
+            },
+          ]
+        } else if (preDefinedFilter === 'Children over 18 years (never eligible)') {
+          // csaStatus = 'Over 18'
+          filter = [{ key: 'csaStatus', op: 'eq', value: 'Over 18' }]
+        }
+
+        const response = await getAllContacts(page, recordsPerPage, filter)
+        setContacts(response.data)
+        setTotalPages(response.totalPages)
+        setTotalRecords(response.total)
+        console.log('Fetched contacts:', response.data)
+        console.log('Total records:', response.total)
+        console.log('Applied filter:', filter)
+      } catch (error) {
+        console.error('Failed to fetch contacts:', error)
+        setContactsError('Failed to load contacts. Please try again.')
+        setContacts([])
+      } finally {
+        setLoadingContacts(false)
+      }
+    },
+    [preDefinedFilter, recordsPerPage],
+  )
+
+  // Function to perform column-specific filter search
+  const performColumnFilterSearch = useCallback(
+    async (column: string, query: string, page: number) => {
+      setIsColumnFilterActive(true)
+      setLoadingContacts(true)
+      setContactsError(null)
+      try {
+        const backendField = columnToFieldMapping[column]
+        if (!backendField) {
+          console.error('Unknown column:', column)
+          return
+        }
+
+        // Build filter for column-specific search
+        // Use like operator for text search (Prisma 'contains' doesn't need % wildcards)
+        const columnFilter = [{ key: backendField, op: 'like', value: query }]
+
+        // Combine with existing pre-defined filter if needed
+        let combinedFilter = columnFilter
+
+        // If there's a pre-defined filter other than "All Records", combine them
+        if (preDefinedFilter !== 'All Records') {
+          const baseFilter = getPreDefinedFilterConfig(preDefinedFilter)
+          if (baseFilter) {
+            combinedFilter = [...baseFilter, ...columnFilter]
+          }
+        }
+
+        const response = await getAllContacts(page, recordsPerPage, combinedFilter)
+        setContacts(response.data)
+        setTotalPages(response.totalPages)
+        setTotalRecords(response.total)
+        console.log('Column filter search results:', response.data)
+        console.log('Total column filter records:', response.total)
+        console.log('Column:', column, 'Query:', query)
+        console.log('Applied filter:', combinedFilter)
+      } catch (error) {
+        console.error('Failed to search column:', error)
+        setContactsError('Failed to search. Please try again.')
+        setContacts([])
+      } finally {
+        setLoadingContacts(false)
+      }
+    },
+    [preDefinedFilter, recordsPerPage, columnToFieldMapping, getPreDefinedFilterConfig],
+  )
+
+  // Function to perform full-text search
+  const performFullTextSearch = useCallback(
+    async (query: string, page: number) => {
+      setIsSearchActive(true)
+      setLoadingContacts(true)
+      setContactsError(null)
+      try {
+        const response = await fullTextSearchContacts(query, page, recordsPerPage)
+        setContacts(response.data)
+        setTotalPages(response.totalPages)
+        setTotalRecords(response.total)
+        console.log('Search results:', response.data)
+        console.log('Total search records:', response.total)
+        console.log('Search query:', query)
+      } catch (error) {
+        console.error('Failed to search contacts:', error)
+        setContactsError('Failed to search contacts. Please try again.')
+        setContacts([])
+      } finally {
+        setLoadingContacts(false)
+      }
+    },
+    [recordsPerPage],
+  )
+
+  // Fetch contacts from backend when pre-defined filter is 'All Records' or filter-based options
+  useEffect(() => {
+    const apiFilters = [
+      'All Records',
+      'Pending User review/action',
+      'All children On Hold from CSA',
+      'Children In Pay',
+      'Children Out of Pay',
+      'CRA Refused CSA List',
+      'Children within a batch',
+      'Children over 18 years (never eligible)',
+    ]
+    if (apiFilters.includes(preDefinedFilter) && isAuthenticated && !isSearchActive) {
+      fetchContacts(currentPage)
+    }
+  }, [preDefinedFilter, currentPage, isAuthenticated, isSearchActive, fetchContacts])
+
+  // Full-text search effect - triggers when searchTerm has 3+ characters
+  useEffect(() => {
+    const apiFilters = [
+      'All Records',
+      'Pending User review/action',
+      'All children On Hold from CSA',
+      'Children In Pay',
+      'Children Out of Pay',
+      'CRA Refused CSA List',
+      'Children within a batch',
+      'Children over 18 years (never eligible)',
+    ]
+
+    // Only trigger search for API-based filters
+    if (!apiFilters.includes(preDefinedFilter) || !isAuthenticated) {
+      return
+    }
+
+    // Debounce search - wait 500ms after user stops typing
+    const searchTimer = setTimeout(() => {
+      if (searchTerm.trim().length >= 3) {
+        performFullTextSearch(searchTerm.trim(), currentPage)
+      } else if (searchTerm.trim().length === 0) {
+        // If search is cleared, go back to regular filter
+        setIsSearchActive(false)
+        fetchContacts(currentPage)
+      }
+    }, 500)
+
+    return () => clearTimeout(searchTimer)
+  }, [
+    searchTerm,
+    currentPage,
+    preDefinedFilter,
+    isAuthenticated,
+    fetchContacts,
+    performFullTextSearch,
+  ])
+
+  // Column filter search effect - triggers when filterSearchTerm has 3+ characters
+  useEffect(() => {
+    const apiFilters = [
+      'All Records',
+      'Pending User review/action',
+      'All children On Hold from CSA',
+      'Children In Pay',
+      'Children Out of Pay',
+      'CRA Refused CSA List',
+      'Children within a batch',
+      'Children over 18 years (never eligible)',
+    ]
+
+    // Only trigger column filter search for API-based filters and when a column is selected
+    if (!apiFilters.includes(preDefinedFilter) || !isAuthenticated || !filterAnchor.column) {
+      return
+    }
+
+    // Debounce column search - wait 500ms after user stops typing
+    const columnSearchTimer = setTimeout(() => {
+      if (filterSearchTerm.trim().length >= 3) {
+        performColumnFilterSearch(filterAnchor.column, filterSearchTerm.trim(), currentPage)
+      } else if (filterSearchTerm.trim().length === 0 && isColumnFilterActive) {
+        // If column search is cleared, go back to regular filter
+        setIsColumnFilterActive(false)
+        fetchContacts(currentPage)
+      }
+    }, 500)
+
+    return () => clearTimeout(columnSearchTimer)
+  }, [
+    filterSearchTerm,
+    filterAnchor.column,
+    currentPage,
+    preDefinedFilter,
+    isAuthenticated,
+    isColumnFilterActive,
+    fetchContacts,
+    performColumnFilterSearch,
+  ])
+
+  // Handle page change
+  const handlePageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
+    setCurrentPage(page)
+  }
+
+  // Handle pre-defined filter change
+  const handlePreDefinedFilterChange = (value: string) => {
+    setPreDefinedFilter(value)
+    setCurrentPage(1) // Reset to first page when filter changes
+    setSearchTerm('') // Clear search when changing filters
+    setIsSearchActive(false) // Deactivate search mode
+  }
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setSelectedTab(newValue)
@@ -461,6 +887,91 @@ function App() {
     setColumnFilters((prev) => ({ ...prev, [column]: [] }))
   }
 
+  // Batch History filter handling functions
+  const handleBatchHistoryFilterClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
+    setBatchHistoryFilterAnchor({ element: event.currentTarget, column })
+    setBatchHistoryFilterSearchTerm('')
+  }
+
+  const handleBatchHistoryFilterClose = () => {
+    setBatchHistoryFilterAnchor({ element: null, column: '' })
+    setBatchHistoryFilterSearchTerm('')
+  }
+
+  const handleBatchHistoryFilterChange = (column: string, value: string) => {
+    setBatchHistoryColumnFilters((prev) => {
+      const currentFilters = prev[column] || []
+      const newFilters = currentFilters.includes(value)
+        ? currentFilters.filter((v) => v !== value)
+        : [...currentFilters, value]
+      return { ...prev, [column]: newFilters }
+    })
+  }
+
+  const clearBatchHistoryColumnFilter = (column: string) => {
+    setBatchHistoryColumnFilters((prev) => ({ ...prev, [column]: [] }))
+  }
+
+  const getBatchHistoryUniqueValues = (column: keyof (typeof childBatchHistory)[0]) => {
+    const values = childBatchHistory.map((row) => row[column])
+    return Array.from(new Set(values)).filter((v) => v !== undefined && v !== '')
+  }
+
+  // Batch Requests filter handling functions
+  const handleBatchRequestsFilterClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
+    setBatchRequestsFilterAnchor({ element: event.currentTarget, column })
+    setBatchRequestsFilterSearchTerm('')
+  }
+
+  const handleBatchRequestsFilterClose = () => {
+    setBatchRequestsFilterAnchor({ element: null, column: '' })
+    setBatchRequestsFilterSearchTerm('')
+  }
+
+  const handleBatchRequestsFilterChange = (column: string, value: string) => {
+    setBatchRequestsColumnFilters((prev) => {
+      const currentFilters = prev[column] || []
+      const newFilters = currentFilters.includes(value)
+        ? currentFilters.filter((v) => v !== value)
+        : [...currentFilters, value]
+      return { ...prev, [column]: newFilters }
+    })
+  }
+
+  const clearBatchRequestsColumnFilter = (column: string) => {
+    setBatchRequestsColumnFilters((prev) => ({ ...prev, [column]: [] }))
+  }
+
+  const getBatchRequestsUniqueValues = (column: keyof (typeof batchRequestsData)[0]) => {
+    const values = batchRequestsData.map((row) => row[column])
+    return Array.from(new Set(values)).filter((v) => v !== undefined && v !== '')
+  }
+
+  // Batch Details filter handling functions
+  const handleBatchDetailsFilterClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
+    setBatchDetailsFilterAnchor({ element: event.currentTarget, column })
+    setBatchDetailsFilterSearchTerm('')
+  }
+
+  const handleBatchDetailsFilterClose = () => {
+    setBatchDetailsFilterAnchor({ element: null, column: '' })
+    setBatchDetailsFilterSearchTerm('')
+  }
+
+  const handleBatchDetailsFilterChange = (column: string, value: string) => {
+    setBatchDetailsColumnFilters((prev) => {
+      const currentFilters = prev[column] || []
+      const newFilters = currentFilters.includes(value)
+        ? currentFilters.filter((v) => v !== value)
+        : [...currentFilters, value]
+      return { ...prev, [column]: newFilters }
+    })
+  }
+
+  const clearBatchDetailsColumnFilter = (column: string) => {
+    setBatchDetailsColumnFilters((prev) => ({ ...prev, [column]: [] }))
+  }
+
   // Sort handling functions
   const handleSortClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
     setSortAnchor({ element: event.currentTarget, column })
@@ -483,31 +994,65 @@ function App() {
 
   // Apply filters and sorting to data
   const filteredData = useMemo(() => {
-    let data = eligibilityData.filter((row) => {
-      // Apply global search
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase()
-        const matchesSearch = Object.values(row).some((value) =>
-          String(value).toLowerCase().includes(searchLower),
-        )
-        if (!matchesSearch) return false
-      }
-
-      // Apply column filters
-      for (const [column, filters] of Object.entries(columnFilters)) {
-        if (filters.length > 0) {
-          const columnValue = String(row[column as keyof typeof row])
-          if (!filters.includes(columnValue)) {
-            return false
+    // Use contacts from API when API-based filters are selected
+    const apiFilters = [
+      'All Records',
+      'Pending User review/action',
+      'All children On Hold from CSA',
+      'Children In Pay',
+      'Children Out of Pay',
+      'CRA Refused CSA List',
+      'Children within a batch',
+      'Children over 18 years (never eligible)',
+    ]
+    let data = apiFilters.includes(preDefinedFilter)
+      ? contacts.map((contact) => ({
+          id: contact.id,
+          firstName: contact.firstName || '',
+          middleName: contact.middleName || '',
+          lastName: contact.lastName || '',
+          gender: contact.gender || '',
+          dob: contact.dateOfBirth ? new Date(contact.dateOfBirth).toLocaleDateString() : '',
+          age: contact.age || 0,
+          din: contact.din || '',
+          csaStatus: contact.csaStatus || '',
+          statusEffective: contact.csaStatusEffectiveDate
+            ? new Date(contact.csaStatusEffectiveDate).toLocaleDateString()
+            : '',
+          caseNumber: contact.caseNumber || '',
+          caseStatus: contact.caseStatus || '',
+          legacyFile: contact.legacyFileNumber || '',
+          cgwrks3: '',
+          lastUpdated: contact.lastUpdatedAt
+            ? new Date(contact.lastUpdatedAt).toLocaleString()
+            : '',
+          lastUpdatedBy: contact.lastUpdatedBy || '',
+        }))
+      : eligibilityData.filter((row) => {
+          // Apply global search
+          if (searchTerm) {
+            const searchLower = searchTerm.toLowerCase()
+            const matchesSearch = Object.values(row).some((value) =>
+              String(value).toLowerCase().includes(searchLower),
+            )
+            if (!matchesSearch) return false
           }
-        }
-      }
 
-      return true
-    })
+          // Apply column filters
+          for (const [column, filters] of Object.entries(columnFilters)) {
+            if (filters.length > 0) {
+              const columnValue = String(row[column as keyof typeof row])
+              if (!filters.includes(columnValue)) {
+                return false
+              }
+            }
+          }
 
-    // Apply sorting
-    if (sortConfig) {
+          return true
+        })
+
+    // Apply sorting (only for non-API data)
+    if (sortConfig && preDefinedFilter !== 'All Records') {
       data = [...data].sort((a, b) => {
         const aValue = a[sortConfig.column as keyof typeof a]
         const bValue = b[sortConfig.column as keyof typeof b]
@@ -534,12 +1079,107 @@ function App() {
     }
 
     return data
-  }, [searchTerm, columnFilters, sortConfig])
+  }, [searchTerm, columnFilters, sortConfig, contacts, preDefinedFilter])
+
+  // Filter batch history data (frontend-only filtering)
+  const filteredBatchHistory = useMemo(() => {
+    let data = [...childBatchHistory]
+
+    // Apply global search across all columns
+    if (batchHistorySearchTerm) {
+      const searchLower = batchHistorySearchTerm.toLowerCase()
+      data = data.filter((row) => {
+        return (
+          row.batchId.toLowerCase().includes(searchLower) ||
+          row.createdDate.toLowerCase().includes(searchLower) ||
+          row.batchDate.toLowerCase().includes(searchLower) ||
+          row.status.toLowerCase().includes(searchLower) ||
+          row.transactionType.toLowerCase().includes(searchLower)
+        )
+      })
+    }
+
+    // Apply column-specific filters
+    for (const [column, filters] of Object.entries(batchHistoryColumnFilters)) {
+      if (filters.length > 0) {
+        data = data.filter((row) => {
+          const columnValue = String(row[column as keyof typeof row])
+          return filters.includes(columnValue)
+        })
+      }
+    }
+
+    return data
+  }, [batchHistorySearchTerm, batchHistoryColumnFilters])
+
+  // Filter batch requests data (frontend-only filtering)
+  const filteredBatchRequests = useMemo(() => {
+    let data = [...batchRequestsData]
+
+    // Apply global search across all columns
+    if (batchRequestsSearchTerm) {
+      const searchLower = batchRequestsSearchTerm.toLowerCase()
+      data = data.filter((row) => {
+        return (
+          row.batchId.toLowerCase().includes(searchLower) ||
+          row.batchDate.toLowerCase().includes(searchLower) ||
+          row.status.toLowerCase().includes(searchLower) ||
+          String(row.recordCount).toLowerCase().includes(searchLower) ||
+          row.createdDate.toLowerCase().includes(searchLower) ||
+          row.systemComments.toLowerCase().includes(searchLower)
+        )
+      })
+    }
+
+    // Apply column-specific filters
+    for (const [column, filters] of Object.entries(batchRequestsColumnFilters)) {
+      if (filters.length > 0) {
+        data = data.filter((row) => {
+          const columnValue = String(row[column as keyof typeof row])
+          return filters.includes(columnValue)
+        })
+      }
+    }
+
+    return data
+  }, [batchRequestsSearchTerm, batchRequestsColumnFilters])
 
   // Get batch details for selected batch
   const currentBatchDetails = useMemo(() => {
     return batchDetailsData[selectedBatch] || []
   }, [selectedBatch])
+
+  // Filter batch details data (frontend-only filtering)
+  const filteredBatchDetails = useMemo(() => {
+    let data = [...currentBatchDetails]
+
+    // Apply global search across all columns
+    if (batchDetailsSearchTerm) {
+      const searchLower = batchDetailsSearchTerm.toLowerCase()
+      data = data.filter((row) => {
+        return (
+          row.lastName.toLowerCase().includes(searchLower) ||
+          row.middleName.toLowerCase().includes(searchLower) ||
+          row.givenName.toLowerCase().includes(searchLower) ||
+          row.transactionType.toLowerCase().includes(searchLower) ||
+          row.status.toLowerCase().includes(searchLower) ||
+          row.systemComments.toLowerCase().includes(searchLower)
+        )
+      })
+    }
+
+    // Apply column-specific filters
+    for (const [column, filters] of Object.entries(batchDetailsColumnFilters)) {
+      if (filters.length > 0) {
+        data = data.filter((row) => {
+          const columnValue = String(row[column as keyof typeof row])
+          return filters.includes(columnValue)
+        })
+      }
+    }
+
+    return data
+  }, [currentBatchDetails, batchDetailsSearchTerm, batchDetailsColumnFilters])
 
   return (
     <Box
@@ -883,10 +1523,28 @@ function App() {
                       }}
                       sx={{ width: '200px' }}
                     />
-                    <FormControl size="small" sx={{ minWidth: 150 }}>
-                      <Select defaultValue="pre-defined" displayEmpty>
-                        <MenuItem value="pre-defined">Pre-defined</MenuItem>
-                        <MenuItem value="custom">Custom</MenuItem>
+                    <FormControl size="small" sx={{ minWidth: 250 }}>
+                      <Select
+                        value={preDefinedFilter}
+                        onChange={(e) => handlePreDefinedFilterChange(e.target.value)}
+                        displayEmpty
+                      >
+                        <MenuItem value="All Records">All Records</MenuItem>
+                        <MenuItem value="All eligible records">All eligible records</MenuItem>
+                        <MenuItem value="All records in progress">All records in progress</MenuItem>
+                        <MenuItem value="Pending User review/action">
+                          Pending User review/action
+                        </MenuItem>
+                        <MenuItem value="All children On Hold from CSA">
+                          All children On Hold from CSA
+                        </MenuItem>
+                        <MenuItem value="Children In Pay">Children In Pay</MenuItem>
+                        <MenuItem value="Children Out of Pay">Children Out of Pay</MenuItem>
+                        <MenuItem value="CRA Refused CSA List">CRA Refused CSA List</MenuItem>
+                        <MenuItem value="Children within a batch">Children within a batch</MenuItem>
+                        <MenuItem value="Children over 18 years (never eligible)">
+                          Children over 18 years (never eligible)
+                        </MenuItem>
                       </Select>
                     </FormControl>
                     <Button variant="contained" size="small" sx={{ textTransform: 'none' }}>
@@ -909,17 +1567,57 @@ function App() {
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
-                              onClick={(e) => handleSortClick(e, 'childName')}
+                              onClick={(e) => handleSortClick(e, 'firstName')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              Child Name
+                              First Name
                             </span>
                             <IconButton
                               size="small"
-                              onClick={(e) => handleFilterClick(e, 'childName')}
+                              onClick={(e) => handleFilterClick(e, 'firstName')}
                               sx={{
                                 padding: 0.5,
-                                color: columnFilters.childName?.length > 0 ? '#1976d2' : 'inherit',
+                                color: columnFilters.firstName?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <span
+                              onClick={(e) => handleSortClick(e, 'middleName')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Middle Name
+                            </span>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'middleName')}
+                              sx={{
+                                padding: 0.5,
+                                color: columnFilters.middleName?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <span
+                              onClick={(e) => handleSortClick(e, 'lastName')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Last Name
+                            </span>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'lastName')}
+                              sx={{
+                                padding: 0.5,
+                                color: columnFilters.lastName?.length > 0 ? '#1976d2' : 'inherit',
                               }}
                             >
                               <FilterListIcon fontSize="small" />
@@ -1196,7 +1894,9 @@ function App() {
                               }}
                             />
                           </TableCell>
-                          <TableCell>{row.childName}</TableCell>
+                          <TableCell>{row.firstName}</TableCell>
+                          <TableCell>{row.middleName}</TableCell>
+                          <TableCell>{row.lastName}</TableCell>
                           <TableCell>{row.gender}</TableCell>
                           <TableCell>{row.dob}</TableCell>
                           <TableCell>{row.age}</TableCell>
@@ -1214,6 +1914,51 @@ function App() {
                     </TableBody>
                   </Table>
                 </TableContainer>
+
+                {/* Pagination - Show when API-based filters are selected */}
+                {[
+                  'All Records',
+                  'Pending User review/action',
+                  'All children On Hold from CSA',
+                  'Children In Pay',
+                  'Children Out of Pay',
+                  'CRA Refused CSA List',
+                  'Children within a batch',
+                  'Children over 18 years (never eligible)',
+                ].includes(preDefinedFilter) && (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      mt: 2,
+                      px: 2,
+                    }}
+                  >
+                    <Typography variant="body2" color="text.secondary">
+                      {loadingContacts
+                        ? 'Loading...'
+                        : `Showing ${contacts.length} of ${totalRecords} records`}
+                    </Typography>
+                    <Pagination
+                      count={totalPages}
+                      page={currentPage}
+                      onChange={handlePageChange}
+                      color="primary"
+                      showFirstButton
+                      showLastButton
+                    />
+                  </Box>
+                )}
+
+                {/* Error message */}
+                {contactsError && preDefinedFilter === 'All Records' && (
+                  <Box sx={{ mt: 2, p: 2, backgroundColor: '#ffebee', borderRadius: 1 }}>
+                    <Typography variant="body2" color="error">
+                      {contactsError}
+                    </Typography>
+                  </Box>
+                )}
 
                 {/* Filter Menu */}
                 <Menu
@@ -1318,6 +2063,96 @@ function App() {
                   </MenuItem>
                 </Menu>
 
+                {/* Batch History Filter Menu */}
+                <Menu
+                  anchorEl={batchHistoryFilterAnchor.element}
+                  open={Boolean(batchHistoryFilterAnchor.element)}
+                  onClose={handleBatchHistoryFilterClose}
+                  PaperProps={{
+                    sx: {
+                      maxHeight: 400,
+                      width: 250,
+                    },
+                  }}
+                >
+                  <Box sx={{ p: 2 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mb: 1,
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        Filter by {batchHistoryFilterAnchor.column}
+                      </Typography>
+                      <Button
+                        size="small"
+                        onClick={() => {
+                          clearBatchHistoryColumnFilter(batchHistoryFilterAnchor.column)
+                          handleBatchHistoryFilterClose()
+                        }}
+                        sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                      >
+                        Clear
+                      </Button>
+                    </Box>
+                    {/* Search bar for filtering items */}
+                    <TextField
+                      size="small"
+                      fullWidth
+                      placeholder="Search"
+                      value={batchHistoryFilterSearchTerm}
+                      onChange={(e) => setBatchHistoryFilterSearchTerm(e.target.value)}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Box component="span" sx={{ fontSize: '18px' }}>
+                              🔍
+                            </Box>
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ mb: 1 }}
+                    />
+                    <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                      {batchHistoryFilterAnchor.column &&
+                        getBatchHistoryUniqueValues(
+                          batchHistoryFilterAnchor.column as keyof (typeof childBatchHistory)[0],
+                        )
+                          .sort()
+                          .filter((value) =>
+                            String(value)
+                              .toLowerCase()
+                              .includes(batchHistoryFilterSearchTerm.toLowerCase()),
+                          )
+                          .map((value) => (
+                            <Box
+                              key={String(value)}
+                              sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                            >
+                              <Checkbox
+                                size="small"
+                                checked={
+                                  batchHistoryColumnFilters[
+                                    batchHistoryFilterAnchor.column
+                                  ]?.includes(String(value)) || false
+                                }
+                                onChange={() =>
+                                  handleBatchHistoryFilterChange(
+                                    batchHistoryFilterAnchor.column,
+                                    String(value),
+                                  )
+                                }
+                              />
+                              <Typography variant="body2">{String(value)}</Typography>
+                            </Box>
+                          ))}
+                    </Box>
+                  </Box>
+                </Menu>
+
                 {/* Details Section */}
                 {selectedChild !== null && (
                   <Box sx={{ mt: 3 }}>
@@ -1332,19 +2167,6 @@ function App() {
                           pb: 2,
                         }}
                       >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                            Details
-                          </Typography>
-                          <Tooltip
-                            title="Detailed information about the selected child including basic info, case details, placement information, and service provider details."
-                            arrow
-                          >
-                            <IconButton size="small" sx={{ padding: 0.5 }}>
-                              <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography variant="h6" sx={{ fontWeight: 500 }}>
                             Details
@@ -1405,14 +2227,14 @@ function App() {
                                   Person Name
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.childName}
+                                  {`${childData.firstName} ${childData.middleName} ${childData.lastName}`.trim()}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Birth Name
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.childName}
+                                  {`${childData.firstName} ${childData.middleName} ${childData.lastName}`.trim()}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
@@ -1740,19 +2562,48 @@ function App() {
                             </IconButton>
                           </Tooltip>
                         </Box>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          sx={{
-                            textTransform: 'none',
-                            backgroundColor: '#1976d2',
-                            '&:hover': {
-                              backgroundColor: '#1565c0',
-                            },
-                          }}
-                        >
-                          Remove from Batch
-                        </Button>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <TextField
+                            size="small"
+                            placeholder="Search batch history..."
+                            value={batchHistorySearchTerm}
+                            onChange={(e) => setBatchHistorySearchTerm(e.target.value)}
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <Box component="span" sx={{ fontSize: '18px' }}>
+                                    🔍
+                                  </Box>
+                                </InputAdornment>
+                              ),
+                              endAdornment: batchHistorySearchTerm && (
+                                <InputAdornment position="end">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => setBatchHistorySearchTerm('')}
+                                    edge="end"
+                                  >
+                                    <CloseIcon fontSize="small" />
+                                  </IconButton>
+                                </InputAdornment>
+                              ),
+                            }}
+                            sx={{ width: '300px' }}
+                          />
+                          <Button
+                            variant="contained"
+                            size="small"
+                            sx={{
+                              textTransform: 'none',
+                              backgroundColor: '#1976d2',
+                              '&:hover': {
+                                backgroundColor: '#1565c0',
+                              },
+                            }}
+                          >
+                            Remove from Batch
+                          </Button>
+                        </Box>
                       </Box>
 
                       {/* Batch History Table */}
@@ -1760,15 +2611,102 @@ function App() {
                         <Table size="small">
                           <TableHead>
                             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                              <TableCell sx={{ fontWeight: 600 }}>Batch ID</TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>Created Date</TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>Batch Date</TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>Transaction Type</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  Batch ID
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => handleBatchHistoryFilterClick(e, 'batchId')}
+                                    sx={{
+                                      padding: 0.5,
+                                      color:
+                                        batchHistoryColumnFilters.batchId?.length > 0
+                                          ? '#1976d2'
+                                          : '#666',
+                                    }}
+                                  >
+                                    <FilterListIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  Created Date
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => handleBatchHistoryFilterClick(e, 'createdDate')}
+                                    sx={{
+                                      padding: 0.5,
+                                      color:
+                                        batchHistoryColumnFilters.createdDate?.length > 0
+                                          ? '#1976d2'
+                                          : '#666',
+                                    }}
+                                  >
+                                    <FilterListIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  Batch Date
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => handleBatchHistoryFilterClick(e, 'batchDate')}
+                                    sx={{
+                                      padding: 0.5,
+                                      color:
+                                        batchHistoryColumnFilters.batchDate?.length > 0
+                                          ? '#1976d2'
+                                          : '#666',
+                                    }}
+                                  >
+                                    <FilterListIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  Status
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => handleBatchHistoryFilterClick(e, 'status')}
+                                    sx={{
+                                      padding: 0.5,
+                                      color:
+                                        batchHistoryColumnFilters.status?.length > 0
+                                          ? '#1976d2'
+                                          : '#666',
+                                    }}
+                                  >
+                                    <FilterListIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  Transaction Type
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) =>
+                                      handleBatchHistoryFilterClick(e, 'transactionType')
+                                    }
+                                    sx={{
+                                      padding: 0.5,
+                                      color:
+                                        batchHistoryColumnFilters.transactionType?.length > 0
+                                          ? '#1976d2'
+                                          : '#666',
+                                    }}
+                                  >
+                                    <FilterListIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                              </TableCell>
                             </TableRow>
                           </TableHead>
                           <TableBody>
-                            {childBatchHistory.map((row) => (
+                            {filteredBatchHistory.map((row) => (
                               <TableRow
                                 key={row.id}
                                 hover
@@ -1826,22 +2764,33 @@ function App() {
                   <Typography variant="h6" sx={{ fontWeight: 500 }}>
                     Batch Requests
                   </Typography>
-                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                    <TextField
-                      size="small"
-                      placeholder="Search"
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Box component="span" sx={{ fontSize: '18px' }}>
-                              🔍
-                            </Box>
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{ width: '200px' }}
-                    />
-                  </Box>
+                  <TextField
+                    size="small"
+                    placeholder="Search batch requests..."
+                    value={batchRequestsSearchTerm}
+                    onChange={(e) => setBatchRequestsSearchTerm(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Box component="span" sx={{ fontSize: '18px' }}>
+                            🔍
+                          </Box>
+                        </InputAdornment>
+                      ),
+                      endAdornment: batchRequestsSearchTerm && (
+                        <InputAdornment position="end">
+                          <IconButton
+                            size="small"
+                            onClick={() => setBatchRequestsSearchTerm('')}
+                            edge="end"
+                          >
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{ width: '300px' }}
+                  />
                 </Box>
 
                 {/* Batch Requests Table */}
@@ -1849,16 +2798,118 @@ function App() {
                   <Table size="small">
                     <TableHead>
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                        <TableCell>Batch ID</TableCell>
-                        <TableCell>Batch Date</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell>Record Count</TableCell>
-                        <TableCell>Created Date</TableCell>
-                        <TableCell>System Comments</TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Batch ID
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleBatchRequestsFilterClick(e, 'batchId')}
+                              sx={{
+                                padding: 0.5,
+                                color:
+                                  batchRequestsColumnFilters.batchId?.length > 0
+                                    ? '#1976d2'
+                                    : '#666',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Batch Date
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleBatchRequestsFilterClick(e, 'batchDate')}
+                              sx={{
+                                padding: 0.5,
+                                color:
+                                  batchRequestsColumnFilters.batchDate?.length > 0
+                                    ? '#1976d2'
+                                    : '#666',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Status
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleBatchRequestsFilterClick(e, 'status')}
+                              sx={{
+                                padding: 0.5,
+                                color:
+                                  batchRequestsColumnFilters.status?.length > 0
+                                    ? '#1976d2'
+                                    : '#666',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Record Count
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleBatchRequestsFilterClick(e, 'recordCount')}
+                              sx={{
+                                padding: 0.5,
+                                color:
+                                  batchRequestsColumnFilters.recordCount?.length > 0
+                                    ? '#1976d2'
+                                    : '#666',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Created Date
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleBatchRequestsFilterClick(e, 'createdDate')}
+                              sx={{
+                                padding: 0.5,
+                                color:
+                                  batchRequestsColumnFilters.createdDate?.length > 0
+                                    ? '#1976d2'
+                                    : '#666',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            System Comments
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleBatchRequestsFilterClick(e, 'systemComments')}
+                              sx={{
+                                padding: 0.5,
+                                color:
+                                  batchRequestsColumnFilters.systemComments?.length > 0
+                                    ? '#1976d2'
+                                    : '#666',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {batchRequestsData.map((row) => (
+                      {filteredBatchRequests.map((row) => (
                         <TableRow
                           key={row.id}
                           hover
@@ -1900,7 +2951,9 @@ function App() {
                     <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                       <TextField
                         size="small"
-                        placeholder="Search"
+                        placeholder="Search batch details..."
+                        value={batchDetailsSearchTerm}
+                        onChange={(e) => setBatchDetailsSearchTerm(e.target.value)}
                         InputProps={{
                           startAdornment: (
                             <InputAdornment position="start">
@@ -1909,19 +2962,20 @@ function App() {
                               </Box>
                             </InputAdornment>
                           ),
+                          endAdornment: batchDetailsSearchTerm && (
+                            <InputAdornment position="end">
+                              <IconButton
+                                size="small"
+                                onClick={() => setBatchDetailsSearchTerm('')}
+                                edge="end"
+                              >
+                                <CloseIcon fontSize="small" />
+                              </IconButton>
+                            </InputAdornment>
+                          ),
                         }}
-                        sx={{ width: '200px' }}
+                        sx={{ width: '300px' }}
                       />
-                      <Button
-                        variant="contained"
-                        size="small"
-                        sx={{
-                          backgroundColor: '#1976d2',
-                          '&:hover': { backgroundColor: '#1565c0' },
-                        }}
-                      >
-                        Pre-Defined
-                      </Button>
                       <Button
                         variant="contained"
                         size="small"
@@ -1944,31 +2998,133 @@ function App() {
                             <Checkbox
                               indeterminate={
                                 selectedBatchDetails.length > 0 &&
-                                selectedBatchDetails.length < currentBatchDetails.length
+                                selectedBatchDetails.length < filteredBatchDetails.length
                               }
                               checked={
-                                currentBatchDetails.length > 0 &&
-                                selectedBatchDetails.length === currentBatchDetails.length
+                                filteredBatchDetails.length > 0 &&
+                                selectedBatchDetails.length === filteredBatchDetails.length
                               }
                               onChange={() => {
-                                if (selectedBatchDetails.length === currentBatchDetails.length) {
+                                if (selectedBatchDetails.length === filteredBatchDetails.length) {
                                   setSelectedBatchDetails([])
                                 } else {
-                                  setSelectedBatchDetails(currentBatchDetails.map((row) => row.id))
+                                  setSelectedBatchDetails(filteredBatchDetails.map((row) => row.id))
                                 }
                               }}
                             />
                           </TableCell>
-                          <TableCell>Last Name</TableCell>
-                          <TableCell>Middle Name(s)</TableCell>
-                          <TableCell>Given Name(s)</TableCell>
-                          <TableCell>Transaction Type</TableCell>
-                          <TableCell>Status</TableCell>
-                          <TableCell>System Comments</TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              Last Name
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleBatchDetailsFilterClick(e, 'lastName')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchDetailsColumnFilters.lastName?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              Middle Name(s)
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleBatchDetailsFilterClick(e, 'middleName')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchDetailsColumnFilters.middleName?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              Given Name(s)
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleBatchDetailsFilterClick(e, 'givenName')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchDetailsColumnFilters.givenName?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              Transaction Type
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleBatchDetailsFilterClick(e, 'transactionType')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchDetailsColumnFilters.transactionType?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              Status
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleBatchDetailsFilterClick(e, 'status')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchDetailsColumnFilters.status?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              System Comments
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleBatchDetailsFilterClick(e, 'systemComments')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchDetailsColumnFilters.systemComments?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {currentBatchDetails.map((row) => (
+                        {filteredBatchDetails.map((row) => (
                           <TableRow
                             key={row.id}
                             hover
@@ -2001,6 +3157,285 @@ function App() {
               </Box>
             )}
           </Box>
+
+          {/* Filter Menus - Outside tabs so they're always available */}
+          {/* Batch History Filter Menu */}
+          <Menu
+            anchorEl={batchHistoryFilterAnchor.element}
+            open={Boolean(batchHistoryFilterAnchor.element)}
+            onClose={handleBatchHistoryFilterClose}
+            PaperProps={{
+              sx: {
+                maxHeight: 400,
+                width: 250,
+              },
+            }}
+          >
+            <Box sx={{ p: 2 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  mb: 1,
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  Filter by {batchHistoryFilterAnchor.column}
+                </Typography>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    clearBatchHistoryColumnFilter(batchHistoryFilterAnchor.column)
+                    handleBatchHistoryFilterClose()
+                  }}
+                  sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                >
+                  Clear
+                </Button>
+              </Box>
+              {/* Search bar for filtering items */}
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="Search"
+                value={batchHistoryFilterSearchTerm}
+                onChange={(e) => setBatchHistoryFilterSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Box component="span" sx={{ fontSize: '18px' }}>
+                        🔍
+                      </Box>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ mb: 1 }}
+              />
+              <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                {batchHistoryFilterAnchor.column &&
+                  getBatchHistoryUniqueValues(
+                    batchHistoryFilterAnchor.column as keyof (typeof childBatchHistory)[0],
+                  )
+                    .sort()
+                    .filter((value) =>
+                      String(value)
+                        .toLowerCase()
+                        .includes(batchHistoryFilterSearchTerm.toLowerCase()),
+                    )
+                    .map((value) => (
+                      <Box
+                        key={String(value)}
+                        sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                      >
+                        <Checkbox
+                          size="small"
+                          checked={
+                            batchHistoryColumnFilters[batchHistoryFilterAnchor.column]?.includes(
+                              String(value),
+                            ) || false
+                          }
+                          onChange={() =>
+                            handleBatchHistoryFilterChange(
+                              batchHistoryFilterAnchor.column,
+                              String(value),
+                            )
+                          }
+                        />
+                        <Typography variant="body2">{String(value)}</Typography>
+                      </Box>
+                    ))}
+              </Box>
+            </Box>
+          </Menu>
+
+          {/* Batch Requests Filter Menu */}
+          <Menu
+            anchorEl={batchRequestsFilterAnchor.element}
+            open={Boolean(batchRequestsFilterAnchor.element)}
+            onClose={handleBatchRequestsFilterClose}
+            PaperProps={{
+              sx: {
+                maxHeight: 400,
+                width: 250,
+              },
+            }}
+          >
+            <Box sx={{ p: 2 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  mb: 1,
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  Filter by {batchRequestsFilterAnchor.column}
+                </Typography>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    clearBatchRequestsColumnFilter(batchRequestsFilterAnchor.column)
+                    handleBatchRequestsFilterClose()
+                  }}
+                  sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                >
+                  Clear
+                </Button>
+              </Box>
+              {/* Search bar for filtering items */}
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="Search"
+                value={batchRequestsFilterSearchTerm}
+                onChange={(e) => setBatchRequestsFilterSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Box component="span" sx={{ fontSize: '18px' }}>
+                        🔍
+                      </Box>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ mb: 1 }}
+              />
+              <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                {batchRequestsFilterAnchor.column &&
+                  getBatchRequestsUniqueValues(
+                    batchRequestsFilterAnchor.column as keyof (typeof batchRequestsData)[0],
+                  )
+                    .sort()
+                    .filter((value) =>
+                      String(value)
+                        .toLowerCase()
+                        .includes(batchRequestsFilterSearchTerm.toLowerCase()),
+                    )
+                    .map((value) => (
+                      <Box
+                        key={String(value)}
+                        sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                      >
+                        <Checkbox
+                          size="small"
+                          checked={
+                            batchRequestsColumnFilters[batchRequestsFilterAnchor.column]?.includes(
+                              String(value),
+                            ) || false
+                          }
+                          onChange={() =>
+                            handleBatchRequestsFilterChange(
+                              batchRequestsFilterAnchor.column,
+                              String(value),
+                            )
+                          }
+                        />
+                        <Typography variant="body2">{String(value)}</Typography>
+                      </Box>
+                    ))}
+              </Box>
+            </Box>
+          </Menu>
+
+          {/* Batch Details Filter Menu */}
+          <Menu
+            anchorEl={batchDetailsFilterAnchor.element}
+            open={Boolean(batchDetailsFilterAnchor.element)}
+            onClose={handleBatchDetailsFilterClose}
+            PaperProps={{
+              sx: {
+                maxHeight: 400,
+                width: 250,
+              },
+            }}
+          >
+            <Box sx={{ p: 2 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  mb: 1,
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  Filter by {batchDetailsFilterAnchor.column}
+                </Typography>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    clearBatchDetailsColumnFilter(batchDetailsFilterAnchor.column)
+                    handleBatchDetailsFilterClose()
+                  }}
+                  sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                >
+                  Clear
+                </Button>
+              </Box>
+              {/* Search bar for filtering items */}
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="Search"
+                value={batchDetailsFilterSearchTerm}
+                onChange={(e) => setBatchDetailsFilterSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Box component="span" sx={{ fontSize: '18px' }}>
+                        🔍
+                      </Box>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ mb: 1 }}
+              />
+              <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                {batchDetailsFilterAnchor.column &&
+                  (() => {
+                    // Get unique values only from currently selected batch
+                    const values = currentBatchDetails.map(
+                      (row) =>
+                        row[
+                          batchDetailsFilterAnchor.column as keyof (typeof batchDetailsData)[number][number]
+                        ],
+                    )
+                    return Array.from(new Set(values))
+                      .filter((v) => v !== undefined && v !== '')
+                      .sort()
+                      .filter((value) =>
+                        String(value)
+                          .toLowerCase()
+                          .includes(batchDetailsFilterSearchTerm.toLowerCase()),
+                      )
+                      .map((value) => (
+                        <Box
+                          key={String(value)}
+                          sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                        >
+                          <Checkbox
+                            size="small"
+                            checked={
+                              batchDetailsColumnFilters[batchDetailsFilterAnchor.column]?.includes(
+                                String(value),
+                              ) || false
+                            }
+                            onChange={() =>
+                              handleBatchDetailsFilterChange(
+                                batchDetailsFilterAnchor.column,
+                                String(value),
+                              )
+                            }
+                          />
+                          <Typography variant="body2">{String(value)}</Typography>
+                        </Box>
+                      ))
+                  })()}
+              </Box>
+            </Box>
+          </Menu>
         </Box>
       )}
 

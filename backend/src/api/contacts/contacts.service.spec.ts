@@ -509,19 +509,24 @@ describe('ContactsService', () => {
   })
 
   describe('fullTextSearch', () => {
-    it('should return paginated results for a search query', async () => {
-      const mockResults = [
-        { id: 1, lastName: 'Doe', firstName: 'John' },
-        { id: 2, lastName: 'Doe', firstName: 'Jane' },
+    it('should search using searchText column', async () => {
+      const mockData = [
+        { id: 1, lastName: 'Smith', firstName: 'John' },
+        { id: 2, lastName: 'Smith', firstName: 'Jane' },
       ]
-      vi.spyOn(prisma, '$queryRaw')
-        .mockResolvedValueOnce(mockResults)
-        .mockResolvedValueOnce([{ count: BigInt(2) }])
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValueOnce(mockData as any)
+      vi.spyOn(prisma.contact, 'count').mockResolvedValueOnce(2)
 
-      const result = await service.fullTextSearch('doe', 1, 10)
+      const result = await service.fullTextSearch('smi', 1, 10)
 
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        where: { searchText: { contains: 'smi', mode: 'insensitive' } },
+        skip: 0,
+        take: 10,
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      })
       expect(result).toEqual({
-        data: mockResults,
+        data: mockData,
         page: 1,
         limit: 10,
         total: 2,
@@ -529,10 +534,21 @@ describe('ContactsService', () => {
       })
     })
 
+    it('should return empty result for empty query', async () => {
+      const result = await service.fullTextSearch('   ', 1, 10)
+
+      expect(result).toEqual({
+        data: [],
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0,
+      })
+    })
+
     it('should handle empty search results', async () => {
-      vi.spyOn(prisma, '$queryRaw')
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ count: BigInt(0) }])
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValueOnce([])
+      vi.spyOn(prisma.contact, 'count').mockResolvedValueOnce(0)
 
       const result = await service.fullTextSearch('nonexistent', 1, 10)
 
@@ -546,24 +562,42 @@ describe('ContactsService', () => {
     })
 
     it('should cap limit at 200', async () => {
-      vi.spyOn(prisma, '$queryRaw')
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ count: BigInt(0) }])
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValueOnce([])
+      vi.spyOn(prisma.contact, 'count').mockResolvedValueOnce(0)
 
       const result = await service.fullTextSearch('test', 1, 500)
 
       expect(result.limit).toBe(200)
     })
 
-    it('should handle multi-word search queries', async () => {
-      vi.spyOn(prisma, '$queryRaw')
-        .mockResolvedValueOnce([{ id: 1, lastName: 'Doe', firstName: 'John' }])
-        .mockResolvedValueOnce([{ count: BigInt(1) }])
+    it('should escape ILIKE special characters', async () => {
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValueOnce([])
+      vi.spyOn(prisma.contact, 'count').mockResolvedValueOnce(0)
 
-      const result = await service.fullTextSearch('john doe', 1, 10)
+      await service.fullTextSearch('100%', 1, 10)
 
-      expect(result.data).toHaveLength(1)
-      expect(prisma.$queryRaw).toHaveBeenCalled()
+      // '%' should be escaped to '\%'
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        where: { searchText: { contains: '100\\%', mode: 'insensitive' } },
+        skip: 0,
+        take: 10,
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      })
+    })
+
+    it('should escape underscore character', async () => {
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValueOnce([])
+      vi.spyOn(prisma.contact, 'count').mockResolvedValueOnce(0)
+
+      await service.fullTextSearch('test_user', 1, 10)
+
+      // '_' should be escaped to '\_'
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        where: { searchText: { contains: 'test\\_user', mode: 'insensitive' } },
+        skip: 0,
+        take: 10,
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      })
     })
   })
 

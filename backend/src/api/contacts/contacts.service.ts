@@ -188,48 +188,24 @@ export class ContactsService {
       limit = 200
     }
 
-    const offset = (page - 1) * limit
-    const searchQuery = query.trim().split(/\s+/).join(' & ')
+    const searchTerm = this.escapeLikePattern(query.trim())
+    if (!searchTerm) {
+      return { data: [], page, limit, total: 0, totalPages: 0 }
+    }
 
-    const data = await this.prisma.$queryRaw<ContactDto[]>`
-      SELECT id, last_name as "lastName", first_name as "firstName", middle_name as "middleName",
-        aka_last_name as "akaLastName", aka_first_name as "akaFirstName",
-        person_id_icm as "personIdIcm", person_id_mis as "personIdMis",
-        gender, date_of_birth as "dateOfBirth", age,
-        case_number as "caseNumber", legacy_file_number as "legacyFileNumber",
-        case_type as "caseType", case_status as "caseStatus", case_load as "caseLoad",
-        service_office as "serviceOffice", assigned_to as "assignedTo",
-        csa_status as "csaStatus", csa_status_effective_date as "csaStatusEffectiveDate",
-        csa_sent_date as "csaSentDate", din, effective_legal_status as "effectiveLegalStatus",
-        effective_date as "effectiveDate", expiry_date as "expiryDate",
-        enroll_for_csa as "enrollForCsa", mis_legal_authority_code as "misLegalAuthorityCode",
-        legal_authority_code as "legalAuthorityCode", birth_city as "birthCity",
-        birth_province as "birthProvince", birth_country as "birthCountry",
-        placement_location as "placementLocation", location_type as "locationType",
-        location_sub_type as "locationSubType", placement_status as "placementStatus",
-        actual_start_date as "actualStartDate", actual_end_date as "actualEndDate",
-        paid_unpaid as "paidUnpaid", interrupted_placement as "interruptedPlacement",
-        source_placement as "sourcePlacement", service_provider_name as "serviceProviderName",
-        provider_id as "providerId", place_of_service_name as "placeOfServiceName",
-        agreement_type as "agreementType", agreement_status as "agreementStatus",
-        agreement_start_date as "agreementStartDate", agreement_end_date as "agreementEndDate",
-        termination_date as "terminationDate", mcfd_contract as "mcfdContract",
-        order_number as "orderNumber", order_type as "orderType", order_status as "orderStatus",
-        order_amount as "orderAmount", order_effective_start_date as "orderEffectiveStartDate",
-        product, source_order as "sourceOrder",
-        created_at as "createdAt", created_by as "createdBy",
-        last_updated_at as "lastUpdatedAt", last_updated_by as "lastUpdatedBy"
-    FROM csa.contacts
-    WHERE search_vector @@ to_tsquery('english', ${searchQuery})
-    ORDER BY ts_rank(search_vector, to_tsquery('english', ${searchQuery})) DESC
-    LIMIT ${limit} OFFSET ${offset}
-    `
+    const where = {
+      searchText: { contains: searchTerm, mode: 'insensitive' as const },
+    }
 
-    const countResult = await this.prisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(*) as count FROM csa.contacts
-      WHERE search_vector @@ to_tsquery('english', ${searchQuery})
-    `
-    const total = Number(countResult[0].count)
+    const [data, total] = await Promise.all([
+      this.prisma.contact.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      }),
+      this.prisma.contact.count({ where }),
+    ])
 
     return {
       data,
@@ -361,5 +337,11 @@ export class ContactsService {
       },
       orderBy: { createdAt: 'desc' },
     })
+  }
+
+  // Escape ILIKE special characters to prevent wildcard injection
+  // '%' and '_' are wildcards, '\' is escape char
+  private escapeLikePattern(input: string): string {
+    return input.replace(/[%_\\]/g, '\\$&')
   }
 }

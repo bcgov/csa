@@ -1,17 +1,21 @@
-import { Injectable, Logger } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
-import { SERVER_CONFIG } from 'src/cra/cra.config'
-import fs from 'fs'
+import { Injectable, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import FormData from 'form-data'
+import fs from 'fs'
 import { catchError, firstValueFrom } from 'rxjs'
-
-const { FTP_BASE_URL } = SERVER_CONFIG
 
 @Injectable()
 export class FileTransferClientService {
   private readonly logger = new Logger(FileTransferClientService.name)
+  private readonly fileTransferServiceUrl: string
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
+  ) {
+    this.fileTransferServiceUrl = this.configService.get<string>('app.fileTransferServiceUrl')!
+  }
 
   async sendFileToTransferService(
     filePath: string,
@@ -24,7 +28,7 @@ export class FileTransferClientService {
     formData.append('fileName', fileName)
 
     try {
-      const url = FTP_BASE_URL + '/api/transfers'
+      const url = this.fileTransferServiceUrl + '/api/transfers'
       const response$ = this.httpService
         .post(url, formData, {
           headers: {

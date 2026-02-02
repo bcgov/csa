@@ -1,10 +1,13 @@
-import 'dotenv/config'
+import { HttpModule } from '@nestjs/axios'
 import { Module, OnModuleInit } from '@nestjs/common'
+import { ConfigModule } from '@nestjs/config'
+import { PrismaModule } from 'src/common/database/prisma.module'
 import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
+import { craConfig } from './cra.config'
 import { PollCraResponseHandler } from './handlers/poll-cra-response.handler'
 import { SendCraFileHandler } from './handlers/send-cra-file.handler'
-import { HttpModule } from '@nestjs/axios'
+import { CraDataService } from './outbound-file/cra-data.service'
 import { FileCreateService } from './outbound-file/file-create.service'
 import { FileTransferClientService } from './outbound-file/file-transfer.service'
 
@@ -14,15 +17,17 @@ import { FileTransferClientService } from './outbound-file/file-transfer.service
  */
 @Module({
   imports: [
+    ConfigModule.forFeature(craConfig),
     JobsModule,
+    PrismaModule,
     HttpModule.register({
-      timeout: 60000, // 60 seconds timeout
-      // maxRedirects: 5,
+      timeout: 60000, //TODO: check this 60 seconds timeout
     }),
   ],
   providers: [
     SendCraFileHandler,
     PollCraResponseHandler,
+    CraDataService,
     FileCreateService,
     FileTransferClientService,
   ],

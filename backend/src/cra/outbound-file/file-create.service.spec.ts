@@ -1,10 +1,11 @@
+import { ConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
 import { existsSync, writeFileSync } from 'fs'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
-import { FileCreateService } from './file-create.service'
-import { FileTransferClientService } from './file-transfer.service'
-import { FILE_MOCK_DATA } from './file-mock-data'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
+import { FileCreateService } from './file-create.service'
+import { FILE_MOCK_DATA } from './file-mock-data'
+import { FileTransferClientService } from './file-transfer.service'
 
 const { header, details, trailer } = FILE_MOCK_DATA
 const { REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
@@ -16,6 +17,17 @@ const {
   TRAILER_TRAN_CODE,
   HEADER_RECORD_CONT,
 } = REQUEST_FILE
+
+const mockConfigService = {
+  get: vi.fn((key: string) => {
+    const config: Record<string, string> = {
+      'app.fileStoragePath': './temp/',
+      'cra.environmentCode': 'ACSAIN',
+      'cra.fileTypeCode': 'AAPL',
+    }
+    return config[key]
+  }),
+}
 
 vi.mock('fs', async () => {
   const actual = await vi.importActual<typeof import('fs')>('fs')
@@ -47,6 +59,10 @@ describe('FileCreateService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FileCreateService,
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
+        },
         {
           provide: FileTransferClientService,
           useValue: {
@@ -80,7 +96,7 @@ describe('CRA Header format', () => {
   let service: FileCreateService
 
   beforeEach(() => {
-    service = new FileCreateService()
+    service = new FileCreateService(mockConfigService as unknown as ConfigService)
   })
 
   it('should build header in correct CRA sequence and length', () => {
@@ -108,7 +124,7 @@ describe('CRA Detail format', () => {
   let service: FileCreateService
 
   beforeEach(() => {
-    service = new FileCreateService()
+    service = new FileCreateService(mockConfigService as unknown as ConfigService)
   })
 
   it('should pad fields correctly and maintain CRA Application field sequence', () => {
@@ -170,7 +186,7 @@ describe('CRA Trailer format', () => {
   let service: FileCreateService
 
   beforeEach(() => {
-    service = new FileCreateService()
+    service = new FileCreateService(mockConfigService as unknown as ConfigService)
   })
 
   it('should pad record count with leading zeros', () => {

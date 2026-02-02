@@ -2,10 +2,9 @@ import type { MiddlewareConsumer } from '@nestjs/common'
 import { Module, RequestMethod } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { TerminusModule } from '@nestjs/terminus'
-import 'dotenv/config'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { appConfig } from 'src/config/app.config'
 import { HTTPLoggerMiddleware } from '../common/middleware/req.res.logger'
-import '../cra/cra.config'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { ContactsModule } from './contacts/contacts.module'
@@ -13,10 +12,13 @@ import { HealthController } from './health/health.controller'
 import { MetricsController } from './metrics/metrics.controller'
 import { MockModule } from './mock/mock.module'
 
-const enableMockApi = process.env.ENABLE_MOCK_API === 'true'
+const enableMockApi = process.env.NODE_ENV !== 'production'
 @Module({
   imports: [
-    ConfigModule.forRoot(),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [appConfig],
+    }),
     TerminusModule,
     ContactsModule,
     ...(enableMockApi ? [MockModule] : []),
@@ -26,6 +28,7 @@ const enableMockApi = process.env.ENABLE_MOCK_API === 'true'
 })
 export class ApiModule {
   // let's add a middleware on all routes
+  //TODO: remove the unused routes
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(HTTPLoggerMiddleware)

@@ -26,6 +26,7 @@ export class CraDataService {
   async buildCraFileData(): Promise<CraFileData> {
     // TODO: Remove mock data override when DB queries are ready
     const mock_data = true
+
     if (mock_data) return FILE_MOCK_DATA
 
     // TODO: Query Batch and ContactBatchDetail tables for pending batch data

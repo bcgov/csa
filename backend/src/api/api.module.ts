@@ -8,6 +8,7 @@ import { HTTPLoggerMiddleware } from '../common/middleware/req.res.logger'
 import '../cra/cra.config'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
+import { BatchesModule } from './batches/batches.module'
 import { ContactsModule } from './contacts/contacts.module'
 import { HealthController } from './health/health.controller'
 import { MetricsController } from './metrics/metrics.controller'
@@ -19,6 +20,7 @@ const enableMockApi = process.env.ENABLE_MOCK_API === 'true'
     ConfigModule.forRoot(),
     TerminusModule,
     ContactsModule,
+    BatchesModule,
     ...(enableMockApi ? [MockModule] : []),
   ],
   controllers: [AppController, MetricsController, HealthController],

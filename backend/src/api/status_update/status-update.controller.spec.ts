@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { StatusUpdateController } from './status-update.controller'
 import { StatusUpdateService } from './status-update.service'
 
@@ -12,10 +13,10 @@ describe('StatusUpdateController', () => {
         {
           provide: StatusUpdateService,
           useValue: {
-            updateContactStatus: jest.fn(),
-            updateBatchStatus: jest.fn(),
-            getContactStatuses: jest.fn(),
-            getBatchStatuses: jest.fn(),
+            updateContactStatus: vi.fn(),
+            updateBatchStatus: vi.fn(),
+            getContactStatuses: vi.fn(),
+            getBatchStatuses: vi.fn(),
           },
         },
       ],

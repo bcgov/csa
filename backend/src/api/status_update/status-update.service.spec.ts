@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { StatusUpdateService } from './status-update.service'
 
 describe('StatusUpdateService', () => {
@@ -13,12 +14,12 @@ describe('StatusUpdateService', () => {
           provide: PrismaService,
           useValue: {
             contact: {
-              findUnique: jest.fn(),
-              update: jest.fn(),
+              findUnique: vi.fn(),
+              update: vi.fn(),
             },
             batch: {
-              findUnique: jest.fn(),
-              update: jest.fn(),
+              findUnique: vi.fn(),
+              update: vi.fn(),
             },
           },
         },

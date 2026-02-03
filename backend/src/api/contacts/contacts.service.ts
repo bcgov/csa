@@ -1,9 +1,14 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { ALLOWED_FILTER_SORT_FIELDS } from './constants'
+import {
+  ALLOWED_FILTER_SORT_FIELDS,
+  BATCH_STATUSES,
+  BULK_OPERATION_SKIP_REASONS,
+  CSA_STATUSES,
+} from './constants'
 import { ContactDto } from './dto/contact.dto'
-import { FilterCondition, FilterItem } from './interfaces'
+import { BulkOperationResponse, FilterCondition, FilterItem } from './interfaces'
 
 @Injectable()
 export class ContactsService {
@@ -183,48 +188,24 @@ export class ContactsService {
       limit = 200
     }
 
-    const offset = (page - 1) * limit
-    const searchQuery = query.trim().split(/\s+/).join(' & ')
+    const searchTerm = this.escapeLikePattern(query.trim())
+    if (!searchTerm) {
+      return { data: [], page, limit, total: 0, totalPages: 0 }
+    }
 
-    const data = await this.prisma.$queryRaw<ContactDto[]>`
-      SELECT id, last_name as "lastName", given_names as "givenNames", middle_name as "middleName",
-        aka_last_name as "akaLastName", aka_first_name as "akaFirstName",
-        person_id_icm as "personIdIcm", person_id_mis as "personIdMis",
-        gender, date_of_birth as "dateOfBirth", age,
-        case_number as "caseNumber", legacy_file_number as "legacyFileNumber",
-        case_type as "caseType", case_status as "caseStatus", case_load as "caseLoad",
-        service_office as "serviceOffice", assigned_to as "assignedTo",
-        csa_status as "csaStatus", csa_status_effective_date as "csaStatusEffectiveDate",
-        csa_sent_date as "csaSentDate", din, effective_legal_status as "effectiveLegalStatus",
-        effective_date as "effectiveDate", expiry_date as "expiryDate",
-        enroll_for_csa as "enrollForCsa", mis_legal_authority_code as "misLegalAuthorityCode",
-        legal_authority_code as "legalAuthorityCode", birth_city as "birthCity",
-        birth_province as "birthProvince", birth_country as "birthCountry",
-        placement_location as "placementLocation", location_type as "locationType",
-        location_sub_type as "locationSubType", placement_status as "placementStatus",
-        actual_start_date as "actualStartDate", actual_end_date as "actualEndDate",
-        paid_unpaid as "paidUnpaid", interrupted_placement as "interruptedPlacement",
-        source_placement as "sourcePlacement", service_provider_name as "serviceProviderName",
-        provider_id as "providerId", place_of_service_name as "placeOfServiceName",
-        agreement_type as "agreementType", agreement_status as "agreementStatus",
-        agreement_start_date as "agreementStartDate", agreement_end_date as "agreementEndDate",
-        termination_date as "terminationDate", mcfd_contract as "mcfdContract",
-        order_number as "orderNumber", order_type as "orderType", order_status as "orderStatus",
-        order_amount as "orderAmount", order_effective_start_date as "orderEffectiveStartDate",
-        product, source_order as "sourceOrder",
-        created_at as "createdAt", created_by as "createdBy",
-        last_updated_at as "lastUpdatedAt", last_updated_by as "lastUpdatedBy"
-    FROM csa.contacts
-    WHERE search_vector @@ to_tsquery('english', ${searchQuery})
-    ORDER BY ts_rank(search_vector, to_tsquery('english', ${searchQuery})) DESC
-    LIMIT ${limit} OFFSET ${offset}
-    `
+    const where = {
+      searchText: { contains: searchTerm, mode: 'insensitive' as const },
+    }
 
-    const countResult = await this.prisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(*) as count FROM csa.contacts
-      WHERE search_vector @@ to_tsquery('english', ${searchQuery})
-    `
-    const total = Number(countResult[0].count)
+    const [data, total] = await Promise.all([
+      this.prisma.contact.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      }),
+      this.prisma.contact.count({ where }),
+    ])
 
     return {
       data,
@@ -233,5 +214,134 @@ export class ContactsService {
       total,
       totalPages: Math.ceil(total / limit),
     }
+  }
+
+  async holdContacts(contactIds: number[], userId: string): Promise<BulkOperationResponse> {
+    const result: BulkOperationResponse = {
+      success: [],
+      skipped: [],
+    }
+
+    // Get all contacts
+    const contacts = await this.prisma.contact.findMany({
+      where: { id: { in: contactIds } },
+    })
+    const contactMap = new Map(contacts.map((c) => [c.id, c]))
+
+    // Find contacts in pending batch
+    const inPendingBatch = await this.prisma.contactBatchDetail.findMany({
+      where: {
+        contactId: { in: contactIds },
+        batch: { status: BATCH_STATUSES.PENDING },
+      },
+      select: { contactId: true },
+    })
+    const inPendingBatchIds = new Set(inPendingBatch.map((c) => c.contactId))
+
+    // Categorize contacts
+    const toHold: number[] = []
+    for (const id of contactIds) {
+      const contact = contactMap.get(id)
+      if (!contact) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
+      } else if (contact.csaStatus === CSA_STATUSES.ON_HOLD) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.ALREADY_ON_HOLD })
+      } else if (inPendingBatchIds.has(id)) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.IN_PENDING_BATCH })
+      } else {
+        toHold.push(id)
+      }
+    }
+
+    // Update valid contacts and preserve original csa_status in resumeStatus
+    for (const id of toHold) {
+      const contact = contactMap.get(id)!
+      await this.prisma.contact.update({
+        where: { id },
+        data: {
+          resumeStatus: contact.csaStatus,
+          csaStatus: CSA_STATUSES.ON_HOLD,
+          holdBy: userId,
+          lastUpdatedAt: new Date(),
+          lastUpdatedBy: userId,
+        },
+      })
+      result.success.push(id)
+    }
+
+    return result
+  }
+
+  async resumeContacts(contactIds: number[], userId: string): Promise<BulkOperationResponse> {
+    const result: BulkOperationResponse = {
+      success: [],
+      skipped: [],
+    }
+
+    // Get all contacts
+    const contacts = await this.prisma.contact.findMany({
+      where: { id: { in: contactIds } },
+    })
+    const contactMap = new Map(contacts.map((c) => [c.id, c]))
+
+    // Categorize contacts
+    const toResume: Array<{ id: number; resumeStatus: string }> = []
+    for (const id of contactIds) {
+      const contact = contactMap.get(id)
+      if (!contact) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
+      } else if (contact.csaStatus !== CSA_STATUSES.ON_HOLD) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_ON_HOLD })
+      } else {
+        toResume.push({ id, resumeStatus: contact.resumeStatus! })
+      }
+    }
+
+    // Update valid contacts
+    for (const { id, resumeStatus } of toResume) {
+      await this.prisma.contact.update({
+        where: { id },
+        data: {
+          csaStatus: resumeStatus,
+          resumeStatus: null,
+          holdBy: null,
+          lastUpdatedAt: new Date(),
+          lastUpdatedBy: userId,
+        },
+      })
+      result.success.push(id)
+    }
+
+    return result
+  }
+
+  async findContactBatches(contactId: number) {
+    const contact = await this.prisma.contact.findUnique({
+      where: { id: contactId },
+    })
+    if (!contact) {
+      throw new NotFoundException(`Contact ${contactId} not found`)
+    }
+
+    // Return all batch details with nested batch info
+    return this.prisma.contactBatchDetail.findMany({
+      where: { contactId },
+      include: {
+        batch: {
+          select: {
+            id: true,
+            batchDate: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+  }
+
+  // Escape ILIKE special characters to prevent wildcard injection
+  // '%' and '_' are wildcards, '\' is escape char
+  private escapeLikePattern(input: string): string {
+    return input.replace(/[%_\\]/g, '\\$&')
   }
 }

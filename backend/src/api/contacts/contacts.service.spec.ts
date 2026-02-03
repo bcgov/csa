@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
@@ -54,16 +55,19 @@ describe('ContactsService', () => {
         {
           provide: PrismaService,
           useValue: {
-            // IMPORTANT: singular "contact" to match prisma.contact
             contact: {
-              findMany: vi.fn().mockResolvedValue(savedContactArray),
-              findUnique: vi.fn().mockResolvedValue(savedContact1),
-              create: vi.fn().mockResolvedValue(savedContact1),
-              update: vi.fn().mockResolvedValue(updatedContact),
+              findMany: vi.fn().mockResolvedValue(savedContactArray as any),
+              findUnique: vi.fn().mockResolvedValue(savedContact1 as any),
+              create: vi.fn().mockResolvedValue(savedContact1 as any),
+              update: vi.fn().mockResolvedValue(updatedContact as any),
               delete: vi.fn().mockResolvedValue(true),
               count: vi.fn(),
             },
+            contactBatchDetail: {
+              findMany: vi.fn().mockResolvedValue([]),
+            },
             $queryRaw: vi.fn(),
+            $transaction: vi.fn(),
           },
         },
       ],
@@ -505,19 +509,24 @@ describe('ContactsService', () => {
   })
 
   describe('fullTextSearch', () => {
-    it('should return paginated results for a search query', async () => {
-      const mockResults = [
-        { id: 1, lastName: 'Doe', firstName: 'John' },
-        { id: 2, lastName: 'Doe', firstName: 'Jane' },
+    it('should search using searchText column', async () => {
+      const mockData = [
+        { id: 1, lastName: 'Smith', firstName: 'John' },
+        { id: 2, lastName: 'Smith', firstName: 'Jane' },
       ]
-      vi.spyOn(prisma, '$queryRaw')
-        .mockResolvedValueOnce(mockResults)
-        .mockResolvedValueOnce([{ count: BigInt(2) }])
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValueOnce(mockData as any)
+      vi.spyOn(prisma.contact, 'count').mockResolvedValueOnce(2)
 
-      const result = await service.fullTextSearch('doe', 1, 10)
+      const result = await service.fullTextSearch('smi', 1, 10)
 
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        where: { searchText: { contains: 'smi', mode: 'insensitive' } },
+        skip: 0,
+        take: 10,
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      })
       expect(result).toEqual({
-        data: mockResults,
+        data: mockData,
         page: 1,
         limit: 10,
         total: 2,
@@ -525,10 +534,21 @@ describe('ContactsService', () => {
       })
     })
 
+    it('should return empty result for empty query', async () => {
+      const result = await service.fullTextSearch('   ', 1, 10)
+
+      expect(result).toEqual({
+        data: [],
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0,
+      })
+    })
+
     it('should handle empty search results', async () => {
-      vi.spyOn(prisma, '$queryRaw')
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ count: BigInt(0) }])
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValueOnce([])
+      vi.spyOn(prisma.contact, 'count').mockResolvedValueOnce(0)
 
       const result = await service.fullTextSearch('nonexistent', 1, 10)
 
@@ -542,24 +562,42 @@ describe('ContactsService', () => {
     })
 
     it('should cap limit at 200', async () => {
-      vi.spyOn(prisma, '$queryRaw')
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ count: BigInt(0) }])
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValueOnce([])
+      vi.spyOn(prisma.contact, 'count').mockResolvedValueOnce(0)
 
       const result = await service.fullTextSearch('test', 1, 500)
 
       expect(result.limit).toBe(200)
     })
 
-    it('should handle multi-word search queries', async () => {
-      vi.spyOn(prisma, '$queryRaw')
-        .mockResolvedValueOnce([{ id: 1, lastName: 'Doe', firstName: 'John' }])
-        .mockResolvedValueOnce([{ count: BigInt(1) }])
+    it('should escape ILIKE special characters', async () => {
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValueOnce([])
+      vi.spyOn(prisma.contact, 'count').mockResolvedValueOnce(0)
 
-      const result = await service.fullTextSearch('john doe', 1, 10)
+      await service.fullTextSearch('100%', 1, 10)
 
-      expect(result.data).toHaveLength(1)
-      expect(prisma.$queryRaw).toHaveBeenCalled()
+      // '%' should be escaped to '\%'
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        where: { searchText: { contains: '100\\%', mode: 'insensitive' } },
+        skip: 0,
+        take: 10,
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      })
+    })
+
+    it('should escape underscore character', async () => {
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValueOnce([])
+      vi.spyOn(prisma.contact, 'count').mockResolvedValueOnce(0)
+
+      await service.fullTextSearch('test_user', 1, 10)
+
+      // '_' should be escaped to '\_'
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        where: { searchText: { contains: 'test\\_user', mode: 'insensitive' } },
+        skip: 0,
+        take: 10,
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      })
     })
   })
 
@@ -603,6 +641,179 @@ describe('ContactsService', () => {
       await expect(service.findAll(1, 10, '{invalid json}', undefined)).rejects.toThrow(
         'Invalid JSON format for sort parameter',
       )
+    })
+  })
+
+  describe('holdContacts (bulk)', () => {
+    it('should put multiple contacts on hold', async () => {
+      const contact1 = { id: 1, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+      const contact2 = { id: 2, csaStatus: 'in_pay', holdBy: null, resumeStatus: null }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1, contact2] as any)
+      vi.spyOn(prisma.contactBatchDetail, 'findMany').mockResolvedValue([])
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.holdContacts([1, 2], 'user1')
+
+      expect(result.success).toEqual([1, 2])
+      expect(result.skipped).toEqual([])
+      expect(updateSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it('should skip not found contacts', async () => {
+      const contact1 = { id: 1, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1] as any)
+      vi.spyOn(prisma.contactBatchDetail, 'findMany').mockResolvedValue([])
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.holdContacts([1, 999], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(result.skipped).toEqual([{ id: 999, reason: 'not_found' }])
+    })
+
+    it('should skip already on hold contacts', async () => {
+      const contact1 = { id: 1, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+      const contact2 = { id: 2, csaStatus: 'on_hold', holdBy: 'user1', resumeStatus: 'eligible' }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1, contact2] as any)
+      vi.spyOn(prisma.contactBatchDetail, 'findMany').mockResolvedValue([])
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.holdContacts([1, 2], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(result.skipped).toEqual([{ id: 2, reason: 'already_on_hold' }])
+    })
+
+    it('should skip contacts in pending batch', async () => {
+      const contact1 = { id: 1, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+      const contact2 = { id: 2, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1, contact2] as any)
+      vi.spyOn(prisma.contactBatchDetail, 'findMany').mockResolvedValue([{ contactId: 2 }] as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.holdContacts([1, 2], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(result.skipped).toEqual([{ id: 2, reason: 'in_pending_batch' }])
+    })
+
+    it('should handle mixed results', async () => {
+      const contact1 = { id: 1, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+      const contact2 = { id: 2, csaStatus: 'on_hold', holdBy: 'user1', resumeStatus: 'eligible' }
+      const contact3 = { id: 3, csaStatus: 'in_pay', holdBy: null, resumeStatus: null }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1, contact2, contact3] as any)
+      vi.spyOn(prisma.contactBatchDetail, 'findMany').mockResolvedValue([{ contactId: 3 }] as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.holdContacts([1, 2, 3, 999], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(result.skipped).toEqual([
+        { id: 2, reason: 'already_on_hold' },
+        { id: 3, reason: 'in_pending_batch' },
+        { id: 999, reason: 'not_found' },
+      ])
+    })
+  })
+
+  describe('resumeContacts (bulk)', () => {
+    it('should resume multiple contacts from hold', async () => {
+      const contact1 = { id: 1, csaStatus: 'on_hold', holdBy: 'user1', resumeStatus: 'eligible' }
+      const contact2 = { id: 2, csaStatus: 'on_hold', holdBy: 'user1', resumeStatus: 'in_pay' }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1, contact2] as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.resumeContacts([1, 2], 'user1')
+
+      expect(result.success).toEqual([1, 2])
+      expect(result.skipped).toEqual([])
+      expect(updateSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it('should skip not found contacts', async () => {
+      const contact1 = { id: 1, csaStatus: 'on_hold', holdBy: 'user1', resumeStatus: 'eligible' }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1] as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.resumeContacts([1, 999], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(result.skipped).toEqual([{ id: 999, reason: 'not_found' }])
+    })
+
+    it('should skip contacts not on hold', async () => {
+      const contact1 = { id: 1, csaStatus: 'on_hold', holdBy: 'user1', resumeStatus: 'eligible' }
+      const contact2 = { id: 2, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1, contact2] as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.resumeContacts([1, 2], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(result.skipped).toEqual([{ id: 2, reason: 'not_on_hold' }])
+    })
+
+    it('should handle mixed results', async () => {
+      const contact1 = { id: 1, csaStatus: 'on_hold', holdBy: 'user1', resumeStatus: 'eligible' }
+      const contact2 = { id: 2, csaStatus: 'eligible', holdBy: null, resumeStatus: null }
+
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([contact1, contact2] as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.resumeContacts([1, 2, 999], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(result.skipped).toEqual([
+        { id: 2, reason: 'not_on_hold' },
+        { id: 999, reason: 'not_found' },
+      ])
+    })
+  })
+
+  describe('findContactBatches', () => {
+    it('should return batch details for a contact', async () => {
+      const contact = { id: 1, firstName: 'John', lastName: 'Doe' }
+      const batchDetails = [
+        {
+          id: 1,
+          contactId: 1,
+          batchId: 5,
+          transactionType: 'application',
+          status: 'processed',
+          batch: { id: 5, batchDate: new Date('2026-01-15'), status: 'processed' },
+        },
+      ]
+
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      vi.spyOn(prisma.contactBatchDetail, 'findMany').mockResolvedValue(batchDetails as any)
+
+      const result = await service.findContactBatches(1)
+
+      expect(result).toEqual(batchDetails)
+      expect(prisma.contactBatchDetail.findMany).toHaveBeenCalledWith({
+        where: { contactId: 1 },
+        include: {
+          batch: {
+            select: { id: true, batchDate: true, status: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+    })
+
+    it('should throw NotFoundException if contact not found', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(null)
+
+      await expect(service.findContactBatches(999)).rejects.toThrow(NotFoundException)
+      await expect(service.findContactBatches(999)).rejects.toThrow('Contact 999 not found')
     })
   })
 })

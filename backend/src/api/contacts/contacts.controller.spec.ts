@@ -28,6 +28,9 @@ describe('ContactsController', () => {
     findAll: vi.fn().mockResolvedValue(mockPaginatedResponse),
     findOne: vi.fn().mockResolvedValue(mockContacts[0]),
     fullTextSearch: vi.fn().mockResolvedValue(mockPaginatedResponse),
+    resumeContacts: vi.fn(),
+    holdContacts: vi.fn(),
+    findContactBatches: vi.fn(),
   }
 
   beforeEach(async () => {
@@ -135,6 +138,88 @@ describe('ContactsController', () => {
         .get('/contacts/search?q=a')
         .expect(400)
         .expect({ statusCode: 400, message: 'Search query must be at least 2 characters' })
+    })
+  })
+
+  describe('POST /contacts/hold', () => {
+    it('should return bulk hold result', async () => {
+      const result = {
+        success: [1, 2],
+        skipped: [
+          { id: 3, reason: 'already_on_hold' },
+          { id: 999, reason: 'not_found' },
+        ],
+      }
+      vi.spyOn(service, 'holdContacts').mockResolvedValue(result)
+
+      return request(app.getHttpServer())
+        .post('/contacts/hold')
+        .send({ contactIds: [1, 2, 3, 999] })
+        .expect(201)
+        .expect(result)
+    })
+
+    it('should call service with correct parameters', async () => {
+      const result = { success: [1], skipped: [] }
+      const spy = vi.spyOn(service, 'holdContacts').mockResolvedValue(result)
+
+      await request(app.getHttpServer())
+        .post('/contacts/hold')
+        .send({ contactIds: [1, 2, 3] })
+        .expect(201)
+
+      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'system')
+    })
+  })
+
+  describe('POST /contacts/resume', () => {
+    it('should return bulk resume result', async () => {
+      const result = {
+        success: [1, 2],
+        skipped: [
+          { id: 3, reason: 'not_on_hold' },
+          { id: 999, reason: 'not_found' },
+        ],
+      }
+      vi.spyOn(service, 'resumeContacts').mockResolvedValue(result)
+
+      return request(app.getHttpServer())
+        .post('/contacts/resume')
+        .send({ contactIds: [1, 2, 3, 999] })
+        .expect(201)
+        .expect(result)
+    })
+
+    it('should call service with correct parameters', async () => {
+      const result = { success: [1], skipped: [] }
+      const spy = vi.spyOn(service, 'resumeContacts').mockResolvedValue(result)
+
+      await request(app.getHttpServer())
+        .post('/contacts/resume')
+        .send({ contactIds: [1, 2, 3] })
+        .expect(201)
+
+      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'system')
+    })
+  })
+
+  describe('GET /contacts/:id/batches', () => {
+    it('should return batch details for a contact', async () => {
+      const batchDetails = [
+        {
+          id: 1,
+          contactId: 1,
+          batchId: 5,
+          transactionType: 'application',
+          batch: { id: 5, batchDate: '2026-01-15', status: 'processed' },
+        },
+      ]
+      vi.spyOn(service, 'findContactBatches').mockResolvedValue(batchDetails as any)
+
+      return request(app.getHttpServer())
+        .get('/contacts/1/batches')
+        .expect(200)
+        .expect(batchDetails)
     })
   })
 })

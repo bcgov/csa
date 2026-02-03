@@ -20,3 +20,5 @@ ALTER COLUMN search_text SET NOT NULL;
 -- Full-text search index (trigram for ILIKE '%term%' queries)
 CREATE INDEX idx_contacts_search_text_trgm ON csa.contacts USING GIN (search_text gin_trgm_ops);
 
+CREATE UNIQUE INDEX batches_pending_unique ON csa.batches (status) WHERE status = 'pending';
+

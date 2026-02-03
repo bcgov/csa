@@ -138,3 +138,127 @@ export const fullTextSearchContacts = async (
   })
   return response.data
 }
+
+export interface BulkOperationResponse {
+  success: number[]
+  skipped: Array<{ id: number; reason: string }>
+}
+
+export interface Batch {
+  id: number
+  batchDate: string | null
+  status: string
+  recordCount: number
+  createdAt: string
+  systemComments: string | null
+}
+
+export interface ContactBatchDetail {
+  id: number
+  contactId: number
+  batchId: number
+  transactionType: string
+  systemComments: string | null
+  createdAt: string
+  createdBy: string
+  lastUpdatedAt: string
+  lastUpdatedBy: string
+  status: string | null
+  batch: {
+    id: number
+    batchDate: string
+    status: string
+  }
+}
+
+export interface BatchContactDetail {
+  id: number
+  contactId: number
+  batchId: number
+  transactionType: string
+  systemComments: string | null
+  createdAt: string
+  createdBy: string
+  lastUpdatedAt: string
+  lastUpdatedBy: string
+  status: string | null
+  contact: {
+    id: number
+    lastName: string
+    firstName: string
+    din: string
+    csaStatus: string
+  }
+}
+
+/**
+ * Put contacts on hold
+ * @param contactIds - Array of contact IDs to put on hold
+ */
+export const holdContacts = async (contactIds: number[]): Promise<BulkOperationResponse> => {
+  const response = await APIService.getAxiosInstance().post('/contacts/hold', {
+    contactIds,
+  })
+  return response.data
+}
+
+/**
+ * Resume contacts from hold
+ * @param contactIds - Array of contact IDs to resume
+ */
+export const resumeContacts = async (contactIds: number[]): Promise<BulkOperationResponse> => {
+  const response = await APIService.getAxiosInstance().post('/contacts/resume', {
+    contactIds,
+  })
+  return response.data
+}
+
+/**
+ * Get batch history for a specific contact
+ * @param contactId - Contact ID
+ */
+export const getContactBatches = async (contactId: number): Promise<ContactBatchDetail[]> => {
+  const response = await APIService.getAxiosInstance().get(`/contacts/${contactId}/batches`)
+  return response.data
+}
+
+/**
+ * Get all batches
+ */
+export const getAllBatches = async (): Promise<Batch[]> => {
+  const response = await APIService.getAxiosInstance().get('/batches')
+  return response.data
+}
+
+/**
+ * Get contacts in a specific batch
+ * @param batchId - Batch ID
+ */
+export const getBatchContacts = async (batchId: number): Promise<BatchContactDetail[]> => {
+  const response = await APIService.getAxiosInstance().get(`/batches/${batchId}/contacts`)
+  return response.data
+}
+
+/**
+ * Add contacts to pending batch
+ * @param contactIds - Array of contact IDs to add to the pending batch
+ */
+export const addContactsToBatch = async (contactIds: number[]): Promise<BulkOperationResponse> => {
+  const response = await APIService.getAxiosInstance().post('/batches/pending/contacts', {
+    contactIds,
+  })
+  return response.data
+}
+
+/**
+ * Remove contact from pending batch
+ * @param contactId - Contact ID to remove
+ */
+export const removeContactFromBatch = async (
+  contactId: number,
+): Promise<{ batchId: number; recordCount: number; message: string }> => {
+  const response = await APIService.getAxiosInstance().delete(
+    `/batches/pending/contacts/${contactId}`,
+  )
+  return response.data
+}

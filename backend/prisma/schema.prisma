@@ -1,7 +1,7 @@
 generator client {
   provider      = "prisma-client-js"
-  moduleFormat  = "cjs"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
+  moduleFormat  = "cjs"
 }
 
 datasource db {
@@ -10,157 +10,163 @@ datasource db {
 }
 
 model Contact {
-  id                         Int       @id @default(autoincrement())
+  id                      Int                      @id @default(autoincrement())
+  lastName                String                   @map("last_name")
+  firstName               String                   @map("first_name")
+  middleName              String                   @map("middle_name")
+  akaLastName             String                   @map("aka_last_name")
+  akaFirstName            String                   @map("aka_first_name")
+  personIdIcm             String                   @map("person_id_icm")
+  personIdMis             String                   @map("person_id_mis")
+  gender                  String?                  @map("gender")
+  dateOfBirth             DateTime?                @map("date_of_birth") @db.Date
+  age                     Int?                     @map("age")
+  csa_age                 Int?
+  caseNumber              String                   @map("case_number")
+  legacyFileNumber        String?                  @map("legacy_file_number")
+  caseType                String                   @map("case_type")
+  caseStatus              String                   @map("case_status")
+  caseLoad                String                   @map("case_load")
+  serviceOffice           String?                  @map("service_office")
+  assignedTo              String?                  @map("assigned_to")
+  csaStatus               String?                  @map("csa_status")
+  csaStatusEffectiveDate  DateTime?                @map("csa_status_effective_date") @db.Timestamp(6)
+  csaSentDate             DateTime?                @map("csa_sent_date") @db.Timestamp(6)
+  din                     String?                  @map("din")
+  effectiveLegalStatus    String?                  @map("effective_legal_status")
+  effectiveDate           DateTime?                @map("effective_date") @db.Timestamp(6)
+  expiryDate              DateTime?                @map("expiry_date") @db.Date
+  enrollForCsa            String?                  @map("enroll_for_csa")
+  misLegalAuthorityCode   String?                  @map("mis_legal_authority_code")
+  legalAuthorityCode      String?                  @map("legal_authority_code")
+  birthCity               String?                  @map("birth_city")
+  birthProvince           String?                  @map("birth_province")
+  birthCountry            String?                  @map("birth_country")
+  placementLocation       String?                  @map("placement_location")
+  locationType            String?                  @map("location_type")
+  locationSubType         String?                  @map("location_sub_type")
+  placementStatus         String?                  @map("placement_status")
+  actualStartDate         DateTime?                @map("actual_start_date") @db.Timestamp(6)
+  actualEndDate           DateTime?                @map("actual_end_date") @db.Timestamp(6)
+  paidUnpaid              String?                  @map("paid_unpaid")
+  interruptedPlacement    String?                  @map("interrupted_placement")
+  sourcePlacement         String?                  @map("source_placement")
+  serviceProviderName     String?                  @map("service_provider_name")
+  providerId              String?                  @map("provider_id")
+  placeOfServiceName      String?                  @map("place_of_service_name")
+  agreementType           String?                  @map("agreement_type")
+  agreementStatus         String?                  @map("agreement_status")
+  agreementStartDate      DateTime?                @map("agreement_start_date") @db.Timestamp(6)
+  agreementEndDate        DateTime?                @map("agreement_end_date") @db.Timestamp(6)
+  terminationDate         DateTime?                @map("termination_date") @db.Timestamp(6)
+  mcfdContract            String?                  @map("mcfd_contract")
+  orderNumber             String?                  @map("order_number")
+  orderType               String?                  @map("order_type")
+  orderStatus             String?                  @map("order_status")
+  orderAmount             String?                  @map("order_amount")
+  orderEffectiveStartDate DateTime?                @map("order_effective_start_date") @db.Date
+  product                 String?                  @map("product")
+  sourceOrder             String                   @map("source_order")
+  resumeStatus            String?                  @map("resume_status")
+  holdBy                  String?                  @map("hold_by")
+  icmIntegrationStatus    Boolean                  @map("icm_integration_status")
+  createdAt               DateTime                 @map("created_at") @db.Timestamp(6)
+  createdBy               String                   @map("created_by")
+  lastUpdatedAt           DateTime                 @map("last_updated_at") @db.Timestamp(6)
+  lastUpdatedBy           String                   @map("last_updated_by")
+  searchText              String                   @default(dbgenerated("((((((((((((((COALESCE(last_name, ''::text) || ' | '::text) || COALESCE(first_name, ''::text)) || ' | '::text) || COALESCE(middle_name, ''::text)) || ' | '::text) || COALESCE(aka_last_name, ''::text)) || ' | '::text) || COALESCE(aka_first_name, ''::text)) || ' | '::text) || COALESCE(case_number, ''::text)) || ' | '::text) || COALESCE(legacy_file_number, ''::text)) || ' | '::text) || COALESCE(din, ''::text))")) @map("search_text")
+  search_vector           Unsupported("tsvector")? @default(dbgenerated("to_tsvector('english'::regconfig, ((((((((((((((((((((COALESCE(last_name, ''::text) || ' '::text) || COALESCE(middle_name, ''::text)) || ' '::text) || COALESCE(first_name, ''::text)) || ' '::text) || COALESCE(gender, ''::text)) || ' '::text) || COALESCE(din, ''::text)) || ' '::text) || COALESCE(csa_status, ''::text)) || ' '::text) || COALESCE(case_number, ''::text)) || ' '::text) || COALESCE(csa_status, ''::text)) || ' '::text) || COALESCE(legacy_file_number, ''::text)) || ' '::text) || COALESCE(hold_by, ''::text)) || ' '::text) || COALESCE(last_updated_by, ''::text)))"))
+  contactBatchDetails     ContactBatchDetail[]
 
-  // Required (NOT NULL)
-  lastName                   String    @map("last_name")
-  firstName                  String    @map("first_name")
-  middleName                 String    @map("middle_name")
-  akaLastName                String    @map("aka_last_name")
-  akaFirstName               String    @map("aka_first_name")
-  personIdIcm                String    @map("person_id_icm")
-  personIdMis                String    @map("person_id_mis")
-  caseNumber                 String    @map("case_number")
-  caseType                   String    @map("case_type")
-  caseStatus                 String    @map("case_status")
-  caseLoad                   String    @map("case_load")
-  sourceOrder                String    @map("source_order")
-  icmIntegrationStatus       Boolean   @map("icm_integration_status")
-  createdAt                  DateTime  @map("created_at")
-  createdBy                  String    @map("created_by")
-  lastUpdatedAt              DateTime  @map("last_updated_at")
-  lastUpdatedBy              String    @map("last_updated_by")
-  searchText                 String    @map("search_text")
-
-  // Optional (nullable in SQL)
-  gender                     String?   @map("gender")
-  dateOfBirth                DateTime? @db.Date @map("date_of_birth")
-  age                        Int?      @map("age")
-  legacyFileNumber           String?   @map("legacy_file_number")
-  serviceOffice              String?   @map("service_office")
-  assignedTo                 String?   @map("assigned_to")
-  csaStatus                  String?   @map("csa_status")
-  csaStatusEffectiveDate     DateTime? @map("csa_status_effective_date")
-  csaSentDate                DateTime? @map("csa_sent_date")
-  din                        String?   @map("din")
-  effectiveLegalStatus       String?   @map("effective_legal_status")
-  effectiveDate              DateTime? @map("effective_date")
-  expiryDate                 DateTime? @db.Date @map("expiry_date")
-  enrollForCsa               String?   @map("enroll_for_csa")
-  misLegalAuthorityCode      String?   @map("mis_legal_authority_code")
-  legalAuthorityCode         String?   @map("legal_authority_code")
-  birthCity                  String?   @map("birth_city")
-  birthProvince              String?   @map("birth_province")
-  birthCountry               String?   @map("birth_country")
-  placementLocation          String?   @map("placement_location")
-  locationType               String?   @map("location_type")
-  locationSubType            String?   @map("location_sub_type")
-  placementStatus            String?   @map("placement_status")
-  actualStartDate            DateTime? @map("actual_start_date")
-  actualEndDate              DateTime? @map("actual_end_date")
-  paidUnpaid                 String?   @map("paid_unpaid")
-  interruptedPlacement       String?   @map("interrupted_placement")
-  sourcePlacement            String?   @map("source_placement")
-  serviceProviderName        String?   @map("service_provider_name")
-  providerId                 String?   @map("provider_id")
-  placeOfServiceName         String?   @map("place_of_service_name")
-  agreementType              String?   @map("agreement_type")
-  agreementStatus            String?   @map("agreement_status")
-  agreementStartDate         DateTime? @map("agreement_start_date")
-  agreementEndDate           DateTime? @map("agreement_end_date")
-  terminationDate            DateTime? @map("termination_date")
-  mcfdContract               String?   @map("mcfd_contract")
-  orderNumber                String?   @map("order_number")
-  orderType                  String?   @map("order_type")
-  orderStatus                String?   @map("order_status")
-  orderAmount                String?   @map("order_amount")
-  orderEffectiveStartDate    DateTime? @db.Date @map("order_effective_start_date")
-  product                    String?   @map("product")
-  holdBy                     String?   @map("hold_by")
-  resumeStatus  String?      @map("resume_status")
-
-  // Relations
-  contactBatchDetails        ContactBatchDetail[]
-
-  @@schema("csa")
+  @@index([searchText(ops: raw("gin_trgm_ops"))], map: "idx_contacts_search_text_trgm", type: Gin)
+  @@index([search_vector], map: "idx_contacts_search_vector", type: Gin)
   @@map("contacts")
+  @@schema("csa")
 }
 
 model Batch {
-  id                    Int                    @id @default(autoincrement())
-  batchDate             DateTime               @db.Date @map("batch_date")
-  status                String
-  recordCount           Int                    @map("record_count")
-  createdAt             DateTime               @map("created_at")
-  updatedAt             DateTime               @map("updated_at")
-  systemComments        String?                @map("system_comments")
+  id                  Int                  @id @default(autoincrement())
+  batchDate           DateTime             @map("batch_date") @db.Date
+  status              String
+  recordCount         Int                  @map("record_count")
+  createdAt           DateTime             @map("created_at") @db.Timestamp(6)
+  systemComments      String?              @map("system_comments")
+  contactBatchDetails ContactBatchDetail[]
+  transferFiles       TransferFile[]
 
-  // Relations
-  contactBatchDetails   ContactBatchDetail[]
-  transferFiles         TransferFile[]
-
-  @@schema("csa")
   @@map("batches")
+  @@schema("csa")
 }
 
 model ContactBatchDetail {
-  id              Int       @id @default(autoincrement())
-  contactId       Int       @map("contact_id")
-  batchId         Int       @map("batch_id")
-  transactionType String    @map("transaction_type")
-  systemComments  String?   @map("system_comments")
-  createdAt       DateTime  @map("created_at")
-  createdBy       String    @map("created_by")
-  lastUpdatedAt   DateTime  @map("last_updated_at")
-  lastUpdatedBy   String    @map("last_updated_by")
+  id              Int      @id @default(autoincrement())
+  contactId       Int      @map("contact_id")
+  batchId         Int      @map("batch_id")
+  transactionType String   @map("transaction_type")
+  systemComments  String?  @map("system_comments")
+  createdAt       DateTime @map("created_at") @db.Timestamp(6)
+  createdBy       String   @map("created_by")
+  lastUpdatedAt   DateTime @map("last_updated_at") @db.Timestamp(6)
+  lastUpdatedBy   String   @map("last_updated_by")
   status          String?
+  batch           Batch    @relation(fields: [batchId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_cbd_batch")
+  contact         Contact  @relation(fields: [contactId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_cbd_contact")
 
-  // Relations
-  contact         Contact   @relation(fields: [contactId], references: [id])
-  batch           Batch     @relation(fields: [batchId], references: [id])
-
-  @@unique([contactId, batchId], name: "contact_batch_unique")
-  @@schema("csa")
+  @@unique([contactId, batchId], name: "contact_batch_unique", map: "contact_batch_unique")
   @@map("contact_batch_details")
+  @@schema("csa")
 }
 
 model TransferFile {
-  id                Int       @id @default(autoincrement())
-  batchId           Int?      @map("batch_id")
-  destinationId     String    @map("destination_id")
-  direction         String
-  fileName          String    @map("file_name")
-  fileSize          String?   @map("file_size")
-  deliveredAt       DateTime? @map("delivered_at")
-  downloadedAt      DateTime? @map("downloaded_at")
-  referenceNumbers  Int[]     @map("reference_numbers")
+  id               Int       @id @default(autoincrement())
+  batchId          Int?      @map("batch_id")
+  destinationId    String    @map("destination_id")
+  direction        String
+  fileName         String    @map("file_name")
+  fileSize         String?   @map("file_size")
+  deliveredAt      DateTime? @map("delivered_at") @db.Timestamp(6)
+  downloadedAt     DateTime? @map("downloaded_at") @db.Timestamp(6)
+  referenceNumbers Int[]     @map("reference_numbers")
+  batch            Batch?    @relation(fields: [batchId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_transfer_files_batch")
 
-  // Relations
-  batch             Batch?    @relation(fields: [batchId], references: [id])
-
-  @@schema("csa")
   @@map("transfer_files")
+  @@schema("csa")
 }
 
 model JobRun {
-  id            Int       @id @default(autoincrement())
-  jobType       String    @map("job_type")
-  status        String
-  parentJobId   Int?      @map("parent_job_id")
-  jobTrigger    String    @map("job_trigger")
-  retryCount    Int       @default(0) @map("retry_count")
-  error         String?
-  metadata      Json      @default("{}") @db.JsonB
-  createdAt     DateTime  @default(now()) @map("created_at")
-  startedAt     DateTime  @map("started_at")
-  completedAt   DateTime? @map("completed_at")
+  id          Int       @id @default(autoincrement())
+  jobType     String    @map("job_type")
+  status      String
+  parentJobId Int?      @map("parent_job_id")
+  jobTrigger  String    @map("job_trigger")
+  retryCount  Int?      @default(0) @map("retry_count")
+  error       String?
+  metadata    Json?     @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  startedAt   DateTime  @map("started_at") @db.Timestamp(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamp(6)
+  parentJob   JobRun?   @relation("ChildJobs", fields: [parentJobId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  childJobs   JobRun[]  @relation("ChildJobs")
 
-  parentJob     JobRun?   @relation("ChildJobs", fields: [parentJobId], references: [id])
-  childJobs     JobRun[]  @relation("ChildJobs")
-
-  @@index([status])
-  @@index([parentJobId])
-  @@index([jobType, status])
-  @@schema("csa")
+  @@index([parentJobId], map: "idx_job_runs_parent")
+  @@index([status], map: "idx_job_runs_status")
+  @@index([jobType, status], map: "idx_job_runs_type_status")
   @@map("job_runs")
+  @@schema("csa")
+}
+
+model flyway_schema_history {
+  installed_rank Int      @id(map: "flyway_schema_history_pk")
+  version        String?  @db.VarChar(50)
+  description    String   @db.VarChar(200)
+  type           String   @db.VarChar(20)
+  script         String   @db.VarChar(1000)
+  checksum       Int?
+  installed_by   String   @db.VarChar(100)
+  installed_on   DateTime @default(now()) @db.Timestamp(6)
+  execution_time Int
+  success        Boolean
+
+  @@index([success], map: "flyway_schema_history_s_idx")
+  @@schema("csa")
 }

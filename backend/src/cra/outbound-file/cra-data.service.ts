@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
-import { CraDetail, CraHeader, CraTrailer } from './file-create.interface'
+import { CraReqDetail, CraReqHeader, CraReqTrailer } from './file-create.interface'
 import { FILE_MOCK_DATA } from './file-mock-data'
 
 const { REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
@@ -9,9 +9,9 @@ const { HEADER_TRAN_CODE, DETAIL_TRAN_CODE, TRAILER_TRAN_CODE, BUSINESS_NUM, VER
   REQUEST_FILE
 
 export interface CraFileData {
-  header: CraHeader
-  details: CraDetail[]
-  trailer: CraTrailer
+  header: CraReqHeader
+  details: CraReqDetail[]
+  trailer: CraReqTrailer
 }
 
 @Injectable()
@@ -49,7 +49,7 @@ export class CraDataService {
     }
   }
 
-  private buildHeader(processDate: string, recordCount: number): CraHeader {
+  private buildHeader(processDate: string, recordCount: number): CraReqHeader {
     return {
       tranCode: HEADER_TRAN_CODE,
       versionNum: VERSION_NUM,
@@ -60,7 +60,7 @@ export class CraDataService {
     }
   }
 
-  private buildTrailer(processDate: string, recordCount: number): CraTrailer {
+  private buildTrailer(processDate: string, recordCount: number): CraReqTrailer {
     return {
       tranCode: TRAILER_TRAN_CODE,
       versionNum: VERSION_NUM,
@@ -75,7 +75,7 @@ export class CraDataService {
    * Transforms a Contact entity to CRA detail format
    * TODO: Verify field mappings match actual Contact Batch schema
    */
-  private transformToDetail(contact: any): CraDetail {
+  private transformToDetail(contact: any): CraReqDetail {
     return {
       tranCode: DETAIL_TRAN_CODE,
       referenceNum: contact.personIdIcm ?? '',

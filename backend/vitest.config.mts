@@ -1,7 +1,7 @@
-import { defineConfig } from "vitest/config";
-import swc from "unplugin-swc";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import swc from "unplugin-swc";
+import { defineConfig } from "vitest/config";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +18,7 @@ export default defineConfig({
     exclude: ["**/node_modules/**"],
     globals: true,
     environment: "node",
+    setupFiles: [path.resolve(__dirname, "test/setup.ts")],
     coverage: {
       provider: "v8",
       reporter: ["lcov", "text-summary", "text", "json", "html"],

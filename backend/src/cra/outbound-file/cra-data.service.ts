@@ -20,9 +20,7 @@ export class CraDataService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Builds CRA file data from pending batch contacts
-   */
+  // Builds CRA file data from pending batch contacts
   async buildCraFileData(): Promise<CraFileData> {
     // TODO: Remove mock data override when DB queries are ready
     const mock_data = true

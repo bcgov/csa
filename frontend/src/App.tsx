@@ -4,6 +4,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import {
+  Alert,
   AppBar,
   Box,
   Button,
@@ -16,6 +17,7 @@ import {
   Pagination,
   Paper,
   Select,
+  Snackbar,
   Tab,
   Table,
   TableBody,
@@ -33,7 +35,41 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { useAuth } from './context/AuthContext'
 import logo from './icons/image.png'
-import { fullTextSearchContacts, getAllContacts, type Contact } from './service/contacts-service'
+import {
+  addContactsToBatch,
+  fullTextSearchContacts,
+  getAllBatches,
+  getAllContacts,
+  getBatchContacts,
+  getContactBatches,
+  holdContacts,
+  removeContactFromBatch,
+  resumeContacts,
+  type Batch,
+  type BatchContactDetail,
+  type Contact,
+  type ContactBatchDetail,
+} from './service/contacts-service'
+
+// Valid CSA statuses for Hold/Resume button
+// Maps to backend CSA_STATUSES constants
+const VALID_CSA_STATUSES = [
+  'eligible_tbd', // Eligible - TBD
+  'application_refused', // Application Refused - CRA (note: no _cra suffix in backend)
+  'not_eligible_ip_tbd', // Not Eligible - IP - TBD
+  'cancellation_refused_cra', // Cancellation Refused - CRA
+  'on_hold', // On Hold
+]
+
+// Valid CSA statuses for Add to Batch button
+const VALID_BATCH_STATUSES = [
+  'eligible', // Eligible
+  'eligible_tbd', // Eligible - TBD
+  'application_refused_cra', // Application Refused - CRA
+  'not_eligible_in_pay', // Not Eligible - In Pay
+  'not_eligible_ip_tbd', // Not Eligible - IP - TBD
+  'cancellation_refused_cra', // Cancellation Refused - CRA
+]
 
 // Sample data for the eligibility table
 const eligibilityData = [
@@ -159,160 +195,6 @@ const eligibilityData = [
   },
 ]
 
-// Sample data for batch requests
-const batchRequestsData = [
-  {
-    id: 1,
-    batchId: '1-567',
-    batchDate: '',
-    status: 'Pending',
-    recordCount: 2,
-    createdDate: '2025-Nov-18',
-    systemComments: 'Placeholder for test',
-  },
-  {
-    id: 2,
-    batchId: '1-490',
-    batchDate: '2025-Nov-20',
-    status: 'In Progress',
-    recordCount: 52,
-    createdDate: '2025-Nov-14',
-    systemComments: 'Placeholder for test',
-  },
-  {
-    id: 3,
-    batchId: '1-234',
-    batchDate: '2025-Oct-30',
-    status: 'CRA Processed',
-    recordCount: 78,
-    createdDate: '2025-Oct-28',
-    systemComments: 'Placeholder for test',
-  },
-]
-
-// Sample data for batch details - organized by batchId
-const batchDetailsData: Record<
-  number,
-  Array<{
-    id: number
-    lastName: string
-    middleName: string
-    givenName: string
-    transactionType: string
-    status: string
-    systemComments: string
-  }>
-> = {
-  1: [
-    // Batch 1-567
-    {
-      id: 1,
-      lastName: 'john',
-      middleName: 'Kevin',
-      givenName: 'Brim',
-      transactionType: 'Cancellation',
-      status: 'Placeholder for test',
-      systemComments: 'Placeholder for test',
-    },
-    {
-      id: 2,
-      lastName: 'Oconnor',
-      middleName: 'D',
-      givenName: 'Jack',
-      transactionType: 'Application',
-      status: '',
-      systemComments: '',
-    },
-  ],
-  2: [
-    // Batch 1-490
-    {
-      id: 3,
-      lastName: 'Smith',
-      middleName: 'Ann',
-      givenName: 'Mary',
-      transactionType: 'Application',
-      status: 'In Progress',
-      systemComments: 'Processing application',
-    },
-    {
-      id: 4,
-      lastName: 'Johnson',
-      middleName: 'Lee',
-      givenName: 'David',
-      transactionType: 'Cancellation',
-      status: 'In Progress',
-      systemComments: 'Pending review',
-    },
-    {
-      id: 5,
-      lastName: 'Williams',
-      middleName: 'Rose',
-      givenName: 'Emily',
-      transactionType: 'Application',
-      status: 'In Progress',
-      systemComments: 'Documents received',
-    },
-    {
-      id: 6,
-      lastName: 'Brown',
-      middleName: 'James',
-      givenName: 'Michael',
-      transactionType: 'Modification',
-      status: 'In Progress',
-      systemComments: 'Awaiting verification',
-    },
-  ],
-  3: [
-    // Batch 1-234
-    {
-      id: 7,
-      lastName: 'Davis',
-      middleName: 'Marie',
-      givenName: 'Sarah',
-      transactionType: 'Application',
-      status: 'Processed',
-      systemComments: 'CRA confirmed',
-    },
-    {
-      id: 8,
-      lastName: 'Miller',
-      middleName: 'Scott',
-      givenName: 'Robert',
-      transactionType: 'Cancellation',
-      status: 'Processed',
-      systemComments: 'CRA confirmed',
-    },
-    {
-      id: 9,
-      lastName: 'Wilson',
-      middleName: 'Lynn',
-      givenName: 'Jennifer',
-      transactionType: 'Application',
-      status: 'Processed',
-      systemComments: 'CRA confirmed',
-    },
-    {
-      id: 10,
-      lastName: 'Moore',
-      middleName: 'Patrick',
-      givenName: 'Christopher',
-      transactionType: 'Modification',
-      status: 'Processed',
-      systemComments: 'CRA confirmed',
-    },
-    {
-      id: 11,
-      lastName: 'Taylor',
-      middleName: 'Grace',
-      givenName: 'Jessica',
-      transactionType: 'Application',
-      status: 'Processed',
-      systemComments: 'CRA confirmed',
-    },
-  ],
-}
-
 // Sample data for batch history (child-specific)
 const childBatchHistory = [
   {
@@ -391,6 +273,30 @@ function App() {
   const [totalRecords, setTotalRecords] = useState(0)
   const [loadingContacts, setLoadingContacts] = useState(false)
   const [contactsError, setContactsError] = useState<string | null>(null)
+
+  // Snackbar state for hold/resume feedback
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean
+    message: string
+    severity: 'success' | 'error' | 'warning' | 'info'
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  })
+
+  // Batch history state for selected contact
+  const [contactBatchHistory, setContactBatchHistory] = useState<ContactBatchDetail[]>([])
+  const [loadingBatchHistory, setLoadingBatchHistory] = useState(false)
+
+  // Batch requests state
+  const [batches, setBatches] = useState<Batch[]>([])
+  const [loadingBatches, setLoadingBatches] = useState(false)
+
+  // Batch details state
+  const [batchDetails, setBatchDetails] = useState<BatchContactDetail[]>([])
+  const [loadingBatchDetails, setLoadingBatchDetails] = useState(false)
+
   const recordsPerPage = 10
   const [isSearchActive, setIsSearchActive] = useState(false)
 
@@ -449,6 +355,7 @@ function App() {
     column: '',
   })
   const [batchHistoryFilterSearchTerm, setBatchHistoryFilterSearchTerm] = useState('')
+  const [selectedBatchHistoryId, setSelectedBatchHistoryId] = useState<number | null>(null)
 
   // Batch Requests search and filter states
   const [batchRequestsSearchTerm, setBatchRequestsSearchTerm] = useState('')
@@ -810,6 +717,48 @@ function App() {
     performColumnFilterSearch,
   ])
 
+  // Fetch batches when component mounts
+  useEffect(() => {
+    const fetchBatches = async () => {
+      if (!isAuthenticated) return
+
+      setLoadingBatches(true)
+      try {
+        const batchesData = await getAllBatches()
+        setBatches(batchesData)
+
+        // Automatically select and load the first batch if available
+        if (batchesData.length > 0) {
+          const firstBatchId = batchesData[0].id
+          setSelectedBatch(firstBatchId)
+
+          // Fetch details for the first batch
+          setLoadingBatchDetails(true)
+          try {
+            const details = await getBatchContacts(firstBatchId)
+            setBatchDetails(details)
+          } catch (detailError) {
+            console.error('Failed to fetch first batch details:', detailError)
+            setBatchDetails([])
+          } finally {
+            setLoadingBatchDetails(false)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching batches:', error)
+        setSnackbar({
+          open: true,
+          message: 'Failed to load batch requests',
+          severity: 'error',
+        })
+      } finally {
+        setLoadingBatches(false)
+      }
+    }
+
+    fetchBatches()
+  }, [isAuthenticated])
+
   // Handle page change
   const handlePageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
     setCurrentPage(page)
@@ -860,6 +809,276 @@ function App() {
       localStorage.removeItem('username')
       setUsername('')
       setPassword('')
+    }
+  }
+
+  // Hold/Resume handler
+  const handleHoldResume = async () => {
+    if (selected.length === 0) return
+
+    try {
+      // Separate selected contacts into hold and resume groups
+      const toHold: number[] = []
+      const toResume: number[] = []
+
+      selected.forEach((id) => {
+        // Check in contacts array from API
+        const contact = contacts.find((c) => c.id === id)
+        if (contact) {
+          if (contact.csaStatus === 'on_hold') {
+            toResume.push(id)
+          } else {
+            toHold.push(id)
+          }
+        }
+      })
+
+      let totalSuccess = 0
+      let totalSkipped = 0
+      const skippedReasons: string[] = []
+
+      // Process hold requests
+      if (toHold.length > 0) {
+        const holdResponse = await holdContacts(toHold)
+        totalSuccess += holdResponse.success.length
+        totalSkipped += holdResponse.skipped.length
+
+        // Collect skip reasons
+        holdResponse.skipped.forEach((skip) => {
+          const reasonText = skip.reason.replace(/_/g, ' ')
+          skippedReasons.push(`ID ${skip.id}: ${reasonText}`)
+        })
+      }
+
+      // Process resume requests
+      if (toResume.length > 0) {
+        const resumeResponse = await resumeContacts(toResume)
+        totalSuccess += resumeResponse.success.length
+        totalSkipped += resumeResponse.skipped.length
+
+        // Collect skip reasons
+        resumeResponse.skipped.forEach((skip) => {
+          const reasonText = skip.reason.replace(/_/g, ' ')
+          skippedReasons.push(`ID ${skip.id}: ${reasonText}`)
+        })
+      }
+
+      // Show success message
+      let message = `Successfully processed ${totalSuccess} contact(s)`
+      if (totalSkipped > 0) {
+        message += `. ${totalSkipped} skipped`
+        if (skippedReasons.length > 0 && skippedReasons.length <= 3) {
+          message += `: ${skippedReasons.join(', ')}`
+        }
+      }
+
+      setSnackbar({
+        open: true,
+        message,
+        severity: totalSuccess > 0 ? 'success' : 'warning',
+      })
+
+      // Clear selection
+      setSelected([])
+
+      // Reload contacts to reflect the changes if at least one record was updated
+      if (totalSuccess > 0) {
+        // Check if we're using API-based filters
+        const apiFilters = [
+          'All Records',
+          'Pending User review/action',
+          'All children On Hold from CSA',
+          'Children In Pay',
+          'Children Out of Pay',
+          'CRA Refused CSA List',
+          'Children within a batch',
+          'Children over 18 years (never eligible)',
+        ]
+
+        if (apiFilters.includes(preDefinedFilter)) {
+          // Reload based on whether search is active
+          if (isSearchActive && searchTerm.trim().length >= 3) {
+            await performFullTextSearch(searchTerm.trim(), currentPage)
+          } else {
+            await fetchContacts(currentPage)
+          }
+        }
+        // For non-API filters (client-side filtering), the data will update automatically
+        // from the eligibilityData array
+      }
+    } catch (error) {
+      console.error('Hold/Resume error:', error)
+      setSnackbar({
+        open: true,
+        message: 'Failed to process hold/resume request. Please try again.',
+        severity: 'error',
+      })
+    }
+  }
+
+  const handleSnackbarClose = () => {
+    setSnackbar({ ...snackbar, open: false })
+  }
+
+  // Handle Add to Batch button click
+  const handleAddToBatch = async () => {
+    if (selected.length === 0) return
+
+    try {
+      const response = await addContactsToBatch(selected)
+
+      // Show success/warning message based on results
+      const successCount = response.success.length
+      const skippedCount = response.skipped.length
+
+      if (successCount > 0 && skippedCount === 0) {
+        setSnackbar({
+          open: true,
+          message: `Successfully added ${successCount} contact${successCount > 1 ? 's' : ''} to batch`,
+          severity: 'success',
+        })
+      } else if (successCount > 0 && skippedCount > 0) {
+        setSnackbar({
+          open: true,
+          message: `Added ${successCount} contact${successCount > 1 ? 's' : ''} to batch. ${skippedCount} skipped (already in batch or not found)`,
+          severity: 'warning',
+        })
+      } else {
+        setSnackbar({
+          open: true,
+          message: 'No contacts were added. All contacts were skipped.',
+          severity: 'warning',
+        })
+      }
+
+      // Clear selection after successful operation
+      setSelected([])
+    } catch (error) {
+      console.error('Add to batch error:', error)
+      setSnackbar({
+        open: true,
+        message: 'Failed to add contacts to batch. Please try again.',
+        severity: 'error',
+      })
+    }
+  }
+
+  // Fetch batch history for selected contact
+  const handleContactClick = async (contactId: number) => {
+    setSelectedChild(contactId)
+    setLoadingBatchHistory(true)
+    setSelectedBatchHistoryId(null) // Clear batch history selection when changing contacts
+
+    try {
+      const batchHistory = await getContactBatches(contactId)
+      setContactBatchHistory(batchHistory)
+    } catch (error) {
+      console.error('Failed to fetch batch history:', error)
+      setContactBatchHistory([])
+    } finally {
+      setLoadingBatchHistory(false)
+    }
+  }
+
+  // Handle batch history row click
+  const handleBatchHistoryRowClick = (batchHistoryId: number) => {
+    setSelectedBatchHistoryId(batchHistoryId)
+  }
+
+  // Handle Remove from Batch button click
+  const handleRemoveFromBatch = async () => {
+    if (!selectedBatchHistoryId || !selectedChild) return
+
+    try {
+      const result = await removeContactFromBatch(selectedChild)
+
+      setSnackbar({
+        open: true,
+        message: `Successfully removed contact from batch. New record count: ${result.recordCount}`,
+        severity: 'success',
+      })
+
+      // Refresh batch history for the selected contact
+      await handleContactClick(selectedChild)
+
+      // Clear selection
+      setSelectedBatchHistoryId(null)
+    } catch (error: any) {
+      console.error('Remove from batch error:', error)
+      // Extract error message from API response
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to remove contact from batch. Please try again.'
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error',
+      })
+    }
+  }
+
+  // Fetch batch details for selected batch
+  const handleBatchClick = async (batchId: number) => {
+    setSelectedBatch(batchId)
+    setLoadingBatchDetails(true)
+
+    try {
+      const details = await getBatchContacts(batchId)
+      setBatchDetails(details)
+    } catch (error) {
+      console.error('Failed to fetch batch details:', error)
+      setSnackbar({
+        open: true,
+        message: 'Failed to load batch details',
+        severity: 'error',
+      })
+      setBatchDetails([])
+    } finally {
+      setLoadingBatchDetails(false)
+    }
+  }
+
+  // Handle Remove from Batch button click in Batch Details table
+  const handleRemoveFromBatchDetails = async () => {
+    if (selectedBatchDetails.length === 0) return
+
+    try {
+      // Remove each selected contact from the batch
+      const removePromises = selectedBatchDetails.map((contactId) =>
+        removeContactFromBatch(contactId),
+      )
+
+      const results = await Promise.all(removePromises)
+
+      // Get the updated record count from the first result
+      const updatedRecordCount = results[0]?.recordCount ?? 0
+
+      setSnackbar({
+        open: true,
+        message: `Successfully removed ${selectedBatchDetails.length} contact${selectedBatchDetails.length > 1 ? 's' : ''} from batch. New record count: ${updatedRecordCount}`,
+        severity: 'success',
+      })
+
+      // Refresh batch details for the selected batch
+      if (selectedBatch) {
+        await handleBatchClick(selectedBatch)
+      }
+
+      // Clear selection
+      setSelectedBatchDetails([])
+    } catch (error: any) {
+      console.error('Remove from batch details error:', error)
+      // Extract error message from API response
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to remove contacts from batch. Please try again.'
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error',
+      })
     }
   }
 
@@ -942,8 +1161,36 @@ function App() {
     setBatchRequestsColumnFilters((prev) => ({ ...prev, [column]: [] }))
   }
 
-  const getBatchRequestsUniqueValues = (column: keyof (typeof batchRequestsData)[0]) => {
-    const values = batchRequestsData.map((row) => row[column])
+  const getBatchRequestsUniqueValues = (column: string) => {
+    const values = batches.map((batch) => {
+      // Map API fields to display fields
+      switch (column) {
+        case 'batchId':
+          return `1-${batch.id}`
+        case 'batchDate':
+          return batch.batchDate
+            ? new Date(batch.batchDate).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: '2-digit',
+              })
+            : ''
+        case 'status':
+          return batch.status
+        case 'recordCount':
+          return String(batch.recordCount)
+        case 'createdDate':
+          return new Date(batch.createdAt).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit',
+          })
+        case 'systemComments':
+          return batch.systemComments || ''
+        default:
+          return ''
+      }
+    })
     return Array.from(new Set(values)).filter((v) => v !== undefined && v !== '')
   }
 
@@ -1081,9 +1328,53 @@ function App() {
     return data
   }, [searchTerm, columnFilters, sortConfig, contacts, preDefinedFilter])
 
+  // Check if all selected records have valid CSA status for Hold/Resume
+  const canHoldResume = useMemo(() => {
+    if (selected.length === 0) return false
+
+    return selected.every((id) => {
+      const record = filteredData.find((row) => row.id === id)
+      return record && VALID_CSA_STATUSES.includes(record.csaStatus)
+    })
+  }, [selected, filteredData])
+
+  // Check if all selected records have valid CSA status for Add to Batch
+  const canAddToBatch = useMemo(() => {
+    if (selected.length === 0) return false
+
+    return selected.every((id) => {
+      const record = filteredData.find((row) => row.id === id)
+      return record && VALID_BATCH_STATUSES.includes(record.csaStatus)
+    })
+  }, [selected, filteredData])
+
+  // Check if Remove from Batch button should be enabled
+  const canRemoveFromBatch = useMemo(() => {
+    if (!selectedBatchHistoryId) return false
+
+    const selectedBatch = contactBatchHistory.find((item) => item.id === selectedBatchHistoryId)
+    return selectedBatch?.batch.status === 'pending'
+  }, [selectedBatchHistoryId, contactBatchHistory])
+
+  // Check if Remove from Batch button in Batch Details should be enabled
+  const canRemoveFromBatchDetails = useMemo(() => {
+    if (selectedBatchDetails.length === 0) return false
+
+    const currentBatch = batches.find((batch) => batch.id === selectedBatch)
+    return currentBatch?.status === 'pending'
+  }, [selectedBatchDetails, batches, selectedBatch])
+
   // Filter batch history data (frontend-only filtering)
   const filteredBatchHistory = useMemo(() => {
-    let data = [...childBatchHistory]
+    // Map API data to match the expected table structure
+    let data = contactBatchHistory.map((item) => ({
+      id: item.id,
+      batchId: String(item.batch.id),
+      createdDate: new Date(item.createdAt).toLocaleDateString(),
+      batchDate: item.batch.batchDate ? new Date(item.batch.batchDate).toLocaleDateString() : '',
+      status: item.batch.status || '',
+      transactionType: item.transactionType || '',
+    }))
 
     // Apply global search across all columns
     if (batchHistorySearchTerm) {
@@ -1110,11 +1401,30 @@ function App() {
     }
 
     return data
-  }, [batchHistorySearchTerm, batchHistoryColumnFilters])
+  }, [contactBatchHistory, batchHistorySearchTerm, batchHistoryColumnFilters])
 
-  // Filter batch requests data (frontend-only filtering)
+  // Filter batch requests data
   const filteredBatchRequests = useMemo(() => {
-    let data = [...batchRequestsData]
+    // Transform API data to match table structure
+    let data = batches.map((batch) => ({
+      id: batch.id,
+      batchId: `1-${batch.id}`, // Format as "1-{id}"
+      batchDate: batch.batchDate
+        ? new Date(batch.batchDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit',
+          })
+        : '',
+      status: batch.status,
+      recordCount: batch.recordCount,
+      createdDate: new Date(batch.createdAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+      }),
+      systemComments: batch.systemComments || '',
+    }))
 
     // Apply global search across all columns
     if (batchRequestsSearchTerm) {
@@ -1142,12 +1452,21 @@ function App() {
     }
 
     return data
-  }, [batchRequestsSearchTerm, batchRequestsColumnFilters])
+  }, [batches, batchRequestsSearchTerm, batchRequestsColumnFilters])
 
   // Get batch details for selected batch
   const currentBatchDetails = useMemo(() => {
-    return batchDetailsData[selectedBatch] || []
-  }, [selectedBatch])
+    // Transform API data to match table structure
+    return batchDetails.map((detail) => ({
+      id: detail.id,
+      lastName: detail.contact.lastName,
+      middleName: '', // API doesn't return middleName from contact
+      givenName: detail.contact.firstName,
+      transactionType: detail.transactionType,
+      status: detail.status || '',
+      systemComments: detail.systemComments || '',
+    }))
+  }, [batchDetails])
 
   // Filter batch details data (frontend-only filtering)
   const filteredBatchDetails = useMemo(() => {
@@ -1547,10 +1866,34 @@ function App() {
                         </MenuItem>
                       </Select>
                     </FormControl>
-                    <Button variant="contained" size="small" sx={{ textTransform: 'none' }}>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      disabled={!canAddToBatch}
+                      onClick={handleAddToBatch}
+                      sx={{
+                        textTransform: 'none',
+                        '&.Mui-disabled': {
+                          opacity: 0.5,
+                          cursor: 'not-allowed',
+                        },
+                      }}
+                    >
                       Add to Batch
                     </Button>
-                    <Button variant="outlined" size="small" sx={{ textTransform: 'none' }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      disabled={!canHoldResume}
+                      onClick={handleHoldResume}
+                      sx={{
+                        textTransform: 'none',
+                        '&.Mui-disabled': {
+                          opacity: 0.5,
+                          cursor: 'not-allowed',
+                        },
+                      }}
+                    >
                       Hold/Resume
                     </Button>
                   </Box>
@@ -1874,7 +2217,7 @@ function App() {
                         <TableRow
                           key={row.id}
                           hover
-                          onClick={() => setSelectedChild(row.id)}
+                          onClick={() => handleContactClick(row.id)}
                           sx={{
                             '&:hover': { backgroundColor: '#f9f9f9' },
                             cursor: 'pointer',
@@ -2593,11 +2936,17 @@ function App() {
                           <Button
                             variant="contained"
                             size="small"
+                            disabled={!canRemoveFromBatch}
+                            onClick={handleRemoveFromBatch}
                             sx={{
                               textTransform: 'none',
                               backgroundColor: '#1976d2',
                               '&:hover': {
                                 backgroundColor: '#1565c0',
+                              },
+                              '&.Mui-disabled': {
+                                backgroundColor: '#e0e0e0',
+                                color: '#9e9e9e',
                               },
                             }}
                           >
@@ -2706,42 +3055,73 @@ function App() {
                             </TableRow>
                           </TableHead>
                           <TableBody>
-                            {filteredBatchHistory.map((row) => (
-                              <TableRow
-                                key={row.id}
-                                hover
-                                sx={{ '&:hover': { backgroundColor: '#f9f9f9' } }}
-                              >
-                                <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
-                                  {row.batchId}
+                            {loadingBatchHistory ? (
+                              <TableRow>
+                                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                                  <Typography variant="body2" color="text.secondary">
+                                    Loading batch history...
+                                  </Typography>
                                 </TableCell>
-                                <TableCell>{row.createdDate}</TableCell>
-                                <TableCell>{row.batchDate}</TableCell>
-                                <TableCell>
-                                  {row.status === 'Pending' && (
-                                    <Box
-                                      component="span"
-                                      sx={{
-                                        backgroundColor: '#fce4ec',
-                                        color: '#c2185b',
-                                        px: 1.5,
-                                        py: 0.5,
-                                        borderRadius: 1,
-                                        fontSize: '0.75rem',
-                                        fontWeight: 500,
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                      }}
-                                    >
-                                      Pending
-                                    </Box>
-                                  )}
-                                  {row.status !== 'Pending' && row.status}
-                                </TableCell>
-                                <TableCell>{row.transactionType}</TableCell>
                               </TableRow>
-                            ))}
+                            ) : filteredBatchHistory.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                                  <Typography variant="body2" color="text.secondary">
+                                    {selectedChild
+                                      ? 'No batch history found for this contact'
+                                      : 'Select a contact to view batch history'}
+                                  </Typography>
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              filteredBatchHistory.map((row) => (
+                                <TableRow
+                                  key={row.id}
+                                  hover
+                                  onClick={() => handleBatchHistoryRowClick(row.id)}
+                                  selected={selectedBatchHistoryId === row.id}
+                                  sx={{
+                                    '&:hover': { backgroundColor: '#f9f9f9' },
+                                    cursor: 'pointer',
+                                    '&.Mui-selected': {
+                                      backgroundColor: '#e3f2fd !important',
+                                    },
+                                    '&.Mui-selected:hover': {
+                                      backgroundColor: '#bbdefb !important',
+                                    },
+                                  }}
+                                >
+                                  <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
+                                    {row.batchId}
+                                  </TableCell>
+                                  <TableCell>{row.createdDate}</TableCell>
+                                  <TableCell>{row.batchDate}</TableCell>
+                                  <TableCell>
+                                    {row.status === 'Pending' && (
+                                      <Box
+                                        component="span"
+                                        sx={{
+                                          backgroundColor: '#fce4ec',
+                                          color: '#c2185b',
+                                          px: 1.5,
+                                          py: 0.5,
+                                          borderRadius: 1,
+                                          fontSize: '0.75rem',
+                                          fontWeight: 500,
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                        }}
+                                      >
+                                        Pending
+                                      </Box>
+                                    )}
+                                    {row.status !== 'Pending' && row.status}
+                                  </TableCell>
+                                  <TableCell>{row.transactionType}</TableCell>
+                                </TableRow>
+                              ))
+                            )}
                           </TableBody>
                         </Table>
                       </TableContainer>
@@ -2909,27 +3289,45 @@ function App() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {filteredBatchRequests.map((row) => (
-                        <TableRow
-                          key={row.id}
-                          hover
-                          onClick={() => setSelectedBatch(row.id)}
-                          sx={{
-                            '&:hover': { backgroundColor: '#f9f9f9' },
-                            cursor: 'pointer',
-                            backgroundColor: selectedBatch === row.id ? '#e3f2fd' : 'inherit',
-                          }}
-                        >
-                          <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
-                            {row.batchId}
+                      {loadingBatches ? (
+                        <TableRow>
+                          <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              Loading batch requests...
+                            </Typography>
                           </TableCell>
-                          <TableCell>{row.batchDate}</TableCell>
-                          <TableCell>{row.status}</TableCell>
-                          <TableCell>{row.recordCount}</TableCell>
-                          <TableCell>{row.createdDate}</TableCell>
-                          <TableCell>{row.systemComments}</TableCell>
                         </TableRow>
-                      ))}
+                      ) : filteredBatchRequests.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              No batch requests found
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredBatchRequests.map((row) => (
+                          <TableRow
+                            key={row.id}
+                            hover
+                            onClick={() => handleBatchClick(row.id)}
+                            sx={{
+                              '&:hover': { backgroundColor: '#f9f9f9' },
+                              cursor: 'pointer',
+                              backgroundColor: selectedBatch === row.id ? '#e3f2fd' : 'inherit',
+                            }}
+                          >
+                            <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
+                              {row.batchId}
+                            </TableCell>
+                            <TableCell>{row.batchDate}</TableCell>
+                            <TableCell>{row.status}</TableCell>
+                            <TableCell>{row.recordCount}</TableCell>
+                            <TableCell>{row.createdDate}</TableCell>
+                            <TableCell>{row.systemComments}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </TableContainer>
@@ -2979,9 +3377,15 @@ function App() {
                       <Button
                         variant="contained"
                         size="small"
+                        disabled={!canRemoveFromBatchDetails}
+                        onClick={handleRemoveFromBatchDetails}
                         sx={{
                           backgroundColor: '#d32f2f',
                           '&:hover': { backgroundColor: '#c62828' },
+                          '&.Mui-disabled': {
+                            backgroundColor: '#e0e0e0',
+                            color: '#9e9e9e',
+                          },
                         }}
                       >
                         Remove from Batch
@@ -3124,32 +3528,52 @@ function App() {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {filteredBatchDetails.map((row) => (
-                          <TableRow
-                            key={row.id}
-                            hover
-                            sx={{ '&:hover': { backgroundColor: '#f9f9f9' } }}
-                          >
-                            <TableCell padding="checkbox">
-                              <Checkbox
-                                checked={selectedBatchDetails.includes(row.id)}
-                                onChange={() => {
-                                  setSelectedBatchDetails((prev) =>
-                                    prev.includes(row.id)
-                                      ? prev.filter((id) => id !== row.id)
-                                      : [...prev, row.id],
-                                  )
-                                }}
-                              />
+                        {loadingBatchDetails ? (
+                          <TableRow>
+                            <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                              <Typography variant="body2" color="text.secondary">
+                                Loading batch details...
+                              </Typography>
                             </TableCell>
-                            <TableCell>{row.lastName}</TableCell>
-                            <TableCell>{row.middleName}</TableCell>
-                            <TableCell>{row.givenName}</TableCell>
-                            <TableCell>{row.transactionType}</TableCell>
-                            <TableCell>{row.status}</TableCell>
-                            <TableCell>{row.systemComments}</TableCell>
                           </TableRow>
-                        ))}
+                        ) : filteredBatchDetails.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                              <Typography variant="body2" color="text.secondary">
+                                {selectedBatch
+                                  ? 'No contacts found in this batch'
+                                  : 'Select a batch to view details'}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredBatchDetails.map((row) => (
+                            <TableRow
+                              key={row.id}
+                              hover
+                              sx={{ '&:hover': { backgroundColor: '#f9f9f9' } }}
+                            >
+                              <TableCell padding="checkbox">
+                                <Checkbox
+                                  checked={selectedBatchDetails.includes(row.id)}
+                                  onChange={() => {
+                                    setSelectedBatchDetails((prev) =>
+                                      prev.includes(row.id)
+                                        ? prev.filter((id) => id !== row.id)
+                                        : [...prev, row.id],
+                                    )
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell>{row.lastName}</TableCell>
+                              <TableCell>{row.middleName}</TableCell>
+                              <TableCell>{row.givenName}</TableCell>
+                              <TableCell>{row.transactionType}</TableCell>
+                              <TableCell>{row.status}</TableCell>
+                              <TableCell>{row.systemComments}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
                       </TableBody>
                     </Table>
                   </TableContainer>
@@ -3304,9 +3728,7 @@ function App() {
               />
               <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
                 {batchRequestsFilterAnchor.column &&
-                  getBatchRequestsUniqueValues(
-                    batchRequestsFilterAnchor.column as keyof (typeof batchRequestsData)[0],
-                  )
+                  getBatchRequestsUniqueValues(batchRequestsFilterAnchor.column)
                     .sort()
                     .filter((value) =>
                       String(value)
@@ -3397,10 +3819,7 @@ function App() {
                   (() => {
                     // Get unique values only from currently selected batch
                     const values = currentBatchDetails.map(
-                      (row) =>
-                        row[
-                          batchDetailsFilterAnchor.column as keyof (typeof batchDetailsData)[number][number]
-                        ],
+                      (row) => row[batchDetailsFilterAnchor.column as keyof typeof row],
                     )
                     return Array.from(new Set(values))
                       .filter((v) => v !== undefined && v !== '')
@@ -3454,6 +3873,18 @@ function App() {
           © 2026 Government of British Columbia.
         </Typography>
       </Box>
+
+      {/* Snackbar for hold/resume feedback */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   )
 }

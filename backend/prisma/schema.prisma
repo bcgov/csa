@@ -30,7 +30,7 @@ model Contact {
   createdBy                  String    @map("created_by")
   lastUpdatedAt              DateTime  @map("last_updated_at")
   lastUpdatedBy              String    @map("last_updated_by")
-  searchText                 String    @map("search_text")
+  searchText                 String    @default(dbgenerated()) @map("search_text")
 
   // Optional (nullable in SQL)
   gender                     String?   @map("gender")

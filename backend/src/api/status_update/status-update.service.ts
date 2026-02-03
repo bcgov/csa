@@ -24,7 +24,7 @@ export class StatusUpdateService {
    * @returns Updated contact
    */
   async updateContactStatus(dto: UpdateContactStatusDto) {
-    const { contactId, status, comments, updatedBy = 'system' } = dto
+    const { contactId, status, updatedBy = 'system' } = dto
 
     // Check if contact exists
     const contact = await this.prisma.contact.findUnique({

@@ -1,10 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from 'src/common/database/prisma.service';
+import { Injectable, NotFoundException } from '@nestjs/common'
+import { PrismaService } from 'src/common/database/prisma.service'
 import {
   UpdateBatchStatusDto,
   UpdateContactStatusDto,
   UpdateEligibilityStatusDto,
-} from './dto/update-status.dto';
+} from './dto/update-status.dto'
 
 export interface BulkUpdateResult {
   success: Array<{ contactId: number; oldStatus: string; newStatus: string }>

@@ -1,9 +1,8 @@
-import { Logger } from '@nestjs/common'
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { SERVER_CONFIG } from 'src/cra/cra.config'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
-import { CraDetail, CraHeader, CraTrailer } from './file-create.interface'
+import { CraReqDetail, CraReqHeader, CraReqTrailer } from '../interfaces/file-create.interface'
 
 const { FILE_CREATED_PATH, FILE_CREATION_ENVIROMENT, FILE_TYPE_APPLICATION } = SERVER_CONFIG
 const { FILE_NAME_PREFIX, REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
@@ -23,9 +22,9 @@ export class FileCreateService {
   logger = new Logger(FileCreateService.name)
   constructor() {}
   createFile(
-    header: CraHeader,
-    details: CraDetail[],
-    trailer: CraTrailer,
+    header: CraReqHeader,
+    details: CraReqDetail[],
+    trailer: CraReqTrailer,
     craUserId: string = 'testuser',
   ): { filePath: string; fileName: string; recordCount: number } {
     const lines: string[] = []
@@ -55,7 +54,7 @@ export class FileCreateService {
   }
 
   /* ========= HEADER 6133 ========= */
-  private buildHeader(h: CraHeader): string {
+  private buildHeader(h: CraReqHeader): string {
     return (
       this.padRight(String(HEADER_TRAN_CODE), 4) +
       this.padRight(VERSION_NUM, 5) +
@@ -67,7 +66,7 @@ export class FileCreateService {
   }
 
   /* ========= DETAIL 6134 ========= */
-  private buildAppDetail(d: CraDetail): string {
+  private buildAppDetail(d: CraReqDetail): string {
     return (
       this.padRight(DETAIL_TRAN_CODE, 4) +
       this.padRight(d.referenceNum, 20) +
@@ -94,7 +93,8 @@ export class FileCreateService {
       this.padRight(d.filler3 || '', 15)
     )
   }
-  private buildCanDetail(d: CraDetail): string {
+  private buildCanDetail(d: CraReqDetail): string {
+    // 274
     return (
       this.padRight(DETAIL_TRAN_CODE, 4) +
       this.padRight(d.referenceNum, 20) +
@@ -115,12 +115,13 @@ export class FileCreateService {
       this.padRight(d.filler3 || '', 1) +
       this.padRight(d.cancelEndDate, 8) +
       this.padRight(d.cancelReasonCode, 2) +
-      this.padRight(d.ccraDinNum, 9)
+      this.padRight(d.ccraDinNum, 9) +
+      this.padRight(d.filler4 || '', 15)
     )
   }
 
   /* ========= TRAILER 6135 ========= */
-  private buildTrailer(t: CraTrailer): string {
+  private buildTrailer(t: CraReqTrailer): string {
     return (
       this.padRight(TRAILER_TRAN_CODE, 4) +
       this.padRight(VERSION_NUM, 5) +

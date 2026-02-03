@@ -91,6 +91,7 @@ model Batch {
   status                String
   recordCount           Int                    @map("record_count")
   createdAt             DateTime               @map("created_at")
+  updatedAt             DateTime               @map("updated_at")
   systemComments        String?                @map("system_comments")
 
   // Relations

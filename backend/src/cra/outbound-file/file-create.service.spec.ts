@@ -158,9 +158,9 @@ describe('CRA Detail format', () => {
     expect(result.substring(4, 24).startsWith('REF')).toBe(true) // padded right
     expect(result.substring(24, 39).trim()).toBe(BUSINESS_NUM)
 
-    // Exact total length (CRA spec)  // to be 305
+    // Exact total length (CRA spec)  // to be 320
     expect(result.length).toBe(
-      4 + 20 + 15 + 1 + 30 + 1 + 30 + 30 + 30 + 8 + 1 + 28 + 2 + 2 + 75 + 8 + 1 + 8 + 2 + 9,
+      4 + 20 + 15 + 1 + 30 + 1 + 30 + 30 + 30 + 8 + 1 + 28 + 2 + 2 + 75 + 8 + 1 + 8 + 2 + 9 + 15,
     )
   })
 })

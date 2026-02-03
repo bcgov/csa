@@ -31,11 +31,11 @@ async function bootstrap() {
       process.exit(0)
     } else {
       logger.error(`CRA response poll failed: ${result.message}`)
-      process.exit(1)
+      // process.exit(1)
     }
   } catch (error) {
     logger.error(`Fatal error: ${error.message}`, error.stack)
-    process.exit(1)
+    // process.exit(1)
   }
 }
 

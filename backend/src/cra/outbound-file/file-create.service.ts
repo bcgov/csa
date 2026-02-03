@@ -1,10 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
-import { SERVER_CONFIG } from 'src/cra/cra.config'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
-import { CraReqDetail, CraReqHeader, CraReqTrailer } from '../interfaces/file-create.interface'
+import { CraReqDetail, CraReqHeader, CraReqTrailer } from './file-create.interface'
 
-const { FILE_CREATED_PATH, FILE_CREATION_ENVIROMENT, FILE_TYPE_APPLICATION } = SERVER_CONFIG
 const { FILE_NAME_PREFIX, REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
 
 const {
@@ -18,9 +17,16 @@ const {
 
 @Injectable()
 export class FileCreateService {
-  /* ========= PUBLIC ENTRY ========= */
-  logger = new Logger(FileCreateService.name)
-  constructor() {}
+  private readonly logger = new Logger(FileCreateService.name)
+  private readonly fileStoragePath: string
+  private readonly environmentCode: string
+  private readonly fileTypeCode: string
+
+  constructor(private readonly configService: ConfigService) {
+    this.fileStoragePath = this.configService.get<string>('app.fileStoragePath')!
+    this.environmentCode = this.configService.get<string>('cra.environmentCode')!
+    this.fileTypeCode = this.configService.get<string>('cra.fileTypeCode')!
+  }
   createFile(
     header: CraReqHeader,
     details: CraReqDetail[],
@@ -40,12 +46,12 @@ export class FileCreateService {
     }
 
     lines.push(this.buildTrailer(trailer))
-    const fileExists = existsSync(FILE_CREATED_PATH)
+    const fileExists = existsSync(this.fileStoragePath)
     if (!fileExists) {
-      mkdirSync(FILE_CREATED_PATH, { recursive: true })
+      mkdirSync(this.fileStoragePath, { recursive: true })
     }
     const fileName = this.createfileName(craUserId)
-    const outputPath = FILE_CREATED_PATH + fileName
+    const outputPath = this.fileStoragePath + fileName
 
     writeFileSync(outputPath, lines.join('\n'), 'utf8')
 
@@ -115,8 +121,7 @@ export class FileCreateService {
       this.padRight(d.filler3 || '', 1) +
       this.padRight(d.cancelEndDate, 8) +
       this.padRight(d.cancelReasonCode, 2) +
-      this.padRight(d.ccraDinNum, 9) +
-      this.padRight(d.filler4 || '', 15)
+      this.padRight(d.ccraDinNum, 9)
     )
   }
 
@@ -153,6 +158,6 @@ export class FileCreateService {
   createfileName(craUserId: string): string {
     const incrementNumber = String(Date.now()).slice(-4)
 
-    return `${FILE_NAME_PREFIX}.${FILE_CREATION_ENVIROMENT}.${craUserId}.${FILE_TYPE_APPLICATION}${incrementNumber}.txt`
+    return `${FILE_NAME_PREFIX}.${this.environmentCode}.${craUserId}.${this.fileTypeCode}${incrementNumber}.txt`
   }
 }

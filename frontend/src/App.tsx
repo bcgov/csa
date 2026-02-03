@@ -990,11 +990,11 @@ function App() {
     if (!selectedBatchHistoryId || !selectedChild) return
 
     try {
-      await removeContactFromBatch(selectedChild)
+      const result = await removeContactFromBatch(selectedChild)
 
       setSnackbar({
         open: true,
-        message: 'Successfully removed contact from batch',
+        message: `Successfully removed contact from batch. New record count: ${result.recordCount}`,
         severity: 'success',
       })
 
@@ -1003,11 +1003,16 @@ function App() {
 
       // Clear selection
       setSelectedBatchHistoryId(null)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Remove from batch error:', error)
+      // Extract error message from API response
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to remove contact from batch. Please try again.'
       setSnackbar({
         open: true,
-        message: 'Failed to remove contact from batch. Please try again.',
+        message: errorMessage,
         severity: 'error',
       })
     }
@@ -1031,6 +1036,49 @@ function App() {
       setBatchDetails([])
     } finally {
       setLoadingBatchDetails(false)
+    }
+  }
+
+  // Handle Remove from Batch button click in Batch Details table
+  const handleRemoveFromBatchDetails = async () => {
+    if (selectedBatchDetails.length === 0) return
+
+    try {
+      // Remove each selected contact from the batch
+      const removePromises = selectedBatchDetails.map((contactId) =>
+        removeContactFromBatch(contactId),
+      )
+
+      const results = await Promise.all(removePromises)
+
+      // Get the updated record count from the first result
+      const updatedRecordCount = results[0]?.recordCount ?? 0
+
+      setSnackbar({
+        open: true,
+        message: `Successfully removed ${selectedBatchDetails.length} contact${selectedBatchDetails.length > 1 ? 's' : ''} from batch. New record count: ${updatedRecordCount}`,
+        severity: 'success',
+      })
+
+      // Refresh batch details for the selected batch
+      if (selectedBatch) {
+        await handleBatchClick(selectedBatch)
+      }
+
+      // Clear selection
+      setSelectedBatchDetails([])
+    } catch (error: any) {
+      console.error('Remove from batch details error:', error)
+      // Extract error message from API response
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to remove contacts from batch. Please try again.'
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error',
+      })
     }
   }
 
@@ -1307,6 +1355,14 @@ function App() {
     const selectedBatch = contactBatchHistory.find((item) => item.id === selectedBatchHistoryId)
     return selectedBatch?.batch.status === 'pending'
   }, [selectedBatchHistoryId, contactBatchHistory])
+
+  // Check if Remove from Batch button in Batch Details should be enabled
+  const canRemoveFromBatchDetails = useMemo(() => {
+    if (selectedBatchDetails.length === 0) return false
+
+    const currentBatch = batches.find((batch) => batch.id === selectedBatch)
+    return currentBatch?.status === 'pending'
+  }, [selectedBatchDetails, batches, selectedBatch])
 
   // Filter batch history data (frontend-only filtering)
   const filteredBatchHistory = useMemo(() => {
@@ -3321,9 +3377,15 @@ function App() {
                       <Button
                         variant="contained"
                         size="small"
+                        disabled={!canRemoveFromBatchDetails}
+                        onClick={handleRemoveFromBatchDetails}
                         sx={{
                           backgroundColor: '#d32f2f',
                           '&:hover': { backgroundColor: '#c62828' },
+                          '&.Mui-disabled': {
+                            backgroundColor: '#e0e0e0',
+                            color: '#9e9e9e',
+                          },
                         }}
                       >
                         Remove from Batch
@@ -3666,9 +3728,7 @@ function App() {
               />
               <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
                 {batchRequestsFilterAnchor.column &&
-                  getBatchRequestsUniqueValues(
-                    batchRequestsFilterAnchor.column as keyof (typeof batchRequestsData)[0],
-                  )
+                  getBatchRequestsUniqueValues(batchRequestsFilterAnchor.column)
                     .sort()
                     .filter((value) =>
                       String(value)
@@ -3759,10 +3819,7 @@ function App() {
                   (() => {
                     // Get unique values only from currently selected batch
                     const values = currentBatchDetails.map(
-                      (row) =>
-                        row[
-                          batchDetailsFilterAnchor.column as keyof (typeof batchDetailsData)[number][number]
-                        ],
+                      (row) => row[batchDetailsFilterAnchor.column as keyof typeof row],
                     )
                     return Array.from(new Set(values))
                       .filter((v) => v !== undefined && v !== '')

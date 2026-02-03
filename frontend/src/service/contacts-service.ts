@@ -254,6 +254,11 @@ export const addContactsToBatch = async (contactIds: number[]): Promise<BulkOper
  * Remove contact from pending batch
  * @param contactId - Contact ID to remove
  */
-export const removeContactFromBatch = async (contactId: number): Promise<void> => {
-  await APIService.getAxiosInstance().delete(`/batches/pending/contacts/${contactId}`)
+export const removeContactFromBatch = async (
+  contactId: number,
+): Promise<{ batchId: number; recordCount: number; message: string }> => {
+  const response = await APIService.getAxiosInstance().delete(
+    `/batches/pending/contacts/${contactId}`,
+  )
+  return response.data
 }

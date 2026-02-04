@@ -75,6 +75,8 @@ jobs:
       build_images: ${{ steps.vars.outputs.build_images }}
     steps:
       - uses: actions/checkout@v4
+        with :
+          fetch-depth: 0
 
       - id: filter
         uses: dorny/paths-filter@v3
@@ -90,11 +92,15 @@ jobs:
       - id: vars
         shell: bash
         run: |
+
           set -euo pipefail
 
           ENVNAME=""
           SVC=""
           BUILD_IMAGES="true"
+
+          echo "Event: ${GITHUB_EVENT_NAME}"
+          echo "RefName: ${GITHUB_REF_NAME}"
 
           # --- push (normal promotions) ---
           if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
@@ -139,37 +145,42 @@ jobs:
           fi
 
           # --- workflow_dispatch (manual build/promotion) ---
-          ENVNAME="${{ inputs.environment }}"
-          SVC="${{ inputs.service }}"
-          TAG_IN="${{ inputs.tag }}"
-          BUILD_IMAGES="${{ inputs.build_images }}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            ENVNAME="${{ inputs.environment }}"
+            SVC="${{ inputs.service }}"
+            TAG_IN="${{ inputs.tag }}"
+            BUILD_IMAGES="${{ inputs.build_images }}"
 
-          [[ "$ENVNAME" =~ ^(dev|test|prod)$ ]] || { echo "Invalid environment: $ENVNAME"; exit 1; }
-          [[ "$SVC" =~ ^(frontend|backend|migrations|all)$ ]] || { echo "Invalid service: $SVC"; exit 1; }
+            [[ "$ENVNAME" =~ ^(dev|test|prod)$ ]] || { echo "Invalid environment: $ENVNAME"; exit 1; }
+            [[ "$SVC" =~ ^(frontend|backend|migrations|all)$ ]] || { echo "Invalid service: $SVC"; exit 1; }
 
-          # Enforce: if build_images=false, tag MUST be provided (we're promoting an existing image)
-          if [[ "$BUILD_IMAGES" != "true" && -z "$TAG_IN" ]]; then
-            echo "ERROR: build_images=false requires a tag input (promoting existing image)."
-            exit 1
+            if [[ "$BUILD_IMAGES" != "true" && -z "$TAG_IN" ]]; then
+              echo "ERROR: build_images=false requires a tag input (promoting existing image)."
+              exit 1
+            fi
+
+            BRANCH="${GITHUB_REF_NAME}"
+            SAFE_BRANCH="$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_.-]+/-/g' | sed -E 's/^-+|-+$//g')"
+
+            if [[ -n "$TAG_IN" ]]; then
+              TAG="$TAG_IN"
+            else
+              TAG="${ENVNAME}-${SAFE_BRANCH}-${GITHUB_SHA::7}"
+            fi
+
+            {
+              echo "envname=$ENVNAME"
+              echo "svc=$SVC"
+              echo "tag=$TAG"
+              echo "build_images=$BUILD_IMAGES"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-          # Branch name of this workflow run (chosen in Actions UI)
-          BRANCH="${GITHUB_REF_NAME}"
-          SAFE_BRANCH="$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_.-]+/-/g' | sed -E 's/^-+|-+$//g')"
+          echo "Unsupported event for Promote workflow: ${GITHUB_EVENT_NAME}"
+          exit 1
 
-          if [[ -n "$TAG_IN" ]]; then
-            TAG="$TAG_IN"
-          else
-            # Default only when we're building
-            TAG="${ENVNAME}-${SAFE_BRANCH}-${GITHUB_SHA::7}"
-          fi
 
-          {
-            echo "envname=$ENVNAME"
-            echo "svc=$SVC"
-            echo "tag=$TAG"
-            echo "build_images=$BUILD_IMAGES"
-          } >> "$GITHUB_OUTPUT"
 
   build-frontend:
     name: Build & Push Frontend Image

@@ -1,61 +1,25 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import type { Contact } from '@prisma/client'
-import { PrismaService } from 'src/common/database/prisma.service'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { BATCH_EVENT, BATCH_STATUS, CSA_EVENT, CSA_STATUS } from './constants'
+import { beforeEach, describe, expect, it } from 'vitest'
+import {
+  BATCH_DETAIL_EVENT,
+  BATCH_DETAIL_STATUS,
+  BATCH_EVENT,
+  BATCH_STATUS,
+  CSA_EVENT,
+  CSA_STATUS,
+} from './constants'
 import { StateMachineService } from './state-machine.service'
 
 describe('StateMachineService', () => {
   let service: StateMachineService
-  let prisma: PrismaService
-
-  // Partial mock - only includes fields used by tests
-  const mockContact = {
-    id: 1,
-    csaStatus: CSA_STATUS.ELIGIBLE,
-    resumeStatus: null,
-    holdBy: null,
-  } as unknown as Contact
-
-  const mockBatch = {
-    id: 1,
-    status: BATCH_STATUS.PENDING,
-  }
-
-  const mockBatchDetail = {
-    id: 1,
-    status: 'pending',
-  }
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        StateMachineService,
-        {
-          provide: PrismaService,
-          useValue: {
-            contact: {
-              findUnique: vi.fn().mockResolvedValue(mockContact),
-              update: vi
-                .fn()
-                .mockResolvedValue({ ...mockContact, csaStatus: CSA_STATUS.IN_BATCH_APPLICATION }),
-            },
-            batch: {
-              findUnique: vi.fn().mockResolvedValue(mockBatch),
-              update: vi.fn().mockResolvedValue({ ...mockBatch, status: BATCH_STATUS.IN_PROGRESS }),
-            },
-            contactBatchDetail: {
-              findUnique: vi.fn().mockResolvedValue(mockBatchDetail),
-              update: vi.fn().mockResolvedValue({ ...mockBatchDetail, status: 'in_progress' }),
-            },
-          },
-        },
-      ],
+      providers: [StateMachineService],
     }).compile()
 
     service = module.get<StateMachineService>(StateMachineService)
-    prisma = module.get<PrismaService>(PrismaService)
   })
 
   it('should be defined', () => {
@@ -80,6 +44,20 @@ describe('StateMachineService', () => {
         true,
       )
     })
+
+    it('should return true for valid BatchDetail transition', () => {
+      expect(
+        service.canTransition(
+          'batchDetail',
+          BATCH_DETAIL_STATUS.PENDING,
+          BATCH_DETAIL_EVENT.SEND_TO_CRA,
+        ),
+      ).toBe(true)
+    })
+
+    it('should return false for unknown machine type', () => {
+      expect(service.canTransition('unknown' as any, 'pending', 'event')).toBe(false)
+    })
   })
 
   describe('getNextState', () => {
@@ -94,6 +72,45 @@ describe('StateMachineService', () => {
         CSA_STATUS.ELIGIBLE,
       )
     })
+
+    it('should return next state for valid Batch transition', () => {
+      expect(service.getNextState('batch', BATCH_STATUS.PENDING, BATCH_EVENT.SEND_TO_CRA)).toBe(
+        BATCH_STATUS.IN_PROGRESS,
+      )
+    })
+
+    it('should return next state for valid BatchDetail transition', () => {
+      expect(
+        service.getNextState(
+          'batchDetail',
+          BATCH_DETAIL_STATUS.PENDING,
+          BATCH_DETAIL_EVENT.SEND_TO_CRA,
+        ),
+      ).toBe(BATCH_DETAIL_STATUS.IN_PROGRESS)
+    })
+  })
+
+  describe('getValidEvents', () => {
+    it('should return valid events for CSA status', () => {
+      const events = service.getValidEvents('csaStatus', CSA_STATUS.ELIGIBLE)
+      expect(events).toContain(CSA_EVENT.ADD_TO_BATCH)
+      expect(events).toContain(CSA_EVENT.SET_NOT_ELIGIBLE)
+    })
+
+    it('should return empty array for final state', () => {
+      const events = service.getValidEvents('csaStatus', CSA_STATUS.OVER_18)
+      expect(events).toHaveLength(0)
+    })
+
+    it('should return valid events for Batch status', () => {
+      const events = service.getValidEvents('batch', BATCH_STATUS.PENDING)
+      expect(events).toContain(BATCH_EVENT.SEND_TO_CRA)
+    })
+
+    it('should return empty array for unknown machine type', () => {
+      const events = service.getValidEvents('unknown' as any, 'pending')
+      expect(events).toHaveLength(0)
+    })
   })
 
   describe('getStatusLabel', () => {
@@ -107,159 +124,157 @@ describe('StateMachineService', () => {
       expect(service.getStatusLabel('batch', BATCH_STATUS.IN_PROGRESS)).toBe('In Progress')
     })
 
+    it('should return display label for BatchDetail status', () => {
+      expect(service.getStatusLabel('batchDetail', BATCH_DETAIL_STATUS.PROCESSED)).toBe('Processed')
+    })
+
     it('should return raw value if label not found', () => {
       expect(service.getStatusLabel('csaStatus', 'unknown_status')).toBe('unknown_status')
     })
   })
 
-  describe('transitionContact', () => {
-    it('should transition contact and update DB for valid USER event', async () => {
-      const result = await service.transitionContact(1, CSA_EVENT.ADD_TO_BATCH, 'USER', 'user123')
+  describe('isActorAllowed', () => {
+    it('should allow USER to trigger user events', () => {
+      expect(service.isActorAllowed(CSA_STATUS.ELIGIBLE, CSA_EVENT.ADD_TO_BATCH, 'USER')).toBe(true)
+    })
+
+    it('should allow SYSTEM to trigger user events', () => {
+      expect(service.isActorAllowed(CSA_STATUS.ELIGIBLE, CSA_EVENT.ADD_TO_BATCH, 'SYSTEM')).toBe(
+        true,
+      )
+    })
+
+    it('should allow SYSTEM to trigger system events', () => {
+      expect(
+        service.isActorAllowed(CSA_STATUS.IN_BATCH_APPLICATION, CSA_EVENT.SEND_TO_CRA, 'SYSTEM'),
+      ).toBe(true)
+    })
+
+    it('should reject USER triggering system events', () => {
+      expect(
+        service.isActorAllowed(CSA_STATUS.IN_BATCH_APPLICATION, CSA_EVENT.SEND_TO_CRA, 'USER'),
+      ).toBe(false)
+    })
+  })
+
+  describe('transitionContact (pure)', () => {
+    it('should return success for valid USER event', () => {
+      const result = service.transitionContact(CSA_STATUS.ELIGIBLE, CSA_EVENT.ADD_TO_BATCH, 'USER')
 
       expect(result.success).toBe(true)
       expect(result.from).toBe(CSA_STATUS.ELIGIBLE)
       expect(result.to).toBe(CSA_STATUS.IN_BATCH_APPLICATION)
-      expect(prisma.contact.update).toHaveBeenCalled()
     })
 
-    it('should reject USER attempting SYSTEM event', async () => {
-      const result = await service.transitionContact(1, CSA_EVENT.SEND_TO_CRA, 'USER', 'user123')
+    it('should reject USER attempting SYSTEM event', () => {
+      const result = service.transitionContact(
+        CSA_STATUS.IN_BATCH_APPLICATION,
+        CSA_EVENT.SEND_TO_CRA,
+        'USER',
+      )
 
       expect(result.success).toBe(false)
-      expect(result.reason).toBe('Event not allowed for users')
-      expect(prisma.contact.update).not.toHaveBeenCalled()
+      expect(result.reason).toBe('Event not allowed for this actor')
     })
 
-    it('should allow SYSTEM to trigger SYSTEM event', async () => {
-      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
-        ...mockContact,
-        csaStatus: CSA_STATUS.IN_BATCH_APPLICATION,
-      } as unknown as Contact)
-
-      const result = await service.transitionContact(1, CSA_EVENT.SEND_TO_CRA, 'SYSTEM')
+    it('should allow SYSTEM to trigger SYSTEM event', () => {
+      const result = service.transitionContact(
+        CSA_STATUS.IN_BATCH_APPLICATION,
+        CSA_EVENT.SEND_TO_CRA,
+        'SYSTEM',
+      )
 
       expect(result.success).toBe(true)
+      expect(result.to).toBe(CSA_STATUS.BATCH_SENT_APPLICATION)
     })
 
-    it('should reject invalid transition', async () => {
-      const result = await service.transitionContact(1, CSA_EVENT.HOLD, 'USER', 'user123')
+    it('should reject invalid transition', () => {
+      const result = service.transitionContact(CSA_STATUS.ELIGIBLE, CSA_EVENT.HOLD, 'USER')
 
       expect(result.success).toBe(false)
       expect(result.reason).toBe('Invalid transition')
     })
 
-    it('should return error if contact not found', async () => {
-      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(null)
-
-      const result = await service.transitionContact(999, CSA_EVENT.ADD_TO_BATCH, 'USER', 'user123')
-
-      expect(result.success).toBe(false)
-      expect(result.reason).toBe('Contact not found')
-    })
-
-    it('should handle HOLD event by saving resume_status', async () => {
-      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
-        ...mockContact,
-        csaStatus: CSA_STATUS.ELIGIBLE_TBD,
-      } as unknown as Contact)
-
-      await service.transitionContact(1, CSA_EVENT.HOLD, 'USER', 'user123')
-
-      expect(prisma.contact.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            csaStatus: CSA_STATUS.ON_HOLD,
-            resumeStatus: CSA_STATUS.ELIGIBLE_TBD,
-            holdBy: 'user123',
-          }),
-        }),
-      )
-    })
-
-    it('should handle RESUME event by restoring resume_status', async () => {
-      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
-        ...mockContact,
-        csaStatus: CSA_STATUS.ON_HOLD,
-        resumeStatus: CSA_STATUS.ELIGIBLE_TBD,
-      } as unknown as Contact)
-
-      const result = await service.transitionContact(1, CSA_EVENT.RESUME, 'USER', 'user123')
+    it('should handle HOLD event', () => {
+      const result = service.transitionContact(CSA_STATUS.ELIGIBLE_TBD, CSA_EVENT.HOLD, 'USER')
 
       expect(result.success).toBe(true)
-      expect(result.to).toBe(CSA_STATUS.ELIGIBLE_TBD)
-      expect(prisma.contact.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            csaStatus: CSA_STATUS.ELIGIBLE_TBD,
-            resumeStatus: null,
-            holdBy: null,
-          }),
-        }),
-      )
+      expect(result.from).toBe(CSA_STATUS.ELIGIBLE_TBD)
+      expect(result.to).toBe(CSA_STATUS.ON_HOLD)
     })
 
-    it('should reject RESUME if no resume_status available', async () => {
-      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
-        ...mockContact,
-        csaStatus: CSA_STATUS.ON_HOLD,
-        resumeStatus: null,
-      } as unknown as Contact)
+    it('should handle RESUME event with valid resumeStatus', () => {
+      const result = service.transitionContact(
+        CSA_STATUS.ON_HOLD,
+        CSA_EVENT.RESUME,
+        'USER',
+        CSA_STATUS.ELIGIBLE_TBD,
+      )
 
-      const result = await service.transitionContact(1, CSA_EVENT.RESUME, 'USER', 'user123')
+      expect(result.success).toBe(true)
+      expect(result.from).toBe(CSA_STATUS.ON_HOLD)
+      expect(result.to).toBe(CSA_STATUS.ELIGIBLE_TBD)
+    })
+
+    it('should reject RESUME if no resumeStatus provided', () => {
+      const result = service.transitionContact(CSA_STATUS.ON_HOLD, CSA_EVENT.RESUME, 'USER', null)
+
+      expect(result.success).toBe(false)
+      expect(result.reason).toBe('No resume status available')
+    })
+
+    it('should reject RESUME if resumeStatus is undefined', () => {
+      const result = service.transitionContact(CSA_STATUS.ON_HOLD, CSA_EVENT.RESUME, 'USER')
 
       expect(result.success).toBe(false)
       expect(result.reason).toBe('No resume status available')
     })
   })
 
-  describe('transitionBatch', () => {
-    it('should transition batch and update DB', async () => {
-      const result = await service.transitionBatch(1, BATCH_EVENT.SEND_TO_CRA, 'SYSTEM')
+  describe('transitionBatch (pure)', () => {
+    it('should return success for valid transition', () => {
+      const result = service.transitionBatch(BATCH_STATUS.PENDING, BATCH_EVENT.SEND_TO_CRA)
 
       expect(result.success).toBe(true)
       expect(result.from).toBe(BATCH_STATUS.PENDING)
       expect(result.to).toBe(BATCH_STATUS.IN_PROGRESS)
     })
 
-    it('should return error if batch not found', async () => {
-      vi.spyOn(prisma.batch, 'findUnique').mockResolvedValue(null)
-
-      const result = await service.transitionBatch(999, BATCH_EVENT.SEND_TO_CRA, 'SYSTEM')
+    it('should return error for invalid transition', () => {
+      const result = service.transitionBatch(BATCH_STATUS.PENDING, BATCH_EVENT.SEND_FAILED)
 
       expect(result.success).toBe(false)
-      expect(result.reason).toBe('Batch not found')
+      expect(result.reason).toBe('Invalid transition')
+    })
+
+    it('should transition from system_error to in_progress on retry', () => {
+      const result = service.transitionBatch(BATCH_STATUS.SYSTEM_ERROR, BATCH_EVENT.SEND_TO_CRA)
+
+      expect(result.success).toBe(true)
+      expect(result.to).toBe(BATCH_STATUS.IN_PROGRESS)
     })
   })
 
-  describe('transitionContacts (bulk)', () => {
-    it('should transition multiple contacts', async () => {
-      const result = await service.transitionContacts(
-        [1, 2, 3],
-        CSA_EVENT.ADD_TO_BATCH,
-        'USER',
-        'user123',
+  describe('transitionBatchDetail (pure)', () => {
+    it('should return success for valid transition', () => {
+      const result = service.transitionBatchDetail(
+        BATCH_DETAIL_STATUS.PENDING,
+        BATCH_DETAIL_EVENT.SEND_TO_CRA,
       )
 
-      expect(result.succeeded).toHaveLength(3)
-      expect(result.failed).toHaveLength(0)
+      expect(result.success).toBe(true)
+      expect(result.from).toBe(BATCH_DETAIL_STATUS.PENDING)
+      expect(result.to).toBe(BATCH_DETAIL_STATUS.IN_PROGRESS)
     })
 
-    it('should handle partial failures', async () => {
-      vi.spyOn(prisma.contact, 'findUnique')
-        .mockResolvedValueOnce(mockContact as unknown as Contact)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(mockContact as unknown as Contact)
-
-      const result = await service.transitionContacts(
-        [1, 2, 3],
-        CSA_EVENT.ADD_TO_BATCH,
-        'USER',
-        'user123',
+    it('should return error for invalid transition', () => {
+      const result = service.transitionBatchDetail(
+        BATCH_DETAIL_STATUS.PENDING,
+        BATCH_DETAIL_EVENT.CRA_ACCEPTED,
       )
 
-      expect(result.succeeded).toHaveLength(2)
-      expect(result.failed).toHaveLength(1)
-      expect(result.failed[0].id).toBe(2)
+      expect(result.success).toBe(false)
+      expect(result.reason).toBe('Invalid transition')
     })
   })
 })

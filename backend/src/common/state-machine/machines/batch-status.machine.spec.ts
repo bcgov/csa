@@ -9,9 +9,9 @@ describe('batchStatusMachine', () => {
       expect(nextState).toBe(BATCH_STATUS.IN_PROGRESS)
     })
 
-    it('should transition from in_progress to error on SEND_FAILED', () => {
+    it('should transition from in_progress to system_error on SEND_FAILED', () => {
       const nextState = getNextBatchState(BATCH_STATUS.IN_PROGRESS, BATCH_EVENT.SEND_FAILED)
-      expect(nextState).toBe(BATCH_STATUS.ERROR)
+      expect(nextState).toBe(BATCH_STATUS.SYSTEM_ERROR)
     })
 
     it('should transition from in_progress to processed on CRA_ACCEPTED', () => {
@@ -19,8 +19,8 @@ describe('batchStatusMachine', () => {
       expect(nextState).toBe(BATCH_STATUS.PROCESSED)
     })
 
-    it('should transition from error to in_progress on RETRY_SEND_TO_CRA', () => {
-      const nextState = getNextBatchState(BATCH_STATUS.ERROR, BATCH_EVENT.RETRY_SEND_TO_CRA)
+    it('should transition from system_error to in_progress on SEND_TO_CRA (retry)', () => {
+      const nextState = getNextBatchState(BATCH_STATUS.SYSTEM_ERROR, BATCH_EVENT.SEND_TO_CRA)
       expect(nextState).toBe(BATCH_STATUS.IN_PROGRESS)
     })
 

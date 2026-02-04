@@ -1,16 +1,41 @@
+import { HttpModule } from '@nestjs/axios'
 import { Module, OnModuleInit } from '@nestjs/common'
+import { ConfigModule } from '@nestjs/config'
+import { PrismaModule } from 'src/common/database/prisma.module'
 import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
+import { appConfig } from '../config/app.config'
+import { craConfig } from './cra.config'
+
 import { PollCraResponseHandler } from './handlers/poll-cra-response.handler'
 import { SendCraFileHandler } from './handlers/send-cra-file.handler'
+import { CraDataService } from './outbound-file/cra-data.service'
+import { FileCreateService } from './outbound-file/file-create.service'
+import { FileTransferClientService } from './outbound-file/file-transfer.service'
 
 /*
  * Generates and sends files to CRA
  * Polls and process response files from CRA
  */
 @Module({
-  imports: [JobsModule],
-  providers: [SendCraFileHandler, PollCraResponseHandler],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [craConfig, appConfig],
+    }),
+    JobsModule,
+    PrismaModule,
+    HttpModule.register({
+      timeout: 60000, //TODO: check this 60 seconds timeout
+    }),
+  ],
+  providers: [
+    SendCraFileHandler,
+    PollCraResponseHandler,
+    CraDataService,
+    FileCreateService,
+    FileTransferClientService,
+  ],
   exports: [SendCraFileHandler, PollCraResponseHandler],
 })
 export class CraModule implements OnModuleInit {

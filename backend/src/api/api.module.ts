@@ -3,6 +3,7 @@ import { Module, RequestMethod } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { TerminusModule } from '@nestjs/terminus'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { StateMachineModule } from 'src/common/state-machine/state-machine.module'
 import { appConfig } from 'src/config/app.config'
 import { HTTPLoggerMiddleware } from '../common/middleware/req.res.logger'
 import { AppController } from './app.controller'
@@ -25,6 +26,7 @@ const enableMockApi = process.env.NODE_ENV !== 'production'
     ContactsModule,
     StatusUpdateModule,
     BatchesModule,
+    StateMachineModule,
     ...(enableMockApi ? [MockModule] : []),
   ],
   controllers: [AppController, MetricsController, HealthController],

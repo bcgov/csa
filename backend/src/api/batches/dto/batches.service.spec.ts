@@ -1,7 +1,8 @@
 import { NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { BATCH_STATUSES } from '../../contacts/constants'
+import { BATCH_STATUS } from 'src/common/state-machine/constants'
+import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { BatchesService } from '../batches.service'
 
 describe('BatchesService', () => {
@@ -20,6 +21,7 @@ describe('BatchesService', () => {
       findFirst: vi.fn(),
       create: vi.fn(),
       delete: vi.fn(),
+      update: vi.fn(),
     },
     contact: {
       findMany: vi.fn(),
@@ -29,7 +31,11 @@ describe('BatchesService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [BatchesService, { provide: PrismaService, useValue: mockPrismaService }],
+      providers: [
+        BatchesService,
+        StateMachineService,
+        { provide: PrismaService, useValue: mockPrismaService },
+      ],
     }).compile()
 
     service = module.get<BatchesService>(BatchesService)
@@ -127,20 +133,20 @@ describe('BatchesService', () => {
 
   describe('findOrCreatePendingBatch', () => {
     it('should return existing pending batch', async () => {
-      const pendingBatch = { id: 1, status: BATCH_STATUSES.PENDING }
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING }
       mockPrismaService.batch.findFirst.mockResolvedValue(pendingBatch)
 
       const result = await service.findOrCreatePendingBatch()
 
       expect(result).toEqual(pendingBatch)
       expect(mockPrismaService.batch.findFirst).toHaveBeenCalledWith({
-        where: { status: BATCH_STATUSES.PENDING },
+        where: { status: BATCH_STATUS.PENDING },
       })
       expect(mockPrismaService.batch.create).not.toHaveBeenCalled()
     })
 
     it('should create new pending batch if none exists', async () => {
-      const newBatch = { id: 1, status: BATCH_STATUSES.PENDING, recordCount: 0 }
+      const newBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 0 }
       mockPrismaService.batch.findFirst.mockResolvedValue(null)
       mockPrismaService.batch.create.mockResolvedValue(newBatch)
 
@@ -150,7 +156,7 @@ describe('BatchesService', () => {
       expect(mockPrismaService.batch.create).toHaveBeenCalledWith({
         data: {
           batchDate: null,
-          status: BATCH_STATUSES.PENDING,
+          status: BATCH_STATUS.PENDING,
           recordCount: 0,
           createdAt: expect.any(Date),
         },
@@ -160,7 +166,7 @@ describe('BatchesService', () => {
 
   describe('addContactsToPendingBatch', () => {
     it('should add contacts to pending batch', async () => {
-      const pendingBatch = { id: 1, status: BATCH_STATUSES.PENDING, recordCount: 0 }
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 0 }
       const updatedBatch = { ...pendingBatch, recordCount: 2 }
 
       vi.spyOn(service, 'findOrCreatePendingBatch').mockResolvedValue(pendingBatch as any)
@@ -181,7 +187,7 @@ describe('BatchesService', () => {
     })
 
     it('should skip contacts already in batch', async () => {
-      const pendingBatch = { id: 1, status: BATCH_STATUSES.PENDING, recordCount: 1 }
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 1 }
 
       vi.spyOn(service, 'findOrCreatePendingBatch').mockResolvedValue(pendingBatch as any)
       mockPrismaService.contact.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }])
@@ -198,7 +204,7 @@ describe('BatchesService', () => {
 
   describe('removeContactFromPendingBatch', () => {
     it('should remove contact from pending batch', async () => {
-      const pendingBatch = { id: 1, status: BATCH_STATUSES.PENDING }
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING }
       const detail = { id: 10, contactId: 100, batchId: 1 }
 
       mockPrismaService.batch.findFirst.mockResolvedValue(pendingBatch)
@@ -218,7 +224,7 @@ describe('BatchesService', () => {
     })
 
     it('should throw NotFoundException if contact not in batch', async () => {
-      const pendingBatch = { id: 1, status: BATCH_STATUSES.PENDING }
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING }
       mockPrismaService.batch.findFirst.mockResolvedValue(pendingBatch)
       mockPrismaService.contactBatchDetail.findFirst.mockResolvedValue(null)
 

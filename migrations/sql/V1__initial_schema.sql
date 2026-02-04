@@ -122,3 +122,16 @@ CREATE TABLE IF NOT EXISTS csa.transfer_files (
   reference_numbers  INTEGER[], -- contact_batch_details.id
   CONSTRAINT fk_transfer_files_batch FOREIGN KEY (batch_id) REFERENCES csa.batches (id)
 );
+
+-- Grant schema access to app user
+GRANT USAGE ON SCHEMA csa TO "csa-app";
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA csa TO "csa-app";
+
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA csa TO "csa-app";
+
+ALTER DEFAULT PRIVILEGES FOR ROLE "csa-admin" IN SCHEMA csa
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "csa-app";
+
+ALTER DEFAULT PRIVILEGES FOR ROLE "csa-admin" IN SCHEMA csa
+  GRANT USAGE, SELECT ON SEQUENCES TO "csa-app";

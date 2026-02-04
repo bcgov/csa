@@ -1,4 +1,3 @@
-// seed.ts
 import { faker } from '@faker-js/faker'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
@@ -9,19 +8,9 @@ import {
   CSA_STATUSES,
   TRANSACTION_TYPES,
 } from '../src/api/contacts/constants'
+import { databaseConfig } from '../src/config/database.config'
 
-const DB_HOST = process.env.POSTGRES_HOST
-const DB_USER = process.env.POSTGRES_USER
-const DB_PWD = encodeURIComponent(process.env.POSTGRES_PASSWORD)
-const DB_PORT = process.env.POSTGRES_PORT
-const DB_NAME = process.env.POSTGRES_DATABASE
-const DB_SCHEMA = process.env.POSTGRES_SCHEMA
-
-const connectionString =
-  process.env.DATABASE_URL ||
-  `postgresql://${DB_USER}:${DB_PWD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?schema=${DB_SCHEMA}`
-
-const adapter = new PrismaPg({ connectionString })
+const adapter = new PrismaPg({ connectionString: databaseConfig.url })
 const prisma = new PrismaClient({ adapter })
 
 // Get contact count from CLI argument or default to 20

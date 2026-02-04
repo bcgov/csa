@@ -12,6 +12,7 @@ import { ContactsModule } from './contacts/contacts.module'
 import { HealthController } from './health/health.controller'
 import { MetricsController } from './metrics/metrics.controller'
 import { MockModule } from './mock/mock.module'
+import { StatusUpdateModule } from './status_update/status-update.module'
 
 const enableMockApi = process.env.NODE_ENV !== 'production'
 @Module({
@@ -22,6 +23,7 @@ const enableMockApi = process.env.NODE_ENV !== 'production'
     }),
     TerminusModule,
     ContactsModule,
+    StatusUpdateModule,
     BatchesModule,
     ...(enableMockApi ? [MockModule] : []),
   ],

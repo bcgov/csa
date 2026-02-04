@@ -70,6 +70,7 @@ jobs:
       tag: ${{ steps.vars.outputs.tag }}
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
+      migrations: ${{ steps.filter.outputs.migrations }}
       svc: ${{ steps.vars.outputs.svc }}
       build_images: ${{ steps.vars.outputs.build_images }}
     steps:
@@ -107,24 +108,22 @@ jobs:
             FE="${{ steps.filter.outputs.frontend }}"
             BE="${{ steps.filter.outputs.backend }}"
             MI="${{ steps.filter.outputs.migrations }}"
-            if [[ "$FE" == "true" && "$BE" == "true" && "$MI" == "true" ]]; then
-              SVC="all"
-            count=0
-              [[ "$FE" == "true" ]] && ((count++))
-              [[ "$BE" == "true" ]] && ((count++))
-              [[ "$MI" == "true" ]] && ((count++))
 
-              if [[ "$count" -gt 1 ]]; then
-                SVC="all"
-              elif [[ "$FE" == "true" ]]; then
-                SVC="frontend"
-              elif [[ "$BE" == "true" ]]; then
-                SVC="backend"
-              else
-                SVC="migrations"
-              fi
-            else
+            count=0
+            [[ "$FE" == "true" ]] && ((count++))
+            [[ "$BE" == "true" ]] && ((count++))
+            [[ "$MI" == "true" ]] && ((count++))
+
+            if [[ "$count" -eq 0 ]]; then
               SVC="none"
+            elif [[ "$count" -gt 1 ]]; then
+              SVC="all"
+            elif [[ "$FE" == "true" ]]; then
+              SVC="frontend"
+            elif [[ "$BE" == "true" ]]; then
+              SVC="backend"
+            else
+              SVC="migrations"
             fi
 
             TAG="${ENVNAME}-${GITHUB_SHA::7}"
@@ -175,8 +174,9 @@ jobs:
   build-frontend:
     name: Build & Push Frontend Image
     needs: [detect]
+
     if: >-
-      (needs.detect.outputs.svc == 'frontend' || needs.detect.outputs.svc == 'both') &&
+      (needs.detect.outputs.svc == 'frontend' || needs.detect.outputs.svc == 'all') &&
       (
         github.event_name == 'push' ||
         (github.event_name == 'workflow_dispatch' && needs.detect.outputs.build_images == 'true')
@@ -202,7 +202,7 @@ jobs:
     name: Build & Push Backend Image
     needs: [detect]
     if: >-
-      (needs.detect.outputs.svc == 'backend' || needs.detect.outputs.svc == 'both') &&
+      (needs.detect.outputs.svc == 'backend' || needs.detect.outputs.svc == 'all') &&
       (
         github.event_name == 'push' ||
         (github.event_name == 'workflow_dispatch' && needs.detect.outputs.build_images == 'true')
@@ -311,11 +311,11 @@ jobs:
             echo "Updated $image -> $TAG in $file"
           }
 
-          if [[ "$SVC" == "frontend" || "$SVC" == "both" ]]; then
+          if [[ "$SVC" == "frontend" || "$SVC" == "all" ]]; then
             update_tag "gitops/${{ env.FRONTEND_OVERLAY }}/${ENV}/kustomization.yaml" "${{ env.FRONTEND_IMAGE }}"
           fi
 
-          if [[ "$SVC" == "backend" || "$SVC" == "both" ]]; then
+          if [[ "$SVC" == "backend" || "$SVC" == "all" ]]; then
             update_tag "gitops/${{ env.BACKEND_OVERLAY }}/${ENV}/kustomization.yaml" "${{ env.BACKEND_IMAGE }}"
           fi
 

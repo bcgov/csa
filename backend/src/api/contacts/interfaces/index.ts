@@ -27,3 +27,8 @@ export interface BulkOperationResponse {
   success: number[]
   skipped: Array<{ id: number; reason: string }>
 }
+
+export interface UpdateCsaStatusOptions {
+  userId?: string
+  additionalData?: Record<string, unknown>
+}

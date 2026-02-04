@@ -1,10 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
-import {
-  BATCH_STATUSES,
-  BULK_OPERATION_SKIP_REASONS,
-  TRANSACTION_TYPES,
-} from '../contacts/constants'
+import { BATCH_STATUS } from 'src/common/state-machine/constants'
+import type { TransitionResult } from 'src/common/state-machine/interfaces'
+import { StateMachineService } from 'src/common/state-machine/state-machine.service'
+import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
 import { BulkOperationResponse } from '../contacts/interfaces'
 
 export interface AddContactsResult extends BulkOperationResponse {
@@ -18,9 +17,18 @@ export interface AddContactsResult extends BulkOperationResponse {
   }
 }
 
+export interface UpdateBatchStatusOptions {
+  additionalData?: Record<string, unknown>
+}
+
 @Injectable()
 export class BatchesService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(BatchesService.name)
+
+  constructor(
+    private prisma: PrismaService,
+    private stateMachine: StateMachineService,
+  ) {}
 
   async findAll() {
     return this.prisma.batch.findMany({
@@ -38,8 +46,75 @@ export class BatchesService {
     return batch
   }
 
+  // Update a batch's status using the state machine.
+  async updateBatchStatus(
+    batchId: number,
+    event: string,
+    options?: UpdateBatchStatusOptions,
+  ): Promise<TransitionResult> {
+    const batch = await this.prisma.batch.findUnique({ where: { id: batchId } })
+    if (!batch) {
+      return { success: false, reason: 'Batch not found' }
+    }
+
+    const currentState = batch.status
+
+    // validate and get next state
+    const result = this.stateMachine.transitionBatch(currentState, event)
+
+    if (!result.success) {
+      return result
+    }
+
+    await this.prisma.batch.update({
+      where: { id: batchId },
+      data: {
+        status: result.to,
+        ...options?.additionalData,
+      },
+    })
+
+    this.logger.log(`Batch ${batchId}: ${currentState} → ${result.to} [${event}]`)
+
+    return result
+  }
+
+  // Update a batch detail's status using the state machine.
+  async updateBatchDetailStatus(
+    detailId: number,
+    event: string,
+    options?: UpdateBatchStatusOptions,
+  ): Promise<TransitionResult> {
+    const detail = await this.prisma.contactBatchDetail.findUnique({ where: { id: detailId } })
+    if (!detail) {
+      return { success: false, reason: 'BatchDetail not found' }
+    }
+
+    const currentState = detail.status ?? ''
+
+    // Use state machine to validate and get next state
+    const result = this.stateMachine.transitionBatchDetail(currentState, event)
+
+    if (!result.success) {
+      return result
+    }
+
+    await this.prisma.contactBatchDetail.update({
+      where: { id: detailId },
+      data: {
+        status: result.to,
+        lastUpdatedAt: new Date(),
+        lastUpdatedBy: 'SYSTEM',
+        ...options?.additionalData,
+      },
+    })
+
+    this.logger.log(`BatchDetail ${detailId}: ${currentState} → ${result.to} [${event}]`)
+
+    return result
+  }
+
   async findBatchContacts(batchId: number) {
-    // Verify batch exists
     const batch = await this.prisma.batch.findUnique({
       where: { id: batchId },
     })
@@ -65,18 +140,15 @@ export class BatchesService {
   }
 
   async findOrCreatePendingBatch() {
-    // Check if pending batch exists
     let pendingBatch = await this.prisma.batch.findFirst({
-      where: { status: BATCH_STATUSES.PENDING },
+      where: { status: BATCH_STATUS.PENDING },
     })
 
     if (!pendingBatch) {
-      // Create new pending batch
-      // DB constraint (batches_pending_unique) ensures only one pending batch can exist
       pendingBatch = await this.prisma.batch.create({
         data: {
           batchDate: null,
-          status: BATCH_STATUSES.PENDING,
+          status: BATCH_STATUS.PENDING,
           recordCount: 0,
           createdAt: new Date(),
         },
@@ -120,13 +192,12 @@ export class BatchesService {
       } else if (alreadyInBatchIds.has(contactId)) {
         result.skipped.push({ id: contactId, reason: BULK_OPERATION_SKIP_REASONS.ALREADY_IN_BATCH })
       } else {
-        // Add to batch
         await this.prisma.contactBatchDetail.create({
           data: {
             contactId,
             batchId: pendingBatch.id,
             transactionType: TRANSACTION_TYPES.APPLICATION,
-            status: BATCH_STATUSES.PENDING,
+            status: BATCH_STATUS.PENDING,
             createdAt: now,
             createdBy: userId,
             lastUpdatedAt: now,
@@ -137,7 +208,6 @@ export class BatchesService {
       }
     }
 
-    // Update record count
     result.batch = await this.prisma.batch.update({
       where: { id: pendingBatch.id },
       data: {
@@ -152,14 +222,13 @@ export class BatchesService {
 
   async removeContactFromPendingBatch(contactId: number): Promise<void> {
     const pendingBatch = await this.prisma.batch.findFirst({
-      where: { status: BATCH_STATUSES.PENDING },
+      where: { status: BATCH_STATUS.PENDING },
     })
 
     if (!pendingBatch) {
       throw new NotFoundException('No pending batch exists')
     }
 
-    // Find the contact batch detail
     const detail = await this.prisma.contactBatchDetail.findFirst({
       where: {
         batchId: pendingBatch.id,

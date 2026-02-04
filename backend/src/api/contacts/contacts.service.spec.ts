@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { ContactsService } from './contacts.service'
 
 describe('ContactsService', () => {
@@ -52,6 +53,7 @@ describe('ContactsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ContactsService,
+        StateMachineService,
         {
           provide: PrismaService,
           useValue: {
@@ -184,7 +186,7 @@ describe('ContactsService', () => {
       await expect(
         service.findAll(1, 10, undefined, '[{"key":"invalidField","op":"eq","value":"value"}]'),
       ).rejects.toThrow('Invalid filter field: invalidField')
-    }) // New comprehensive tests for flexible filter/sort
+    })
 
     it('should throw BadRequestException on invalid sort JSON', async () => {
       await expect(service.findAll(1, 10, 'not-valid-json')).rejects.toThrow(
@@ -276,7 +278,7 @@ describe('ContactsService', () => {
           ],
         },
       })
-    }) // Filter operation tests
+    })
 
     it('should handle eq operation', async () => {
       vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
@@ -454,7 +456,7 @@ describe('ContactsService', () => {
         orderBy: undefined,
         where: { NOT: { OR: [{ din: null }, { din: '' }] } },
       })
-    }) // Edge cases
+    })
 
     it('should handle empty filter array', async () => {
       vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
@@ -576,7 +578,6 @@ describe('ContactsService', () => {
 
       await service.fullTextSearch('100%', 1, 10)
 
-      // '%' should be escaped to '\%'
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         where: { searchText: { contains: '100\\%', mode: 'insensitive' } },
         skip: 0,
@@ -591,7 +592,6 @@ describe('ContactsService', () => {
 
       await service.fullTextSearch('test_user', 1, 10)
 
-      // '_' should be escaped to '\_'
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         where: { searchText: { contains: 'test\\_user', mode: 'insensitive' } },
         skip: 0,

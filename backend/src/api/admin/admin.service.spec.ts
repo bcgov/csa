@@ -1,14 +1,34 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { UnauthorizedException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { HttpService } from '@nestjs/axios'
 import { AdminService } from './admin.service'
 import * as jwt from 'jsonwebtoken'
 
 describe('AdminService', () => {
   let service: AdminService
 
+  const mockHttpService = {
+    post: vi.fn(),
+  }
+
+  const mockConfigService = {
+    get: vi.fn(),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [AdminService],
+      providers: [
+        AdminService,
+        {
+          provide: HttpService,
+          useValue: mockHttpService,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
+        },
+      ],
     }).compile()
 
     service = module.get<AdminService>(AdminService)

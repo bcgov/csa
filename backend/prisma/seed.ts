@@ -63,6 +63,8 @@ async function seedContacts() {
     const age = new Date().getFullYear() - birthDate.getFullYear()
     const firstName = faker.person.firstName()
     const middle = faker.person.middleName()
+    const searchText = `${firstName} ${middle} ${faker.person.lastName()} ${faker.string.alphanumeric(5)}`
+
 
     const effectiveDate = faker.date.past({ years: 2 })
     const expiryDate = ensureAfter(effectiveDate, 730) // DATE after effective_date
@@ -94,6 +96,7 @@ async function seedContacts() {
       middleName: middle, // NOT NULL
       akaLastName: faker.person.lastName(),
       akaFirstName: faker.person.firstName(),
+      searchText,
 
       personIdIcm: faker.string.alphanumeric(10).toUpperCase(),
       personIdMis: faker.string.alphanumeric(10).toUpperCase(),
@@ -164,7 +167,7 @@ async function seedContacts() {
   })
   // clear existing data first
   await prisma.contact.deleteMany()
-  console.log('Cleared exising contacts')
+  console.log('Cleared existing contacts', JSON.stringify(contacts, null, 2)  )
 
   await prisma.contact.createMany({ data: contacts })
   console.log(`Seeded ${CONTACT_COUNT} contacts.`)

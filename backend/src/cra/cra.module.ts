@@ -9,9 +9,10 @@ import { craConfig } from './cra.config'
 
 import { PollCraResponseHandler } from './handlers/poll-cra-response.handler'
 import { SendCraFileHandler } from './handlers/send-cra-file.handler'
-import { CraDataService } from './outbound-file/cra-data.service'
 import { FileCreateService } from './outbound-file/file-create.service'
 import { FileTransferClientService } from './outbound-file/file-transfer.service'
+import { ResponseFileService } from './inbound-file/response-file.service'
+import { CraDataService } from './outbound-file/cra-data.service'
 
 /*
  * Generates and sends files to CRA
@@ -32,9 +33,10 @@ import { FileTransferClientService } from './outbound-file/file-transfer.service
   providers: [
     SendCraFileHandler,
     PollCraResponseHandler,
-    CraDataService,
     FileCreateService,
     FileTransferClientService,
+    ResponseFileService,
+    CraDataService,
   ],
   exports: [SendCraFileHandler, PollCraResponseHandler],
 })

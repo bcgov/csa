@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
-import { CraDetail, CraHeader, CraTrailer } from './file-create.interface'
+import { CraDetail, CraHeader, CraTrailer } from '../interfaces/file-create.interface'
 
 const { FILE_NAME_PREFIX, REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
 

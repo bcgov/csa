@@ -12,7 +12,7 @@ export class AdminService {
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
   /**
    * Decode JWT token and extract user information
    * @param token - JWT token from Authorization header

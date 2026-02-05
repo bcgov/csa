@@ -39,7 +39,7 @@
     path api/* /health
   }
 	handle @backend {
-		reverse_proxy VITE_API_BASE_URL {
+		reverse_proxy {env.VITE_API_BASE_URL} {
 			header_up Host {http.reverse_proxy.upstream.hostport}
 			header_up X-Real-IP {remote_host}
 		}

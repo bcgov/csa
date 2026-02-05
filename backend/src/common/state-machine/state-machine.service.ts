@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common'
 import {
   BATCH_DETAIL_STATUS_LABELS,
   BATCH_STATUS_LABELS,
-  CSA_EVENT,
   CSA_STATUS_LABELS,
   STATE_ACTOR_PERMISSIONS,
   SYSTEM_CSA_EVENTS,
@@ -36,7 +35,7 @@ export class StateMachineService {
     }
   }
 
-  getNextState(machine: MachineType, currentState: string, event: string): string {
+  getNextState(machine: MachineType, currentState: string, event: string): string | string[] {
     switch (machine) {
       case 'csaStatus':
         return getNextCsaState(currentState, event)
@@ -94,21 +93,15 @@ export class StateMachineService {
   }
 
   // Validate and compute next state for a contact CSA status transition.
+  // For dynamic transitions (e.g., RESUME), caller must provide targetState.
   transitionContact(
     currentState: string,
     event: string,
     actor: Actor,
-    resumeStatus?: string | null,
+    targetState?: string,
   ): TransitionResult {
     if (!this.isActorAllowed(currentState, event, actor)) {
       return { success: false, reason: 'Event not allowed for this actor' }
-    }
-    // Handle RESUME
-    if (event === CSA_EVENT.RESUME) {
-      if (!resumeStatus) {
-        return { success: false, reason: 'No resume status available' }
-      }
-      return { success: true, from: currentState, to: resumeStatus }
     }
 
     if (!this.canTransition('csaStatus', currentState, event)) {
@@ -116,6 +109,18 @@ export class StateMachineService {
     }
 
     const nextState = this.getNextState('csaStatus', currentState, event)
+
+    // Handle dynamic transitions (array of valid targets)
+    if (Array.isArray(nextState)) {
+      if (!targetState) {
+        return { success: false, reason: 'Target state required for dynamic transition' }
+      }
+      if (!nextState.includes(targetState)) {
+        return { success: false, reason: 'Invalid target state for this transition' }
+      }
+      return { success: true, from: currentState, to: targetState }
+    }
+
     return { success: true, from: currentState, to: nextState }
   }
 
@@ -124,7 +129,8 @@ export class StateMachineService {
       return { success: false, reason: 'Invalid transition' }
     }
 
-    const nextState = this.getNextState('batch', currentState, event)
+    // Batch machine has no dynamic transitions, always returns string
+    const nextState = this.getNextState('batch', currentState, event) as string
     return { success: true, from: currentState, to: nextState }
   }
 
@@ -133,7 +139,8 @@ export class StateMachineService {
       return { success: false, reason: 'Invalid transition' }
     }
 
-    const nextState = this.getNextState('batchDetail', currentState, event)
+    // BatchDetail machine has no dynamic transitions, always returns string
+    const nextState = this.getNextState('batchDetail', currentState, event) as string
     return { success: true, from: currentState, to: nextState }
   }
 }

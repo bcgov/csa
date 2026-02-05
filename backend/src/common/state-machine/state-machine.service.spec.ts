@@ -203,7 +203,14 @@ describe('StateMachineService', () => {
       expect(result.to).toBe(CSA_STATUS.ON_HOLD)
     })
 
-    it('should handle RESUME event with valid resumeStatus', () => {
+    it('should require targetState for RESUME event (dynamic transition)', () => {
+      const result = service.transitionContact(CSA_STATUS.ON_HOLD, CSA_EVENT.RESUME, 'USER')
+
+      expect(result.success).toBe(false)
+      expect(result.reason).toBe('Target state required for dynamic transition')
+    })
+
+    it('should succeed for RESUME with valid targetState', () => {
       const result = service.transitionContact(
         CSA_STATUS.ON_HOLD,
         CSA_EVENT.RESUME,
@@ -216,18 +223,16 @@ describe('StateMachineService', () => {
       expect(result.to).toBe(CSA_STATUS.ELIGIBLE_TBD)
     })
 
-    it('should reject RESUME if no resumeStatus provided', () => {
-      const result = service.transitionContact(CSA_STATUS.ON_HOLD, CSA_EVENT.RESUME, 'USER', null)
+    it('should reject RESUME with invalid targetState', () => {
+      const result = service.transitionContact(
+        CSA_STATUS.ON_HOLD,
+        CSA_EVENT.RESUME,
+        'USER',
+        CSA_STATUS.IN_PAY, // not a valid target for RESUME from ON_HOLD
+      )
 
       expect(result.success).toBe(false)
-      expect(result.reason).toBe('No resume status available')
-    })
-
-    it('should reject RESUME if resumeStatus is undefined', () => {
-      const result = service.transitionContact(CSA_STATUS.ON_HOLD, CSA_EVENT.RESUME, 'USER')
-
-      expect(result.success).toBe(false)
-      expect(result.reason).toBe('No resume status available')
+      expect(result.reason).toBe('Invalid target state for this transition')
     })
   })
 

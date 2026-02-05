@@ -35,8 +35,11 @@
 	# -------------------------------
 	# Backend API
 	# -------------------------------
-	handle /api* {
-		reverse_proxy {$BACKEND_UPSTREAM:csa-backend:3000} {
+  @backend {
+    path api/* /health
+  }
+	handle @backend {
+		reverse_proxy VITE_API_BASE_URL {
 			header_up Host {http.reverse_proxy.upstream.hostport}
 			header_up X-Real-IP {remote_host}
 		}
@@ -53,7 +56,7 @@
 	# - not config.json
 	# - not a real file
 	@spa {
-		not path /api* /config.json
+		not path /api* /config.json /health
 		not file
 	}
 	rewrite @spa /index.html

@@ -36,7 +36,7 @@
 	# Backend API
 	# -------------------------------
   @backend {
-    path api/* /health
+    path /api/* /health
   }
 	handle @backend {
 		reverse_proxy {env.VITE_API_BASE_URL} {

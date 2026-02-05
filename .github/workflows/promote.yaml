@@ -116,9 +116,9 @@ jobs:
             MI="${{ steps.filter.outputs.migrations }}"
 
             count=0
-            [[ "$FE" == "true" ]] && ((count++))
-            [[ "$BE" == "true" ]] && ((count++))
-            [[ "$MI" == "true" ]] && ((count++))
+            [[ "$FE" == "true" ]] && count=$((count+1))
+            [[ "$BE" == "true" ]] && count=$((count+1))
+            [[ "$MI" == "true" ]] && count=$((count+1))
 
             if [[ "$count" -eq 0 ]]; then
               SVC="none"

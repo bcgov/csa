@@ -146,7 +146,7 @@ describe('ContactsController', () => {
       const result = {
         success: [1, 2],
         skipped: [
-          { id: 3, reason: 'already_on_hold' },
+          { id: 3, reason: 'invalid_transition' },
           { id: 999, reason: 'not_found' },
         ],
       }
@@ -177,7 +177,7 @@ describe('ContactsController', () => {
       const result = {
         success: [1, 2],
         skipped: [
-          { id: 3, reason: 'not_on_hold' },
+          { id: 3, reason: 'invalid_transition' },
           { id: 999, reason: 'not_found' },
         ],
       }

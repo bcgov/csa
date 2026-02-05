@@ -66,17 +66,19 @@ export class BatchesService {
       return result
     }
 
+    const nextState = result.to!
+
     await this.prisma.batch.update({
       where: { id: batchId },
       data: {
-        status: result.to,
+        status: nextState,
         ...options?.additionalData,
       },
     })
 
-    this.logger.log(`Batch ${batchId}: ${currentState} → ${result.to} [${event}]`)
+    this.logger.log(`Batch ${batchId}: ${currentState} → ${nextState} [${event}]`)
 
-    return result
+    return { success: true, from: currentState, to: nextState }
   }
 
   // Update a batch detail's status using the state machine.
@@ -99,19 +101,21 @@ export class BatchesService {
       return result
     }
 
+    const nextState = result.to!
+
     await this.prisma.contactBatchDetail.update({
       where: { id: detailId },
       data: {
-        status: result.to,
+        status: nextState,
         lastUpdatedAt: new Date(),
         lastUpdatedBy: 'SYSTEM',
         ...options?.additionalData,
       },
     })
 
-    this.logger.log(`BatchDetail ${detailId}: ${currentState} → ${result.to} [${event}]`)
+    this.logger.log(`BatchDetail ${detailId}: ${currentState} → ${nextState} [${event}]`)
 
-    return result
+    return { success: true, from: currentState, to: nextState }
   }
 
   async findBatchContacts(batchId: number) {

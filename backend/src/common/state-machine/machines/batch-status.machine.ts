@@ -1,8 +1,14 @@
 import { BATCH_EVENT, BATCH_STATUS } from '../constants'
-import { canTransition, getNextState, getValidEvents } from './machine.utils'
+import {
+  canTransition,
+  getNextState,
+  getValidEvents,
+  type TransitionMap,
+  type TransitionTarget,
+} from './machine.utils'
 
 // { [fromState]: { [event]: toState } }
-export const BATCH_TRANSITIONS: Record<string, Record<string, string>> = {
+export const BATCH_TRANSITIONS: TransitionMap = {
   [BATCH_STATUS.PENDING]: {
     [BATCH_EVENT.SEND_TO_CRA]: BATCH_STATUS.IN_PROGRESS,
   },
@@ -20,7 +26,7 @@ export const BATCH_TRANSITIONS: Record<string, Record<string, string>> = {
   },
 }
 
-export const getNextBatchState = (currentState: string, event: string): string =>
+export const getNextBatchState = (currentState: string, event: string): TransitionTarget =>
   getNextState(BATCH_TRANSITIONS, currentState, event)
 
 export const canTransitionBatch = (currentState: string, event: string): boolean =>

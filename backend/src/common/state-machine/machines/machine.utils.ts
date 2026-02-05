@@ -1,10 +1,11 @@
-export type TransitionMap = Record<string, Record<string, string>>
+export type TransitionTarget = string | string[]
+export type TransitionMap = Record<string, Record<string, TransitionTarget>>
 
 export function getNextState(
   transitions: TransitionMap,
   currentState: string,
   event: string,
-): string {
+): TransitionTarget {
   const stateTransitions = transitions[currentState]
   if (!stateTransitions) {
     return currentState

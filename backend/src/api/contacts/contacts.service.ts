@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { BATCH_STATUS, CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
+import { CSA_EVENT } from 'src/common/state-machine/constants'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { ALLOWED_FILTER_SORT_FIELDS, BULK_OPERATION_SKIP_REASONS } from './constants'
@@ -202,21 +202,21 @@ export class ContactsService {
 
     const currentState = contact.csaStatus ?? ''
 
+    // For RESUME, pass the stored resumeStatus as the target state
+    const targetState = event === CSA_EVENT.RESUME ? (contact.resumeStatus ?? undefined) : undefined
+
     // Use state machine to validate and get next state
-    const result = this.stateMachine.transitionContact(
-      currentState,
-      event,
-      actor,
-      contact.resumeStatus,
-    )
+    const result = this.stateMachine.transitionContact(currentState, event, actor, targetState)
 
     if (!result.success) {
       return result
     }
 
+    const nextState = result.to!
+
     // Build update data
     const updateData: Record<string, unknown> = {
-      csaStatus: result.to,
+      csaStatus: nextState,
       csaStatusEffectiveDate: new Date(),
       lastUpdatedBy: options?.userId ?? 'SYSTEM',
       lastUpdatedAt: new Date(),
@@ -240,9 +240,9 @@ export class ContactsService {
       data: updateData,
     })
 
-    this.logger.log(`Contact ${contactId}: ${currentState} → ${result.to} [${event}] by ${actor}`)
+    this.logger.log(`Contact ${contactId}: ${currentState} → ${nextState} [${event}] by ${actor}`)
 
-    return result
+    return { success: true, from: currentState, to: nextState }
   }
 
   async fullTextSearch(
@@ -288,51 +288,17 @@ export class ContactsService {
       skipped: [],
     }
 
-    // Get all contacts
-    const contacts = await this.prisma.contact.findMany({
-      where: { id: { in: contactIds } },
-    })
-    const contactMap = new Map(contacts.map((c) => [c.id, c]))
-
-    // Find contacts in pending batch
-    const inPendingBatch = await this.prisma.contactBatchDetail.findMany({
-      where: {
-        contactId: { in: contactIds },
-        batch: { status: BATCH_STATUS.PENDING },
-      },
-      select: { contactId: true },
-    })
-    const inPendingBatchIds = new Set(inPendingBatch.map((c) => c.contactId))
-
-    // Categorize contacts
-    const toHold: number[] = []
     for (const id of contactIds) {
-      const contact = contactMap.get(id)
-      if (!contact) {
-        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
-      } else if (contact.csaStatus === CSA_STATUS.ON_HOLD) {
-        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.ALREADY_ON_HOLD })
-      } else if (inPendingBatchIds.has(id)) {
-        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.IN_PENDING_BATCH })
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.HOLD, 'USER', { userId })
+      if (transitionResult.success) {
+        result.success.push(id)
       } else {
-        toHold.push(id)
+        const reason =
+          transitionResult.reason === 'Contact not found'
+            ? BULK_OPERATION_SKIP_REASONS.NOT_FOUND
+            : BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION
+        result.skipped.push({ id, reason })
       }
-    }
-
-    // Update valid contacts and preserve original csa_status in resumeStatus
-    for (const id of toHold) {
-      const contact = contactMap.get(id)!
-      await this.prisma.contact.update({
-        where: { id },
-        data: {
-          resumeStatus: contact.csaStatus,
-          csaStatus: CSA_STATUS.ON_HOLD,
-          holdBy: userId,
-          lastUpdatedAt: new Date(),
-          lastUpdatedBy: userId,
-        },
-      })
-      result.success.push(id)
     }
 
     return result
@@ -344,38 +310,17 @@ export class ContactsService {
       skipped: [],
     }
 
-    // Get all contacts
-    const contacts = await this.prisma.contact.findMany({
-      where: { id: { in: contactIds } },
-    })
-    const contactMap = new Map(contacts.map((c) => [c.id, c]))
-
-    // Categorize contacts
-    const toResume: Array<{ id: number; resumeStatus: string }> = []
     for (const id of contactIds) {
-      const contact = contactMap.get(id)
-      if (!contact) {
-        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
-      } else if (contact.csaStatus !== CSA_STATUS.ON_HOLD) {
-        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_ON_HOLD })
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.RESUME, 'USER', { userId })
+      if (transitionResult.success) {
+        result.success.push(id)
       } else {
-        toResume.push({ id, resumeStatus: contact.resumeStatus! })
+        const reason =
+          transitionResult.reason === 'Contact not found'
+            ? BULK_OPERATION_SKIP_REASONS.NOT_FOUND
+            : BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION
+        result.skipped.push({ id, reason })
       }
-    }
-
-    // Update valid contacts
-    for (const { id, resumeStatus } of toResume) {
-      await this.prisma.contact.update({
-        where: { id },
-        data: {
-          csaStatus: resumeStatus,
-          resumeStatus: null,
-          holdBy: null,
-          lastUpdatedAt: new Date(),
-          lastUpdatedBy: userId,
-        },
-      })
-      result.success.push(id)
     }
 
     return result

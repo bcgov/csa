@@ -1,0 +1,221 @@
+{
+   "items":    [
+            {
+         "Designate": "",
+         "Effective Date": "08/05/2014",
+         "Legal Authority Code Deletion": "",
+         "Effective Legal Status": "RMN-Removed Child 30(1)(b)",
+         "Name": "1-3UHZC6K",
+         "Dependant Sequence Number": "",
+         "In Care?": "Y",
+         "Reason for Service 4": "",
+         "Updated": "01/05/2026 09:54:04",
+         "Reason for Service 3": "",
+         "Reason for Service 2": "",
+         "Type": "Legal Authority",
+         "Legacy File Number": "CS04000401",
+         "Created By Name": "CGWRK49",
+         "Reason for Service": "ABN - Abandoned",
+         "Agreement with": "",
+         "Directors Authority": "",
+         "Parent Contact Id": "1-3UHK13D",
+         "Id": "1-3UHZC6K",
+         "Incident Parent": "",
+         "Created": "08/05/2014 15:15:55",
+         "Updated By Name": "GUESTCST",
+         "Terms and Conditions": "",
+         "Updated By": "1-50HYEUS",
+         "Legal Authority Code": "RMN-Removed Child 30(1)(b)",
+         "Expiry Date": "08/12/2014",
+         "Created By": "1-1HPTRX2",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorities/ContactLegalAuthority/1-3UHZC6K",
+               "name": "ContactLegalAuthority"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorities/ContactLegalAuthority/1-3UHZC6K",
+               "name": "ContactLegalAuthority"
+            }
+         ]
+      },
+            {
+         "Designate": "",
+         "Effective Date": "08/07/2014",
+         "Legal Authority Code Deletion": "",
+         "Effective Legal Status": "ICD-Interim Order-35(2)(a)",
+         "Name": "1-3VFX7JL",
+         "Dependant Sequence Number": "0",
+         "In Care?": "Y",
+         "Reason for Service 4": "",
+         "Updated": "10/04/2019 11:28:32",
+         "Reason for Service 3": "",
+         "Reason for Service 2": "",
+         "Type": "Legal Authority",
+         "Legacy File Number": "CS04000346",
+         "Created By Name": "CGWRK50",
+         "Reason for Service": "NEG - Neglect",
+         "Agreement with": "",
+         "Directors Authority": "",
+         "Parent Contact Id": "1-3V7RRGL",
+         "Id": "1-3VFX7JL",
+         "Incident Parent": "",
+         "Created": "08/11/2014 16:00:35",
+         "Updated By Name": "CGWRK50",
+         "Terms and Conditions": "",
+         "Updated By": "1-1HPTS56",
+         "Legal Authority Code": "ICD-Interim Order-35(2)(a)",
+         "Expiry Date": "08/12/2014",
+         "Created By": "1-1HPTS56",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorities/ContactLegalAuthority/1-3VFX7JL",
+               "name": "ContactLegalAuthority"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorities/ContactLegalAuthority/1-3VFX7JL",
+               "name": "ContactLegalAuthority"
+            }
+         ]
+      },
+            {
+         "Designate": "",
+         "Effective Date": "09/17/2014",
+         "Legal Authority Code Deletion": "",
+         "Effective Legal Status": "TDR-TCO (Cust Dir)-41(1)(c)",
+         "Name": "1-3VG2R3I",
+         "Dependant Sequence Number": "0",
+         "In Care?": "Y",
+         "Reason for Service 4": "",
+         "Updated": "02/18/2016 23:47:08",
+         "Reason for Service 3": "",
+         "Reason for Service 2": "",
+         "Type": "Legal Authority",
+         "Legacy File Number": "CS04000356",
+         "Created By Name": "CGWRK49",
+         "Reason for Service": "ABN - Abandoned",
+         "Agreement with": "",
+         "Directors Authority": "",
+         "Parent Contact Id": "1-3UI3F7Q",
+         "Id": "1-3VG2R3I",
+         "Incident Parent": "",
+         "Created": "08/12/2014 09:52:02",
+         "Updated By Name": "EIMUSER",
+         "Terms and Conditions": "",
+         "Updated By": "1-AMKFR",
+         "Legal Authority Code": "TDR-TCO (Cust Dir)-41(1)(c)",
+         "Expiry Date": "11/27/2014",
+         "Created By": "1-1HPTRX2",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorities/ContactLegalAuthority/1-3VG2R3I",
+               "name": "ContactLegalAuthority"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorities/ContactLegalAuthority/1-3VG2R3I",
+               "name": "ContactLegalAuthority"
+            }
+         ]
+      },
+            {
+         "Designate": "",
+         "Effective Date": "08/13/2014",
+         "Legal Authority Code Deletion": "",
+         "Effective Legal Status": "RMN-Removed Child 30(1)(b)",
+         "Name": "1-3VJFV0L",
+         "Dependant Sequence Number": "",
+         "In Care?": "Y",
+         "Reason for Service 4": "",
+         "Updated": "08/13/2014 14:52:45",
+         "Reason for Service 3": "",
+         "Reason for Service 2": "",
+         "Type": "Legal Authority",
+         "Legacy File Number": "CS04001150",
+         "Created By Name": "CGWRK50",
+         "Reason for Service": "UNA - Unable",
+         "Agreement with": "",
+         "Directors Authority": "",
+         "Parent Contact Id": "1-3VJ0HAN",
+         "Id": "1-3VJFV0L",
+         "Incident Parent": "",
+         "Created": "08/13/2014 14:52:33",
+         "Updated By Name": "SADMIN",
+         "Terms and Conditions": "",
+         "Updated By": "0-1",
+         "Legal Authority Code": "RMN-Removed Child 30(1)(b)",
+         "Expiry Date": "08/20/2014",
+         "Created By": "1-1HPTS56",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorities/ContactLegalAuthority/1-3VJFV0L",
+               "name": "ContactLegalAuthority"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorities/ContactLegalAuthority/1-3VJFV0L",
+               "name": "ContactLegalAuthority"
+            }
+         ]
+      },
+            {
+         "Designate": "",
+         "Effective Date": "08/20/2014",
+         "Legal Authority Code Deletion": "",
+         "Effective Legal Status": "ADO-Adoption Act-24",
+         "Name": "1-3VNZ0N2",
+         "Dependant Sequence Number": "",
+         "In Care?": "Y",
+         "Reason for Service 4": "",
+         "Updated": "08/22/2014 13:14:46",
+         "Reason for Service 3": "",
+         "Reason for Service 2": "",
+         "Type": "Legal Authority",
+         "Legacy File Number": "CS04000637",
+         "Created By Name": "CGWRK50",
+         "Reason for Service": "UNA - Unable",
+         "Agreement with": "",
+         "Directors Authority": "",
+         "Parent Contact Id": "1-3VN5LYV",
+         "Id": "1-3VNZ0N2",
+         "Incident Parent": "",
+         "Created": "08/22/2014 10:02:03",
+         "Updated By Name": "SADMIN",
+         "Terms and Conditions": "",
+         "Updated By": "0-1",
+         "Legal Authority Code": "ADO-Adoption Act-24",
+         "Expiry Date": "09/22/2014",
+         "Created By": "1-1HPTS56",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorities/ContactLegalAuthority/1-3VNZ0N2",
+               "name": "ContactLegalAuthority"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorities/ContactLegalAuthority/1-3VNZ0N2",
+               "name": "ContactLegalAuthority"
+            }
+         ]
+      }
+   ],
+   "Link":    [
+            {
+         "rel": "self",
+         "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorities/ContactLegalAuthority?workspace=int_release_5.4&excludeEmptyFieldsInResponse=False&PageSize=5&childlinks=None&ViewMode=Catalog&recordcountneeded=true&StartRowNum=0&GetChildren=false&SearchSpec=[Expiry Date] >= \"05/05/2014\"",
+         "name": "ContactLegalAuthority"
+      },
+            {
+         "rel": "nextSet",
+         "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorities/ContactLegalAuthority?workspace=int_release_5.4&excludeEmptyFieldsInResponse=False&PageSize=5&childlinks=None&ViewMode=Catalog&recordcountneeded=true&StartRowNum=5&GetChildren=false&SearchSpec=[Expiry Date] >= \"05/05/2014\"",
+         "name": "ContactLegalAuthority"
+      }
+   ]
+}

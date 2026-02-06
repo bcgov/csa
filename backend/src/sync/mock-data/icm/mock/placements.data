@@ -1,0 +1,216 @@
+{
+   "items":    [
+            {
+         "Service Provider": "LEVEL2_FCH_EFT",
+         "MCFD Contract Number": "FCH000000000214",
+         "Place of Service": "",
+         "Contract Item Id": "1-4YXFN4J",
+         "Agreement Id": "1-4YXFN4G",
+         "Place of Service Id": "",
+         "Updated": "08/21/2025 00:55:41",
+         "Service Provider RowId": "1-4YW0HTZ",
+         "Type": "Placement",
+         "Created By Name": "SWSHARMA",
+         "End Date": "",
+         "Paid/Unpaid?": "Paid",
+         "Service Provider Id": "1-10816750151",
+         "Status": "Interrupted",
+         "Interrupted Placement #": "",
+         "Place of Service RowId": "",
+         "Id": "1-5CLX8R0",
+         "Service Type": "FCH Level 2",
+         "Placement Number": "1-11646328716",
+         "Created": "08/21/2025 00:47:56",
+         "Updated By Name": "SWSHARMA",
+         "Updated By": "1-4T3S4D9",
+         "Contact Id": "1-52QITXP",
+         "Case Id": "1-4Z1Y6L9",
+         "Start Date": "08/20/2025 00:00:00",
+         "Created By": "1-4T3S4D9",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Placements/Placement/1-5CLX8R0",
+               "name": "Placement"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Placements/Placement/1-5CLX8R0",
+               "name": "Placement"
+            }
+         ]
+      },
+            {
+         "Service Provider": "FCH #1",
+         "MCFD Contract Number": "FCH-USK-9999",
+         "Place of Service": "",
+         "Contract Item Id": "1-5D0N7LD",
+         "Agreement Id": "1-5D0N0OP",
+         "Place of Service Id": "",
+         "Updated": "01/13/2026 10:56:18",
+         "Service Provider RowId": "1-4Z0AR7F",
+         "Type": "Placement",
+         "Created By Name": "SIEBEL_EAI",
+         "End Date": "",
+         "Paid/Unpaid?": "Paid",
+         "Service Provider Id": "1-10823947323",
+         "Status": "Active",
+         "Interrupted Placement #": "",
+         "Place of Service RowId": "",
+         "Id": "1-5D0N7LF",
+         "Service Type": "FCH Level 3",
+         "Placement Number": "1-11671054899",
+         "Created": "09/22/2025 09:57:23",
+         "Updated By Name": "UKHAN",
+         "Updated By": "1-4ZZ950O",
+         "Contact Id": "1-48XCXJL",
+         "Case Id": "1-48XE64L",
+         "Start Date": "10/27/2025 23:34:51",
+         "Created By": "1-A6IS",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Placements/Placement/1-5D0N7LF",
+               "name": "Placement"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Placements/Placement/1-5D0N7LF",
+               "name": "Placement"
+            }
+         ]
+      },
+            {
+         "Service Provider": "ROSE_BC",
+         "MCFD Contract Number": "FCH000000000254",
+         "Place of Service": "",
+         "Contract Item Id": "1-4YYRNTB",
+         "Agreement Id": "1-4YYRNT8",
+         "Place of Service Id": "",
+         "Updated": "09/09/2025 04:25:37",
+         "Service Provider RowId": "1-4YW1292",
+         "Type": "Placement",
+         "Created By Name": "SWSHARMA",
+         "End Date": "",
+         "Paid/Unpaid?": "Unpaid",
+         "Service Provider Id": "1-10816776614",
+         "Status": "Interrupted",
+         "Interrupted Placement #": "",
+         "Place of Service RowId": "",
+         "Id": "1-5CUGKHI",
+         "Service Type": "FCH Level 1",
+         "Placement Number": "1-11660667318",
+         "Created": "09/09/2025 04:19:25",
+         "Updated By Name": "SWSHARMA",
+         "Updated By": "1-4T3S4D9",
+         "Contact Id": "1-4ZT5E3N",
+         "Case Id": "1-4ZT5E5J",
+         "Start Date": "09/07/2025 00:00:00",
+         "Created By": "1-4T3S4D9",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Placements/Placement/1-5CUGKHI",
+               "name": "Placement"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Placements/Placement/1-5CUGKHI",
+               "name": "Placement"
+            }
+         ]
+      },
+            {
+         "Service Provider": "FCH Agency",
+         "MCFD Contract Number": "MCFD-FCH-001",
+         "Place of Service": "",
+         "Contract Item Id": "1-4YSVPGU",
+         "Agreement Id": "1-4YSVPGQ",
+         "Place of Service Id": "",
+         "Updated": "09/11/2025 09:09:36",
+         "Service Provider RowId": "1-4YSUF0R",
+         "Type": "Placement",
+         "Created By Name": "SWSHARMA",
+         "End Date": "",
+         "Paid/Unpaid?": "Unpaid",
+         "Service Provider Id": "1-10811427723",
+         "Status": "Interrupted",
+         "Interrupted Placement #": "",
+         "Place of Service RowId": "",
+         "Id": "1-5CVFS5V",
+         "Service Type": "FCH Level 1",
+         "Placement Number": "1-11662310227",
+         "Created": "09/11/2025 09:03:26",
+         "Updated By Name": "SWSHARMA",
+         "Updated By": "1-4T3S4D9",
+         "Contact Id": "1-4ZTY443",
+         "Case Id": "1-4ZTFMIX",
+         "Start Date": "09/10/2025 00:00:00",
+         "Created By": "1-4T3S4D9",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Placements/Placement/1-5CVFS5V",
+               "name": "Placement"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Placements/Placement/1-5CVFS5V",
+               "name": "Placement"
+            }
+         ]
+      },
+            {
+         "Service Provider": "ROSE_BC",
+         "MCFD Contract Number": "FCH000000000254",
+         "Place of Service": "",
+         "Contract Item Id": "1-4YYRNTB",
+         "Agreement Id": "1-4YYRNT8",
+         "Place of Service Id": "",
+         "Updated": "09/11/2025 09:13:34",
+         "Service Provider RowId": "1-4YW1292",
+         "Type": "Placement",
+         "Created By Name": "SWSHARMA",
+         "End Date": "",
+         "Paid/Unpaid?": "",
+         "Service Provider Id": "1-10816776614",
+         "Status": "Active",
+         "Interrupted Placement #": "1-11662310227",
+         "Place of Service RowId": "",
+         "Id": "1-5CVFTGX",
+         "Service Type": "FCH Level 1",
+         "Placement Number": "1-11662311921",
+         "Created": "09/11/2025 09:09:35",
+         "Updated By Name": "SWSHARMA",
+         "Updated By": "1-4T3S4D9",
+         "Contact Id": "1-4ZTY443",
+         "Case Id": "1-4ZTFMIX",
+         "Start Date": "09/09/2025 00:00:00",
+         "Created By": "1-4T3S4D9",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Placements/Placement/1-5CVFTGX",
+               "name": "Placement"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Placements/Placement/1-5CVFTGX",
+               "name": "Placement"
+            }
+         ]
+      }
+   ],
+   "Link":    [
+            {
+         "rel": "self",
+         "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Placements/Placement?workspace=int_release_5.4&excludeEmptyFieldsInResponse=False&PageSize=5&childlinks=None&ViewMode=Catalog&recordcountneeded=true&StartRowNum=0&GetChildren=false&SearchSpec=[Status] = \"Active\" OR [Status] = \"Interrupted\"",
+         "name": "Placement"
+      },
+            {
+         "rel": "nextSet",
+         "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Placements/Placement?workspace=int_release_5.4&excludeEmptyFieldsInResponse=False&PageSize=5&childlinks=None&ViewMode=Catalog&recordcountneeded=true&StartRowNum=5&GetChildren=false&SearchSpec=[Status] = \"Active\" OR [Status] = \"Interrupted\"",
+         "name": "Placement"
+      }
+   ]
+}

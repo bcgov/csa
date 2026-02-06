@@ -1,5 +1,11 @@
 CREATE SCHEMA IF NOT EXISTS csa;
 
+-- Trigram extension for substring search (ILIKE '%term%')
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-------------------
+-- master tables --
+-------------------
 CREATE TABLE IF NOT EXISTS csa.contacts (
   id                          SERIAL PRIMARY KEY,
   last_name                   TEXT        NOT NULL,
@@ -67,6 +73,25 @@ CREATE TABLE IF NOT EXISTS csa.contacts (
   last_updated_by             TEXT        NOT NULL
 );
 
+-- Concatenates searchable text fields Automatically updated by PostgreSQL on INSERT/UPDATE
+ALTER TABLE csa.contacts
+ADD COLUMN search_text TEXT GENERATED ALWAYS AS (
+  coalesce(last_name, '') || ' | ' ||
+  coalesce(first_name, '') || ' | ' ||
+  coalesce(middle_name, '') || ' | ' ||
+  coalesce(aka_last_name, '') || ' | ' ||
+  coalesce(aka_first_name, '') || ' | ' ||
+  coalesce(case_number, '') || ' | ' ||
+  coalesce(legacy_file_number, '') || ' | ' ||
+  coalesce(din, '')
+) STORED;
+
+ALTER TABLE csa.contacts
+ALTER COLUMN search_text SET NOT NULL;
+
+-- Full-text search index (trigram for ILIKE '%term%' queries)
+CREATE INDEX idx_contacts_search_text_trgm ON csa.contacts USING GIN (search_text gin_trgm_ops);
+
 CREATE TABLE IF NOT EXISTS csa.batches (
     id              SERIAL PRIMARY KEY,
     batch_date      DATE        NOT NULL,
@@ -75,6 +100,8 @@ CREATE TABLE IF NOT EXISTS csa.batches (
     created_at      TIMESTAMP   NOT NULL,
     system_comments TEXT
 );
+
+CREATE UNIQUE INDEX batches_pending_unique ON csa.batches (status) WHERE status = 'pending';
 
 CREATE TABLE IF NOT EXISTS csa.contact_batch_details (
   id                SERIAL PRIMARY KEY,
@@ -122,6 +149,57 @@ CREATE TABLE IF NOT EXISTS csa.transfer_files (
   reference_numbers  INTEGER[], -- contact_batch_details.id
   CONSTRAINT fk_transfer_files_batch FOREIGN KEY (batch_id) REFERENCES csa.batches (id)
 );
+
+--------------------
+-- staging tables --
+--------------------
+
+CREATE TABLE IF NOT EXIST csa.stg_icm_cases (
+    ROW_ID             TEXT PRIMARY KEY,
+    LAST_UPD           TIMESTAMP,
+    FST_NAME           TEXT,
+    LAST_NAME          TEXT,
+    X_AGE              TEXT,
+    X_BIRTH_CITY       TEXT,
+    BIRTH_DT           DATE,
+    X_BIRTH_PROV_CD    TEXT,
+    X_CSA_SENT_DATE    TIMESTAMP,
+    X_CSA_PAY_STATUS   TEXT,
+    X_CSA_EFF_DATE     TIMESTAMP,
+    X_CSA_DIN          TEXT,
+    SEX_MF             TEXT,
+    BIRTH_PLACE        TEXT,
+    ROW_ID_CASE        TEXT,
+    CASE_NUM           TEXT,
+    X_LEGACY_FILE_NUM  TEXT,
+    TYPE_CD            TEXT,
+    STATUS_CD          TEXT,
+    X_CASELOAD         TEXT,
+    NAME               TEXT,
+    LOGIN              TEXT,
+    MID_NAME           TEXT,
+    X_ADM_FIRST_NAME   TEXT,
+    X_ADM_LAST_NAME    TEXT,
+    ingested_at        TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE stg_icm_contacts (
+    "Id"                TEXT PRIMARY KEY,
+    "X_CSA_DIN"         TEXT,
+    "X_CSA_SENT_DATE"   TIMESTAMP,
+    "X_CSA_PAY_STATUS"  TEXT,
+    "X_CSA_EFF_DATE"    TIMESTAMP,
+    ingested_at         TIMESTAMP DEFAULT NOW()
+);
+
+
+
+
+
+
+-------------------------
+-- db users permissons --
+-------------------------
 
 -- Grant schema access to app user
 GRANT USAGE ON SCHEMA csa TO "csa-app";

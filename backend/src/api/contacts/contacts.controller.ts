@@ -123,6 +123,75 @@ export class ContactsController {
     return this.contactsService.resumeContacts(body.contactIds, userId)
   }
 
+  @Post('set-eligible')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        contactIds: { type: 'array', items: { type: 'number' } },
+        action: { type: 'string', enum: ['ELIGIBLE'] },
+      },
+      required: ['contactIds', 'action'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk eligibility status update result with success and failed arrays',
+  })
+  async updateEligibilityStatus(
+    @Body() body: { contactIds: number[]; action: string },
+  ): Promise<BulkOperationResponse> {
+    // TODO: Get userId from auth context when authentication is implemented
+    const userId = 'system'
+    return this.contactsService.updateEligibilityStatus(body.contactIds, body.action, userId)
+  }
+
+  @Post('set-not-eligible')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        contactIds: { type: 'array', items: { type: 'number' } },
+        action: { type: 'string', enum: ['SET_NOT_ELIGIBLE'] },
+      },
+      required: ['contactIds', 'action'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk not eligible status update result with success and failed arrays',
+  })
+  async updateNotEligibleStatus(
+    @Body() body: { contactIds: number[]; action: string },
+  ): Promise<BulkOperationResponse> {
+    // TODO: Get userId from auth context when authentication is implemented
+    const userId = 'system'
+    return this.contactsService.updateNotEligibleStatus(body.contactIds, body.action, userId)
+  }
+
+  @Post('age-out')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        contactIds: { type: 'array', items: { type: 'number' } },
+        action: { type: 'string', enum: ['AGE_OUT'] },
+      },
+      required: ['contactIds', 'action'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk child over 18 status update result with success and failed arrays',
+  })
+  async updateChildOver18(
+    @Body() body: { contactIds: number[]; action: string },
+  ): Promise<BulkOperationResponse> {
+    // TODO: Get userId from auth context when authentication is implemented
+    const userId = 'system'
+    return this.contactsService.updateChildOver18(body.contactIds, body.action, userId)
+  }
+
   @Get(':id/batches')
   @ApiResponse({ status: 200, description: 'List of batch details for this contact' })
   @ApiResponse({ status: 404, description: 'Contact not found' })

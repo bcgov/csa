@@ -1,7 +1,7 @@
 {
 	metrics
 	auto_https off
-	admin 0.0.0.0:3003
+	admin 127.0.0.1:3003
 	order coraza_waf first
 }
 
@@ -30,20 +30,21 @@
   handle @config {
 	  root * /runtime-config
 	  file_server
+    header Cache-Control "no-cache, no-store, must-revalidate"
   }
 
 	# -------------------------------
 	# Backend API
 	# -------------------------------
+
   @backend {
     path /api/* /health
   }
-	handle @backend {
-		reverse_proxy http://{env.VITE_API_BASE_URL}:80 {
-			header_up Host {http.reverse_proxy.upstream.hostport}
-			header_up X-Real-IP {remote_host}
-		}
-	}
+
+  handle @backend {
+    reverse_proxy {env.VITE_API_BASE_URL} {
+    }
+  }
 
 	# -------------------------------
 	# Static SPA assets
@@ -56,7 +57,7 @@
 	# - not config.json
 	# - not a real file
 	@spa {
-		not path /api* /config.json /health
+		not path /api/* /config.json /health
 		not file
 	}
 	rewrite @spa /index.html

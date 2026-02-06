@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
-import { CraDetail, CraHeader, CraTrailer } from './file-create.interface'
+import { CraDetail, CraHeader, CraTrailer } from '../interfaces/file-create.interface'
 import { FILE_MOCK_DATA } from './file-mock-data'
 
 const { REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT

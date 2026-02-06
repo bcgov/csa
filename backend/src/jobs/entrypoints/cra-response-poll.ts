@@ -28,11 +28,13 @@ async function bootstrap() {
 
     if (result.success) {
       logger.log('CRA response poll completed successfully')
-      process.exit(0)
     } else {
       logger.error(`CRA response poll failed: ${result.message}`)
-      process.exit(1)
     }
+
+    // Always exit with 0 - job success/failure is tracked in the job_runs
+    // Exit 1 only for infra failure to infra failure to allow Openshift CronJob to start
+    process.exit(0)
   } catch (error) {
     logger.error(`Fatal error: ${error.message}`, error.stack)
     process.exit(1)

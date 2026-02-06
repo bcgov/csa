@@ -312,13 +312,10 @@ export const updateNotEligibleStatusAlt = async (
   contactIds: number[],
   action: string,
 ): Promise<BulkOperationResponse> => {
-  const response = await APIService.getAxiosInstance().post(
-    '/contacts/set-not-eligible',
-    {
-      contactIds,
-      action,
-    },
-  )
+  const response = await APIService.getAxiosInstance().post('/contacts/set-not-eligible', {
+    contactIds,
+    action,
+  })
   return response.data
 }
 

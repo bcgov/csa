@@ -8,7 +8,7 @@ import { BulkOperationResponse } from './interfaces'
 @ApiTags('contacts')
 @Controller('contacts')
 export class ContactsController {
-  constructor(private readonly contactsService: ContactsService) {}
+  constructor(private readonly contactsService: ContactsService) { }
 
   @Get()
   @ApiQuery({
@@ -121,6 +121,75 @@ export class ContactsController {
     // TODO: Get userId from auth context when authentication is implemented
     const userId = 'system'
     return this.contactsService.resumeContacts(body.contactIds, userId)
+  }
+
+  @Post('update_eligibility_status')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        contactIds: { type: 'array', items: { type: 'number' } },
+        action: { type: 'string', enum: ['ELIGIBLE'] },
+      },
+      required: ['contactIds', 'action'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk eligibility status update result with success and failed arrays',
+  })
+  async updateEligibilityStatus(
+    @Body() body: { contactIds: number[]; action: string },
+  ): Promise<BulkOperationResponse> {
+    // TODO: Get userId from auth context when authentication is implemented
+    const userId = 'system'
+    return this.contactsService.updateEligibilityStatus(body.contactIds, body.action, userId)
+  }
+
+  @Post('update_not_eligible_status')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        contactIds: { type: 'array', items: { type: 'number' } },
+        action: { type: 'string', enum: ['SET_NOT_ELIGIBLE'] },
+      },
+      required: ['contactIds', 'action'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk not eligible status update result with success and failed arrays',
+  })
+  async updateNotEligibleStatus(
+    @Body() body: { contactIds: number[]; action: string },
+  ): Promise<BulkOperationResponse> {
+    // TODO: Get userId from auth context when authentication is implemented
+    const userId = 'system'
+    return this.contactsService.updateNotEligibleStatus(body.contactIds, body.action, userId)
+  }
+
+  @Post('update_child_over_18')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        contactIds: { type: 'array', items: { type: 'number' } },
+        action: { type: 'string', enum: ['AGE_OUT'] },
+      },
+      required: ['contactIds', 'action'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk child over 18 status update result with success and failed arrays',
+  })
+  async updateChildOver18(
+    @Body() body: { contactIds: number[]; action: string },
+  ): Promise<BulkOperationResponse> {
+    // TODO: Get userId from auth context when authentication is implemented
+    const userId = 'system'
+    return this.contactsService.updateChildOver18(body.contactIds, body.action, userId)
   }
 
   @Get(':id/batches')

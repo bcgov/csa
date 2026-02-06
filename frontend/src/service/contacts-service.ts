@@ -266,21 +266,15 @@ export const removeContactFromBatch = async (
 /**
  * Update eligibility status for multiple contacts
  * @param contactIds - Array of contact IDs to update
- * @param updatedBy - User who performed the update
+ * @param action - Action to perform (e.g., 'ELIGIBLE')
  */
 export const updateEligibilityStatus = async (
   contactIds: number[],
-  updatedBy?: string,
-): Promise<{
-  success: Array<{ contactId: number; oldStatus: string; newStatus: string }>
-  failed: Array<{ contactId: number; reason: string }>
-  totalProcessed: number
-  successCount: number
-  failedCount: number
-}> => {
-  const response = await APIService.getAxiosInstance().post('/status-update/eligibility', {
+  action: string,
+): Promise<BulkOperationResponse> => {
+  const response = await APIService.getAxiosInstance().post('/contacts/update_eligibility_status', {
     contactIds,
-    updatedBy,
+    action,
   })
   return response.data
 }
@@ -312,22 +306,19 @@ export const updateNotEligibleStatus = async (
  * Eligible-TBD or On Hold → Not Eligible - Out of Pay
  * In Pay → Not Eligible - IP - TBD
  * @param contactIds - Array of contact IDs to update
- * @param updatedBy - User who performed the update
+ * @param action - Action to perform (e.g., 'SET_NOT_ELIGIBLE')
  */
 export const updateNotEligibleStatusAlt = async (
   contactIds: number[],
-  updatedBy?: string,
-): Promise<{
-  success: Array<{ contactId: number; oldStatus: string; newStatus: string }>
-  failed: Array<{ contactId: number; reason: string }>
-  totalProcessed: number
-  successCount: number
-  failedCount: number
-}> => {
-  const response = await APIService.getAxiosInstance().post('/status-update/not-eligible-alt', {
-    contactIds,
-    updatedBy,
-  })
+  action: string,
+): Promise<BulkOperationResponse> => {
+  const response = await APIService.getAxiosInstance().post(
+    '/contacts/update_not_eligible_status',
+    {
+      contactIds,
+      action,
+    },
+  )
   return response.data
 }
 
@@ -335,21 +326,15 @@ export const updateNotEligibleStatusAlt = async (
  * Update to "Over 18" status for multiple contacts
  * Eligible-TBD or Not Eligible-IP-TBD → Over 18
  * @param contactIds - Array of contact IDs to update
- * @param updatedBy - User who performed the update
+ * @param action - Action to perform (e.g., 'AGE_OUT')
  */
 export const updateOver18Status = async (
   contactIds: number[],
-  updatedBy?: string,
-): Promise<{
-  success: Array<{ contactId: number; oldStatus: string; newStatus: string }>
-  failed: Array<{ contactId: number; reason: string }>
-  totalProcessed: number
-  successCount: number
-  failedCount: number
-}> => {
-  const response = await APIService.getAxiosInstance().post('/status-update/over-18', {
+  action: string,
+): Promise<BulkOperationResponse> => {
+  const response = await APIService.getAxiosInstance().post('/contacts/update_child_over_18', {
     contactIds,
-    updatedBy,
+    action,
   })
   return response.data
 }

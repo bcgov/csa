@@ -8,7 +8,7 @@ import { BulkOperationResponse } from './interfaces'
 @ApiTags('contacts')
 @Controller('contacts')
 export class ContactsController {
-  constructor(private readonly contactsService: ContactsService) {}
+  constructor(private readonly contactsService: ContactsService) { }
 
   @Get()
   @ApiQuery({
@@ -123,7 +123,7 @@ export class ContactsController {
     return this.contactsService.resumeContacts(body.contactIds, userId)
   }
 
-  @Post('update_eligibility_status')
+  @Post('update-eligibility-status')
   @ApiBody({
     schema: {
       type: 'object',
@@ -146,7 +146,7 @@ export class ContactsController {
     return this.contactsService.updateEligibilityStatus(body.contactIds, body.action, userId)
   }
 
-  @Post('update_not_eligible_status')
+  @Post('update-not-eligible-status')
   @ApiBody({
     schema: {
       type: 'object',
@@ -169,7 +169,7 @@ export class ContactsController {
     return this.contactsService.updateNotEligibleStatus(body.contactIds, body.action, userId)
   }
 
-  @Post('update_child_over_18')
+  @Post('update-child-over-18')
   @ApiBody({
     schema: {
       type: 'object',

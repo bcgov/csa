@@ -272,7 +272,7 @@ export const updateEligibilityStatus = async (
   contactIds: number[],
   action: string,
 ): Promise<BulkOperationResponse> => {
-  const response = await APIService.getAxiosInstance().post('/contacts/update_eligibility_status', {
+  const response = await APIService.getAxiosInstance().post('/contacts/update-eligibility-status', {
     contactIds,
     action,
   })
@@ -313,7 +313,7 @@ export const updateNotEligibleStatusAlt = async (
   action: string,
 ): Promise<BulkOperationResponse> => {
   const response = await APIService.getAxiosInstance().post(
-    '/contacts/update_not_eligible_status',
+    '/contacts/update-not-eligible-status',
     {
       contactIds,
       action,
@@ -332,7 +332,7 @@ export const updateOver18Status = async (
   contactIds: number[],
   action: string,
 ): Promise<BulkOperationResponse> => {
-  const response = await APIService.getAxiosInstance().post('/contacts/update_child_over_18', {
+  const response = await APIService.getAxiosInstance().post('/contacts/update-child-over-18', {
     contactIds,
     action,
   })

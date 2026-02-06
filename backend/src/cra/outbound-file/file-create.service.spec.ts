@@ -87,7 +87,7 @@ describe('FileCreateService', () => {
       message: 'Success',
     })
 
-    service.createFile(header, details, trailer, 'testuser')
+    service.createFile(header, details, trailer, 'test-destination', 'testuser')
     expect(writeFileSync).toHaveBeenCalled()
   })
 })

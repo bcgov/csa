@@ -1,8 +1,14 @@
 import { CSA_EVENT, CSA_STATUS } from '../constants'
-import { canTransition, getNextState, getValidEvents } from './machine.utils'
+import {
+  canTransition,
+  getNextState,
+  getValidEvents,
+  type TransitionMap,
+  type TransitionTarget,
+} from './machine.utils'
 
-// { [fromState]: { [event]: toState } }
-export const CSA_TRANSITIONS: Record<string, Record<string, string>> = {
+// { [fromState]: { [event]: toState | toState[] } }
+export const CSA_TRANSITIONS: TransitionMap = {
   [CSA_STATUS.ELIGIBLE]: {
     [CSA_EVENT.ADD_TO_BATCH]: CSA_STATUS.IN_BATCH_APPLICATION,
     [CSA_EVENT.SET_NOT_ELIGIBLE]: CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY,
@@ -21,9 +27,12 @@ export const CSA_TRANSITIONS: Record<string, Record<string, string>> = {
   },
   [CSA_STATUS.ON_HOLD]: {
     [CSA_EVENT.SET_NOT_ELIGIBLE]: CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY,
-    // RESUME is handled specially in StateMachineService - target comes from resume_status field
-    // This placeholder allows canTransition to return true for RESUME
-    [CSA_EVENT.RESUME]: CSA_STATUS.ELIGIBLE_TBD,
+    [CSA_EVENT.RESUME]: [
+      CSA_STATUS.ELIGIBLE_TBD,
+      CSA_STATUS.APPLICATION_REFUSED_CRA,
+      CSA_STATUS.NOT_ELIGIBLE_IP_TBD,
+      CSA_STATUS.CANCELLATION_REFUSED_CRA,
+    ],
   },
   [CSA_STATUS.IN_BATCH_APPLICATION]: {
     [CSA_EVENT.SEND_TO_CRA]: CSA_STATUS.BATCH_SENT_APPLICATION,
@@ -52,6 +61,7 @@ export const CSA_TRANSITIONS: Record<string, Record<string, string>> = {
     [CSA_EVENT.BECOME_ELIGIBLE]: CSA_STATUS.IN_PAY,
     [CSA_EVENT.AGE_OUT]: CSA_STATUS.OVER_18,
     [CSA_EVENT.ADD_TO_BATCH]: CSA_STATUS.IN_BATCH_CANCELLATION,
+    [CSA_EVENT.HOLD]: CSA_STATUS.ON_HOLD,
   },
   [CSA_STATUS.IN_BATCH_CANCELLATION]: {
     [CSA_EVENT.SEND_TO_CRA]: CSA_STATUS.BATCH_SENT_CANCELLATION,
@@ -69,7 +79,7 @@ export const CSA_TRANSITIONS: Record<string, Record<string, string>> = {
   [CSA_STATUS.OVER_18]: {},
 }
 
-export const getNextCsaState = (currentState: string, event: string): string =>
+export const getNextCsaState = (currentState: string, event: string): TransitionTarget =>
   getNextState(CSA_TRANSITIONS, currentState, event)
 
 export const canTransitionCsa = (currentState: string, event: string): boolean =>

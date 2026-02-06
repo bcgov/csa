@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
+import { join } from 'path'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 import { CraDetail, CraHeader, CraTrailer } from '../interfaces/file-create.interface'
 
@@ -31,6 +32,7 @@ export class FileCreateService {
     header: CraHeader,
     details: CraDetail[],
     trailer: CraTrailer,
+    destinationId: string,
     craUserId: string = 'testuser',
   ): { filePath: string; fileName: string; recordCount: number } {
     const lines: string[] = []
@@ -46,12 +48,12 @@ export class FileCreateService {
     }
 
     lines.push(this.buildTrailer(trailer))
-    const fileExists = existsSync(this.fileStoragePath)
-    if (!fileExists) {
-      mkdirSync(this.fileStoragePath, { recursive: true })
+    const destinationPath = join(this.fileStoragePath, destinationId)
+    if (!existsSync(destinationPath)) {
+      mkdirSync(destinationPath, { recursive: true })
     }
     const fileName = this.createfileName(craUserId)
-    const outputPath = this.fileStoragePath + fileName
+    const outputPath = join(destinationPath, fileName)
 
     writeFileSync(outputPath, lines.join('\n'), 'utf8')
 

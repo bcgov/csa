@@ -37,6 +37,7 @@ export class SendCraFileHandler extends BaseJob {
       header,
       details,
       trailer,
+      DESTINATION_ID,
     )
     const fileTransferResponse = await this.fileTransferClientService.sendFileToTransferService(
       filePath,

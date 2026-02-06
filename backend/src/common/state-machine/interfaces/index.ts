@@ -19,7 +19,7 @@ export interface BulkTransitionResult {
 
 export interface Transition {
   event: string
-  targetState: string
+  targetState: string | string[]
 }
 
 export interface StateConfig {

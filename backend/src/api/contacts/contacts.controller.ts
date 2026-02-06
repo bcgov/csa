@@ -8,7 +8,7 @@ import { BulkOperationResponse } from './interfaces'
 @ApiTags('contacts')
 @Controller('contacts')
 export class ContactsController {
-  constructor(private readonly contactsService: ContactsService) { }
+  constructor(private readonly contactsService: ContactsService) {}
 
   @Get()
   @ApiQuery({

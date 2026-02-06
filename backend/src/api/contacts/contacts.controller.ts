@@ -123,7 +123,7 @@ export class ContactsController {
     return this.contactsService.resumeContacts(body.contactIds, userId)
   }
 
-  @Post('update-eligibility-status')
+  @Post('set-eligible')
   @ApiBody({
     schema: {
       type: 'object',
@@ -146,7 +146,7 @@ export class ContactsController {
     return this.contactsService.updateEligibilityStatus(body.contactIds, body.action, userId)
   }
 
-  @Post('update-not-eligible-status')
+  @Post('set-not-eligible')
   @ApiBody({
     schema: {
       type: 'object',
@@ -169,7 +169,7 @@ export class ContactsController {
     return this.contactsService.updateNotEligibleStatus(body.contactIds, body.action, userId)
   }
 
-  @Post('update-child-over-18')
+  @Post('age-out')
   @ApiBody({
     schema: {
       type: 'object',

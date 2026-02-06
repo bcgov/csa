@@ -206,7 +206,7 @@ describe('ContactsController', () => {
     })
   })
 
-  describe('POST /contacts/update-eligibility-status', () => {
+  describe('POST /contacts/set-eligible', () => {
     it('should return bulk eligibility status update result', async () => {
       const result = {
         success: [1, 2],
@@ -218,7 +218,7 @@ describe('ContactsController', () => {
       vi.spyOn(service, 'updateEligibilityStatus').mockResolvedValue(result)
 
       return request(app.getHttpServer())
-        .post('/contacts/update-eligibility-status')
+        .post('/contacts/set-eligible')
         .send({ contactIds: [1, 2, 3, 999], action: 'ELIGIBLE' })
         .expect(201)
         .expect(result)
@@ -229,7 +229,7 @@ describe('ContactsController', () => {
       const spy = vi.spyOn(service, 'updateEligibilityStatus').mockResolvedValue(result)
 
       await request(app.getHttpServer())
-        .post('/contacts/update-eligibility-status')
+        .post('/contacts/set-eligible')
         .send({ contactIds: [1, 2, 3], action: 'ELIGIBLE' })
         .expect(201)
 
@@ -237,7 +237,7 @@ describe('ContactsController', () => {
     })
   })
 
-  describe('POST /contacts/update-not-eligible-status', () => {
+  describe('POST /contacts/set-not-eligible', () => {
     it('should return bulk not eligible status update result', async () => {
       const result = {
         success: [1, 2],
@@ -249,7 +249,7 @@ describe('ContactsController', () => {
       vi.spyOn(service, 'updateNotEligibleStatus').mockResolvedValue(result)
 
       return request(app.getHttpServer())
-        .post('/contacts/update-not-eligible-status')
+        .post('/contacts/set-not-eligible')
         .send({ contactIds: [1, 2, 3, 999], action: 'SET_NOT_ELIGIBLE' })
         .expect(201)
         .expect(result)
@@ -260,7 +260,7 @@ describe('ContactsController', () => {
       const spy = vi.spyOn(service, 'updateNotEligibleStatus').mockResolvedValue(result)
 
       await request(app.getHttpServer())
-        .post('/contacts/update-not-eligible-status')
+        .post('/contacts/set-not-eligible')
         .send({ contactIds: [1, 2, 3], action: 'SET_NOT_ELIGIBLE' })
         .expect(201)
 
@@ -268,7 +268,7 @@ describe('ContactsController', () => {
     })
   })
 
-  describe('POST /contacts/update-child-over-18', () => {
+  describe('POST /contacts/age-out', () => {
     it('should return bulk child over 18 status update result', async () => {
       const result = {
         success: [1, 2],
@@ -280,7 +280,7 @@ describe('ContactsController', () => {
       vi.spyOn(service, 'updateChildOver18').mockResolvedValue(result)
 
       return request(app.getHttpServer())
-        .post('/contacts/update-child-over-18')
+        .post('/contacts/age-out')
         .send({ contactIds: [1, 2, 3, 999], action: 'AGE_OUT' })
         .expect(201)
         .expect(result)
@@ -291,7 +291,7 @@ describe('ContactsController', () => {
       const spy = vi.spyOn(service, 'updateChildOver18').mockResolvedValue(result)
 
       await request(app.getHttpServer())
-        .post('/contacts/update-child-over-18')
+        .post('/contacts/age-out')
         .send({ contactIds: [1, 2, 3], action: 'AGE_OUT' })
         .expect(201)
 

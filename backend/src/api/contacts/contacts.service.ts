@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { CSA_EVENT } from 'src/common/state-machine/constants'
+import { CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { ALLOWED_FILTER_SORT_FIELDS, BULK_OPERATION_SKIP_REASONS } from './constants'
@@ -320,6 +320,162 @@ export class ContactsService {
             ? BULK_OPERATION_SKIP_REASONS.NOT_FOUND
             : BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION
         result.skipped.push({ id, reason })
+      }
+    }
+
+    return result
+  }
+
+  async updateEligibilityStatus(
+    contactIds: number[],
+    action: string,
+    userId: string,
+  ): Promise<BulkOperationResponse> {
+    if (action !== 'ELIGIBLE') {
+      throw new BadRequestException(`Invalid action: ${action}. Only 'ELIGIBLE' is supported.`)
+    }
+
+    const result: BulkOperationResponse = {
+      success: [],
+      skipped: [],
+    }
+
+    for (const id of contactIds) {
+      // Fetch the contact to determine current CSA status
+      const contact = await this.prisma.contact.findUnique({
+        where: { id },
+        select: { csaStatus: true },
+      })
+
+      if (!contact) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
+        continue
+      }
+
+      // Determine the appropriate event based on current status
+      let event: string
+      let actor: Actor
+
+      if (contact.csaStatus === CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY) {
+        // not_eligible_out_of_pay -> eligible_tbd using SET_ELIGIBLE_TBD
+        event = CSA_EVENT.SET_ELIGIBLE_TBD
+        actor = 'USER'
+      } else if (contact.csaStatus === CSA_STATUS.NOT_ELIGIBLE_IP_TBD) {
+        // not_eligible_ip_tbd -> in_pay using BECOME_ELIGIBLE
+        event = CSA_EVENT.BECOME_ELIGIBLE
+        actor = 'USER'
+      } else {
+        // Current status is not eligible for this operation
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION })
+        continue
+      }
+
+      const transitionResult = await this.updateCsaStatus(id, event, actor, { userId })
+      if (transitionResult.success) {
+        result.success.push(id)
+      } else {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION })
+      }
+    }
+
+    return result
+  }
+
+  async updateNotEligibleStatus(
+    contactIds: number[],
+    action: string,
+    userId: string,
+  ): Promise<BulkOperationResponse> {
+    if (action !== 'SET_NOT_ELIGIBLE') {
+      throw new BadRequestException(
+        `Invalid action: ${action}. Only 'SET_NOT_ELIGIBLE' is supported.`,
+      )
+    }
+
+    const result: BulkOperationResponse = {
+      success: [],
+      skipped: [],
+    }
+
+    for (const id of contactIds) {
+      // Fetch the contact to determine current CSA status
+      const contact = await this.prisma.contact.findUnique({
+        where: { id },
+        select: { csaStatus: true },
+      })
+
+      if (!contact) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
+        continue
+      }
+
+      // Determine if the current status supports SET_NOT_ELIGIBLE transition
+      // eligible_tbd -> not_eligible_out_of_pay
+      // on_hold -> not_eligible_out_of_pay
+      // in_pay -> not_eligible_ip_tbd
+      const validStatuses = [CSA_STATUS.ELIGIBLE_TBD, CSA_STATUS.ON_HOLD, CSA_STATUS.IN_PAY]
+
+      if (!validStatuses.includes(contact.csaStatus as any)) {
+        // Current status is not eligible for this operation
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION })
+        continue
+      }
+
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.SET_NOT_ELIGIBLE, 'USER', {
+        userId,
+      })
+      if (transitionResult.success) {
+        result.success.push(id)
+      } else {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION })
+      }
+    }
+
+    return result
+  }
+
+  async updateChildOver18(
+    contactIds: number[],
+    action: string,
+    userId: string,
+  ): Promise<BulkOperationResponse> {
+    if (action !== 'AGE_OUT') {
+      throw new BadRequestException(`Invalid action: ${action}. Only 'AGE_OUT' is supported.`)
+    }
+
+    const result: BulkOperationResponse = {
+      success: [],
+      skipped: [],
+    }
+
+    for (const id of contactIds) {
+      // Fetch the contact to determine current CSA status
+      const contact = await this.prisma.contact.findUnique({
+        where: { id },
+        select: { csaStatus: true },
+      })
+
+      if (!contact) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
+        continue
+      }
+
+      // Determine if the current status supports AGE_OUT transition
+      // eligible_tbd -> over_18
+      // not_eligible_ip_tbd -> over_18
+      const validStatuses = [CSA_STATUS.ELIGIBLE_TBD, CSA_STATUS.NOT_ELIGIBLE_IP_TBD]
+
+      if (!validStatuses.includes(contact.csaStatus as any)) {
+        // Current status is not eligible for this operation
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION })
+        continue
+      }
+
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.AGE_OUT, 'USER', { userId })
+      if (transitionResult.success) {
+        result.success.push(id)
+      } else {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION })
       }
     }
 

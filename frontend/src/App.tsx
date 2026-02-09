@@ -924,14 +924,19 @@ function App() {
     if (selected.length === 0) return
 
     try {
-      const response = await updateEligibilityStatus(selected, 'system')
+      const response = await updateEligibilityStatus(selected, 'ELIGIBLE')
 
       // Show results
-      let message = `Successfully updated ${response.successCount} contact(s)`
-      if (response.failedCount > 0) {
-        message += `. ${response.failedCount} failed`
-        if (response.failed.length <= 3) {
-          const reasons = response.failed.map((f) => `ID ${f.contactId}: ${f.reason}`).join(', ')
+      let message = `Successfully updated ${response.success.length} contact(s)`
+      if (response.skipped.length > 0) {
+        message += `. ${response.skipped.length} skipped`
+        if (response.skipped.length <= 3) {
+          const reasons = response.skipped
+            .map((skip) => {
+              const reasonText = skip.reason.replace(/_/g, ' ')
+              return `ID ${skip.id}: ${reasonText}`
+            })
+            .join(', ')
           message += `: ${reasons}`
         }
       }
@@ -939,14 +944,14 @@ function App() {
       setSnackbar({
         open: true,
         message,
-        severity: response.successCount > 0 ? 'success' : 'error',
+        severity: response.success.length > 0 ? 'success' : 'error',
       })
 
       // Clear selection
       setSelected([])
 
       // Reload contacts to reflect the changes
-      if (response.successCount > 0) {
+      if (response.success.length > 0) {
         const apiFilters = [
           'All Records',
           'Pending User review/action',
@@ -983,14 +988,19 @@ function App() {
     if (selected.length === 0) return
 
     try {
-      const response = await updateNotEligibleStatusAlt(selected, 'system')
+      const response = await updateNotEligibleStatusAlt(selected, 'SET_NOT_ELIGIBLE')
 
       // Show results
-      let message = `Successfully updated ${response.successCount} contact(s) to not eligible`
-      if (response.failedCount > 0) {
-        message += `. ${response.failedCount} failed`
-        if (response.failed.length <= 3) {
-          const reasons = response.failed.map((f) => `ID ${f.contactId}: ${f.reason}`).join(', ')
+      let message = `Successfully updated ${response.success.length} contact(s) to not eligible`
+      if (response.skipped.length > 0) {
+        message += `. ${response.skipped.length} skipped`
+        if (response.skipped.length <= 3) {
+          const reasons = response.skipped
+            .map((skip) => {
+              const reasonText = skip.reason.replace(/_/g, ' ')
+              return `ID ${skip.id}: ${reasonText}`
+            })
+            .join(', ')
           message += `: ${reasons}`
         }
       }
@@ -998,14 +1008,14 @@ function App() {
       setSnackbar({
         open: true,
         message,
-        severity: response.successCount > 0 ? 'success' : 'error',
+        severity: response.success.length > 0 ? 'success' : 'error',
       })
 
       // Clear selection
       setSelected([])
 
       // Reload contacts to reflect the changes
-      if (response.successCount > 0) {
+      if (response.success.length > 0) {
         const apiFilters = [
           'All Records',
           'Pending User review/action',
@@ -1044,14 +1054,19 @@ function App() {
     if (selected.length === 0) return
 
     try {
-      const response = await updateOver18Status(selected, 'system')
+      const response = await updateOver18Status(selected, 'AGE_OUT')
 
       // Show results
-      let message = `Successfully updated ${response.successCount} contact(s) to Over 18`
-      if (response.failedCount > 0) {
-        message += `. ${response.failedCount} failed`
-        if (response.failed.length <= 3) {
-          const reasons = response.failed.map((f) => `ID ${f.contactId}: ${f.reason}`).join(', ')
+      let message = `Successfully updated ${response.success.length} contact(s) to Over 18`
+      if (response.skipped.length > 0) {
+        message += `. ${response.skipped.length} skipped`
+        if (response.skipped.length <= 3) {
+          const reasons = response.skipped
+            .map((skip) => {
+              const reasonText = skip.reason.replace(/_/g, ' ')
+              return `ID ${skip.id}: ${reasonText}`
+            })
+            .join(', ')
           message += `: ${reasons}`
         }
       }
@@ -1059,14 +1074,14 @@ function App() {
       setSnackbar({
         open: true,
         message,
-        severity: response.successCount > 0 ? 'success' : 'error',
+        severity: response.success.length > 0 ? 'success' : 'error',
       })
 
       // Clear selection
       setSelected([])
 
       // Reload contacts to reflect the changes
-      if (response.successCount > 0) {
+      if (response.success.length > 0) {
         const apiFilters = [
           'All Records',
           'Pending User review/action',

@@ -63,8 +63,6 @@ async function seedContacts() {
     const age = new Date().getFullYear() - birthDate.getFullYear()
     const firstName = faker.person.firstName()
     const middle = faker.person.middleName()
-    const searchText = `${firstName} ${middle} ${faker.person.lastName()} ${faker.string.alphanumeric(5)}`
-
 
     const effectiveDate = faker.date.past({ years: 2 })
     const expiryDate = ensureAfter(effectiveDate, 730) // DATE after effective_date
@@ -96,7 +94,6 @@ async function seedContacts() {
       middleName: middle, // NOT NULL
       akaLastName: faker.person.lastName(),
       akaFirstName: faker.person.firstName(),
-      searchText,
 
       personIdIcm: faker.string.alphanumeric(10).toUpperCase(),
       personIdMis: faker.string.alphanumeric(10).toUpperCase(),
@@ -165,12 +162,23 @@ async function seedContacts() {
       lastUpdatedBy: 'seed',
     }
   })
-  // clear existing data first
-  await prisma.contact.deleteMany()
-  console.log('Cleared existing contacts', JSON.stringify(contacts, null, 2)  )
 
   await prisma.contact.createMany({ data: contacts })
   console.log(`Seeded ${CONTACT_COUNT} contacts.`)
+}
+
+async function cleanupDatabase() {
+  console.log('Cleaning up existing data...')
+  // Delete in order respecting foreign key constraints
+  // contact_batch_details references both contacts and batches
+  await prisma.contactBatchDetail.deleteMany()
+  console.log('Cleared existing contact batch details')
+
+  await prisma.contact.deleteMany()
+  console.log('Cleared existing contacts')
+
+  await prisma.batch.deleteMany()
+  console.log('Cleared existing batches')
 }
 
 async function seedBatches() {
@@ -200,10 +208,6 @@ async function seedBatches() {
       systemComments: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.5 }),
     })
   }
-
-  // Clear existing data first
-  await prisma.batch.deleteMany()
-  console.log('Cleared existing batches')
 
   await prisma.batch.createMany({ data: batches })
   console.log('Seeded 6 batches.')
@@ -245,10 +249,6 @@ async function seedContactBatchDetails() {
     }
   }
 
-  // Clear existing data first
-  await prisma.contactBatchDetail.deleteMany()
-  console.log('Cleared existing contact batch details')
-
   await prisma.contactBatchDetail.createMany({ data: contactBatchDetails })
   console.log(`Seeded ${contactBatchDetails.length} contact batch details.`)
 }
@@ -259,6 +259,7 @@ async function main() {
     process.exit(1)
   }
   console.log(`Starting seed with ${CONTACT_COUNT} contacts...`)
+  await cleanupDatabase()
   await seedContacts()
   await seedBatches()
   await seedContactBatchDetails()

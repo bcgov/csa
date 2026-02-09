@@ -1,5 +1,17 @@
 export const CRA_DATA_HANDLING_CONSTANT = {
   FILE_NAME_PREFIX: 'HT',
+  CRA_USERID: 'craUserId',
+  DESTINATION_ID: 'cra-ftp',
+  LOCAL_DIR: {
+    INBOUND: 'inbound',
+    OUTBOUND: 'outbound'
+  },
+  FILE_DIRECTION:{
+    INBOUND: 'INBOUND',
+    OUTBOUND: 'OUTBOUND'
+  },
+
+
   REQUEST_FILE: {
     HEADER_TRAN_CODE: 6133,
     DETAIL_TRAN_CODE: 6134,
@@ -104,6 +116,6 @@ export const CRA_DATA_HANDLING_CONSTANT = {
     COMPLETED: 'COMPLETED',
     PENDING: 'PENDING',
   },
-  CRA_USERID: 'craUserId',
-  DESTINATION_ID: 'cra-ftp',
+
+
 }

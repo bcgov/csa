@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { readFileSync } from 'fs'
-import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
+import { CRA_DATA_HANDLING_CONSTANT } from '../common/constants/cra.constant'
 import { CraResHeader, CraResDetail, CraResTrailer } from '../interfaces/response-file.interface'
 
 const { RESPONSE_FILE } = CRA_DATA_HANDLING_CONSTANT
@@ -53,7 +53,7 @@ export class ResponseFileService {
 
   private parseHeader(line: string): CraResHeader {
     return {
-      tranCode: this.slice(line, 0, 4), // 6118
+      tranCode: parseInt(this.slice(line, 0, 4),10), // 6118
       versionNum: this.slice(line, 4, 5),
       processDate: this.slice(line, 9, 8),
       businessNum: this.slice(line, 17, 15),
@@ -62,19 +62,19 @@ export class ResponseFileService {
   }
   private parseDetail(line: string): any {
     return {
-      tranCode: parseInt(this.slice(line, 0, 4)),
-      fileStatCd: parseInt(this.slice(line, 4, 2)),
-      tranStatCd: parseInt(this.slice(line, 6, 1)),
+      tranCode: parseInt(this.slice(line, 0, 4),10),
+      fileStatCd: parseInt(this.slice(line, 4, 2),10),
+      tranStatCd: parseInt(this.slice(line, 6, 1),10),
       rejectCd1: this.slice(line, 7, 3),
       rejectCd2: this.slice(line, 10, 3),
       rejectCd3: this.slice(line, 13, 3),
       rejectCd4: this.slice(line, 16, 3),
       rejectCd5: this.slice(line, 19, 3),
 
-      outTranCode: parseInt(this.slice(line, 22, 4)),
+      outTranCode: parseInt(this.slice(line, 22, 4),10),
       referenceNum: this.slice(line, 26, 20),
       businessNum: this.slice(line, 46, 15),
-      tranType: parseInt(this.slice(line, 61, 1)),
+      tranType: parseInt(this.slice(line, 61, 1),10 ),
 
       childGivenName: this.slice(line, 62, 30),
       childInitial: this.slice(line, 92, 1),
@@ -106,7 +106,7 @@ export class ResponseFileService {
 
   private parseTrailer(line: string): CraResTrailer {
     return {
-      tranCode: this.slice(line, 0, 4), // 6120
+      tranCode: parseInt(this.slice(line, 0, 4),10), // 6120
       versionNum: this.slice(line, 4, 5),
       processDate: this.slice(line, 9, 8),
       businessNum: this.slice(line, 17, 15),

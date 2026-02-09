@@ -63,7 +63,7 @@ export class JobRunner {
         }
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error))
-        this.logger.warn(`Job ${jobId} inline attempt ${attempt + 1} failed: ${lastError.message}`)
+        this.logger.warn(`Job ${jobId} inline attempt ${attempt + 1} failed: ${lastError.message} stack:${error?.stack}`)
       }
     }
 

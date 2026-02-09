@@ -196,6 +196,7 @@ async function seedBatches() {
       status: batchStatuses[i],
       recordCount: faker.number.int({ min: 5, max: 50 }),
       createdAt: batchDate,
+      updatedAt: batchDate,
       systemComments: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.5 }),
     })
   }

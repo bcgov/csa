@@ -17,6 +17,7 @@ class PrismaService
     if (PrismaService.instance) {
       return PrismaService.instance
     }
+    console.log('Initializing PrismaService with database URL:', databaseConfig.url)
     const pool = new Pool({ connectionString: databaseConfig.url })
     const adapter = new PrismaPg(pool)
     super({

@@ -7,20 +7,13 @@ export const adminConfig = registerAs('admin', () => {
   const keycloakClientId = process.env.KEYCLOAK_CLIENT_ID
   const keycloakClientSecret = process.env.KEYCLOAK_CLIENT_SECRET
 
-  if (!icmApiUrl) {
-    throw new Error('ICM_API_URL is required')
-  }
-  if (!icmTrustedUsername) {
-    throw new Error('ICM_TRUSTED_USERNAME is required')
-  }
-  if (!keycloakTokenUrl) {
-    throw new Error('KEYCLOAK_TOKEN_URL is required')
-  }
-  if (!keycloakClientId) {
-    throw new Error('KEYCLOAK_CLIENT_ID is required')
-  }
-  if (!keycloakClientSecret) {
-    throw new Error('KEYCLOAK_CLIENT_SECRET is required')
+  const useMockData = process.env.USE_MOCK_DATA === 'true'
+  if (!useMockData) {
+    if (!icmApiUrl) throw new Error('ICM_API_URL is required')
+    if (!icmTrustedUsername) throw new Error('ICM_TRUSTED_USERNAME is required')
+    if (!keycloakTokenUrl) throw new Error('KEYCLOAK_TOKEN_URL is required')
+    if (!keycloakClientId) throw new Error('KEYCLOAK_CLIENT_ID is required')
+    if (!keycloakClientSecret) throw new Error('KEYCLOAK_CLIENT_SECRET is required')
   }
 
   return {

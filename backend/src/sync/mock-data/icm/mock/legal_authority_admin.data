@@ -1,0 +1,3987 @@
+{
+   "items":    [
+            {
+         "Duration": "12",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order (No Grounds for Removal) - Consent (60&42.2(3))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/23/2025 09:29:07",
+         "Legal Auth Code": "SGC-SupOrd-Cons(NoG)60&42.2(3)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SGC",
+         "Id": "1-3KDJQTX",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "GUESTCST",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-50HYEUS",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQTX",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQTX",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "12",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order-Consent (60&42.2(4)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "SNC-Sup Ord-Cons-60&42.2(4)(a)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SNC",
+         "Id": "1-3KDJQTY",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQTY",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQTY",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "12",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Special Needs Agreement-Non Protection (7(1))",
+         "By Agreement Flag": "Y",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:49:34",
+         "Legal Auth Code": "SNN-SNA-Non-Protection 7(1)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SNN",
+         "Id": "1-3KDJQTZ",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQTZ",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQTZ",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "12",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Special Needs Agreement-Protection (7(1))",
+         "By Agreement Flag": "Y",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:50:57",
+         "Legal Auth Code": "SNP-SNA-Protection 7(1)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SNP",
+         "Id": "1-3KDJQU0",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU0",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU0",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order (Custody Of Other)-Consent (60&41(1)(b))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "SOC-Sup Ord-Cons(60&41(1)(b))",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SOC",
+         "Id": "1-3KDJQU1",
+         "Unit": "",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU1",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU1",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "12",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order (42.2(4)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "SON-Supervision Ord 42.2(4)(a)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SON",
+         "Id": "1-3KDJQU2",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU2",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU2",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order (Custody Of Other) (42.2(4)(c))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "Sup Ord(Cust Other)-42.2(4)(c)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SOP",
+         "Id": "1-3KDJQU3",
+         "Unit": "",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU3",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU3",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order (Custody Of Other) (41(1)(b))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "Sup Ord(Cust Other)-41(1)(b)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SOT",
+         "Id": "1-3KDJQU4",
+         "Unit": "",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU4",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU4",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order - Consent (60&41(1)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "SPC-Sup Order-Cons-60&41(1)(a)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SPC",
+         "Id": "1-3KDJQU5",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU5",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU5",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "12",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Special Needs Agreement (7(1)) - CYSN",
+         "By Agreement Flag": "Y",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:51:25",
+         "Legal Auth Code": "SPN-Special Needs Agreemnt (7)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SPN",
+         "Id": "1-3KDJQU7",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU7",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU7",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order (Cust Of Other) (60&42.2(4)(c)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "SO(CustOth)Cons (60&42.2(4)(c)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SRC",
+         "Id": "1-3KDJQU8",
+         "Unit": "",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU8",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU8",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Stacked Supervision Order-Consent (60&41(1.1))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:59:33",
+         "Legal Auth Code": "SSC-Stkd SupOrdCons-60&41(1.1)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SSC",
+         "Id": "1-3KDJQU9",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU9",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQU9",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "12",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order (No Grounds for Removal) (42.2(3))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "SSO-SupOrd(NoGrounds)-42 (2.3)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SSO",
+         "Id": "1-3KDJQUA",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUA",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUA",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Stacked Supervision Order (41(1.1))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "SST-Stacked Sup Order 41(1.1)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SST",
+         "Id": "1-3KDJQUB",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUB",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUB",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order After Temporary Custody Order-Consent (60&46)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "STC-Sup Order After TCO-60&46",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "STC",
+         "Id": "1-3KDJQUC",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUC",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUC",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order After Temporary Custody Order (46)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "STM-Sup Order After TCO-46",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "STM",
+         "Id": "1-3KDJQUD",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUD",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUD",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order (If No CCO)-Consent (60&49(8))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "SUC-SupOrd-Cons(NoCCO)60&49(8)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SUC",
+         "Id": "1-3KDJQUE",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUE",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUE",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order (If No CCO) (49(8))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "SUP-Sup Order-(No CCO)-49(8)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SUP",
+         "Id": "1-3KDJQUF",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUF",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUF",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order Without Removal-Consent (60&41(2.1))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "SWC-Sup Ord W/O Rem 60&41(2.1)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SWC",
+         "Id": "1-3KDJQUG",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUG",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUG",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "TBD",
+         "Legal Auth Desc": "Support Services For Youth (12.1)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:57:59",
+         "Legal Auth Code": "SSY-Suppt Services-Youth-12.1",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SSY",
+         "Id": "1-3KDJQUH",
+         "Unit": "",
+         "In Care": "SSY",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUH",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUH",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order Without Removal (41(2.1))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "SWR-Sup Ord W/O Rem 41(2.1)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SWR",
+         "Id": "1-3KDJQUI",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUI",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUI",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order (Extension)-Consent (60&44(3)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "SXC-SupOrdCons(Ext)60&44(3)(a)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SXC",
+         "Id": "1-3KDJQUJ",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUJ",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUJ",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order (Extension) (44(3)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "SXT-Sup Ord (Ext)-44(3)(a)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SXT",
+         "Id": "1-3KDJQUK",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUK",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUK",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "12",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of the Director-Consent (60&41(1)(c))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "TDC-TCO-Consent-60&41(1)(c)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "TDC",
+         "Id": "1-3KDJQUL",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUL",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUL",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "12",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of the Director (41(1)(c))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "TDR-TCO (Cust Dir)-41(1)(c)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "TDR",
+         "Id": "1-3KDJQUM",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUM",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUM",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Temporary Custody Order-Consent (60&49(7)(b))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "TMC-TCO (60&49(7)(b))",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "TMC",
+         "Id": "1-3KDJQUN",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "N",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUN",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUN",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Temporary Custody Order 49(7)(b)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "TMP-TCO 49(7)(b)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "TMP",
+         "Id": "1-3KDJQUO",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "N",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUO",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUO",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "12",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of the Director-Consent (60&42.2(4)(b))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "TSC-TCO-Consent-60&42.2(4)(b)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "TSC",
+         "Id": "1-3KDJQUP",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUP",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUP",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "12",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of the Director (42.2(4)(b))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "TSO-TCO 42.2(4)(b)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "TSO",
+         "Id": "1-3KDJQUQ",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUQ",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUQ",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Temporary Custody Order (Extension)-Consent(60&44.3(b))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "TCO (Ext)-Cons(60&44.3(b))",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "TXA",
+         "Id": "1-3KDJQUR",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "N",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUR",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUR",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Temporary Custody Order (Extension) (44.3(b))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "TCO (Extension) (44.3b)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "TXB",
+         "Id": "1-3KDJQUS",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "N",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUS",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUS",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "24",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of the Director (Extension)-Consent (60&44(3)(b))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "TXC-TCO (Ext)-Cons-60&44(3)(b)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "TXC",
+         "Id": "1-3KDJQUT",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUT",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUT",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "30",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Voluntary Care Agreement-Grace Period (6(8))",
+         "By Agreement Flag": "Y",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:52:13",
+         "Legal Auth Code": "VCG-VCA-Grace Period-6(8)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "VCG",
+         "Id": "1-3KDJQUU",
+         "Unit": "Day(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUU",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUU",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "24",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of the Director (Extension) (44(3)(b))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "TXT-TCO (Ext)-44(3)(b)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "TXT",
+         "Id": "1-3KDJQUV",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUV",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUV",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "3",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Take Charge - Unattended Child (25(1))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "UNC-Unattended Child-25(1)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "UNC",
+         "Id": "1-3KDJQUW",
+         "Unit": "Day(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUW",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUW",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Voluntary Care Agreement (6)",
+         "By Agreement Flag": "Y",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:52:09",
+         "Legal Auth Code": "VCA-VCA-(6)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "VCA",
+         "Id": "1-3KDJQUX",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUX",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUX",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Voluntary Care Agreement-Non Protection (6(1))",
+         "By Agreement Flag": "Y",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:52:16",
+         "Legal Auth Code": "VCN-VCA-Non-Protection-6(1)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "VCN",
+         "Id": "1-3KDJQUY",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUY",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUY",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Voluntary Care Agreement-Protection (6(1))",
+         "By Agreement Flag": "Y",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:52:20",
+         "Legal Auth Code": "VCP-VCA-Protection-6(1)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "VCP",
+         "Id": "1-3KDJQUZ",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUZ",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQUZ",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Youth Agreement (12.2)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "YAG-Youth Agreement 12.2",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "YAG",
+         "Id": "1-3KDJQV0",
+         "Unit": "",
+         "In Care": "YAG",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV0",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV0",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Infant Act Section 51 - No guardian or appointed guardian is dead, refuses or is incompetent.",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "Infant Act S.51 - No Guardian",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ING",
+         "Id": "1-3KDJQV1",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV1",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV1",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Adjournment Of Court Hearing Date",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "ADJ-Adjournment Of Crt Hearing",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ADJ",
+         "Id": "1-3KDJQV2",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV2",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV2",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "TBD",
+         "Legal Auth Desc": "Adoption Act(24)-By Adoption Consent",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:57:59",
+         "Legal Auth Code": "ADO-Adoption Act-24",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "Y",
+         "MIS Legal Auth Code": "ADO",
+         "Id": "1-3KDJQV3",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV3",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV3",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Agreement With Child's Kin Or Others (8)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "AKO-Kin or Other",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "AKO",
+         "Id": "1-3KDJQV4",
+         "Unit": "",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "N",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV4",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV4",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "TBD",
+         "Legal Auth Desc": "ADT-Adoption Act(23)-Transfer of Care and Custody",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:57:59",
+         "Legal Auth Code": "ADT-Adoption Act-23",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "Y",
+         "MIS Legal Auth Code": "ADT",
+         "Id": "1-3KDJQV5",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV5",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV5",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Associate Family Program (93(d))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "AFP-Associate Family Program",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "AFP",
+         "Id": "1-3KDJQV6",
+         "Unit": "",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV6",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV6",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Cancel Continuing Custody Order (s.54)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "Cancel CCO (s.54)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ECO",
+         "Id": "1-3KDJQV7",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV7",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV7",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Continuing Custody Order (41(1)(d))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "CAA-CCO-41(1)(d)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "Y",
+         "MIS Legal Auth Code": "CAA",
+         "Id": "1-3KDJQV8",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV8",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV8",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Continuing Custody Order-Consent (60&41(1)(d)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "CAC-CCO-Consent-60&41(1)(d)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "Y",
+         "MIS Legal Auth Code": "CAC",
+         "Id": "1-3KDJQV9",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV9",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQV9",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Continuing Custody Order (49(4)/(5))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "CBB-CCO-49(4)/(5)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "Y",
+         "MIS Legal Auth Code": "CBB",
+         "Id": "1-3KDJQVA",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVA",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVA",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Continuing Custody Order-Consent (60&49(4)/(5))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "CBC-CCO-Consent-60&49(4)/(5)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "Y",
+         "MIS Legal Auth Code": "CBC",
+         "Id": "1-3KDJQVB",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVB",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVB",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Continuing Custody Order (49(10)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "CCA-CCO-49(10)(a)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "Y",
+         "MIS Legal Auth Code": "CCA",
+         "Id": "1-3KDJQVC",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVC",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVC",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Continuing Custody Order-Consent (60&49(10)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "CCC-CCO-Consent-60&49(10)(a)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "Y",
+         "MIS Legal Auth Code": "CCC",
+         "Id": "1-3KDJQVD",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVD",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVD",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Continuing Custody Order After Removal from Supervision-Consent (60&42.2(4)(d))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "CSC-CCO-Consent-60&42.2(4)(d)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "Y",
+         "MIS Legal Auth Code": "CSC",
+         "Id": "1-3KDJQVE",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVE",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVE",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Continuing Custody Order After Removal from Supervision (42.2(4)(d))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "CSO-CCO-42.2(4)(d)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "Y",
+         "MIS Legal Auth Code": "CSO",
+         "Id": "1-3KDJQVF",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVF",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVF",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "1",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Take Charge - Child In Immediate Danger (27(1))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "DGR-Child In Imm Danger-27(1)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "DGR",
+         "Id": "1-3KDJQVG",
+         "Unit": "Day(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVG",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVG",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "FRA Ward (29)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "FRA-FRA Ward (Section 29)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "FRA",
+         "Id": "1-3KDJQVH",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVH",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVH",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "TBD",
+         "Legal Auth Desc": "FRA Ward (Other)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:57:59",
+         "Legal Auth Code": "FRO-FRA Ward (Other)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "FRO",
+         "Id": "1-3KDJQVI",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVI",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVI",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Interim Custody of Director-Consent (60&35.2a)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "ICC-Intrm Ord-Cons-60&35(2)(a)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ICC",
+         "Id": "1-3KDJQVJ",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "N",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVJ",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVJ",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Interim Order (35(2)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "ICD-Interim Order-35(2)(a)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ICD",
+         "Id": "1-3KDJQVK",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVK",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVK",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Interim Custody of Director (36(3)(b)(ii))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "ICF-Interim-36(3)(b)(ii)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ICF",
+         "Id": "1-3KDJQVL",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVL",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVL",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Interim Order Custody Of Other-Consent (60&35(2)(d))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "Int Ord Cus OthCons60&35(2)(d)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ICN",
+         "Id": "1-3KDJQVM",
+         "Unit": "",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVM",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVM",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Interim Order Custody Of Other (35(2) (d))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "Int Ord Cus Oth (35(2)(d))",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ICO",
+         "Id": "1-3KDJQVN",
+         "Unit": "",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVN",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVN",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Interim Custody of Director After Removal from Supervision (42.1(6)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "ICP-Interim Order-42.1(6)(a)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ICP",
+         "Id": "1-3KDJQVO",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVO",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVO",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Interim Supervision Order-Consent (60&35(2)(b))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "ISC-Intrm Sup-Cons-60&35(2)(b)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ISC",
+         "Id": "1-3KDJQVP",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "N",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVP",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVP",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Interim Order(Supervision Of Director) (35(2)(b))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "ISD-Interim Sup-35(2)(b)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ISD",
+         "Id": "1-3KDJQVQ",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVQ",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVQ",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Interim Supervision Order (36(3)(b)(i))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "ISF-Interim Sup-36(3)(b)(i)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ISF",
+         "Id": "1-3KDJQVR",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVR",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVR",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Interim Order (Supervision Of Director) (42.1(6)(b))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "ISP-Interim Sup-42.1(6)(b)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ISP",
+         "Id": "1-3KDJQVS",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVS",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVS",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Interim Supervision Order (No Grounds for Removal)  (36(3)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "ISR-Interim Sup-36(3)(a)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ISR",
+         "Id": "1-3KDJQVT",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVT",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVT",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Interim Order (Supervision Of Director) Without Removal(33.2(2))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "ISW-Interim Sup-33.2(2)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ISW",
+         "Id": "1-3KDJQVU",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVU",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVU",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Adoption Order - Adoption Act (35)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": " OAD-Adopt Order-Adopt Act-35",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "OAD",
+         "Id": "1-3KDJQVV",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVV",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVV",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Extended Family Program (8)",
+         "By Agreement Flag": "Y",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "OFP-Extended Fam Program-(8)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "OFP",
+         "Id": "1-3KDJQVW",
+         "Unit": "Month(s)",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVW",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVW",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Interim Custody of Other Person-Consent (35(2)(d) &60)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "OIC-Int Custody-Other-Consent",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "OIC",
+         "Id": "1-3KDJQVX",
+         "Unit": "",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVX",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVX",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Interim Custody of Other Person (35(2)(d))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "OIO-Int Custody-Other-35(2)(d)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "OIO",
+         "Id": "1-3KDJQVY",
+         "Unit": "",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVY",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVY",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Permanent Custody Transfer  to Care of Other Person- Consent (54.01&60)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "OPC-Perm Cust Trans-Cons-54.01",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "OPC",
+         "Id": "1-3KDJQVZ",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVZ",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQVZ",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Permanent Custody Transfer to Care of Other Person (54.01)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "OPO-Perm Custody Trans-54.01",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "OPO",
+         "Id": "1-3KDJQW0",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW0",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW0",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Permanent Custody Transfer to Care of Other Person from CCO (54.1)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "OPT-Perm Custody Trans-54.1",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "OPT",
+         "Id": "1-3KDJQW1",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW1",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW1",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "12",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of Other Person-Consent (41(1)(b)or42.2(4)(c)or54.01(9)(b)/&60)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "OTC-Temp Custody-Other-Consent",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "OTC",
+         "Id": "1-3KDJQW2",
+         "Unit": "Month(s)",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW2",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW2",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Other Province/Country (100)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "OTH-Other Prov/Country (100)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "Y",
+         "MIS Legal Auth Code": "OTH",
+         "Id": "1-3KDJQW3",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW3",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW3",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "12",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of Other Person 41(1)(b), 42.2(4)(c), 54.01(9)(b)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "OTO-Temporary Custody-Other",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "OTO",
+         "Id": "1-3KDJQW4",
+         "Unit": "Month(s)",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW4",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW4",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "24",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of Other Person (Extension)-Consent (44(3)(b),44.1(3)&60)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "OXC-Temp Cust-Other-(Ext)-Cons",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "OXC",
+         "Id": "1-3KDJQW5",
+         "Unit": "Month(s)",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW5",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW5",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "24",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of Other Person (Extension)  (44(3)(b),44.1(3))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "OXO-Temp Custody-Other-(Ext)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "OXO",
+         "Id": "1-3KDJQW6",
+         "Unit": "Month(s)",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW6",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW6",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Pending Service",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "PEN-Pending Service",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "PEN",
+         "Id": "1-3KDJQW7",
+         "Unit": "",
+         "In Care": "SSY",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "N",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW7",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW7",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Removed Child (Breach Of Interim Order) (35.3b)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "Rem Child(Br Intrm Ord)(35.3b)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "RMB",
+         "Id": "1-3KDJQW8",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "N",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW8",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW8",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "7",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Removed Child (Immediate Danger) (30(1)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "RMD-Removed Child-30(1)(a)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "RMD",
+         "Id": "1-3KDJQW9",
+         "Unit": "Day(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW9",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQW9",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "7",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Removed Child (Interim Not Protecting) (36(1))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "RMI-Removed Child-36(1)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "RMI",
+         "Id": "1-3KDJQWA",
+         "Unit": "Day(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQWA",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQWA",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "7",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Removed Child (No Other Measure Available) (30(1)(b))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "RMN-Removed Child 30(1)(b)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "RMN",
+         "Id": "1-3KDJQWB",
+         "Unit": "Day(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQWB",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQWB",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "7",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Removed Child (Supervision Order Not Protecting/Breach) (42(1))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "RMS-Removed Child 42(1)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "RMS",
+         "Id": "1-3KDJQWC",
+         "Unit": "Day(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQWC",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQWC",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "3",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Take Charge - Lost Or Runaway Child (26(1))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "RUN-Lost/Runaway Child-26(1)",
+         "Created By Name": "PRSINGH",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "RUN",
+         "Id": "1-3KDJQWD",
+         "Unit": "Day(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/11/2014 20:18:19",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-35FLI3E",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQWD",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3KDJQWD",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Supervision Order (41(1)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "SPT-Supervision Order 41(1)(a)",
+         "Created By Name": "INFRAUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SPT",
+         "Id": "1-3Y6463V",
+         "Unit": "Month(s)",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "03/17/2015 17:10:28",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-3UINTAM",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3Y6463V",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3Y6463V",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Guardianship of the Director under Infants Act (51)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "INF-Infants Act-51",
+         "Created By Name": "SIEBEL_EAI",
+         "Eligible for Adoption": "Y",
+         "MIS Legal Auth Code": "INF",
+         "Id": "1-40ZN8NU",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "09/10/2015 18:50:26",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-A6IS",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-40ZN8NU",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-40ZN8NU",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "Y",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of Other Person-(If no CCO) (49(7)(b))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "OMR-TempCustOth(NoCCO)49(7)(b)",
+         "Created By Name": "SIEBEL_EAI",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "OMR",
+         "Id": "1-40ZN8NW",
+         "Unit": "Month(s)",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "09/10/2015 19:07:00",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-A6IS",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-40ZN8NW",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-40ZN8NW",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "30",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Special Needs Agreement-Grace Period (7(3))",
+         "By Agreement Flag": "Y",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:49:06",
+         "Legal Auth Code": "SNG-SNA-Grace Period 7(3)",
+         "Created By Name": "SIEBEL_EAI",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SNG",
+         "Id": "1-411HL5D",
+         "Unit": "Day(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "09/14/2015 17:38:31",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-A6IS",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-411HL5D",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-411HL5D",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of the Director (If no CCO)-Consent 60&49(7)(c)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "TMD-TCO-Consent-60&49(7)(c)",
+         "Created By Name": "BIPUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "TMD",
+         "Id": "1-3XT36GE",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "01/15/2015 21:50:05",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-1JKK0NJ",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3XT36GE",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3XT36GE",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of the Director (If no CCO) (49(7)(c))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "TMN-TCO-49(7)(c)",
+         "Created By Name": "BIPUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "TMN",
+         "Id": "1-3XT36GF",
+         "Unit": "Month(s)",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "01/15/2015 21:50:54",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-1JKK0NJ",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3XT36GF",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3XT36GF",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "6",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of Other Person-(If no CCO)-Consent (60&49(7)(b))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "OMO-TempCustOther(NoCCO)-Cons",
+         "Created By Name": "BIPUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "OMO",
+         "Id": "1-3XT36GG",
+         "Unit": "Month(s)",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "01/15/2015 21:52:01",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-1JKK0NJ",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3XT36GG",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-3XT36GG",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of Other Person - Consent (Extension (45(1.1)))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "OLC-OTC (Ext)-45(1.1)-Cons",
+         "Created By Name": "INFRAUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "OLC",
+         "Id": "1-4SSULK4",
+         "Unit": "",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/25/2020 19:48:51",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-3UINTAM",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4SSULK4",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4SSULK4",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of Other Person (Extension (45(1.1)))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "OLX-OTO (Ext)-45(1.1)",
+         "Created By Name": "INFRAUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "OLX",
+         "Id": "1-4SSULK6",
+         "Unit": "",
+         "In Care": "OOC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/25/2020 19:48:51",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-3UINTAM",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4SSULK6",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4SSULK6",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of the Director - Consent (Extension (45(1.1)))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "TLC-TCO (Ext)-45(1.1)-Cons",
+         "Created By Name": "INFRAUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "TLC",
+         "Id": "1-4SSULK8",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/25/2020 19:48:51",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-3UINTAM",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4SSULK8",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4SSULK8",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "Temporary Custody of the Director (Extension (45(1.1)))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "TLX-TCO (Ext)-45(1.1)",
+         "Created By Name": "INFRAUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "TLX",
+         "Id": "1-4SSULKA",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "06/25/2020 19:48:51",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-3UINTAM",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4SSULKA",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4SSULKA",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "NOT in Care - e.g. Accessing SHSS through Disability Services",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "NIC - Not in Care",
+         "Created By Name": "INFRAUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "NIC",
+         "Id": "1-4X8BJ87",
+         "Unit": "",
+         "In Care": "NIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "11/07/2022 20:36:50",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-3UINTAM",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4X8BJ87",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4X8BJ87",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "Y",
+         "Enroll for CSA": "TBD",
+         "Legal Auth Desc": "Support Service Agreement â€“ access SHSS Low Barrier Short-Term Stabilization or respite (5(1))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:57:59",
+         "Legal Auth Code": "SHS-S.5 SSA-SHSS LBSTS, Respt",
+         "Created By Name": "INFRAUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "SHS",
+         "Id": "1-4YI6XMI",
+         "Unit": "",
+         "In Care": "SHS",
+         "Updated By Name": "AKALPALL",
+         "Created": "05/30/2023 20:22:30",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-3UINTAM",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YI6XMI",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YI6XMI",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Indigenous law applies (no application for hearing), director to withdraw under 33.05(2)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "ILD-Director WDRL- 33.05(2)",
+         "Created By Name": "INFRAUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ILD",
+         "Id": "1-4YXYDZN",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "11/28/2023 20:31:54",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-3UINTAM",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYDZN",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYDZN",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Indigenous law applies (33.04(8)(b) order), director to withdraw",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "ILE-Director WDRL- 33.04(8)(b)",
+         "Created By Name": "INFRAUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ILE",
+         "Id": "1-4YXYDZR",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "11/28/2023 20:31:54",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-3UINTAM",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYDZR",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYDZR",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Indigenous law applies (no application for hearing), director to withdraw under 48.4(2)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "ILH-Director WDRL -48.4(2)",
+         "Created By Name": "INFRAUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ILH",
+         "Id": "1-4YXYDZV",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "11/28/2023 20:31:54",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-3UINTAM",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYDZV",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYDZV",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Indigenous law applies (48.3(8)(b) order), director to withdraw",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "ILI-Director WDRL -48.3(8)(b)",
+         "Created By Name": "INFRAUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ILI",
+         "Id": "1-4YXYDZZ",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "11/28/2023 20:31:54",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-3UINTAM",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYDZZ",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYDZZ",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Indigenous law applies (48.5(5)(b)), director to withdraw",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "ILL-Director WDRL-48.5(5)(b)",
+         "Created By Name": "INFRAUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ILL",
+         "Id": "1-4YXYE03",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "11/28/2023 20:31:54",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-3UINTAM",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYE03",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYE03",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Indigenous law applies (50.03(8)(b) order), CCO to be cancelled",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "ILN-CCO Cancelled-50.03(8)(b)",
+         "Created By Name": "INFRAUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ILN",
+         "Id": "1-4YXYE07",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "11/28/2023 20:31:54",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-3UINTAM",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYE07",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYE07",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Indigenous law applies (no application for hearing), director to withdraw under 50.04(2)",
+         "By Agreement Flag": "N",
+         "In Care Flag": "Y",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "ILP-CCO Cancelled-50.04(2)",
+         "Created By Name": "INFRAUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ILP",
+         "Id": "1-4YXYE0B",
+         "Unit": "",
+         "In Care": "CIC",
+         "Updated By Name": "AKALPALL",
+         "Created": "11/28/2023 20:31:54",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-3UINTAM",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYE0B",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYE0B",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Indigenous law applies (50.05(5)(b)), CCO to be cancelled",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "ILQ-CCO Cancelled-50.05(5)(b)",
+         "Created By Name": "INFRAUSER",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ILQ",
+         "Id": "1-4YXYE0F",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "11/28/2023 20:31:54",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-3UINTAM",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYE0F",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-4YXYE0F",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "TBD",
+         "Legal Auth Desc": "Adjournment â€“ Indigenous Law Hearing",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:57:59",
+         "Legal Auth Code": "ILA-Adjournment for IL Hearing",
+         "Created By Name": "SHUJAIN",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ILA",
+         "Id": "1-503E80Q",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "04/17/2024 16:38:29",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-4ZZ8Y38",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-503E80Q",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-503E80Q",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Indigenous Law applies, SO cancelled under s.57",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 05:02:54",
+         "Legal Auth Code": "ILR-SO Cancelled-s.57",
+         "Created By Name": "SHUJAIN",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ILR",
+         "Id": "1-503E80U",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "04/17/2024 16:40:06",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-4ZZ8Y38",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-503E80U",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-503E80U",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "NO",
+         "Legal Auth Desc": "Indigenous Law applies, TCO cancelled under s.57",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:56:30",
+         "Legal Auth Code": "ILS-TCO Cancelled-s.57",
+         "Created By Name": "SHUJAIN",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ILS",
+         "Id": "1-503E80Y",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "04/17/2024 16:40:39",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-4ZZ8Y38",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-503E80Y",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-503E80Y",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "TBD",
+         "Legal Auth Desc": "IL hearing ends, Proceedings continue under (33.04(8)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:57:59",
+         "Legal Auth Code": "ILB-ProceedingsCON-33.04(8)(a)",
+         "Created By Name": "SHUJAIN",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ILB",
+         "Id": "1-50499TJ",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "04/23/2024 17:42:00",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-4ZZ8Y38",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-50499TJ",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-50499TJ",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "TBD",
+         "Legal Auth Desc": "IL hearing ends, Proceedings continue under (48.3(8)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:57:59",
+         "Legal Auth Code": "ILF-Proceedings CON-48.3(8)(a)",
+         "Created By Name": "SHUJAIN",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ILF",
+         "Id": "1-50499TN",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "04/23/2024 17:42:22",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-4ZZ8Y38",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-50499TN",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-50499TN",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "TBD",
+         "Legal Auth Desc": "SCC-IL hearing ends, Proceedings continue under (48.5(5)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:57:59",
+         "Legal Auth Code": "ILJ-Proceedings CON-48.5(5)(a)",
+         "Created By Name": "SHUJAIN",
+         "Eligible for Adoption": "N",
+         "MIS Legal Auth Code": "ILJ",
+         "Id": "1-50499UL",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "04/23/2024 17:43:11",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-4ZZ8Y38",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-50499UL",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-50499UL",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "IL hearing ends, Child remains in the custody of the director, CCO is maintained (50.03(8)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "ILM-CCO Maintained-50.03(8)(a)",
+         "Created By Name": "SHUJAIN",
+         "Eligible for Adoption": "Y",
+         "MIS Legal Auth Code": "ILM",
+         "Id": "1-50499UP",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "04/23/2024 17:46:20",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-4ZZ8Y38",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-50499UP",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-50499UP",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      },
+            {
+         "Duration": "",
+         "Supervision Order": "N",
+         "Expiry Date Required": "N",
+         "Enroll for CSA": "YES",
+         "Legal Auth Desc": "SCC-IL hearing ends, Child remains in the custody of the director, CCO is maintained (50.05(5)(a))",
+         "By Agreement Flag": "N",
+         "In Care Flag": "N",
+         "Updated": "12/17/2025 04:54:19",
+         "Legal Auth Code": "ILO-CCO Maintained-50.05(5)(a)",
+         "Created By Name": "SHUJAIN",
+         "Eligible for Adoption": "Y",
+         "MIS Legal Auth Code": "ILO",
+         "Id": "1-50499V3",
+         "Unit": "",
+         "In Care": "N/A",
+         "Updated By Name": "AKALPALL",
+         "Created": "04/23/2024 17:47:27",
+         "In Use Flag": "Y",
+         "Updated By": "1-505CJGX",
+         "Created By": "1-4ZZ8Y38",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-50499V3",
+               "name": "ContactLegalAuthorityAdmin"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin/1-50499V3",
+               "name": "ContactLegalAuthorityAdmin"
+            }
+         ]
+      }
+   ],
+   "Link":    {
+      "rel": "self",
+      "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin?workspace=int_release_5.4&excludeEmptyFieldsInResponse=False&PageSize=250&childlinks=None&ViewMode=Catalog&recordcountneeded=true&StartRowNum=0&GetChildren=false",
+      "name": "ContactLegalAuthorityAdmin"
+   }
+}

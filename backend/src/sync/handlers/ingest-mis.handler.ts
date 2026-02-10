@@ -3,28 +3,28 @@ import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
-import { JobsService } from 'src/jobs/jobs.service'
+import { MisService } from '../mis/mis.service'
 
-// Fetches MIS data using full reload
+// Fetches MIS data using full reload (truncate + COPY FROM STDIN)
 @Injectable()
 export class IngestMisHandler extends BaseJob {
   readonly jobType = JobType.INGEST_MIS
 
-  constructor(private readonly jobsService: JobsService) {
+  constructor(private readonly misService: MisService) {
     super()
   }
 
   async execute(_context: JobContext): Promise<JobResult> {
-    // TODO: Implement MIS ingestion logic
+    const results = await this.misService.ingestAll()
 
-    this.logger.log('INGEST_MIS stub - not yet implemented')
+    const totalRows = results.reduce((sum, r) => sum + r.rows, 0)
 
     return {
       success: true,
-      message: 'MIS ingestion stub',
+      message: `MIS ingestion complete: ${totalRows} rows loaded across ${results.length} files`,
       metadata: {
-        records_fetched: 0,
-        last_updated_at_used: null,
+        results,
+        totalRows,
       },
     }
   }

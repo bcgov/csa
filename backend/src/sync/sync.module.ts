@@ -17,22 +17,34 @@ import { IcmApiDataSource } from './icm/data-source/icm-api-data-source'
 import { IcmDataSource } from './icm/data-source/icm-data-source'
 import { MockIcmDataSource } from './icm/data-source/mock-icm-data-source'
 import { IcmService } from './icm/icm.service'
+import { FileStorageService } from './mis/file-storage/file-storage.service'
+import { MockFileStorageService } from './mis/file-storage/mock-file-storage.service'
+import { S3Service } from './mis/file-storage/s3.service'
+import { MisService } from './mis/mis.service'
 
-/*
- * Ingestion from ICM (CRM) and MIS (payment system)
- * Eligibility processing
- * Syncing results back to ICM
- */
-// TODO: rename handlers
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, load: [syncConfig, adminConfig] }),
-    PrismaModule,
-    KeycloakAuthModule,
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [syncConfig, adminConfig],
+    }),
     HttpModule,
+    PrismaModule,
     JobsModule,
+    KeycloakAuthModule,
   ],
   providers: [
+    // Factory: FileStorageService (S3 or Mock based on config)
+    {
+      provide: FileStorageService,
+      useFactory: (configService: ConfigService) => {
+        return configService.get<boolean>('sync.useMockData')
+          ? new MockFileStorageService()
+          : new S3Service(configService)
+      },
+      inject: [ConfigService],
+    },
+    // Factory: IcmDataSource (API or Mock based on config)
     {
       provide: IcmDataSource,
       useFactory: (
@@ -40,13 +52,14 @@ import { IcmService } from './icm/icm.service'
         httpService: HttpService,
         keycloakAuthService: KeycloakAuthService,
       ) => {
-        return configService.get<boolean>('sync.useMocjkData')
+        return configService.get<boolean>('sync.useMockData')
           ? new MockIcmDataSource()
           : new IcmApiDataSource(httpService, configService, keycloakAuthService)
       },
       inject: [ConfigService, HttpService, KeycloakAuthService],
     },
     IcmService,
+    MisService,
     IngestDataHandler,
     IngestIcmHandler,
     IngestMisHandler,
@@ -72,7 +85,6 @@ export class SyncModule implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    // Register all sync-related job handlers
     this.registry.register(this.ingestDataHandler.jobType, this.ingestDataHandler)
     this.registry.register(this.ingestIcmHandler.jobType, this.ingestIcmHandler)
     this.registry.register(this.ingestMisHandler.jobType, this.ingestMisHandler)

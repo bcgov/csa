@@ -46,6 +46,11 @@ class PrismaService
     })
   }
 
+  /** Expose the underlying pg Pool for raw operations (e.g. COPY FROM STDIN). */
+  getPool(): Pool {
+    return this.pool
+  }
+
   async onModuleDestroy() {
     await this.$disconnect()
   }

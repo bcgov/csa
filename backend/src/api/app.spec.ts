@@ -11,6 +11,9 @@ vi.mock('express-prom-bundle', () => ({
 vi.mock('src/common/middleware/prom', () => ({
   metricsMiddleware: vi.fn().mockImplementation((_req, _res, next) => next()),
 }))
+vi.mock('src/common/logger/logger.config', () => ({
+  customLogger: false,
+}))
 
 describe('main', () => {
   let app: NestExpressApplication

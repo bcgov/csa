@@ -25,7 +25,7 @@ export class MockService {
   }
 
   listFiles(): string[] {
-    console.log({ directory: this.dataDir })
+    this.logger.debug(`Listing files from ${this.dataDir}`)
     if (!existsSync(this.dataDir)) {
       return []
     }

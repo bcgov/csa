@@ -154,54 +154,168 @@ CREATE TABLE IF NOT EXISTS csa.transfer_files (
 -- staging tables --
 --------------------
 
-CREATE TABLE IF NOT EXIST csa.stg_icm_cases (
-    ROW_ID             TEXT PRIMARY KEY,
-    LAST_UPD           TIMESTAMP,
-    FST_NAME           TEXT,
-    LAST_NAME          TEXT,
-    X_AGE              TEXT,
-    X_BIRTH_CITY       TEXT,
-    BIRTH_DT           DATE,
-    X_BIRTH_PROV_CD    TEXT,
-    X_CSA_SENT_DATE    TIMESTAMP,
-    X_CSA_PAY_STATUS   TEXT,
-    X_CSA_EFF_DATE     TIMESTAMP,
-    X_CSA_DIN          TEXT,
-    SEX_MF             TEXT,
-    BIRTH_PLACE        TEXT,
-    ROW_ID_CASE        TEXT,
-    CASE_NUM           TEXT,
-    X_LEGACY_FILE_NUM  TEXT,
-    TYPE_CD            TEXT,
-    STATUS_CD          TEXT,
-    X_CASELOAD         TEXT,
-    NAME               TEXT,
-    LOGIN              TEXT,
-    MID_NAME           TEXT,
-    X_ADM_FIRST_NAME   TEXT,
-    X_ADM_LAST_NAME    TEXT,
-    ingested_at        TIMESTAMP DEFAULT NOW()
+-- ICM staging tables (6)
+
+CREATE TABLE IF NOT EXISTS csa.stg_icm_cases (
+    ROW_ID              TEXT PRIMARY KEY,
+    LAST_UPD            TIMESTAMP,
+    FST_NAME            TEXT,
+    LAST_NAME           TEXT,
+    X_AGE               TEXT,
+    X_BIRTH_CITY        TEXT,
+    BIRTH_DT            DATE,
+    X_BIRTH_PROV_CD     TEXT,
+    X_CSA_SENT_DATE     TIMESTAMP,
+    X_CSA_PAY_STATUS    TEXT,
+    X_CSA_EFF_DATE      TIMESTAMP,
+    X_CSA_DIN           TEXT,
+    CONTACT_LAST_UPD    TIMESTAMP,
+    SEX_MF              TEXT,
+    BIRTH_PLACE         TEXT,
+    CONTACT_ROW_ID      TEXT,
+    CASE_NUM            TEXT,
+    X_LEGACY_FILE_NUM   TEXT,
+    TYPE_CD             TEXT,
+    STATUS_CD           TEXT,
+    X_CASELOAD          TEXT,
+    NAME                TEXT,
+    LOGIN               TEXT,
+    SUBJECT_LAST_NAME   TEXT,
+    SUBJECT_MID_NAME    TEXT,
+    SUBJECT_FST_NAME    TEXT,
+    X_ADM_FIRST_NAME    TEXT,
+    X_ADM_LAST_NAME     TEXT,
+    INGESTED_AT         TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE stg_icm_contacts (
-    "Id"                TEXT PRIMARY KEY,
-    "X_CSA_DIN"         TEXT,
-    "X_CSA_SENT_DATE"   TIMESTAMP,
-    "X_CSA_PAY_STATUS"  TEXT,
-    "X_CSA_EFF_DATE"    TIMESTAMP,
-    ingested_at         TIMESTAMP DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS csa.stg_icm_placements (
+    ROW_ID                      TEXT PRIMARY KEY,
+    LAST_UPD                    TIMESTAMP,
+    X_PLACEMENT_NUM             TEXT,
+    X_TYPE                      TEXT,
+    X_SERVICE_TYPE              TEXT,
+    X_STATUS                    TEXT,
+    X_START_DATE                TIMESTAMP,
+    X_END_DATE                  TIMESTAMP,
+    X_SRV_PLC_NAME              TEXT,
+    X_ORIG_PLMT_PAID_UNPAID     TEXT,
+    X_SRV_PROV_NAME             TEXT,
+    OU_NUM                      TEXT,
+    X_PCMS_CONTRACT_NUM         TEXT,
+    X_PLACEMENT_ID              TEXT,
+    CASE_ROW_ID                 TEXT,
+    AGREEMENT_ROW_ID            TEXT,
+    INGESTED_AT                 TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS csa.stg_icm_legal_authority_admin (
+    ROW_ID              TEXT PRIMARY KEY,
+    LGL_AUTH_CD         TEXT,
+    MIS_LGL_AUTH_CD     TEXT,
+    LAST_UPD            TIMESTAMP,
+    X_ENROLL_CSA        TEXT,
+    INGESTED_AT         TIMESTAMP DEFAULT NOW()
+);
 
+CREATE TABLE IF NOT EXISTS csa.stg_legal_authority (
+    ROW_ID              TEXT PRIMARY KEY,
+    LAST_UPD            TIMESTAMP,
+    LGL_AUTH_CD         TEXT,
+    EFF_LGL_STATUS      TEXT,
+    START_DT            TIMESTAMP,
+    EXPIRY_DT           TIMESTAMP,
+    PAR_ROW_ID          TEXT,
+    INGESTED_AT         TIMESTAMP DEFAULT NOW()
+);
 
+CREATE TABLE IF NOT EXISTS csa.stg_icm_agreement (
+    ROW_ID                TEXT PRIMARY KEY,
+    NAME                  TEXT,
+    OU_NUM                TEXT,
+    X_PCMS_CONTRACT_NUM   TEXT,
+    STAT_CD               TEXT,
+    EFF_START_DT          TIMESTAMP,
+    EFF_END_DT            TIMESTAMP,
+    AGREE_CD              TEXT,
+    X_TERMINATION_DT      TIMESTAMP,
+    LAST_UPD              TIMESTAMP,
+    INGESTED_AT           TIMESTAMP DEFAULT NOW()
+);
 
+CREATE TABLE IF NOT EXISTS csa.stg_icm_order_lines (
+    ROW_ID                  TEXT PRIMARY KEY,
+    ORDER_NUM               TEXT,
+    NAME                    TEXT,
+    STATUS_CD               TEXT,
+    TOTAL_AMT               NUMERIC,
+    X_EFF_START_DT          TIMESTAMP,
+    PRODUCT_NAME            TEXT,
+    X_PCMS_CONTRACT_NUM     TEXT,
+    AGREE_ID                TEXT,
+    LAST_UPD                TIMESTAMP,
+    INGESTED_AT             TIMESTAMP DEFAULT NOW()
+);
 
+-- MIS staging tables (3)
+
+CREATE TABLE IF NOT EXISTS csa.stg_mis_payments (
+    id                          INTEGER PRIMARY KEY,
+    payment_number              TEXT,
+    payment_type                TEXT,
+    payment_status              TEXT,
+    payment_amount              TEXT,
+    payment_effective_start_date DATE,
+    product                     TEXT,
+    agreement_num               TEXT,
+    contract_num                TEXT,
+    contract_id                 INTEGER,
+    payment_updated             TEXT,
+    person_id_mis               TEXT,
+    last_updated_date           DATE,
+    file_stat_cd                TEXT,
+    process_dt                  DATE,
+    ingested_at                 TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS csa.stg_mis_contracts (
+    id                      INTEGER PRIMARY KEY,
+    service_provider_name   TEXT,
+    contract_number         TEXT,
+    status                  TEXT,
+    contract_start_date     DATE,
+    contract_end_date       DATE,
+    type                    TEXT,
+    contract_termination_date DATE,
+    last_updated_date       DATE,
+    file_stat_cd            TEXT,
+    process_dt              DATE,
+    ingested_at             TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS csa.stg_mis_placements (
+    id                      INTEGER PRIMARY KEY,
+    placement_location_no   TEXT,
+    type                    TEXT,
+    sub_type                TEXT,
+    status                  TEXT,
+    start_date              DATE,
+    end_date                DATE,
+    place_of_service_name   TEXT,
+    service_provider_name   TEXT,
+    service_provider_id     TEXT,
+    contract_no             TEXT,
+    client_fileid_dep_no    TEXT,
+    last_updated_date       DATE,
+    file_stat_cd            TEXT,
+    process_dt              DATE,
+    ingested_at             TIMESTAMP DEFAULT NOW()
+);
 
 -------------------------
 -- db users permissons --
 -------------------------
 
--- Grant schema access to app user
+Grant schema access to app user
 GRANT USAGE ON SCHEMA csa TO "csa-app";
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA csa TO "csa-app";

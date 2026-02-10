@@ -3,6 +3,7 @@ import { UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { HttpService } from '@nestjs/axios'
 import { AdminService } from './admin.service'
+import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import * as jwt from 'jsonwebtoken'
 
 describe('AdminService', () => {
@@ -16,6 +17,10 @@ describe('AdminService', () => {
     get: vi.fn(),
   }
 
+  const mockKeycloakAuthService = {
+    getBearerToken: vi.fn().mockResolvedValue('mock-bearer-token'),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -27,6 +32,10 @@ describe('AdminService', () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: KeycloakAuthService,
+          useValue: mockKeycloakAuthService,
         },
       ],
     }).compile()

@@ -87,6 +87,9 @@
   },
   "overrides": {
     "minimist@<1.2.6": "1.2.6",
-    "reflect-metadata": "^0.2.2"
+    "reflect-metadata": "^0.2.2",
+    "minio": {
+      "fast-xml-parser": "^5.3.5"
+    }
   }
 }

@@ -1,17 +1,27 @@
 import { HttpService } from '@nestjs/axios'
-import { HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common'
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import * as jwt from 'jsonwebtoken'
 import { firstValueFrom } from 'rxjs'
+import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { UserInfoDto } from './dto/user-info.dto'
 import { PermissionDto, UserPermissionsDto } from './dto/user-permissions.dto'
 import { ICMEmployeeResponse } from './interfaces/icm-api.interface'
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name)
+
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly keycloakAuthService: KeycloakAuthService,
   ) {}
   /**
    * Decode JWT token and extract user information
@@ -77,7 +87,7 @@ export class AdminService {
         retrievedAt: new Date().toISOString(),
       }
     } catch (error) {
-      console.error('Failed to fetch user permissions from ICM:', error)
+      this.logger.warn('Failed to fetch user permissions from ICM, using fallback', error)
       // Fallback to mock permissions if ICM fails
       const mockPermissions = this.getMockPermissions(username)
       return {
@@ -234,8 +244,8 @@ export class AdminService {
    */
   async fetchUserFromICM(username: string): Promise<ICMEmployeeResponse> {
     try {
-      // Step 1: Get Bearer token from Keycloak
-      const bearerToken = await this.getICMBearerToken()
+      // Step 1: Get Bearer token from Keycloak (shared via IcmApiService)
+      const bearerToken = await this.keycloakAuthService.getBearerToken()
 
       // Step 2: Query ICM API with the bearer token
       const requestBody = {
@@ -264,42 +274,9 @@ export class AdminService {
 
       return response.data
     } catch (error) {
-      console.error('ICM API request failed:', error)
+      this.logger.error('ICM API request failed:', error)
       throw new HttpException(
         'Failed to fetch user data from ICM',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      )
-    }
-  }
-
-  /**
-   * Get Bearer token from Keycloak for ICM API access
-   * @returns Bearer token string
-   */
-  private async getICMBearerToken(): Promise<string> {
-    try {
-      const keycloakTokenUrl = this.configService.get<string>('admin.keycloakTokenUrl')!
-      const keycloakClientId = this.configService.get<string>('admin.keycloakClientId')!
-      const keycloakClientSecret = this.configService.get<string>('admin.keycloakClientSecret')!
-
-      const params = new URLSearchParams()
-      params.append('grant_type', 'client_credentials')
-      params.append('client_id', keycloakClientId)
-      params.append('client_secret', keycloakClientSecret)
-
-      const response = await firstValueFrom(
-        this.httpService.post(keycloakTokenUrl, params, {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        }),
-      )
-
-      return response.data.access_token
-    } catch (error) {
-      console.error('Failed to obtain ICM bearer token:', error)
-      throw new HttpException(
-        'Failed to authenticate with ICM service',
         HttpStatus.INTERNAL_SERVER_ERROR,
       )
     }

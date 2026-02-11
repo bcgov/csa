@@ -79,74 +79,78 @@ CREATE TABLE IF NOT EXISTS csa.contacts (
 -- Concatenates searchable text fields Automatically updated by PostgreSQL on INSERT/UPDATE
 ALTER TABLE csa.contacts
 ADD COLUMN search_text TEXT GENERATED ALWAYS AS (
-    coalesce(last_name, '') || ' | ' || coalesce(first_name, '') || ' | ' || coalesce(middle_name, '') || ' | ' || coalesce(aka_last_name, '') || ' | ' || coalesce(aka_first_name, '') || ' | ' || coalesce(case_number, '') || ' | ' || coalesce(legacy_file_number, '') || ' | ' || coalesce(din, '')
+  coalesce(last_name, '') || ' | ' ||
+  coalesce(first_name, '') || ' | ' ||
+  coalesce(middle_name, '') || ' | ' ||
+  coalesce(aka_last_name, '') || ' | ' ||
+  coalesce(aka_first_name, '') || ' | ' ||
+  coalesce(case_number, '') || ' | ' ||
+  coalesce(legacy_file_number, '') || ' | ' ||
+  coalesce(din, '')
 ) STORED;
 
-ALTER TABLE csa.contacts ALTER COLUMN search_text SET NOT NULL;
+ALTER TABLE csa.contacts
+ALTER COLUMN search_text SET NOT NULL;
 
 -- Full-text search index (trigram for ILIKE '%term%' queries)
 CREATE INDEX idx_contacts_search_text_trgm ON csa.contacts USING GIN (search_text gin_trgm_ops);
 
 CREATE TABLE IF NOT EXISTS csa.batches (
-    id SERIAL PRIMARY KEY,
-    batch_date DATE NOT NULL,
-    status TEXT NOT NULL,
-    record_count INTEGER NOT NULL,
-    created_at TIMESTAMP NOT NULL,
+    id              SERIAL PRIMARY KEY,
+    batch_date      DATE        NOT NULL,
+    status          TEXT        NOT NULL,
+    record_count    INTEGER     NOT NULL,
+    created_at      TIMESTAMP   NOT NULL,
     system_comments TEXT
 );
 
-CREATE UNIQUE INDEX batches_pending_unique ON csa.batches (status)
-WHERE
-    status = 'pending';
+CREATE UNIQUE INDEX batches_pending_unique ON csa.batches (status) WHERE status = 'pending';
 
 CREATE TABLE IF NOT EXISTS csa.contact_batch_details (
-    id SERIAL PRIMARY KEY,
-    contact_id INTEGER NOT NULL,
-    batch_id INTEGER NOT NULL,
-    transaction_type TEXT NOT NULL,
-    system_comments TEXT,
-    created_at TIMESTAMP NOT NULL,
-    created_by TEXT NOT NULL,
-    last_updated_at TIMESTAMP NOT NULL,
-    last_updated_by TEXT NOT NULL,
-    status TEXT,
-    CONSTRAINT contact_batch_unique UNIQUE (contact_id, batch_id),
-    CONSTRAINT fk_cbd_contact FOREIGN KEY (contact_id) REFERENCES csa.contacts (id),
-    CONSTRAINT fk_cbd_batch FOREIGN KEY (batch_id) REFERENCES csa.batches (id)
+  id                SERIAL PRIMARY KEY,
+  contact_id        INTEGER     NOT NULL,
+  batch_id          INTEGER     NOT NULL,
+  transaction_type  TEXT        NOT NULL,
+  system_comments   TEXT,
+  created_at        TIMESTAMP   NOT NULL,
+  created_by        TEXT        NOT NULL,
+  last_updated_at   TIMESTAMP   NOT NULL,
+  last_updated_by   TEXT        NOT NULL,
+  status            TEXT,
+  CONSTRAINT contact_batch_unique UNIQUE (contact_id, batch_id),
+  CONSTRAINT fk_cbd_contact FOREIGN KEY (contact_id) REFERENCES csa.contacts (id),
+  CONSTRAINT fk_cbd_batch   FOREIGN KEY (batch_id)   REFERENCES csa.batches  (id)
 );
 
 CREATE TABLE IF NOT EXISTS csa.job_runs (
-    id SERIAL PRIMARY KEY,
-    job_type TEXT NOT NULL,
-    status TEXT NOT NULL,
-    parent_job_id INTEGER REFERENCES csa.job_runs (id),
-    job_trigger TEXT NOT NULL,
-    retry_count INTEGER DEFAULT 0,
-    error TEXT,
-    metadata JSONB DEFAULT '{}'::jsonb,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    started_at TIMESTAMP NOT NULL,
-    completed_at TIMESTAMP
+  id             SERIAL PRIMARY KEY,
+  job_type       TEXT        NOT NULL,
+  status         TEXT        NOT NULL,
+  parent_job_id  INTEGER     REFERENCES csa.job_runs(id),
+  job_trigger    TEXT        NOT NULL,
+  retry_count    INTEGER     DEFAULT 0,
+  error          TEXT,
+  metadata       JSONB       DEFAULT '{}'::jsonb,
+  created_at     TIMESTAMP   NOT NULL DEFAULT NOW(),
+  started_at     TIMESTAMP   NOT NULL,
+  completed_at   TIMESTAMP
 );
 
-CREATE INDEX idx_job_runs_status ON csa.job_runs (status);
-
-CREATE INDEX idx_job_runs_parent ON csa.job_runs (parent_job_id);
-
-CREATE INDEX idx_job_runs_type_status ON csa.job_runs (job_type, status);
+CREATE INDEX idx_job_runs_status ON csa.job_runs(status);
+CREATE INDEX idx_job_runs_parent ON csa.job_runs(parent_job_id);
+CREATE INDEX idx_job_runs_type_status ON csa.job_runs(job_type, status);
 
 CREATE TABLE IF NOT EXISTS csa.transfer_files (
-    id SERIAL PRIMARY KEY,
-    batch_id INTEGER,
-    destination_id TEXT NOT NULL,
-    direction TEXT NOT NULL,
-    file_name TEXT NOT NULL,
-    file_size TEXT,
-    delivered_at TIMESTAMP,
-    downloaded_at TIMESTAMP,
-    reference_numbers INTEGER[], -- contact_batch_details.id
-    CONSTRAINT fk_transfer_files_batch FOREIGN KEY (batch_id) REFERENCES csa.batches (id)
+  id                 SERIAL PRIMARY KEY,
+  batch_id           INTEGER,
+  destination_id     TEXT        NOT NULL,
+  direction          TEXT        NOT NULL,
+  file_name          TEXT        NOT NULL,
+  file_size          TEXT,
+  delivered_at       TIMESTAMP,
+  downloaded_at      TIMESTAMP,
+  reference_numbers  INTEGER[], -- contact_batch_details.id
+  CONSTRAINT fk_transfer_files_batch FOREIGN KEY (batch_id) REFERENCES csa.batches (id)
 );
 
 --------------------
@@ -156,92 +160,92 @@ CREATE TABLE IF NOT EXISTS csa.transfer_files (
 -- ICM staging tables (6)
 
 CREATE TABLE IF NOT EXISTS csa.stg_icm_cases (
-    ROW_ID TEXT PRIMARY KEY,
-    LAST_UPD TIMESTAMP,
-    FST_NAME TEXT,
-    LAST_NAME TEXT,
-    X_AGE TEXT,
-    X_BIRTH_CITY TEXT,
-    BIRTH_DT DATE,
-    X_BIRTH_PROV_CD TEXT,
-    X_CSA_SENT_DATE TIMESTAMP,
-    X_CSA_PAY_STATUS TEXT,
-    X_CSA_EFF_DATE TIMESTAMP,
-    X_CSA_DIN TEXT,
-    CONTACT_LAST_UPD TIMESTAMP,
-    SEX_MF TEXT,
-    BIRTH_PLACE TEXT,
-    CONTACT_ROW_ID TEXT,
-    CASE_NUM TEXT,
-    X_LEGACY_FILE_NUM TEXT,
-    TYPE_CD TEXT,
-    STATUS_CD TEXT,
-    X_CASELOAD TEXT,
-    NAME TEXT,
-    LOGIN TEXT,
-    SUBJECT_LAST_NAME TEXT,
-    SUBJECT_MID_NAME TEXT,
-    SUBJECT_FST_NAME TEXT,
-    X_ADM_FIRST_NAME TEXT,
-    X_ADM_LAST_NAME TEXT,
-    INGESTED_AT TIMESTAMP DEFAULT NOW()
+    ROW_ID              TEXT PRIMARY KEY,
+    LAST_UPD            TIMESTAMP,
+    FST_NAME            TEXT,
+    LAST_NAME           TEXT,
+    X_AGE               TEXT,
+    X_BIRTH_CITY        TEXT,
+    BIRTH_DT            DATE,
+    X_BIRTH_PROV_CD     TEXT,
+    X_CSA_SENT_DATE     TIMESTAMP,
+    X_CSA_PAY_STATUS    TEXT,
+    X_CSA_EFF_DATE      TIMESTAMP,
+    X_CSA_DIN           TEXT,
+    CONTACT_LAST_UPD    TIMESTAMP,
+    SEX_MF              TEXT,
+    BIRTH_PLACE         TEXT,
+    CONTACT_ROW_ID      TEXT,
+    CASE_NUM            TEXT,
+    X_LEGACY_FILE_NUM   TEXT,
+    TYPE_CD             TEXT,
+    STATUS_CD           TEXT,
+    X_CASELOAD          TEXT,
+    NAME                TEXT,
+    LOGIN               TEXT,
+    SUBJECT_LAST_NAME   TEXT,
+    SUBJECT_MID_NAME    TEXT,
+    SUBJECT_FST_NAME    TEXT,
+    X_ADM_FIRST_NAME    TEXT,
+    X_ADM_LAST_NAME     TEXT,
+    INGESTED_AT         TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS csa.stg_icm_placements (
-    ROW_ID TEXT PRIMARY KEY,
-    LAST_UPD TIMESTAMP,
-    X_PLACEMENT_NUM TEXT,
-    X_TYPE TEXT,
-    X_SERVICE_TYPE TEXT,
-    X_STATUS TEXT,
-    X_START_DATE TIMESTAMP,
-    X_END_DATE TIMESTAMP,
-    X_SRV_PLC_NAME TEXT,
-    X_ORIG_PLMT_PAID_UNPAID TEXT,
-    X_SRV_PROV_NAME TEXT,
-    OU_NUM TEXT,
-    X_PCMS_CONTRACT_NUM TEXT,
-    X_PLACEMENT_ID TEXT,
-    CASE_ROW_ID TEXT,
-    AGREEMENT_ROW_ID TEXT,
-    INGESTED_AT TIMESTAMP DEFAULT NOW()
+    ROW_ID                      TEXT PRIMARY KEY,
+    LAST_UPD                    TIMESTAMP,
+    X_PLACEMENT_NUM             TEXT,
+    X_TYPE                      TEXT,
+    X_SERVICE_TYPE              TEXT,
+    X_STATUS                    TEXT,
+    X_START_DATE                TIMESTAMP,
+    X_END_DATE                  TIMESTAMP,
+    X_SRV_PLC_NAME              TEXT,
+    X_ORIG_PLMT_PAID_UNPAID     TEXT,
+    X_SRV_PROV_NAME             TEXT,
+    OU_NUM                      TEXT,
+    X_PCMS_CONTRACT_NUM         TEXT,
+    X_PLACEMENT_ID              TEXT,
+    CASE_ROW_ID                 TEXT,
+    AGREEMENT_ROW_ID            TEXT,
+    INGESTED_AT                 TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS csa.stg_icm_legal_authority_admin (
-    ROW_ID TEXT PRIMARY KEY,
-    LGL_AUTH_CD TEXT,
-    MIS_LGL_AUTH_CD TEXT,
-    LAST_UPD TIMESTAMP,
-    X_ENROLL_CSA TEXT,
-    INGESTED_AT TIMESTAMP DEFAULT NOW()
+    ROW_ID              TEXT PRIMARY KEY,
+    LGL_AUTH_CD         TEXT,
+    MIS_LGL_AUTH_CD     TEXT,
+    LAST_UPD            TIMESTAMP,
+    X_ENROLL_CSA        TEXT,
+    INGESTED_AT         TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS csa.stg_legal_authority (
-    ROW_ID TEXT PRIMARY KEY,
-    LAST_UPD TIMESTAMP,
-    LGL_AUTH_CD TEXT,
-    EFF_LGL_STATUS TEXT,
-    START_DT TIMESTAMP,
-    EXPIRY_DT TIMESTAMP,
-    PAR_ROW_ID TEXT,
-    INGESTED_AT TIMESTAMP DEFAULT NOW()
+    ROW_ID              TEXT PRIMARY KEY,
+    LAST_UPD            TIMESTAMP,
+    LGL_AUTH_CD         TEXT,
+    EFF_LGL_STATUS      TEXT,
+    START_DT            TIMESTAMP,
+    EXPIRY_DT           TIMESTAMP,
+    PAR_ROW_ID          TEXT,
+    INGESTED_AT         TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS csa.stg_icm_agreement (
-    ROW_ID TEXT PRIMARY KEY,
-    NAME TEXT,
-    OU_NUM TEXT,
-    X_PCMS_CONTRACT_NUM TEXT,
-    STAT_CD TEXT,
-    EFF_START_DT TIMESTAMP,
-    EFF_END_DT TIMESTAMP,
-    AGREE_CD TEXT,
-    X_TERMINATION_DT TIMESTAMP,
-    LAST_UPD TIMESTAMP,
-    INGESTED_AT TIMESTAMP DEFAULT NOW()
+    ROW_ID                TEXT PRIMARY KEY,
+    NAME                  TEXT,
+    OU_NUM                TEXT,
+    X_PCMS_CONTRACT_NUM   TEXT,
+    STAT_CD               TEXT,
+    EFF_START_DT          TIMESTAMP,
+    EFF_END_DT            TIMESTAMP,
+    AGREE_CD              TEXT,
+    X_TERMINATION_DT      TIMESTAMP,
+    LAST_UPD              TIMESTAMP,
+    INGESTED_AT           TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS csa.stg_icm_orders (
+CREATE TABLE IF NOT EXISTS csa.stg_icm_order_lines (
     ROW_ID                  TEXT PRIMARY KEY,
     ORDER_NUM               TEXT,
     NAME                    TEXT,
@@ -250,7 +254,7 @@ CREATE TABLE IF NOT EXISTS csa.stg_icm_orders (
     X_EFF_START_DT          TIMESTAMP,
     PRODUCT_NAME            TEXT,
     X_PCMS_CONTRACT_NUM     TEXT,
-    AGREEMENT_ROW_ID        TEXT,
+    AGREE_ID                TEXT,
     LAST_UPD                TIMESTAMP,
     INGESTED_AT             TIMESTAMP DEFAULT NOW()
 );
@@ -258,56 +262,56 @@ CREATE TABLE IF NOT EXISTS csa.stg_icm_orders (
 -- MIS staging tables (3)
 
 CREATE TABLE IF NOT EXISTS csa.stg_mis_payments (
-    id INTEGER PRIMARY KEY,
-    payment_number TEXT,
-    payment_type TEXT,
-    payment_status TEXT,
-    payment_amount TEXT,
+    id                          INTEGER PRIMARY KEY,
+    payment_number              TEXT,
+    payment_type                TEXT,
+    payment_status              TEXT,
+    payment_amount              TEXT,
     payment_effective_start_date DATE,
-    product TEXT,
-    agreement_num TEXT,
-    contract_num TEXT,
-    contract_id INTEGER,
-    payment_updated TEXT,
-    person_id_mis TEXT,
-    last_updated_date DATE,
-    file_stat_cd TEXT,
-    process_dt DATE,
-    ingested_at TIMESTAMP DEFAULT NOW()
+    product                     TEXT,
+    agreement_num               TEXT,
+    contract_num                TEXT,
+    contract_id                 INTEGER,
+    payment_updated             TEXT,
+    person_id_mis               TEXT,
+    last_updated_date           DATE,
+    file_stat_cd                TEXT,
+    process_dt                  DATE,
+    ingested_at                 TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS csa.stg_mis_contracts (
-    id INTEGER PRIMARY KEY,
-    service_provider_name TEXT,
-    contract_number TEXT,
-    status TEXT,
-    contract_start_date DATE,
-    contract_end_date DATE,
-    type TEXT,
+    id                      INTEGER PRIMARY KEY,
+    service_provider_name   TEXT,
+    contract_number         TEXT,
+    status                  TEXT,
+    contract_start_date     DATE,
+    contract_end_date       DATE,
+    type                    TEXT,
     contract_termination_date DATE,
-    last_updated_date DATE,
-    file_stat_cd TEXT,
-    process_dt DATE,
-    ingested_at TIMESTAMP DEFAULT NOW()
+    last_updated_date       DATE,
+    file_stat_cd            TEXT,
+    process_dt              DATE,
+    ingested_at             TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS csa.stg_mis_placements (
-    id INTEGER PRIMARY KEY,
-    placement_location_no TEXT,
-    type TEXT,
-    sub_type TEXT,
-    status TEXT,
-    start_date DATE,
-    end_date DATE,
-    place_of_service_name TEXT,
-    service_provider_name TEXT,
-    service_provider_id TEXT,
-    contract_no TEXT,
-    client_fileid_dep_no TEXT,
-    last_updated_date DATE,
-    file_stat_cd TEXT,
-    process_dt DATE,
-    ingested_at TIMESTAMP DEFAULT NOW()
+    id                      INTEGER PRIMARY KEY,
+    placement_location_no   TEXT,
+    type                    TEXT,
+    sub_type                TEXT,
+    status                  TEXT,
+    start_date              DATE,
+    end_date                DATE,
+    place_of_service_name   TEXT,
+    service_provider_name   TEXT,
+    service_provider_id     TEXT,
+    contract_no             TEXT,
+    client_fileid_dep_no    TEXT,
+    last_updated_date       DATE,
+    file_stat_cd            TEXT,
+    process_dt              DATE,
+    ingested_at             TIMESTAMP DEFAULT NOW()
 );
 
 -------------------------

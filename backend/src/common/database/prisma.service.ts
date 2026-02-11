@@ -19,7 +19,9 @@ class PrismaService
     }
     const pool = new Pool({
       connectionString: databaseConfig.url,
-      options: `-c search_path=${databaseConfig.schema}`,
+    })
+    pool.on('connect', (client) => {
+      client.query(`SET search_path TO ${databaseConfig.schema}`)
     })
     const adapter = new PrismaPg(pool)
     super({

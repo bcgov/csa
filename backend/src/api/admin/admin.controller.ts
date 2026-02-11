@@ -6,14 +6,17 @@ import {
   Param,
   Query,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common'
 import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { AuthGuard } from '../common/guards/auth.guard'
 import { AdminService } from './admin.service'
 import { UserInfoDto } from './dto/user-info.dto'
 import { UserPermissionsDto } from './dto/user-permissions.dto'
 
 @ApiTags('admin')
 @Controller({ path: 'admin', version: '1' })
+@UseGuards(AuthGuard)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
@@ -210,6 +213,44 @@ export class AdminController {
       username,
       responsibility,
     }
+  }
+
+  @Get('verify-csa-access')
+  @ApiOperation({
+    summary: 'Verify user has CSA access',
+    description:
+      'Validates the auth token, extracts username, and queries ICM to verify user has CSA Application responsibility',
+  })
+  @ApiHeader({
+    name: 'Authorization',
+    description: 'Bearer token from Keycloak authentication',
+    required: true,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'CSA access verification result',
+    schema: {
+      properties: {
+        hasAccess: { type: 'boolean' },
+        username: { type: 'string' },
+        userInfo: { type: 'object' },
+        message: { type: 'string' },
+        icmResponsibility: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid, expired, or missing token',
+  })
+  async verifyCSAAccess(@Headers('authorization') authHeader: string): Promise<{
+    hasAccess: boolean
+    username: string
+    userInfo: UserInfoDto
+    message: string
+    icmResponsibility?: string
+  }> {
+    return this.adminService.verifyCSAAccess(authHeader)
   }
 
   @Get('user/icm-data')

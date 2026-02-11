@@ -18,6 +18,21 @@ class APIService {
         'Content-Type': 'application/json',
       },
     })
+
+    // Request interceptor to attach auth token
+    this.client.interceptors.request.use(
+      (config) => {
+        const token = localStorage.getItem('authToken')
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`
+        }
+        return config
+      },
+      (error) => {
+        return Promise.reject(error)
+      },
+    )
+
     this.client.interceptors.response.use(
       (config) => {
         console.info(`received response status: ${config.status} , data: ${config.data}`)

@@ -7,7 +7,7 @@ import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
 import { appConfig } from '../config/app.config'
 import { craConfig } from '../config/cra.config'
-
+import { StateMachineModule } from 'src/common/state-machine'
 import { PollCraResponseHandler } from './handlers/poll-cra-response.handler'
 import { SendCraFileHandler } from './handlers/send-cra-file.handler'
 import { FileCreateService } from './outbound-file/file-create.service'
@@ -27,6 +27,7 @@ import { CraDataService } from './outbound-file/cra-data.service'
     }),
     JobsModule,
     PrismaModule,
+    StateMachineModule,
     HttpModule.register({
       timeout: 60000, //TODO: check this 60 seconds timeout
     }),

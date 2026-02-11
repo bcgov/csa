@@ -1,4 +1,3 @@
-
 export interface CraResHeader {
   // header = 6133V00.020260110885633354RA000100000002
   tranCode: number | string // 9(04) 6133
@@ -61,13 +60,12 @@ export interface CraResTrailer {
   filler?: string
 }
 
-
 export interface CreateFileTransferObj {
-  batchId: number,
-  destinationId: string,
-  direction: string,
-  fileName: string,
-  fileSize: string,
-  deliveredAt: string,
+  batchId: number
+  destinationId: string
+  direction: string
+  fileName: string
+  fileSize: string
+  deliveredAt: string
   referenceNumbers?: (string | number)[]
 }

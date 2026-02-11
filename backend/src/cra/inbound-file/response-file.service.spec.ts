@@ -36,7 +36,7 @@ describe('ResponseFileService', () => {
 
     // ---- HEADER ASSERTIONS ----
     expect(result.header).toBeDefined()
-    expect(result.header.tranCode).toBe(RESPONSE_FILE.HEADER_TRAN_CODE.toString())
+    expect(result.header.tranCode).toBe(RESPONSE_FILE.HEADER_TRAN_CODE)
     expect(result.header.recordCount).toBe(1)
 
     // ---- DETAILS ASSERTIONS ----
@@ -56,7 +56,7 @@ describe('ResponseFileService', () => {
 
     // ---- TRAILER ASSERTIONS ----
     expect(result.trailer).toBeDefined()
-    expect(result.trailer.tranCode).toBe(RESPONSE_FILE.TRAILER_TRAN_CODE.toString())
+    expect(result.trailer.tranCode).toBe(RESPONSE_FILE.TRAILER_TRAN_CODE)
     expect(result.trailer.recordCount).toBe(1)
   })
 

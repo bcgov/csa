@@ -2,15 +2,23 @@ export const CRA_DATA_HANDLING_CONSTANT = {
   FILE_NAME_PREFIX: 'HT',
   CRA_USERID: 'craUserId',
   DESTINATION_ID: 'cra-ftp',
+  RESPONSE_FILE_TYPE: {
+    RSP: 'RSP',
+    WKL: 'WKL',
+    MRR: 'MRR',
+    MTC: 'MTC',
+  },
   LOCAL_DIR: {
     INBOUND: 'inbound',
-    OUTBOUND: 'outbound'
+    OUTBOUND: 'outbound',
   },
-  FILE_DIRECTION:{
+  FILE_DIRECTION: {
     INBOUND: 'INBOUND',
-    OUTBOUND: 'OUTBOUND'
+    OUTBOUND: 'OUTBOUND',
   },
-
+  UPDATED_BY: {
+    SYSTEM: 'SYSTEM',
+  },
 
   REQUEST_FILE: {
     HEADER_TRAN_CODE: 6133,
@@ -41,6 +49,22 @@ export const CRA_DATA_HANDLING_CONSTANT = {
     TRAN_RECYCLED: 3,
     PROBLEM_DEDUCTED: 4,
   },
+  BATCH_EVENT_BY_FILE_STAT_CODE: {
+    0: 'CRA_ALL_REJECTED',
+    1: 'CRA_ACCEPTED',
+    90: 'CRA_ALL_REJECTED',
+    91: 'CRA_ALL_REJECTED',
+    92: 'CRA_ALL_REJECTED',
+    93: 'CRA_ALL_REJECTED',
+    94: 'CRA_ALL_REJECTED',
+    95: 'CRA_ALL_REJECTED',
+  },
+  CSA_EVENT_BY_TRAN_CD: {
+    1: 'CRA_ACCEPTED',
+    2: 'CRA_REJECTED',
+    3: 'CRA_RECYCLED',
+    4: 'CRA_PROBLEM_DEDUCTED',
+  },
   ERROR_MESSAGE: {
     FILE_STAT_MESSAGE: {
       0: 'FILE NOT SET',
@@ -52,13 +76,8 @@ export const CRA_DATA_HANDLING_CONSTANT = {
       94: 'INVALID NO DETAILS',
       95: 'RECS OUT OF SEQ',
     },
-    TRAN_STAT_MESSAGE: {
-      1: ' Transaction Accepted',
-      2: 'Transaction Rejected',
-      3: 'Transaction Recycled',
-      4: 'Problem deducted',
-    },
-    REJECT_CODE: {
+
+    REJECT_MESSAGE_BY_CODE: {
       '001':
         'You are not authorized to use this service. Please contact your Canada Revenue Agency tax centre.',
       '002':
@@ -116,6 +135,4 @@ export const CRA_DATA_HANDLING_CONSTANT = {
     COMPLETED: 'COMPLETED',
     PENDING: 'PENDING',
   },
-
-
 }

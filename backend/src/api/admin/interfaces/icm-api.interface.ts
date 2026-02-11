@@ -14,7 +14,7 @@ export interface ICMEmployee {
   Id: string
   'Party Name': string
   'Login Name': string
-  Responsibility: ICMResponsibility
+  Responsibility: ICMResponsibility[]
   Link: ICMLink[]
 }
 

@@ -22,7 +22,7 @@ export class AdminService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly keycloakAuthService: KeycloakAuthService,
-  ) {}
+  ) { }
   /**
    * Decode JWT token and extract user information
    * @param token - JWT token from Authorization header
@@ -133,8 +133,20 @@ export class AdminService {
     try {
       const icmData = await this.fetchUserFromICM(username)
 
-      // Check if user has ICM CSA Application responsibility
-      const hasCSAResponsibility = icmData?.items?.Responsibility?.Name === 'ICM CSA Application'
+      // Check if user has ICM CSA Application responsibility (RW or RO)
+      let hasCSAResponsibility = false
+      let icmResponsibilityName: string | undefined
+
+      if (icmData?.items?.Responsibility && Array.isArray(icmData.items.Responsibility)) {
+        const responsibilities = icmData.items.Responsibility
+        const rwResponsibility = responsibilities.find((r) => r.Name === 'ICM CSA Application - RW')
+        const roResponsibility = responsibilities.find((r) => r.Name === 'ICM CSA Application - RO')
+
+        if (rwResponsibility || roResponsibility) {
+          hasCSAResponsibility = true
+          icmResponsibilityName = rwResponsibility?.Name || roResponsibility?.Name
+        }
+      }
 
       if (hasCSAResponsibility) {
         return {
@@ -142,7 +154,7 @@ export class AdminService {
           username,
           userInfo,
           message: 'User has CSA access',
-          icmResponsibility: icmData?.items?.Responsibility?.Name,
+          icmResponsibility: icmResponsibilityName,
         }
       }
 
@@ -326,7 +338,7 @@ export class AdminService {
           // searchspec: `[Login Name] = '${username}'`,
           Responsibility: {
             fields: 'Name',
-            searchspec: "[Name] = 'ICM CSA Application'",
+            searchspec: "[Name] = 'ICM CSA Application - RW' OR [Name] = 'ICM CSA Application - RO'",
           },
         },
       }
@@ -389,10 +401,12 @@ export class AdminService {
     ]
 
     // Check if user has ICM CSA Application responsibility
-    if (icmData?.items?.Responsibility) {
-      const responsibility = icmData.items.Responsibility
+    if (icmData?.items?.Responsibility && Array.isArray(icmData.items.Responsibility)) {
+      const responsibilities = icmData.items.Responsibility
+      const hasRWAccess = responsibilities.some((r) => r.Name === 'ICM CSA Application - RW')
+      const hasROAccess = responsibilities.some((r) => r.Name === 'ICM CSA Application - RO')
 
-      if (responsibility.Name === 'ICM CSA Application') {
+      if (hasRWAccess) {
         basePermissions.push(
           {
             id: 'applicants.write',
@@ -416,6 +430,8 @@ export class AdminService {
             action: 'all',
           },
         )
+      } else if (hasROAccess) {
+        // Read-only CSA access - no additional write permissions
       }
     }
 
@@ -430,13 +446,16 @@ export class AdminService {
   private extractResponsibilitiesFromICMData(icmData: ICMEmployeeResponse): string[] {
     const responsibilities = ['user'] // Default responsibility
 
-    if (icmData?.items?.Responsibility) {
-      const responsibility = icmData.items.Responsibility
+    if (icmData?.items?.Responsibility && Array.isArray(icmData.items.Responsibility)) {
+      const icmResponsibilities = icmData.items.Responsibility
+      const hasRWAccess = icmResponsibilities.some((r) => r.Name === 'ICM CSA Application - RW')
+      const hasROAccess = icmResponsibilities.some((r) => r.Name === 'ICM CSA Application - RO')
 
-      if (responsibility.Name === 'ICM CSA Application') {
+      if (hasRWAccess) {
         responsibilities.push('csa_user', 'admin')
+      } else if (hasROAccess) {
+        responsibilities.push('csa_user', 'reviewer')
       }
-      // Add more responsibility mappings as needed
     }
 
     return responsibilities

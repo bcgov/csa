@@ -41,9 +41,25 @@ export class AdminService {
         throw new UnauthorizedException('Invalid token')
       }
 
+      // Log token fields to see available username formats
+      console.log('Token fields:', {
+        idir_username: decoded.idir_username,
+        preferred_username: decoded.preferred_username,
+        email: decoded.email,
+        sub: decoded.sub,
+      })
+
+      // Extract username - prefer idir_username, then extract from preferred_username
+      let username = decoded.idir_username
+      if (!username && decoded.preferred_username) {
+        // Extract short username from formats like "plakkara@idir" or "plakkara@gov.bc.ca"
+        username = decoded.preferred_username.split('@')[0]
+      }
+      username = username || decoded.email?.split('@')[0] || decoded.sub || 'unknown'
+
       // Extract common Keycloak token fields
       const userInfo: UserInfoDto = {
-        username: decoded.preferred_username || decoded.email || decoded.sub || 'unknown',
+        username: username.toUpperCase(), // ICM often expects uppercase
         email: decoded.email,
         firstName: decoded.given_name,
         lastName: decoded.family_name,
@@ -95,6 +111,55 @@ export class AdminService {
         permissions: mockPermissions.permissions,
         responsibilities: mockPermissions.responsibilities,
         retrievedAt: new Date().toISOString(),
+      }
+    }
+  }
+
+  /**
+   * Verify if user has CSA access by checking ICM for CSA Application responsibility
+   * @param token - JWT token from Authorization header
+   * @returns Object with access status, username, and details
+   */
+  async verifyCSAAccess(token: string): Promise<{
+    hasAccess: boolean
+    username: string
+    userInfo: UserInfoDto
+    message: string
+    icmResponsibility?: string
+  }> {
+    const userInfo = this.decodeToken(token)
+    const username = userInfo.username
+
+    try {
+      const icmData = await this.fetchUserFromICM(username)
+
+      // Check if user has ICM CSA Application responsibility
+      const hasCSAResponsibility = icmData?.items?.Responsibility?.Name === 'ICM CSA Application'
+
+      if (hasCSAResponsibility) {
+        return {
+          hasAccess: true,
+          username,
+          userInfo,
+          message: 'User has CSA access',
+          icmResponsibility: icmData?.items?.Responsibility?.Name,
+        }
+      }
+
+      return {
+        hasAccess: false,
+        username,
+        userInfo,
+        message: 'User does not have ICM CSA Application responsibility',
+      }
+    } catch (error) {
+      console.error('Failed to verify CSA access from ICM:', error)
+      // Return unauthorized if ICM check fails
+      return {
+        hasAccess: false,
+        username,
+        userInfo,
+        message: 'Failed to verify user access from ICM system',
       }
     }
   }
@@ -244,14 +309,21 @@ export class AdminService {
    */
   async fetchUserFromICM(username: string): Promise<ICMEmployeeResponse> {
     try {
-      // Step 1: Get Bearer token from Keycloak (shared via IcmApiService)
+      // Step 1: Get Bearer token from Keycloak
+      console.log('Fetching ICM bearer token...')
       const bearerToken = await this.keycloakAuthService.getBearerToken()
 
-      // Step 2: Query ICM API with the bearer token
-      const requestBody = {
+      console.log('Requesting ICM API with username:', username)
+
+      const icmApiUrl = this.configService.get<string>('admin.icmApiUrl')!
+      const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
+
+      // Build QueryHierarchy parameter
+      const queryHierarchy = {
         Employee: {
           fields: 'Login Name, Party Name',
-          searchspec: `[Login Name] = '${username}'`,
+          searchspec: "[Login Name] = 'UKHAN'",
+          // searchspec: `[Login Name] = '${username}'`,
           Responsibility: {
             fields: 'Name',
             searchspec: "[Name] = 'ICM CSA Application'",
@@ -259,22 +331,32 @@ export class AdminService {
         },
       }
 
-      const icmApiUrl = this.configService.get<string>('admin.icmApiUrl')!
-      const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
+      // Build query parameters
+      const params = new URLSearchParams({
+        ViewMode: 'Catalog',
+        excludeEmptyFieldsInResponse: 'True',
+        PageSize: '100',
+        workspace: 'int_release_5.4',
+        recordcountneeded: 'true',
+        StartRowNum: '0',
+        GetChildren: 'false',
+        childlinks: 'None',
+        QueryHierarchy: JSON.stringify(queryHierarchy),
+      })
 
       const response = await firstValueFrom(
-        this.httpService.post(`${icmApiUrl}/data/Employee`, requestBody, {
+        this.httpService.get(`${icmApiUrl}/Employee?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${bearerToken}`,
             'X-ICM-TrustedUsername': icmTrustedUsername,
-            'Content-Type': 'application/json',
           },
         }),
       )
+      console.log('ICM API response received:', response.data)
 
       return response.data
     } catch (error) {
-      this.logger.error('ICM API request failed:', error)
+      console.error('ICM API request failed:', error)
       throw new HttpException(
         'Failed to fetch user data from ICM',
         HttpStatus.INTERNAL_SERVER_ERROR,

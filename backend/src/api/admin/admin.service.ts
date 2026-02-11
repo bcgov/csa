@@ -22,7 +22,7 @@ export class AdminService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly keycloakAuthService: KeycloakAuthService,
-  ) { }
+  ) {}
   /**
    * Decode JWT token and extract user information
    * @param token - JWT token from Authorization header
@@ -338,7 +338,8 @@ export class AdminService {
           // searchspec: `[Login Name] = '${username}'`,
           Responsibility: {
             fields: 'Name',
-            searchspec: "[Name] = 'ICM CSA Application - RW' OR [Name] = 'ICM CSA Application - RO'",
+            searchspec:
+              "[Name] = 'ICM CSA Application - RW' OR [Name] = 'ICM CSA Application - RO'",
           },
         },
       }

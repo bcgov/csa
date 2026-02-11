@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { IcmService, BATCH_SIZE } from './icm.service'
 import { IcmDataSource } from './data-source/icm-data-source'
-import { ConfigService } from '@nestjs/config'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { IcmApiConfig } from './icm.config'
 import { FieldMapEntry } from './field-maps'
@@ -34,19 +33,11 @@ describe('IcmService', () => {
       $executeRawUnsafe: vi.fn().mockResolvedValue(1),
     }
 
-    const mockConfigService = {
-      get: vi.fn((key: string) => {
-        if (key === 'sync.postgresSchema') return 'csa'
-        return undefined
-      }),
-    }
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         IcmService,
         { provide: IcmDataSource, useValue: mockIcmDataSource },
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile()
 
@@ -77,7 +68,7 @@ describe('IcmService', () => {
       await service.ingestResource(testConfig)
 
       const sql = mockPrisma.$executeRawUnsafe.mock.calls[0][0]
-      expect(sql).toContain('INSERT INTO csa.stg_icm_cases')
+      expect(sql).toContain('INSERT INTO stg_icm_cases')
       expect(sql).toContain('ON CONFLICT (ROW_ID) DO UPDATE SET')
       expect(sql).toContain('CASE_NUM = EXCLUDED.CASE_NUM')
       // Two value groups: ($1, $2, NOW()), ($3, $4, NOW())

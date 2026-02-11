@@ -20,6 +20,7 @@ import { IcmService } from './icm/icm.service'
 import { FileStorageService } from './mis/file-storage/file-storage.service'
 import { MockFileStorageService } from './mis/file-storage/mock-file-storage.service'
 import { S3Service } from './mis/file-storage/s3.service'
+import { EligibilityService } from './eligibility/eligibility.service'
 import { MisService } from './mis/mis.service'
 
 @Module({
@@ -60,6 +61,7 @@ import { MisService } from './mis/mis.service'
     },
     IcmService,
     MisService,
+    EligibilityService,
     IngestDataHandler,
     IngestIcmHandler,
     IngestMisHandler,

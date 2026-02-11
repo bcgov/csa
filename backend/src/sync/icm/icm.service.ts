@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { IcmApiRecord, IcmDataSource } from './data-source/icm-data-source'
 import { IcmApiConfig } from './icm.config'
@@ -19,7 +18,6 @@ export class IcmService {
   constructor(
     private readonly icmDataSource: IcmDataSource,
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
   ) {}
 
   async ingestResource(config: IcmApiConfig, lastUpdated?: Date): Promise<IcmResult> {
@@ -47,7 +45,6 @@ export class IcmService {
 
   // Batch upsert records into the staging table.
   private async batchUpsert(config: IcmApiConfig, records: IcmApiRecord[]): Promise<void> {
-    const schema = this.configService.get<string>('sync.postgresSchema')!
     const table = config.stagingTable
     const { fieldMap, primaryKey } = config
 
@@ -71,7 +68,7 @@ export class IcmService {
       .join(', ')
 
     const sql = `
-      INSERT INTO ${schema}.${table} (${colList}, ingested_at)
+      INSERT INTO ${table} (${colList}, ingested_at)
       VALUES ${valueGroups.join(', ')}
       ON CONFLICT (${primaryKey}) DO UPDATE SET
         ${updateSet},

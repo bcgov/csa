@@ -100,9 +100,9 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     fieldMap: STG_AGREEMENT_MAP,
   },
   {
-    name: 'order_lines',
+    name: 'orders',
     endpoint: '/data/OrderLine',
-    stagingTable: 'stg_icm_order_lines',
+    stagingTable: 'stg_icm_orders',
     primaryKey: 'ROW_ID',
     cursorLabel: 'Order Updated',
     searchSpec: () =>

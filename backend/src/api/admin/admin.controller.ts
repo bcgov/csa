@@ -6,14 +6,17 @@ import {
   Param,
   Query,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common'
 import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { AuthGuard } from '../common/guards/auth.guard'
 import { AdminService } from './admin.service'
 import { UserInfoDto } from './dto/user-info.dto'
 import { UserPermissionsDto } from './dto/user-permissions.dto'
 
 @ApiTags('admin')
 @Controller({ path: 'admin', version: '1' })
+@UseGuards(AuthGuard)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 

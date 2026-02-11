@@ -53,16 +53,15 @@ export class MisService {
   }
 
   private async truncateAndCopy(config: MisFileConfig, readable: Readable): Promise<number> {
-    const schema = this.configService.get<string>('sync.postgresSchema')!
     const pool = this.prisma.getPool()
     const client = await pool.connect()
 
     try {
       await client.query('BEGIN')
-      await client.query(`TRUNCATE TABLE ${schema}.${config.stagingTable}`)
+      await client.query(`TRUNCATE TABLE ${config.stagingTable}`)
 
       const colList = config.columns.join(', ')
-      const copyQuery = `COPY ${schema}.${config.stagingTable} (${colList}) FROM STDIN WITH (FORMAT csv, HEADER true, NULL '')`
+      const copyQuery = `COPY ${config.stagingTable} (${colList}) FROM STDIN WITH (FORMAT csv, HEADER true, NULL '')`
 
       const copyStream = client.query(copyFrom(copyQuery))
       await pipeline(readable, copyStream)

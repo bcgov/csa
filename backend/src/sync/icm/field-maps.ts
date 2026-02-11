@@ -229,7 +229,7 @@ export const STG_ORDER_MAP: FieldMapEntry[] = [
     sourceLabel: 'MCFD Contract Num',
     masterField: 'mcfd_contract',
   },
-  { sourceField: 'AGREE_ID', sourceLabel: 'Agreement Id', masterField: 'agreement_id_icm' },
+  { sourceField: 'AGREEMENT_ROW_ID', sourceLabel: 'Agreement Id', masterField: 'agreement_id_icm' },
   { sourceField: 'LAST_UPD', sourceLabel: 'Order Updated', masterField: 'last_upd_dt_order_icm' },
   { sourceField: 'ROW_ID', sourceLabel: 'Id', masterField: 'order_id_icm' },
 ]

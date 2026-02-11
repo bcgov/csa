@@ -16,7 +16,6 @@ export const syncConfig = registerAs('sync', () => {
   }
 
   return {
-    postgresSchema: process.env.POSTGRES_SCHEMA || 'csa',
     useMockData,
     icmCursorLookbackDays,
     icmWorkspace: process.env.ICM_WORKSPACE || '',

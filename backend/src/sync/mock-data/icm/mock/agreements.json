@@ -1,0 +1,251 @@
+{
+   "items":    [
+            {
+         "Service Provider": "SAPHIRE_BC",
+         "Contract Renewal Flag": "N",
+         "ICM Termination Date": "",
+         "Resource Case Id": "1-4YXEWTT",
+         "SHSS Transition In End Date": "",
+         "SHSS Transition Complete Flag": "N",
+         "Agreement Number": "1-10794795754",
+         "ICM Agreement RESP Centre": "18XWB",
+         "SHSS Amendment Effective Date": "",
+         "Updated": "01/28/2026 01:39:05",
+         "Service Provider Id": "1-4XNKNU5",
+         "Created By User": "SIEBEL_EAI",
+         "Agreement End Date": "12/31/2026 00:01:01",
+         "ICM Signing Office": "Test_Garima",
+         "SHSS Transition In Start Date": "",
+         "SHSS Transition In Applicable Flag": "",
+         "CSN": "1-10742108333",
+         "Id": "1-4YIXXPM",
+         "MIS Resource Case #": "RE34567890",
+         "SHSS Transition Completed Date": "",
+         "ICM PCMS Contract Number": "SHSS000000000093",
+         "Contract Renewal Version": "",
+         "Created": "06/06/2023 08:58:41",
+         "ICM SHSS Locked Flag": "N",
+         "Updated By User": "SIEBEL_EAI",
+         "Agreement Status": "Active",
+         "Updated By": "1-A6IS",
+         "PCMS Version Num": "1",
+         "Agreement Type": "SHSS",
+         "Provider Status": "Active",
+         "Resource Case #": "1-10819102385",
+         "Created By": "1-A6IS",
+         "Agreement Start Date": "01/01/2026 01:01:01",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Agreements/Agreements/1-4YIXXPM",
+               "name": "Agreements"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Agreements/Agreements/1-4YIXXPM",
+               "name": "Agreements"
+            }
+         ]
+      },
+            {
+         "Service Provider": "SAPHIRE_BC",
+         "Contract Renewal Flag": "N",
+         "ICM Termination Date": "",
+         "Resource Case Id": "1-4YXEWTT",
+         "SHSS Transition In End Date": "",
+         "SHSS Transition Complete Flag": "",
+         "Agreement Number": "1-10784047318",
+         "ICM Agreement RESP Centre": "18XCN",
+         "SHSS Amendment Effective Date": "",
+         "Updated": "01/12/2026 21:59:56",
+         "Service Provider Id": "1-4XNKNU5",
+         "Created By User": "CGWRK19",
+         "Agreement End Date": "12/31/2026 00:01:01",
+         "ICM Signing Office": "Test_Garima",
+         "SHSS Transition In Start Date": "",
+         "SHSS Transition In Applicable Flag": "Y",
+         "CSN": "1-10742108333",
+         "Id": "1-4YCJK5Y",
+         "MIS Resource Case #": "RE34567890",
+         "SHSS Transition Completed Date": "",
+         "ICM PCMS Contract Number": "SHSS000000000023",
+         "Contract Renewal Version": "",
+         "Created": "05/05/2023 10:41:54",
+         "ICM SHSS Locked Flag": "N",
+         "Updated By User": "SIEBEL_EAI",
+         "Agreement Status": "Active",
+         "Updated By": "1-A6IS",
+         "PCMS Version Num": "1",
+         "Agreement Type": "SHSS",
+         "Provider Status": "Active",
+         "Resource Case #": "1-10819102385",
+         "Created By": "1-1FCNOJY",
+         "Agreement Start Date": "01/01/2026 01:01:01",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Agreements/Agreements/1-4YCJK5Y",
+               "name": "Agreements"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Agreements/Agreements/1-4YCJK5Y",
+               "name": "Agreements"
+            }
+         ]
+      },
+            {
+         "Service Provider": "SAPHIRE_BC",
+         "Contract Renewal Flag": "N",
+         "ICM Termination Date": "",
+         "Resource Case Id": "1-4YXEWTT",
+         "SHSS Transition In End Date": "",
+         "SHSS Transition Complete Flag": "",
+         "Agreement Number": "1-10784857927",
+         "ICM Agreement RESP Centre": "18XWB",
+         "SHSS Amendment Effective Date": "",
+         "Updated": "01/28/2026 01:13:08",
+         "Service Provider Id": "1-4XNKNU5",
+         "Created By User": "SIEBEL_EAI",
+         "Agreement End Date": "12/31/2026 00:01:01",
+         "ICM Signing Office": "Test_Garima",
+         "SHSS Transition In Start Date": "",
+         "SHSS Transition In Applicable Flag": "",
+         "CSN": "1-10742108333",
+         "Id": "1-4YD0XMV",
+         "MIS Resource Case #": "RE34567890",
+         "SHSS Transition Completed Date": "",
+         "ICM PCMS Contract Number": "SHSS000000000026",
+         "Contract Renewal Version": "",
+         "Created": "05/05/2023 14:11:25",
+         "ICM SHSS Locked Flag": "N",
+         "Updated By User": "SIEBEL_EAI",
+         "Agreement Status": "Active",
+         "Updated By": "1-A6IS",
+         "PCMS Version Num": "1",
+         "Agreement Type": "SHSS",
+         "Provider Status": "Active",
+         "Resource Case #": "1-10819102385",
+         "Created By": "1-A6IS",
+         "Agreement Start Date": "01/01/2026 01:01:01",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Agreements/Agreements/1-4YD0XMV",
+               "name": "Agreements"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Agreements/Agreements/1-4YD0XMV",
+               "name": "Agreements"
+            }
+         ]
+      },
+            {
+         "Service Provider": "SAPHIRE_BC",
+         "Contract Renewal Flag": "N",
+         "ICM Termination Date": "",
+         "Resource Case Id": "1-4YXEWTT",
+         "SHSS Transition In End Date": "",
+         "SHSS Transition Complete Flag": "N",
+         "Agreement Number": "1-10797238008",
+         "ICM Agreement RESP Centre": "18XCN",
+         "SHSS Amendment Effective Date": "",
+         "Updated": "01/14/2026 04:07:45",
+         "Service Provider Id": "1-4XNKNU5",
+         "Created By User": "SIEBEL_EAI",
+         "Agreement End Date": "12/31/2026 00:01:01",
+         "ICM Signing Office": "Test_Garima",
+         "SHSS Transition In Start Date": "",
+         "SHSS Transition In Applicable Flag": "",
+         "CSN": "1-10742108333",
+         "Id": "1-4YKEA60",
+         "MIS Resource Case #": "RE34567890",
+         "SHSS Transition Completed Date": "",
+         "ICM PCMS Contract Number": "SHSS000000000169",
+         "Contract Renewal Version": "",
+         "Created": "06/16/2023 11:33:13",
+         "ICM SHSS Locked Flag": "N",
+         "Updated By User": "SIEBEL_EAI",
+         "Agreement Status": "Active",
+         "Updated By": "1-A6IS",
+         "PCMS Version Num": "1",
+         "Agreement Type": "SHSS",
+         "Provider Status": "Active",
+         "Resource Case #": "1-10819102385",
+         "Created By": "1-A6IS",
+         "Agreement Start Date": "01/01/2026 01:01:01",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Agreements/Agreements/1-4YKEA60",
+               "name": "Agreements"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Agreements/Agreements/1-4YKEA60",
+               "name": "Agreements"
+            }
+         ]
+      },
+            {
+         "Service Provider": "SAPHIRE_BC",
+         "Contract Renewal Flag": "N",
+         "ICM Termination Date": "",
+         "Resource Case Id": "1-4YXEWTT",
+         "SHSS Transition In End Date": "12/31/2026 00:01:01",
+         "SHSS Transition Complete Flag": "Y",
+         "Agreement Number": "1-10797238018",
+         "ICM Agreement RESP Centre": "18XCN",
+         "SHSS Amendment Effective Date": "",
+         "Updated": "02/01/2026 23:39:29",
+         "Service Provider Id": "1-4XNKNU5",
+         "Created By User": "SIEBEL_EAI",
+         "Agreement End Date": "12/31/2026 00:01:01",
+         "ICM Signing Office": "Test_Garima",
+         "SHSS Transition In Start Date": "01/01/2026 01:01:01",
+         "SHSS Transition In Applicable Flag": "Y",
+         "CSN": "1-10742108333",
+         "Id": "1-4YKEA6A",
+         "MIS Resource Case #": "RE34567890",
+         "SHSS Transition Completed Date": "06/18/2023 00:00:00",
+         "ICM PCMS Contract Number": "SHSS000000000168",
+         "Contract Renewal Version": "",
+         "Created": "06/16/2023 11:33:59",
+         "ICM SHSS Locked Flag": "N",
+         "Updated By User": "SIEBEL_EAI",
+         "Agreement Status": "Active",
+         "Updated By": "1-A6IS",
+         "PCMS Version Num": "1",
+         "Agreement Type": "SHSS",
+         "Provider Status": "Active",
+         "Resource Case #": "1-10819102385",
+         "Created By": "1-A6IS",
+         "Agreement Start Date": "01/01/2026 01:01:01",
+         "Link":          [
+                        {
+               "rel": "self",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Agreements/Agreements/1-4YKEA6A",
+               "name": "Agreements"
+            },
+                        {
+               "rel": "canonical",
+               "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Agreements/Agreements/1-4YKEA6A",
+               "name": "Agreements"
+            }
+         ]
+      }
+   ],
+   "Link":    [
+            {
+         "rel": "self",
+         "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Agreements/Agreements?workspace=int_release_5.4&excludeEmptyFieldsInResponse=False&PageSize=5&childlinks=None&ViewMode=Catalog&recordcountneeded=true&StartRowNum=0&GetChildren=false&SearchSpec=[Agreement Status] = \"Active\" AND ([Agreement Type] = \"SHSS\" OR [Agreement Type] = \"FCH\" OR [Agreement Type] = \"Out of Care\")",
+         "name": "Agreements"
+      },
+            {
+         "rel": "nextSet",
+         "href": "https://development.icm.gov.bc.ca/gov/v1.0/data/Agreements/Agreements?workspace=int_release_5.4&excludeEmptyFieldsInResponse=False&PageSize=5&childlinks=None&ViewMode=Catalog&recordcountneeded=true&StartRowNum=5&GetChildren=false&SearchSpec=[Agreement Status] = \"Active\" AND ([Agreement Type] = \"SHSS\" OR [Agreement Type] = \"FCH\" OR [Agreement Type] = \"Out of Care\")",
+         "name": "Agreements"
+      }
+   ]
+}

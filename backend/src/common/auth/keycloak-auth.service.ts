@@ -1,5 +1,5 @@
 import { HttpService } from '@nestjs/axios'
-import { Injectable } from '@nestjs/common'
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { firstValueFrom } from 'rxjs'
 
@@ -20,12 +20,23 @@ export class KeycloakAuthService {
     params.append('client_id', keycloakClientId)
     params.append('client_secret', keycloakClientSecret)
 
+    console.log('Requesting Keycloak token from:', keycloakTokenUrl)
     const response = await firstValueFrom(
       this.httpService.post(keycloakTokenUrl, params, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
       }),
     )
+    console.log('ICM token token response received ', response.data.access_token)
 
     return response.data.access_token
+  }
+  catch(error) {
+    console.error('Failed to obtain ICM bearer token:', error)
+    throw new HttpException(
+      'Failed to authenticate with ICM service',
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    )
   }
 }

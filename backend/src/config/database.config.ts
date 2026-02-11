@@ -15,4 +15,5 @@ const buildDataSourceUrl = (): string => {
 
 export const databaseConfig = {
   url: buildDataSourceUrl(),
+  schema: process.env.POSTGRES_SCHEMA || 'csa',
 }

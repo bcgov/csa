@@ -17,7 +17,10 @@ class PrismaService
     if (PrismaService.instance) {
       return PrismaService.instance
     }
-    const pool = new Pool({ connectionString: databaseConfig.url })
+    const pool = new Pool({
+      connectionString: databaseConfig.url,
+      options: `-c search_path=${databaseConfig.schema}`,
+    })
     const adapter = new PrismaPg(pool)
     super({
       adapter,

@@ -26,7 +26,6 @@ export class IcmApiDataSource extends IcmDataSource {
     bearerToken: string,
     lastUpdated?: Date,
   ): Promise<IcmApiRecord[]> {
-    // const bearerToken = await this.keycloakAuthService.getBearerToken()
     const icmApiUrl = this.configService.get<string>('admin.icmApiUrl')!
     const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
 
@@ -49,14 +48,18 @@ export class IcmApiDataSource extends IcmDataSource {
             'X-ICM-TrustedUsername': icmTrustedUsername,
             'Content-Type': 'application/json',
           },
-          validateStatus: () => true,
+          validateStatus: (status) => status === 200 || status === 404 || status === 500,
         }),
       )
 
-      this.logger.log(`Response status: ${response.status}`)
-      this.logger.log(`Response headers: ${JSON.stringify(response.headers)}`)
+      if (response.status === 404) {
+        this.logger.log(`Fetching ${config.name}: received 404, no more records`)
+        break
+      }
 
-      if (response.status >= 400) {
+      if (response.status === 500) {
+        this.logger.log(`Response status: ${response.status}`)
+        this.logger.log(`Response headers: ${JSON.stringify(response.headers)}`)
         this.logger.error(
           `ICM API error for ${config.name}: status=${response.status}, body=${JSON.stringify(response.data)}`,
         )

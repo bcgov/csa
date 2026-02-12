@@ -64,17 +64,19 @@ describe('step1B_CancellationDetermination', () => {
 
   it('should set isInEligible=true and cancelReasonCode=22 for AWOL ICM placement', () => {
     const ctx = makeCtx({
-      placements: [{
-        type: 'Non-Placement Location',
-        serviceType: 'Absent/Unknown Location',
-        status: 'Active',
-        startDate: null,
-        endDate: null,
-        contractNumber: null,
-        agreementRowId: null,
-        paidUnpaid: null,
-        source: 'ICM',
-      }],
+      placements: [
+        {
+          type: 'Non-Placement Location',
+          serviceType: 'Absent/Unknown Location',
+          status: 'Active',
+          startDate: null,
+          endDate: null,
+          contractNumber: null,
+          agreementRowId: null,
+          paidUnpaid: null,
+          source: 'ICM',
+        },
+      ],
     })
     step1B_CancellationDetermination.evaluate(ctx)
     expect(ctx.contact.isInEligible).toBe(true)
@@ -83,16 +85,18 @@ describe('step1B_CancellationDetermination', () => {
 
   it('should set isInEligible=true and cancelReasonCode=22 for AWOL MIS placement', () => {
     const ctx = makeCtx({
-      placements: [{
-        type: 'AW',
-        status: 'Active',
-        startDate: null,
-        endDate: null,
-        contractNumber: null,
-        agreementRowId: null,
-        paidUnpaid: null,
-        source: 'MIS',
-      }],
+      placements: [
+        {
+          type: 'AW',
+          status: 'Active',
+          startDate: null,
+          endDate: null,
+          contractNumber: null,
+          agreementRowId: null,
+          paidUnpaid: null,
+          source: 'MIS',
+        },
+      ],
     })
     step1B_CancellationDetermination.evaluate(ctx)
     expect(ctx.contact.isInEligible).toBe(true)
@@ -101,17 +105,19 @@ describe('step1B_CancellationDetermination', () => {
 
   it('should set isInEligible=true and cancelReasonCode=29 for Adoption ICM placement', () => {
     const ctx = makeCtx({
-      placements: [{
-        type: 'Non-Placement Location',
-        serviceType: 'Adoption Home',
-        status: 'Active',
-        startDate: null,
-        endDate: null,
-        contractNumber: null,
-        agreementRowId: null,
-        paidUnpaid: null,
-        source: 'ICM',
-      }],
+      placements: [
+        {
+          type: 'Non-Placement Location',
+          serviceType: 'Adoption Home',
+          status: 'Active',
+          startDate: null,
+          endDate: null,
+          contractNumber: null,
+          agreementRowId: null,
+          paidUnpaid: null,
+          source: 'ICM',
+        },
+      ],
     })
     step1B_CancellationDetermination.evaluate(ctx)
     expect(ctx.contact.isInEligible).toBe(true)
@@ -120,16 +126,18 @@ describe('step1B_CancellationDetermination', () => {
 
   it('should set isInEligible=true and cancelReasonCode=29 for Adoption MIS placement', () => {
     const ctx = makeCtx({
-      placements: [{
-        type: 'AD',
-        status: 'Active',
-        startDate: null,
-        endDate: null,
-        contractNumber: null,
-        agreementRowId: null,
-        paidUnpaid: null,
-        source: 'MIS',
-      }],
+      placements: [
+        {
+          type: 'AD',
+          status: 'Active',
+          startDate: null,
+          endDate: null,
+          contractNumber: null,
+          agreementRowId: null,
+          paidUnpaid: null,
+          source: 'MIS',
+        },
+      ],
     })
     step1B_CancellationDetermination.evaluate(ctx)
     expect(ctx.contact.isInEligible).toBe(true)
@@ -139,17 +147,19 @@ describe('step1B_CancellationDetermination', () => {
   it('should NOT modify contact when no cancellation conditions match', () => {
     const ctx = makeCtx({
       deceased: null,
-      placements: [{
-        type: 'Placement',
-        serviceType: 'FCH Level 1',
-        status: 'Active',
-        startDate: null,
-        endDate: null,
-        contractNumber: null,
-        agreementRowId: null,
-        paidUnpaid: null,
-        source: 'ICM',
-      }],
+      placements: [
+        {
+          type: 'Placement',
+          serviceType: 'FCH Level 1',
+          status: 'Active',
+          startDate: null,
+          endDate: null,
+          contractNumber: null,
+          agreementRowId: null,
+          paidUnpaid: null,
+          source: 'ICM',
+        },
+      ],
     })
     step1B_CancellationDetermination.evaluate(ctx)
     expect(ctx.contact.isInEligible).toBe(false)

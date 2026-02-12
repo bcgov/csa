@@ -12,10 +12,7 @@ export const step1C_CancellationCheck: EligibilityRule = {
 
   evaluate(ctx: EligibilityContext): EligibilityResult | null {
     if (ctx.contact.isInEligible) {
-      return step9_UpdateNotEligible(
-        ctx.contact.csaStatus,
-        ctx.contact.cancelReasonCode,
-      )
+      return step9_UpdateNotEligible(ctx.contact.csaStatus, ctx.contact.cancelReasonCode)
     }
 
     return null

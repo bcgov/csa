@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { formatDate } from 'src/common/utils'
 import { IcmApiConfig } from '../icm.config'
-import { IcmDataSource, IcmApiRecord } from './icm-data-source'
+import { IcmApiRecord, IcmDataSource } from './icm-data-source'
 
 const PAGE_SIZE = 250
 
@@ -35,8 +35,10 @@ export class IcmApiDataSource extends IcmDataSource {
     while (hasMore) {
       const pageUrl = `${baseUrl}&PageSize=${PAGE_SIZE}&StartRowNum=${startRow}`
 
+      this.logger.log({ pageUrl })
       this.logger.log(`Fetching ${config.name}: startRow=${startRow}`)
 
+      //TODO: validate 500
       const response = await firstValueFrom(
         this.httpService.get(pageUrl, {
           headers: {
@@ -47,7 +49,7 @@ export class IcmApiDataSource extends IcmDataSource {
           validateStatus: (status) => status === 200 || status === 404,
         }),
       )
-
+      this.logger.log({ response })
       if (response.status === 404) {
         this.logger.log(`Fetching ${config.name}: received 404, no more records`)
         break

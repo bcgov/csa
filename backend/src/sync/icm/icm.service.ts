@@ -22,8 +22,11 @@ export class IcmService {
     private readonly keycloakAuthService: KeycloakAuthService,
   ) {}
 
-  async ingestResource(config: IcmApiConfig, lastUpdated?: Date): Promise<IcmResult> {
-    const bearerToken = await this.keycloakAuthService.getBearerToken()
+  async ingestResource(
+    config: IcmApiConfig,
+    bearerToken: string,
+    lastUpdated?: Date,
+  ): Promise<IcmResult> {
     const records = await this.icmDataSource.fetchAll(config, bearerToken, lastUpdated)
 
     for (let i = 0; i < records.length; i += BATCH_SIZE) {
@@ -37,9 +40,11 @@ export class IcmService {
 
   // Ingest all ICM API endpoints sequentially.
   async ingestAll(configs: IcmApiConfig[], lastUpdated?: Date): Promise<IcmResult[]> {
+    const bearerToken = await this.keycloakAuthService.getBearerToken()
+    this.logger.log({ bearerToken })
     const results: IcmResult[] = []
     for (const config of configs) {
-      const result = await this.ingestResource(config, lastUpdated)
+      const result = await this.ingestResource(config, bearerToken, lastUpdated)
       results.push(result)
     }
 

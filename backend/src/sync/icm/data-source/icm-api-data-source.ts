@@ -39,10 +39,9 @@ export class IcmApiDataSource extends IcmDataSource {
     while (hasMore) {
       const pageUrl = `${baseUrl}&PageSize=${PAGE_SIZE}&StartRowNum=${startRow}`
 
-      this.logger.log({ pageUrl })
       this.logger.log(`Fetching ${config.name}: startRow=${startRow}`)
+      this.logger.debug(`Request URL: ${pageUrl}`)
 
-      //TODO: validate 500
       const response = await firstValueFrom(
         this.httpService.get(pageUrl, {
           headers: {
@@ -50,13 +49,18 @@ export class IcmApiDataSource extends IcmDataSource {
             'X-ICM-TrustedUsername': icmTrustedUsername,
             'Content-Type': 'application/json',
           },
-          validateStatus: (status) => status === 200 || status === 404,
+          validateStatus: () => true,
         }),
       )
-      this.logger.log({ response })
-      if (response.status === 404) {
-        this.logger.log(`Fetching ${config.name}: received 404, no more records`)
-        break
+
+      this.logger.debug(`Response status: ${response.status}`)
+      this.logger.debug(`Response headers: ${JSON.stringify(response.headers)}`)
+
+      if (response.status >= 400) {
+        this.logger.error(
+          `ICM API error for ${config.name}: status=${response.status}, body=${JSON.stringify(response.data)}`,
+        )
+        throw new Error(`ICM API returned ${response.status} for ${config.name}`)
       }
 
       const items: IcmApiRecord[] = response.data?.items ?? []

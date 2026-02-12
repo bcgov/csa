@@ -349,7 +349,6 @@ export class AdminService {
         ViewMode: 'Catalog',
         excludeEmptyFieldsInResponse: 'True',
         PageSize: '100',
-        workspace: 'int_release_5.4',
         recordcountneeded: 'true',
         StartRowNum: '0',
         GetChildren: 'false',
@@ -357,8 +356,13 @@ export class AdminService {
         QueryHierarchy: JSON.stringify(queryHierarchy),
       })
 
+      const workspace = this.configService.get<string>('icm.workspace')
+      if (workspace) {
+        params.set('workspace', workspace)
+      }
+
       const response = await firstValueFrom(
-        this.httpService.get(`${icmApiUrl}/Employee?${params.toString()}`, {
+        this.httpService.get(`${icmApiUrl}/Employee/Employee?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${bearerToken}`,
             'X-ICM-TrustedUsername': icmTrustedUsername,

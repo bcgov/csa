@@ -13,7 +13,8 @@ import {
 import { runEligibility } from './rules/rule-runner'
 import { EligibilityRule } from './rules/rule.interface'
 import { step1A_AgeCheck } from './rules/steps/step1a-age-check'
-import { step1B_CancellationCheck } from './rules/steps/step1b-cancellation-check'
+import { step1B_CancellationDetermination } from './rules/steps/step1b-cancellation-determination'
+import { step1C_CancellationCheck } from './rules/steps/step1c-cancellation-check'
 import { step2_LegalStatusCheck } from './rules/steps/step2-legal-status-check'
 import { step3_PlacementCheck } from './rules/steps/step3-placement-check'
 import { step4_FetchAgreementContract } from './rules/steps/step4-fetch-agreement-contract'
@@ -21,7 +22,8 @@ import { step6_OrderPaymentCheck } from './rules/steps/step6-order-payment-check
 
 const RULES: EligibilityRule[] = [
   step1A_AgeCheck,
-  step1B_CancellationCheck,
+  step1B_CancellationDetermination,
+  step1C_CancellationCheck,
   step2_LegalStatusCheck,
   step3_PlacementCheck,
   step4_FetchAgreementContract,
@@ -35,12 +37,10 @@ export class EligibilityService {
   constructor(private readonly prisma: PrismaService) {}
 
   async run(): Promise<EligibilityRunResult> {
-    // 1. Load all data from staging tables
     const profiles = await this.loadContactProfiles()
 
     this.logger.log(`Loaded ${profiles.length} contact profiles from staging`)
 
-    // 2. Run eligibility rules and collect updates
     const stats: EligibilityRunResult = {
       processed: profiles.length,
       statusChanges: 0,
@@ -197,6 +197,7 @@ export class EligibilityService {
         birthProvince: raw.birthProvince ?? null,
         birthCountry: raw.birthCountry ?? null,
         isInEligible: raw.isInEligible ?? false,
+        deceased: raw.deceased ?? null,
         placements: [...icmPlacements, ...misPlacements],
         orders: [...icmOrders, ...misPayments],
         agreements,
@@ -204,10 +205,8 @@ export class EligibilityService {
     })
   }
 
-  /**
-   * Select one representative placement, order, and agreement to denormalize
-   * into the master contacts table.
-   */
+  // Select one representative placement, order, and agreement to add
+  // into the master contacts table.
   private selectPrimaryRecords(profile: ContactProfile): {
     primaryPlacement: PlacementRecord | null
     primaryOrder: OrderRecord | null
@@ -274,7 +273,7 @@ export class EligibilityService {
   private async batchInsertContacts(
     batch: Array<{ profile: ContactProfile; result: EligibilityResult }>,
   ): Promise<void> {
-    const PARAMS_PER_ROW = 57
+    const PARAMS_PER_ROW = 58
     const allValues: unknown[] = []
     const valueGroups: string[] = []
 
@@ -284,6 +283,7 @@ export class EligibilityService {
 
       const offset = allValues.length
       const placeholders = Array.from({ length: PARAMS_PER_ROW }, (_, j) => `$${offset + j + 1}`)
+      // Hardcoded trailing values per row
       valueGroups.push(
         `(${placeholders.join(', ')}, NOW(), false, NOW(), 'SYSTEM', NOW(), 'SYSTEM')`,
       )
@@ -363,6 +363,7 @@ export class EligibilityService {
         result.cancelReasonCode, // 55 cancel_reason_code
         result.careEndDate, // 56 care_end_date
         profile.isInEligible, // 57 is_in_eligible
+        profile.deceased, // 58 deceased_flag
       )
     }
 
@@ -387,7 +388,7 @@ export class EligibilityService {
         agreement_end_date, termination_date, mcfd_contract,
         order_number, order_type, order_status,
         order_amount, order_effective_start_date, product,
-        source_order, cancel_reason_code, care_end_date, is_in_eligible,
+        source_order, cancel_reason_code, care_end_date, is_in_eligible, deceased_flag,
         csa_status_effective_date, icm_integration_status,
         created_at, created_by, last_updated_at, last_updated_by
       ) VALUES ${valueGroups.join(', ')}

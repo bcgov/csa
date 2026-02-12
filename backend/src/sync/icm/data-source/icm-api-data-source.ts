@@ -3,7 +3,8 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { firstValueFrom } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
-import { IcmApiConfig, formatDate } from '../icm.config'
+import { formatDate } from 'src/common/utils'
+import { IcmApiConfig } from '../icm.config'
 import { IcmDataSource, IcmApiRecord } from './icm-data-source'
 
 const PAGE_SIZE = 250
@@ -73,7 +74,7 @@ export class IcmApiDataSource extends IcmDataSource {
       childlinks: 'None',
     })
 
-    const workspace = this.configService.get<string>('sync.icmWorkspace')
+    const workspace = this.configService.get<string>('icm.workspace')
     if (workspace) {
       params.set('workspace', workspace)
     }

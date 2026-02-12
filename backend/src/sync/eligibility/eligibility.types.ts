@@ -39,6 +39,8 @@ export interface ContactProfile {
   birthCountry: string | null
 
   isInEligible: boolean
+  deceased: string | null
+  cancelReasonCode?: string | null
 
   placements: PlacementRecord[]
   orders: OrderRecord[]

@@ -33,7 +33,7 @@ describe('IcmApiDataSource', () => {
         const values: Record<string, unknown> = {
           'admin.icmApiUrl': 'http://icm-api',
           'admin.icmTrustedUsername': 'trusted-user',
-          'sync.icmWorkspace': '',
+          'icm.workspace': '',
         }
         return values[key]
       }),
@@ -110,7 +110,7 @@ describe('IcmApiDataSource', () => {
 
     it('should include workspace param when configured', async () => {
       configService.get.mockImplementation((key: string) => {
-        if (key === 'sync.icmWorkspace') return 'int_release_5.4'
+        if (key === 'icm.workspace') return 'int_release_5.4'
         if (key === 'admin.icmApiUrl') return 'http://icm-api'
         if (key === 'admin.icmTrustedUsername') return 'trusted-user'
         return undefined

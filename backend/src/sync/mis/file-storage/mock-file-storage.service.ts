@@ -2,29 +2,33 @@ import { Injectable, Logger } from '@nestjs/common'
 import * as fs from 'fs'
 import * as path from 'path'
 import { Readable } from 'stream'
-import { FileStorageService, FileInfo } from './file-storage.service'
+import { FileStorageService } from './file-storage.service'
 
 @Injectable()
 export class MockFileStorageService extends FileStorageService {
   private readonly logger = new Logger(MockFileStorageService.name)
 
-  async download(key: string): Promise<Readable> {
+  private getMockPath(key: string): string {
     const filename = path.basename(key)
-    const mockFile = path.join(__dirname, '..', '..', 'mock-data', 'mis', 'mock', filename)
+    return path.join(__dirname, '..', '..', 'mock-data', 'mis', 'mock', filename)
+  }
+
+  async download(key: string): Promise<Readable> {
+    const mockFile = this.getMockPath(key)
 
     if (!fs.existsSync(mockFile)) {
       throw new Error(`Mock file not found: ${mockFile}`)
     }
 
-    this.logger.log(`Loaded mock file ${filename}`)
+    this.logger.log(`Loaded mock file ${path.basename(key)}`)
     return fs.createReadStream(mockFile)
   }
 
-  async getFileInfo(key: string): Promise<FileInfo> {
-    return { key, lastModified: new Date() }
+  async exists(key: string): Promise<boolean> {
+    return fs.existsSync(this.getMockPath(key))
   }
 
-  async isStale(_key: string): Promise<boolean> {
-    return false
+  async move(_fromKey: string, _toKey: string): Promise<void> {
+    this.logger.log('Mock: skipping file move')
   }
 }

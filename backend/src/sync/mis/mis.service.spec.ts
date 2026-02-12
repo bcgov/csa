@@ -8,8 +8,9 @@ import { PrismaService } from 'src/common/database/prisma.service'
 describe('MisService', () => {
   let service: MisService
   let mockFileStorage: {
-    isStale: ReturnType<typeof vi.fn>
+    exists: ReturnType<typeof vi.fn>
     download: ReturnType<typeof vi.fn>
+    move: ReturnType<typeof vi.fn>
   }
   let mockClient: {
     query: ReturnType<typeof vi.fn>
@@ -38,10 +39,11 @@ describe('MisService', () => {
     copyRowCount = 2
 
     mockFileStorage = {
-      isStale: vi.fn().mockResolvedValue(false),
+      exists: vi.fn().mockResolvedValue(true),
       download: vi
         .fn()
         .mockImplementation(() => Promise.resolve(Readable.from(['HEADER\nrow1\nrow2']))),
+      move: vi.fn().mockResolvedValue(undefined),
     }
 
     mockClient = {
@@ -80,18 +82,24 @@ describe('MisService', () => {
   })
 
   describe('ingestAll', () => {
-    it('should throw when any file is stale', async () => {
-      mockFileStorage.isStale.mockResolvedValue(true)
+    it('should skip files that do not exist', async () => {
+      mockFileStorage.exists.mockResolvedValue(false)
 
-      await expect(service.ingestAll()).rejects.toThrow('MIS files are stale')
+      const results = await service.ingestAll()
+
+      expect(results).toHaveLength(3)
+      expect(results.every((r) => r.skipped === true)).toBe(true)
+      expect(results.every((r) => r.rows === 0)).toBe(true)
+      expect(mockFileStorage.download).not.toHaveBeenCalled()
     })
 
-    it('should ingest all 3 MIS files', async () => {
+    it('should ingest all 3 MIS files when they exist', async () => {
       const results = await service.ingestAll()
 
       expect(results).toHaveLength(3)
       expect(mockFileStorage.download).toHaveBeenCalledTimes(3)
       expect(results.every((r) => r.rows === 2)).toBe(true)
+      expect(results.every((r) => r.skipped === undefined)).toBe(true)
     })
 
     it('should prepend S3 prefix to file keys', async () => {
@@ -101,6 +109,23 @@ describe('MisService', () => {
       expect(keys).toContain('csas3/CSAS3_Payments.csv')
       expect(keys).toContain('csas3/CSAS3_Contract.csv')
       expect(keys).toContain('csas3/CSAS3_Placement.csv')
+    })
+
+    it('should move files to processed after successful ingestion', async () => {
+      await service.ingestAll()
+
+      expect(mockFileStorage.move).toHaveBeenCalledTimes(3)
+      const moveCalls = mockFileStorage.move.mock.calls
+      expect(moveCalls[0][0]).toBe('csas3/CSAS3_Payments.csv')
+      expect(moveCalls[0][1]).toMatch(/^csas3\/processed\/\d{4}-\d{2}-\d{2}\/CSAS3_Payments\.csv$/)
+    })
+
+    it('should not move files when they are skipped', async () => {
+      mockFileStorage.exists.mockResolvedValue(false)
+
+      await service.ingestAll()
+
+      expect(mockFileStorage.move).not.toHaveBeenCalled()
     })
 
     it('should throw when CSV has no data rows', async () => {
@@ -128,6 +153,15 @@ describe('MisService', () => {
         (call: unknown[]) => call[0] === 'ROLLBACK',
       )
       expect(rollbackCalls.length).toBeGreaterThan(0)
+    })
+
+    it('should continue if move fails (non-fatal)', async () => {
+      mockFileStorage.move.mockRejectedValue(new Error('Access Denied'))
+
+      const results = await service.ingestAll()
+
+      expect(results).toHaveLength(3)
+      expect(results.every((r) => r.rows === 2)).toBe(true)
     })
   })
 })

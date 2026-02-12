@@ -1,11 +1,17 @@
 import {
+  firstDayOfPreviousMonth,
+  formatDate,
+  formatDateTime,
+  getAgeCutoffDate,
+} from 'src/common/utils'
+import {
   FieldMapEntry,
+  STG_AGREEMENT_MAP,
   STG_ICM_CASES_MAP,
   STG_ICM_CONTACTS_MAP,
   STG_ICM_PLACEMENTS_MAP,
   STG_LEGAL_ADMIN_MAP,
   STG_LEGAL_AUTHORITY_MAP,
-  STG_AGREEMENT_MAP,
   STG_ORDER_MAP,
 } from './field-maps'
 
@@ -18,62 +24,32 @@ export interface IcmApiConfig {
   searchSpec?: () => string
   fieldMap: FieldMapEntry[]
 }
-
-// Date helpers for dynamic search specs
-
-export function formatDate(date: Date): string {
-  return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
-}
-
-function formatDateTime(date: Date): string {
-  return `${formatDate(date)} 00:00:00`
-}
-
-function today(): string {
-  return formatDate(new Date())
-}
-
-function eighteenYearsAgo(): string {
-  const d = new Date()
-  d.setFullYear(d.getFullYear() - 18)
-  return formatDate(d)
-}
-
-function firstDayOfPreviousMonth(): string {
-  const d = new Date()
-  d.setMonth(d.getMonth() - 1)
-  d.setDate(1)
-  return formatDateTime(d)
-}
-
-// NOTE: The endpoint paths are placeholders.
-// Update with actual ICM API endpoint paths before production use.
-
-/** Configs for ingesting ICM data into staging tables */
+// TODO: date may not need DateTime as query params
+// Configs for ingesting ICM data into staging tables
 export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
   {
     name: 'cases',
-    endpoint: '/data/Case',
+    endpoint: '/Cases/Case',
     stagingTable: 'stg_icm_cases',
     primaryKey: 'ROW_ID',
     cursorLabel: 'Key Player Last Updated Date',
     searchSpec: () =>
-      `[Type] = "Child Services" AND [Key Player Birth Date] >= "${eighteenYearsAgo()}"`,
+      `[Type] = "Child Services" AND [Key Player Birth Date] >= "${formatDate(getAgeCutoffDate())}"`,
     fieldMap: STG_ICM_CASES_MAP,
   },
   {
     name: 'placements',
-    endpoint: '/data/Placement',
+    endpoint: '/Placements/Placement',
     stagingTable: 'stg_icm_placements',
     primaryKey: 'ROW_ID',
     cursorLabel: 'Updated',
     searchSpec: () =>
-      `([Status] = "Active" OR [Status] = "Interrupted" OR [Status] = "Ended") AND [End Date] >= "${today()}"`,
+      `([Status] = "Active" OR [Status] = "Interrupted" OR [Status] = "Ended") AND [End Date] >= "${formatDate(new Date())}"`,
     fieldMap: STG_ICM_PLACEMENTS_MAP,
   },
   {
     name: 'legal_authority_admin',
-    endpoint: '/data/LegalAuthorityAdmin',
+    endpoint: '/ContactLegalAuthorityAdmin/ContactLegalAuthorityAdmin',
     stagingTable: 'stg_icm_legal_authority_admin',
     primaryKey: 'ROW_ID',
     cursorLabel: 'Updated',
@@ -81,17 +57,17 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
   },
   {
     name: 'legal_authority',
-    endpoint: '/data/LegalAuthority',
+    endpoint: '/ContactLegalAuthorities/ContactLegalAuthority',
     stagingTable: 'stg_legal_authority',
     primaryKey: 'ROW_ID',
     cursorLabel: 'Updated',
     searchSpec: () =>
-      `([Legal Authority Code] = 'OPC-Perm Cust Trans-Cons-54.01' OR [Legal Authority Code] = 'OPO-Perm Custody Trans-54.01' OR [Legal Authority Code] = 'OPT-Perm Custody Trans-54.1') OR ([Expiry Date] IS NULL OR [Expiry Date] >= "${today()}")`,
+      `([Legal Authority Code] = 'OPC-Perm Cust Trans-Cons-54.01' OR [Legal Authority Code] = 'OPO-Perm Custody Trans-54.01' OR [Legal Authority Code] = 'OPT-Perm Custody Trans-54.1') OR ([Expiry Date] IS NULL OR [Expiry Date] >= "${formatDate(new Date())}")`,
     fieldMap: STG_LEGAL_AUTHORITY_MAP,
   },
   {
     name: 'agreements',
-    endpoint: '/data/Agreement',
+    endpoint: '/Agreements/Agreements',
     stagingTable: 'stg_icm_agreement',
     primaryKey: 'ROW_ID',
     cursorLabel: 'Updated',
@@ -101,12 +77,12 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
   },
   {
     name: 'orders',
-    endpoint: '/data/OrderLine',
+    endpoint: '/OrderLines/OrderLine',
     stagingTable: 'stg_icm_orders',
     primaryKey: 'ROW_ID',
     cursorLabel: 'Order Updated',
     searchSpec: () =>
-      `[Product] <> "Recovered Funds" AND [Order Status] = "Closed" AND ([Order Type] = "Variable" OR [Order Type] = "ADJ-Variable" OR [Order Type] = "Monthly Family Care Rate" OR [Order Type] = "Adj-Monthly Family Care Rate" OR [Order Type] = "Maintenance Payment") AND [Order Effective Start Date] >= "${firstDayOfPreviousMonth()}"`,
+      `[Product] <> "Recovered Funds" AND [Order Status] = "Closed" AND ([Order Type] = "Variable" OR [Order Type] = "ADJ-Variable" OR [Order Type] = "Monthly Family Care Rate" OR [Order Type] = "Adj-Monthly Family Care Rate" OR [Order Type] = "Maintenance Payment") AND [Order Effective Start Date] >= "${formatDateTime(firstDayOfPreviousMonth())}"`,
     fieldMap: STG_ORDER_MAP,
   },
 ]
@@ -115,7 +91,7 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
 export const ICM_SYNC_CONFIGS: IcmApiConfig[] = [
   {
     name: 'contacts',
-    endpoint: '/data/Contact',
+    endpoint: '/Contact/Contact',
     stagingTable: 'stg_icm_contacts',
     primaryKey: 'id',
     cursorLabel: 'Updated',

@@ -2,13 +2,17 @@ import { Injectable, Logger } from '@nestjs/common'
 import * as fs from 'fs'
 import * as path from 'path'
 import { IcmApiConfig } from '../icm.config'
-import { IcmDataSource, IcmApiRecord } from './icm-data-source'
+import { IcmApiRecord, IcmDataSource } from './icm-data-source'
 
 @Injectable()
 export class MockIcmDataSource extends IcmDataSource {
   private readonly logger = new Logger(MockIcmDataSource.name)
 
-  async fetchAll(config: IcmApiConfig, lastUpdated?: Date): Promise<IcmApiRecord[]> {
+  async fetchAll(
+    config: IcmApiConfig,
+    _bearerToken: string,
+    lastUpdated?: Date,
+  ): Promise<IcmApiRecord[]> {
     const mockDir = path.join(__dirname, '..', '..', 'mock-data', 'icm', 'mock')
     const mockFile = path.join(mockDir, `${config.name}.json`)
 

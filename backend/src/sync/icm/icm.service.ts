@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { IcmApiRecord, IcmDataSource } from './data-source/icm-data-source'
 import { IcmApiConfig } from './icm.config'
@@ -18,10 +19,12 @@ export class IcmService {
   constructor(
     private readonly icmDataSource: IcmDataSource,
     private readonly prisma: PrismaService,
+    private readonly keycloakAuthService: KeycloakAuthService,
   ) {}
 
   async ingestResource(config: IcmApiConfig, lastUpdated?: Date): Promise<IcmResult> {
-    const records = await this.icmDataSource.fetchAll(config, lastUpdated)
+    const bearerToken = await this.keycloakAuthService.getBearerToken()
+    const records = await this.icmDataSource.fetchAll(config, bearerToken, lastUpdated)
 
     for (let i = 0; i < records.length; i += BATCH_SIZE) {
       const batch = records.slice(i, i + BATCH_SIZE)

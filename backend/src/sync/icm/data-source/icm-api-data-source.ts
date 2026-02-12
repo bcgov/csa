@@ -21,8 +21,12 @@ export class IcmApiDataSource extends IcmDataSource {
     super()
   }
 
-  async fetchAll(config: IcmApiConfig, lastUpdated?: Date): Promise<IcmApiRecord[]> {
-    const bearerToken = await this.keycloakAuthService.getBearerToken()
+  async fetchAll(
+    config: IcmApiConfig,
+    bearerToken: string,
+    lastUpdated?: Date,
+  ): Promise<IcmApiRecord[]> {
+    // const bearerToken = await this.keycloakAuthService.getBearerToken()
     const icmApiUrl = this.configService.get<string>('admin.icmApiUrl')!
     const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
 

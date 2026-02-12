@@ -5,5 +5,9 @@ export interface IcmApiRecord {
 }
 
 export abstract class IcmDataSource {
-  abstract fetchAll(config: IcmApiConfig, lastUpdated?: Date): Promise<IcmApiRecord[]>
+  abstract fetchAll(
+    config: IcmApiConfig,
+    bearerToken: string,
+    lastUpdated?: Date,
+  ): Promise<IcmApiRecord[]>
 }

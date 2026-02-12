@@ -15,7 +15,7 @@ export class IngestMisHandler extends BaseJob {
   }
 
   async execute(_context: JobContext): Promise<JobResult> {
-    const results = await this.misService.ingestAll()
+    const results = [] // TODO: await this.misService.ingestAll()
 
     const totalRows = results.reduce((sum, r) => sum + r.rows, 0)
 

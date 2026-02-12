@@ -7,7 +7,7 @@ import { formatDate } from 'src/common/utils'
 import { IcmApiConfig } from '../icm.config'
 import { IcmApiRecord, IcmDataSource } from './icm-data-source'
 
-const PAGE_SIZE = 250
+const PAGE_SIZE = 100
 
 @Injectable()
 export class IcmApiDataSource extends IcmDataSource {
@@ -40,7 +40,7 @@ export class IcmApiDataSource extends IcmDataSource {
       const pageUrl = `${baseUrl}&PageSize=${PAGE_SIZE}&StartRowNum=${startRow}`
 
       this.logger.log(`Fetching ${config.name}: startRow=${startRow}`)
-      this.logger.debug(`Request URL: ${pageUrl}`)
+      this.logger.log(`Request URL: ${pageUrl}`)
 
       const response = await firstValueFrom(
         this.httpService.get(pageUrl, {
@@ -53,8 +53,8 @@ export class IcmApiDataSource extends IcmDataSource {
         }),
       )
 
-      this.logger.debug(`Response status: ${response.status}`)
-      this.logger.debug(`Response headers: ${JSON.stringify(response.headers)}`)
+      this.logger.log(`Response status: ${response.status}`)
+      this.logger.log(`Response headers: ${JSON.stringify(response.headers)}`)
 
       if (response.status >= 400) {
         this.logger.error(

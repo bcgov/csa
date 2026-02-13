@@ -15,6 +15,7 @@ import { JobRunner } from 'src/jobs/job-runner.service'
 @Injectable()
 export class IngestDataHandler extends BaseJob {
   readonly jobType = JobType.INGEST_DATA
+  readonly inlineRetryAttempts = 0 // Orchestrator: children handle their own retries
 
   constructor(private readonly jobRunner: JobRunner) {
     super()

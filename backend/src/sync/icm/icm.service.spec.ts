@@ -59,7 +59,7 @@ describe('IcmService', () => {
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
     })
 
-    it('should build correct multi-row INSERT ON CONFLICT SQL', async () => {
+    it('should build correct unnest INSERT ON CONFLICT SQL', async () => {
       mockIcmDataSource.fetchAll.mockResolvedValue([
         { 'Row Id': '1-ABC', 'Case Num': 'CS001' },
         { 'Row Id': '2-DEF', 'Case Num': 'CS002' },
@@ -71,12 +71,12 @@ describe('IcmService', () => {
       expect(sql).toContain('INSERT INTO stg_icm_cases')
       expect(sql).toContain('ON CONFLICT (ROW_ID) DO UPDATE SET')
       expect(sql).toContain('CASE_NUM = EXCLUDED.CASE_NUM')
-      // Two value groups: ($1, $2, NOW()), ($3, $4, NOW())
-      expect(sql).toContain('$1')
-      expect(sql).toContain('$3')
+      expect(sql).toContain('unnest(')
+      expect(sql).toContain('$1::text[]')
+      expect(sql).toContain('$2::text[]')
     })
 
-    it('should pass correct values from all records', async () => {
+    it('should pass correct arrays per column', async () => {
       mockIcmDataSource.fetchAll.mockResolvedValue([
         { 'Row Id': '1-ABC', 'Case Num': 'CS001' },
         { 'Row Id': '2-DEF', 'Case Num': 'CS002' },
@@ -85,11 +85,9 @@ describe('IcmService', () => {
       await service.ingestResource(testConfig)
 
       const args = mockPrisma.$executeRawUnsafe.mock.calls[0]
-      // args[0] is SQL, args[1..] are values for all records
-      expect(args[1]).toBe('1-ABC')
-      expect(args[2]).toBe('CS001')
-      expect(args[3]).toBe('2-DEF')
-      expect(args[4]).toBe('CS002')
+      // args[0] is SQL, args[1] is ROW_ID array, args[2] is CASE_NUM array
+      expect(args[1]).toEqual(['1-ABC', '2-DEF'])
+      expect(args[2]).toEqual(['CS001', 'CS002'])
     })
 
     it('should map null for missing API fields', async () => {
@@ -100,7 +98,7 @@ describe('IcmService', () => {
       await service.ingestResource(testConfig)
 
       const args = mockPrisma.$executeRawUnsafe.mock.calls[0]
-      expect(args[2]).toBeNull() // CASE_NUM should be null
+      expect(args[2]).toEqual([null]) // CASE_NUM array should contain null
     })
 
     it('should return zero counts for empty results', async () => {

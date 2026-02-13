@@ -30,7 +30,8 @@ export class KeycloakAuthService {
         },
       }),
     )
-    this.logger.log('ICM token token response received ', response.data.access_token)
+    // TODO: this.logger.log('ICM token token response received ', response.data.access_token)
+    this.logger.log('ICM token token response received ')
 
     return response.data.access_token
   }

@@ -11,12 +11,12 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
   {
     sourceField: 'FST_NAME',
     sourceLabel: 'Key Player AKA First Name',
-    masterField: 'aka_last_name',
+    masterField: 'aka_first_name',
   },
   {
     sourceField: 'LAST_NAME',
     sourceLabel: 'Key Player AKA Last Name',
-    masterField: 'aka_first_name',
+    masterField: 'aka_last_name',
   },
   { sourceField: 'X_AGE', sourceLabel: 'Key Player Age', masterField: 'age' },
 

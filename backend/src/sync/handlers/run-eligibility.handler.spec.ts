@@ -23,6 +23,7 @@ describe('RunEligibilityHandler', () => {
         processed: 100,
         statusChanges: 25,
         newContacts: 10,
+        skipped: 0,
         stepCounts: { step7: 15, step8: 5, step9: 3, step10: 2, noChange: 25 },
       }),
     }

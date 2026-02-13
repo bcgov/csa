@@ -41,13 +41,14 @@ export class AdminService {
         throw new UnauthorizedException('Invalid token')
       }
 
+      // TODO: debug Tokens
       // Log token fields to see available username formats
-      console.log('Token fields:', {
-        idir_username: decoded.idir_username,
-        preferred_username: decoded.preferred_username,
-        email: decoded.email,
-        sub: decoded.sub,
-      })
+      // console.log('Token fields:', {
+      //   idir_username: decoded.idir_username,
+      //   preferred_username: decoded.preferred_username,
+      //   email: decoded.email,
+      //   sub: decoded.sub,
+      // })
 
       // Extract username - prefer idir_username, then extract from preferred_username
       let username = decoded.idir_username
@@ -322,10 +323,10 @@ export class AdminService {
   async fetchUserFromICM(username: string): Promise<ICMEmployeeResponse> {
     try {
       // Step 1: Get Bearer token from Keycloak
-      console.log('Fetching ICM bearer token...')
+      this.logger.log('Fetching ICM bearer token...')
       const bearerToken = await this.keycloakAuthService.getBearerToken()
 
-      console.log('Requesting ICM API with username:', username)
+      this.logger.log('Requesting ICM API with username:', username)
 
       const icmApiUrl = this.configService.get<string>('admin.icmApiUrl')!
       const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
@@ -369,7 +370,7 @@ export class AdminService {
           },
         }),
       )
-      console.log('ICM API response received:', response.data)
+      this.logger.log('ICM API response received:', response.data)
 
       return response.data
     } catch (error) {

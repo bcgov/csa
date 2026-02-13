@@ -1,10 +1,12 @@
 import { HttpService } from '@nestjs/axios'
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common'
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { firstValueFrom } from 'rxjs'
 
 @Injectable()
 export class KeycloakAuthService {
+  private readonly logger = new Logger(KeycloakAuthService.name)
+
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
@@ -20,7 +22,7 @@ export class KeycloakAuthService {
     params.append('client_id', keycloakClientId)
     params.append('client_secret', keycloakClientSecret)
 
-    console.log('Requesting Keycloak token from:', keycloakTokenUrl)
+    this.logger.log('Requesting Keycloak token from:', keycloakTokenUrl)
     const response = await firstValueFrom(
       this.httpService.post(keycloakTokenUrl, params, {
         headers: {
@@ -28,7 +30,7 @@ export class KeycloakAuthService {
         },
       }),
     )
-    console.log('ICM token token response received ', response.data.access_token)
+    this.logger.log('ICM token token response received ', response.data.access_token)
 
     return response.data.access_token
   }

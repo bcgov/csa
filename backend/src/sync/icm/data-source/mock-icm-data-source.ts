@@ -8,10 +8,7 @@ import { IcmApiRecord, IcmDataSource } from './icm-data-source'
 export class MockIcmDataSource extends IcmDataSource {
   private readonly logger = new Logger(MockIcmDataSource.name)
 
-  async fetchAll(
-    config: IcmApiConfig,
-    lastUpdated?: Date,
-  ): Promise<IcmApiRecord[]> {
+  async fetchAll(config: IcmApiConfig, lastUpdated?: Date): Promise<IcmApiRecord[]> {
     const mockDir = path.join(__dirname, '..', '..', 'mock-data', 'icm', 'mock')
     const mockFile = path.join(mockDir, `${config.name}.json`)
 

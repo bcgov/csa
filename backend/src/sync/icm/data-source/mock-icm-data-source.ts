@@ -10,7 +10,6 @@ export class MockIcmDataSource extends IcmDataSource {
 
   async fetchAll(
     config: IcmApiConfig,
-    _bearerToken: string,
     lastUpdated?: Date,
   ): Promise<IcmApiRecord[]> {
     const mockDir = path.join(__dirname, '..', '..', 'mock-data', 'icm', 'mock')

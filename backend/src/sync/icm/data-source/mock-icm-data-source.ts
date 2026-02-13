@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import * as fs from 'fs'
 import * as path from 'path'
 import { IcmApiConfig } from '../icm.config'
-import { IcmDataSource, IcmApiRecord } from './icm-data-source'
+import { IcmApiRecord, IcmDataSource } from './icm-data-source'
 
 @Injectable()
 export class MockIcmDataSource extends IcmDataSource {

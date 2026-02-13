@@ -5,6 +5,7 @@ import { KeycloakAuthModule } from 'src/common/auth/keycloak-auth.module'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { PrismaModule } from 'src/common/database/prisma.module'
 import { adminConfig } from 'src/config/admin.config'
+import { icmConfig } from 'src/config/icm.config'
 import { syncConfig } from 'src/config/sync.config'
 import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
@@ -27,7 +28,7 @@ import { MisService } from './mis/mis.service'
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [syncConfig, adminConfig],
+      load: [syncConfig, adminConfig, icmConfig],
     }),
     HttpModule,
     PrismaModule,

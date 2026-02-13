@@ -53,9 +53,9 @@ describe('IngestMisHandler', () => {
     })
 
     it('should propagate errors from MisService', async () => {
-      mockMisService.ingestAll.mockRejectedValue(new Error('MIS files are stale: payments'))
+      mockMisService.ingestAll.mockRejectedValue(new Error('payments: CSV has no data rows'))
 
-      await expect(handler.execute(mockContext)).rejects.toThrow('MIS files are stale')
+      await expect(handler.execute(mockContext)).rejects.toThrow('CSV has no data rows')
     })
   })
 })

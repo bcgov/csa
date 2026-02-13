@@ -11,6 +11,7 @@ describe('AdminService', () => {
 
   const mockHttpService = {
     post: vi.fn(),
+    get: vi.fn(),
   }
 
   const mockConfigService = {

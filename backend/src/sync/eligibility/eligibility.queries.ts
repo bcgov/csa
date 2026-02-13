@@ -162,6 +162,7 @@ export const LOAD_CONTACT_PROFILES_SQL = `
     mc.csa_status       AS "csaStatus",
     mc.person_id_mis    AS "personIdMis",
     mc.is_in_eligible   AS "isInEligible",
+    c.X_DECEASED        AS "deceased",
     COALESCE(ipa.data, '[]'::json) AS "icmPlacements",
     COALESCE(ioa.data, '[]'::json) AS "icmOrders",
     COALESCE(iaa.data, '[]'::json) AS "icmAgreements",

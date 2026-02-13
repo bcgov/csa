@@ -47,22 +47,27 @@ describe('MockFileStorageService', () => {
     })
   })
 
-  describe('isStale', () => {
-    it('should always return false', async () => {
-      const result = await service.isStale('any-key')
+  describe('exists', () => {
+    it('should return true when mock file exists', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true)
+
+      const result = await service.exists('csas3/test.csv')
+
+      expect(result).toBe(true)
+    })
+
+    it('should return false when mock file does not exist', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false)
+
+      const result = await service.exists('csas3/nonexistent.csv')
+
       expect(result).toBe(false)
     })
   })
 
-  describe('getFileInfo', () => {
-    it('should return current date as lastModified', async () => {
-      const before = Date.now()
-      const info = await service.getFileInfo('test.csv')
-      const after = Date.now()
-
-      expect(info.key).toBe('test.csv')
-      expect(info.lastModified.getTime()).toBeGreaterThanOrEqual(before)
-      expect(info.lastModified.getTime()).toBeLessThanOrEqual(after)
+  describe('move', () => {
+    it('should be a no-op', async () => {
+      await expect(service.move('from', 'to')).resolves.toBeUndefined()
     })
   })
 })

@@ -1,7 +1,7 @@
 import { registerAs } from '@nestjs/config'
 
 export const adminConfig = registerAs('admin', () => {
-  const icmApiUrl = process.env.ICM_API_URL
+  const icmApiUrl = process.env.ICM_API_URL?.replace(/\/Employee\/?$/, '')
   const icmTrustedUsername = process.env.ICM_TRUSTED_USERNAME
   const keycloakTokenUrl = process.env.ICM_TOKEN_URL
   const keycloakClientId = process.env.ICM_CLIENT_ID

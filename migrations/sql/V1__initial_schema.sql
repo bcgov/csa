@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS csa.contacts (
   cancel_reason_code          TEXT,
   care_end_date               DATE,
   is_in_eligible              BOOLEAN     DEFAULT FALSE,
+  deceased_flag               TEXT,
   icm_integration_status      BOOLEAN     NOT NULL,
   created_at                  TIMESTAMP   NOT NULL,
   created_by                  TEXT        NOT NULL,
@@ -184,6 +185,7 @@ CREATE TABLE IF NOT EXISTS csa.stg_icm_cases (
     SUBJECT_FST_NAME TEXT,
     X_ADM_FIRST_NAME TEXT,
     X_ADM_LAST_NAME TEXT,
+    X_DECEASED TEXT,
     INGESTED_AT TIMESTAMP DEFAULT NOW()
 );
 

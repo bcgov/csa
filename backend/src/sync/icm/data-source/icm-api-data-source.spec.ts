@@ -1,10 +1,10 @@
-import { Test, TestingModule } from '@nestjs/testing'
 import { HttpService } from '@nestjs/axios'
 import { ConfigService } from '@nestjs/config'
+import { Test, TestingModule } from '@nestjs/testing'
 import { of } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
-import { IcmApiDataSource } from './icm-api-data-source'
 import { IcmApiConfig } from '../icm.config'
+import { IcmApiDataSource } from './icm-api-data-source'
 
 const mockConfig: IcmApiConfig = {
   name: 'cases',
@@ -33,7 +33,7 @@ describe('IcmApiDataSource', () => {
         const values: Record<string, unknown> = {
           'admin.icmApiUrl': 'http://icm-api',
           'admin.icmTrustedUsername': 'trusted-user',
-          'sync.icmWorkspace': '',
+          'icm.workspace': '',
         }
         return values[key]
       }),
@@ -59,7 +59,7 @@ describe('IcmApiDataSource', () => {
             status: 200,
             headers: {},
             data: {
-              items: Array.from({ length: 250 }, (_, i) => ({ Id: `${i}` })),
+              items: Array.from({ length: 100 }, (_, i) => ({ Id: `${i}` })),
             },
           }),
         )
@@ -68,14 +68,14 @@ describe('IcmApiDataSource', () => {
             status: 200,
             headers: {},
             data: {
-              items: [{ Id: '250' }, { Id: '251' }],
+              items: [{ Id: '100' }, { Id: '251' }],
             },
           }),
         )
 
       const results = await service.fetchAll(mockConfig)
 
-      expect(results).toHaveLength(252)
+      expect(results).toHaveLength(102)
       expect(httpService.get).toHaveBeenCalledTimes(2)
     })
 
@@ -110,7 +110,7 @@ describe('IcmApiDataSource', () => {
 
     it('should include workspace param when configured', async () => {
       configService.get.mockImplementation((key: string) => {
-        if (key === 'sync.icmWorkspace') return 'int_release_5.4'
+        if (key === 'icm.workspace') return 'int_release_5.4'
         if (key === 'admin.icmApiUrl') return 'http://icm-api'
         if (key === 'admin.icmTrustedUsername') return 'trusted-user'
         return undefined

@@ -3,10 +3,11 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { firstValueFrom } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
-import { IcmApiConfig, formatDate } from '../icm.config'
-import { IcmDataSource, IcmApiRecord } from './icm-data-source'
+import { formatDate } from 'src/common/utils'
+import { IcmApiConfig } from '../icm.config'
+import { IcmApiRecord, IcmDataSource } from './icm-data-source'
 
-const PAGE_SIZE = 250
+const PAGE_SIZE = 100
 
 @Injectable()
 export class IcmApiDataSource extends IcmDataSource {
@@ -35,6 +36,7 @@ export class IcmApiDataSource extends IcmDataSource {
       const pageUrl = `${baseUrl}&PageSize=${PAGE_SIZE}&StartRowNum=${startRow}`
 
       this.logger.log(`Fetching ${config.name}: startRow=${startRow}`)
+      this.logger.log(`Request URL: ${pageUrl}`)
 
       const response = await firstValueFrom(
         this.httpService.get(pageUrl, {
@@ -43,13 +45,22 @@ export class IcmApiDataSource extends IcmDataSource {
             'X-ICM-TrustedUsername': icmTrustedUsername,
             'Content-Type': 'application/json',
           },
-          validateStatus: (status) => status === 200 || status === 404,
+          validateStatus: (status) => status === 200 || status === 404 || status === 500,
         }),
       )
 
       if (response.status === 404) {
         this.logger.log(`Fetching ${config.name}: received 404, no more records`)
         break
+      }
+
+      if (response.status === 500) {
+        this.logger.log(`Response status: ${response.status}`)
+        this.logger.log(`Response headers: ${JSON.stringify(response.headers)}`)
+        this.logger.error(
+          `ICM API error for ${config.name}: status=${response.status}, body=${JSON.stringify(response.data)}`,
+        )
+        throw new Error(`ICM API returned ${response.status} for ${config.name}`)
       }
 
       const items: IcmApiRecord[] = response.data?.items ?? []
@@ -73,7 +84,7 @@ export class IcmApiDataSource extends IcmDataSource {
       childlinks: 'None',
     })
 
-    const workspace = this.configService.get<string>('sync.icmWorkspace')
+    const workspace = this.configService.get<string>('icm.workspace')
     if (workspace) {
       params.set('workspace', workspace)
     }

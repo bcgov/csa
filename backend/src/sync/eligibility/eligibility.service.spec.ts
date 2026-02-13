@@ -59,6 +59,7 @@ describe('EligibilityService', () => {
         csaStatus: null,
         personIdMis: 'MIS-1',
         isInEligible: false,
+        deceased: null,
         akaFirstName: null,
         akaLastName: null,
         legacyFileNumber: null,

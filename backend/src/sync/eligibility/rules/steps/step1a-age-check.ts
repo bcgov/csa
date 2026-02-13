@@ -1,4 +1,5 @@
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
+import { isEligibleAge } from 'src/common/utils'
 import { EligibilityResult } from '../../eligibility.types'
 import { EligibilityContext, EligibilityRule } from '../rule.interface'
 import { step10_UpdateOver18 } from './step10-update-over18'
@@ -28,12 +29,4 @@ export const step1A_AgeCheck: EligibilityRule & {
 
     return step10_UpdateOver18(csaStatus)
   },
-}
-
-export function isEligibleAge(dateOfBirth: Date, referenceDate: Date): boolean {
-  const year18 = dateOfBirth.getFullYear() + 18
-  const month18 = dateOfBirth.getMonth()
-  // Last day of birth month at age 18
-  const lastEligibleDay = new Date(year18, month18 + 1, 0)
-  return referenceDate <= lastEligibleDay
 }

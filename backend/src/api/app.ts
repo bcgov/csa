@@ -18,7 +18,7 @@ export async function bootstrap() {
   app.setGlobalPrefix('api', {
     exclude: ['health', 'health/live', 'health/ready'],
   })
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.ENABLE_SWAGGER === 'true') {
     const config = new DocumentBuilder()
       .setTitle('CSA API')
       .setDescription('CSA BACKEND API')

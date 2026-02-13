@@ -507,7 +507,7 @@ export class EligibilityService {
     let skipped = 0
 
     // Build full context and validate before upserting
-    const validRows: UpsertContext[] = []
+    const rowMap = new Map<string, UpsertContext>()
     for (const { profile, result } of updates) {
       const row: UpsertContext = {
         profile,
@@ -522,8 +522,9 @@ export class EligibilityService {
         skipped++
         continue
       }
-      validRows.push(row)
+      rowMap.set(profile.personIdIcm, row)
     }
+    const validRows = Array.from(rowMap.values())
 
     for (let i = 0; i < validRows.length; i += batchSize) {
       const batch = validRows.slice(i, i + batchSize)

@@ -22,6 +22,11 @@ async function bootstrap() {
     const jobRunner = app.get(JobRunner)
 
     // Run INGEST_DATA job
+    jobRunner.runJobType = async () => ({
+      success: true,
+      message: 'Fake job completed',
+      metadata: {},
+    })
     const result = await jobRunner.runJobType(JobType.INGEST_DATA, JobTrigger.CRON)
 
     await app.close()

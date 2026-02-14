@@ -506,7 +506,8 @@ export class EligibilityService {
     const batchSize = ELIGIBILITY_CONFIG.BATCH_SIZE
     let skipped = 0
 
-    // Build full context and validate before upserting
+    // Build full context, validate, and deduplicate by personIdIcm
+    // TODO: check db staging tables
     const rowMap = new Map<string, UpsertContext>()
     for (const { profile, result } of updates) {
       const row: UpsertContext = {

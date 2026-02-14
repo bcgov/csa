@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
-import { CraDetail, CraHeader, CraTrailer } from '../interfaces/file-create.interface'
+import { CraDetail, CraHeader, CraTrailer } from './outbound.interface'
 
 const { FILE_NAME_PREFIX, REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
 
@@ -17,8 +17,8 @@ const {
 } = REQUEST_FILE
 
 @Injectable()
-export class FileCreateService {
-  private readonly logger = new Logger(FileCreateService.name)
+export class OutboundFileService {
+  private readonly logger = new Logger(OutboundFileService.name)
   private readonly fileStoragePath: string
   private readonly environmentCode: string
   private readonly fileTypeCode: string
@@ -48,7 +48,7 @@ export class FileCreateService {
     }
 
     lines.push(this.buildTrailer(trailer))
-    const destinationPath = join(this.fileStoragePath, destinationId)
+    const destinationPath = join(this.fileStoragePath, destinationId, 'outbound')
     if (!existsSync(destinationPath)) {
       mkdirSync(destinationPath, { recursive: true })
     }

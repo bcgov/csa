@@ -3,7 +3,7 @@ import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
-import { ResponseFileService } from '../inbound-file/response-file.service'
+import { InboundResponseService } from '../inbound/inbound-response.service'
 import path from 'path'
 // import { PrismaService } from 'src/common/database/prisma.service'
 
@@ -14,7 +14,7 @@ import path from 'path'
 @Injectable()
 export class PollCraResponseHandler extends BaseJob {
   readonly jobType = JobType.POLL_CRA_RESPONSE
-  constructor(private readonly responseFileService: ResponseFileService) {
+  constructor(private readonly inboundResponseService: InboundResponseService) {
     super()
   }
 
@@ -26,13 +26,13 @@ export class PollCraResponseHandler extends BaseJob {
     // 4. Update contact records with CRA responses
     // 5. Return metadata: { files_processed, records_updated, errors }
 
-    const localPath = './src/cra/inbound-file/response-file.txt'
+    const localPath = './src/cra/inbound/response-file.txt'
 
     const fullPath = path.join(process.cwd(), localPath)
 
     console.log('fullPath====>', fullPath)
 
-    const { header, details, trailer } = this.responseFileService.parseFile(fullPath)
+    const { header, details, trailer } = this.inboundResponseService.parseFile(fullPath)
     console.log('Response file data', header, details, trailer)
 
     this.logger.log('POLL_CRA_RESPONSE stub - not yet implemented')

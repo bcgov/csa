@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common'
 import { readFileSync } from 'fs'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
-import { CraResHeader, CraResDetail, CraResTrailer } from '../interfaces/response-file.interface'
+import { CraResHeader, CraResDetail, CraResTrailer } from './inbound.interface'
 
 const { RESPONSE_FILE } = CRA_DATA_HANDLING_CONSTANT
 
 @Injectable()
-export class ResponseFileService {
+export class InboundResponseService {
   // Helper method to slice field values
 
   parseFile(filePath: string): {

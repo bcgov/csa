@@ -40,7 +40,7 @@ describe('JobRunner', () => {
   }
 
   beforeEach(async () => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -112,6 +112,53 @@ describe('JobRunner', () => {
       expect(mockHandler.execute).toHaveBeenCalledTimes(3) // 1 initial + 2 retries
       expect(jobsService.markFailed).toHaveBeenCalled()
       expect(mockHandler.onFailure).toHaveBeenCalled()
+      expect(result.success).toBe(false)
+    })
+
+    it('should persist stack trace to DB on failure', async () => {
+      const error = new Error('Connection failed')
+      vi.mocked(mockHandler.execute).mockRejectedValue(error)
+
+      await runner.executeJob(1)
+
+      // markFailed should receive the full stack, not just message
+      const errorArg = vi.mocked(jobsService.markFailed).mock.calls[0][1]
+      expect(errorArg).toContain('Connection failed')
+      expect(errorArg).toContain('Error')
+      // Stack traces include file paths
+      expect(errorArg.length).toBeGreaterThan(error.message.length)
+    })
+
+    it('should handle onStart hook failure gracefully', async () => {
+      vi.mocked(mockHandler.onStart).mockRejectedValue(new Error('onStart boom'))
+
+      const result = await runner.executeJob(1)
+
+      expect(result.success).toBe(false)
+      expect(result.message).toContain('onStart failed')
+      expect(jobsService.markFailed).toHaveBeenCalled()
+      // execute should never be called if onStart fails
+      expect(mockHandler.execute).not.toHaveBeenCalled()
+    })
+
+    it('should handle onFailure hook error without masking original error', async () => {
+      vi.mocked(mockHandler.execute).mockRejectedValue(new Error('Original error'))
+      vi.mocked(mockHandler.onFailure).mockRejectedValue(new Error('onFailure boom'))
+
+      const result = await runner.executeJob(1)
+
+      expect(result.success).toBe(false)
+      // The original error message should be in the result, not the hook error
+      expect(result.message).toContain('Original error')
+      expect(jobsService.markFailed).toHaveBeenCalled()
+    })
+
+    it('should still log if markFailed DB call fails', async () => {
+      vi.mocked(mockHandler.execute).mockRejectedValue(new Error('Job error'))
+      vi.mocked(jobsService.markFailed).mockRejectedValue(new Error('DB down'))
+
+      // Should not throw - safeMarkFailed catches DB errors
+      const result = await runner.executeJob(1)
       expect(result.success).toBe(false)
     })
   })

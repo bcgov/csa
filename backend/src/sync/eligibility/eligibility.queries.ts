@@ -8,10 +8,12 @@ const PROTECTED_STATUS_LIST = PROTECTED_STATUSES.map((s) => `'${s}'`).join(', ')
  *
  * CTEs:
  *  - eligible_cases: filters to non-protected contacts
+ *  - latest_legal_auth: most recent legal authority per case (DISTINCT ON)
  *  - icm_placements_agg: active/interrupted ICM placements grouped by case
  *  - icm_orders_agg: ICM orders grouped by case (via placement → agreement)
  *  - icm_agreements_agg: ICM agreements grouped by case (via placement)
  *  - mis_payments_agg: MIS payments grouped by person_id_mis
+ *  - mis_contracts_agg: MIS contracts grouped by person_id_mis (via placement)
  *  - mis_placements_agg: active/interrupted MIS placements grouped by person_id_mis
  *
  * Join keys:
@@ -22,164 +24,199 @@ export const LOAD_CONTACT_PROFILES_SQL = `
   WITH
     eligible_cases AS (
       SELECT
-        c.ROW_ID,
-        c.CONTACT_ROW_ID,
-        mc.person_id_mis
-      FROM stg_icm_cases c
-      LEFT JOIN contacts mc
-        ON mc.person_id_icm = c.CONTACT_ROW_ID
-      WHERE mc.csa_status IS NULL
-        OR mc.csa_status NOT IN (${PROTECTED_STATUS_LIST})
+        cases.ROW_ID,
+        cases.CONTACT_ROW_ID,
+        master_contacts.person_id_mis
+      FROM stg_icm_cases cases
+      LEFT JOIN contacts master_contacts
+        ON master_contacts.person_id_icm = cases.CONTACT_ROW_ID
+      WHERE master_contacts.csa_status IS NULL
+        OR master_contacts.csa_status NOT IN (${PROTECTED_STATUS_LIST})
+    ),
+
+    latest_legal_auth AS (
+      SELECT DISTINCT ON (legal_auth.PAR_ROW_ID)
+        legal_auth.PAR_ROW_ID,
+        legal_auth.LGL_AUTH_CD,
+        legal_auth.EFF_LGL_STATUS,
+        legal_auth.EXPIRY_DT,
+        legal_auth.START_DT
+      FROM stg_legal_authority legal_auth
+      WHERE legal_auth.PAR_ROW_ID IN (SELECT ROW_ID FROM eligible_cases)
+      ORDER BY legal_auth.PAR_ROW_ID, legal_auth.START_DT DESC NULLS LAST
     ),
 
     icm_placements_agg AS (
       SELECT
-        p.CASE_ROW_ID,
+        icm_plc.CASE_ROW_ID,
         json_agg(json_build_object(
-          'type', p.X_TYPE,
-          'status', p.X_STATUS,
-          'startDate', p.X_START_DATE,
-          'endDate', p.X_END_DATE,
-          'contractNumber', p.X_PCMS_CONTRACT_NUM,
-          'agreementRowId', p.AGREEMENT_ROW_ID,
-          'paidUnpaid', p.X_ORIG_PLMT_PAID_UNPAID,
-          'placementNumber', p.X_PLACEMENT_NUM,
-          'serviceType', p.X_SERVICE_TYPE,
-          'serviceProviderName', p.X_SRV_PROV_NAME,
-          'providerId', p.OU_NUM,
-          'placeOfServiceName', p.X_SRV_PLC_NAME,
-          'interruptedPlacementId', p.X_PLACEMENT_ID
+          'type', icm_plc.X_TYPE,
+          'status', icm_plc.X_STATUS,
+          'startDate', icm_plc.X_START_DATE,
+          'endDate', icm_plc.X_END_DATE,
+          'contractNumber', icm_plc.X_PCMS_CONTRACT_NUM,
+          'agreementRowId', icm_plc.AGREEMENT_ROW_ID,
+          'paidUnpaid', icm_plc.X_ORIG_PLMT_PAID_UNPAID,
+          'placementNumber', icm_plc.X_PLACEMENT_NUM,
+          'serviceType', icm_plc.X_SERVICE_TYPE,
+          'serviceProviderName', icm_plc.X_SRV_PROV_NAME,
+          'providerId', icm_plc.OU_NUM,
+          'placeOfServiceName', icm_plc.X_SRV_PLC_NAME,
+          'interruptedPlacementId', icm_plc.X_PLACEMENT_ID
         )) AS data
-      FROM stg_icm_placements p
-      WHERE p.CASE_ROW_ID IN (SELECT ROW_ID FROM eligible_cases)
-        AND p.X_STATUS IN ('Active', 'Interrupted')
-      GROUP BY p.CASE_ROW_ID
+      FROM stg_icm_placements icm_plc
+      WHERE icm_plc.CASE_ROW_ID IN (SELECT ROW_ID FROM eligible_cases)
+        AND icm_plc.X_STATUS IN ('Active', 'Interrupted')
+      GROUP BY icm_plc.CASE_ROW_ID
     ),
 
     icm_orders_agg AS (
       SELECT
-        p.CASE_ROW_ID,
+        icm_plc.CASE_ROW_ID,
         json_agg(json_build_object(
-          'orderType', o.NAME,
-          'orderStatus', o.STATUS_CD,
-          'effectiveStartDate', o.X_EFF_START_DT,
-          'amount', o.TOTAL_AMT,
-          'contractNumber', o.X_PCMS_CONTRACT_NUM,
-          'orderNumber', o.ORDER_NUM,
-          'product', o.PRODUCT_NAME,
-          'agreementRowId', o.AGREEMENT_ROW_ID
+          'orderType', icm_ord.NAME,
+          'orderStatus', icm_ord.STATUS_CD,
+          'effectiveStartDate', icm_ord.X_EFF_START_DT,
+          'amount', icm_ord.TOTAL_AMT,
+          'contractNumber', icm_ord.X_PCMS_CONTRACT_NUM,
+          'orderNumber', icm_ord.ORDER_NUM,
+          'product', icm_ord.PRODUCT_NAME,
+          'agreementRowId', icm_ord.AGREEMENT_ROW_ID
         )) AS data
-      FROM stg_icm_orders o
-      INNER JOIN stg_icm_placements p
-        ON o.AGREEMENT_ROW_ID = p.AGREEMENT_ROW_ID
-      WHERE p.CASE_ROW_ID IN (SELECT ROW_ID FROM eligible_cases)
-      GROUP BY p.CASE_ROW_ID
+      FROM stg_icm_orders icm_ord
+      INNER JOIN stg_icm_placements icm_plc
+        ON icm_ord.AGREEMENT_ROW_ID = icm_plc.AGREEMENT_ROW_ID
+      WHERE icm_plc.CASE_ROW_ID IN (SELECT ROW_ID FROM eligible_cases)
+      GROUP BY icm_plc.CASE_ROW_ID
     ),
 
     icm_agreements_agg AS (
       SELECT
-        p.CASE_ROW_ID,
+        icm_plc.CASE_ROW_ID,
         json_agg(json_build_object(
-          'rowId', a.ROW_ID,
-          'agreementType', a.AGREE_CD,
-          'agreementStatus', a.STAT_CD,
-          'agreementStartDate', a.EFF_START_DT,
-          'agreementEndDate', a.EFF_END_DT,
-          'terminationDate', a.X_TERMINATION_DT,
-          'mcfdContract', a.X_PCMS_CONTRACT_NUM
+          'rowId', icm_agr.ROW_ID,
+          'agreementType', icm_agr.AGREE_CD,
+          'agreementStatus', icm_agr.STAT_CD,
+          'agreementStartDate', icm_agr.EFF_START_DT,
+          'agreementEndDate', icm_agr.EFF_END_DT,
+          'terminationDate', icm_agr.X_TERMINATION_DT,
+          'mcfdContract', icm_agr.X_PCMS_CONTRACT_NUM
         )) AS data
-      FROM stg_icm_agreement a
-      INNER JOIN stg_icm_placements p
-        ON a.ROW_ID = p.AGREEMENT_ROW_ID
-      WHERE p.CASE_ROW_ID IN (SELECT ROW_ID FROM eligible_cases)
-      GROUP BY p.CASE_ROW_ID
+      FROM stg_icm_agreement icm_agr
+      INNER JOIN stg_icm_placements icm_plc
+        ON icm_agr.ROW_ID = icm_plc.AGREEMENT_ROW_ID
+      WHERE icm_plc.CASE_ROW_ID IN (SELECT ROW_ID FROM eligible_cases)
+      GROUP BY icm_plc.CASE_ROW_ID
     ),
 
     mis_payments_agg AS (
       SELECT
-        mp.person_id_mis,
+        mis_pay.person_id_mis,
         json_agg(json_build_object(
-          'orderType', mp.payment_type,
-          'orderStatus', mp.payment_status,
-          'effectiveStartDate', mp.payment_effective_start_date,
-          'amount', mp.payment_amount::NUMERIC,
-          'contractNumber', mp.contract_num
+          'orderType', mis_pay.payment_type,
+          'orderStatus', mis_pay.payment_status,
+          'effectiveStartDate', mis_pay.payment_effective_start_date,
+          'amount', mis_pay.payment_amount::NUMERIC,
+          'contractNumber', mis_pay.contract_num
         )) AS data
-      FROM stg_mis_payments mp
-      WHERE mp.person_id_mis IN (
+      FROM stg_mis_payments mis_pay
+      WHERE mis_pay.person_id_mis IN (
         SELECT person_id_mis FROM eligible_cases WHERE person_id_mis IS NOT NULL
       )
-      GROUP BY mp.person_id_mis
+      GROUP BY mis_pay.person_id_mis
+    ),
+
+    mis_contracts_agg AS (
+      SELECT
+        mis_plc.client_fileid_dep_no AS person_id_mis,
+        json_agg(json_build_object(
+          'contractNumber', mis_con.contract_number,
+          'serviceProviderName', mis_con.service_provider_name,
+          'status', mis_con.status,
+          'type', mis_con.type,
+          'startDate', mis_con.contract_start_date,
+          'endDate', mis_con.contract_end_date,
+          'terminationDate', mis_con.contract_termination_date
+        )) AS data
+      FROM stg_mis_contracts mis_con
+      INNER JOIN stg_mis_placements mis_plc
+        ON mis_con.contract_number = mis_plc.contract_no
+      WHERE mis_plc.client_fileid_dep_no IN (
+        SELECT person_id_mis FROM eligible_cases WHERE person_id_mis IS NOT NULL
+      )
+      GROUP BY mis_plc.client_fileid_dep_no
     ),
 
     mis_placements_agg AS (
       SELECT
-        mp.client_fileid_dep_no AS person_id_mis,
+        mis_plc.client_fileid_dep_no AS person_id_mis,
         json_agg(json_build_object(
-          'type', mp.type,
-          'status', mp.status,
-          'startDate', mp.start_date,
-          'endDate', mp.end_date,
-          'contractNumber', mp.contract_no
+          'type', mis_plc.type,
+          'status', mis_plc.status,
+          'startDate', mis_plc.start_date,
+          'endDate', mis_plc.end_date,
+          'contractNumber', mis_plc.contract_no
         )) AS data
-      FROM stg_mis_placements mp
-      WHERE mp.client_fileid_dep_no IN (
+      FROM stg_mis_placements mis_plc
+      WHERE mis_plc.client_fileid_dep_no IN (
         SELECT person_id_mis FROM eligible_cases WHERE person_id_mis IS NOT NULL
       )
-        AND mp.status IN ('Active', 'Interrupted')
-      GROUP BY mp.client_fileid_dep_no
+        AND mis_plc.status IN ('Active', 'Interrupted')
+      GROUP BY mis_plc.client_fileid_dep_no
     )
 
   SELECT
-    c.CONTACT_ROW_ID    AS "personIdIcm",
-    c.FST_NAME          AS "firstName",
-    c.LAST_NAME         AS "lastName",
-    c.SUBJECT_MID_NAME  AS "middleName",
-    c.SUBJECT_FST_NAME  AS "akaFirstName",
-    c.SUBJECT_LAST_NAME AS "akaLastName",
-    c.BIRTH_DT          AS "dateOfBirth",
-    c.X_AGE::INTEGER    AS "age",
-    c.SEX_MF            AS "gender",
-    c.CASE_NUM          AS "caseNumber",
-    c.TYPE_CD           AS "caseType",
-    c.STATUS_CD         AS "caseStatus",
-    c.X_CASELOAD        AS "caseLoad",
-    c.X_LEGACY_FILE_NUM AS "legacyFileNumber",
-    c.NAME              AS "serviceOffice",
-    c.LOGIN             AS "assignedTo",
-    c.X_CSA_DIN         AS "din",
-    c.X_CSA_SENT_DATE   AS "csaSentDate",
-    c.X_BIRTH_CITY      AS "birthCity",
-    c.X_BIRTH_PROV_CD   AS "birthProvince",
-    c.BIRTH_PLACE       AS "birthCountry",
-    la.MIS_LGL_AUTH_CD  AS "misLegalAuthCode",
-    la.X_ENROLL_CSA     AS "enrollForCsa",
-    la.LGL_AUTH_CD      AS "legalAuthorityCode",
-    leg.EFF_LGL_STATUS  AS "effectiveLegalStatus",
-    leg.EXPIRY_DT       AS "legalExpiryDate",
-    leg.START_DT        AS "effectiveDate",
-    mc.id               AS "existingContactId",
-    mc.csa_status       AS "csaStatus",
-    mc.person_id_mis    AS "personIdMis",
-    mc.is_in_eligible   AS "isInEligible",
-    c.X_DECEASED        AS "deceased",
-    COALESCE(ipa.data, '[]'::json) AS "icmPlacements",
-    COALESCE(ioa.data, '[]'::json) AS "icmOrders",
-    COALESCE(iaa.data, '[]'::json) AS "icmAgreements",
-    COALESCE(mpa.data, '[]'::json) AS "misPayments",
-    COALESCE(mpla.data, '[]'::json) AS "misPlacements"
-  FROM stg_icm_cases c
-  INNER JOIN eligible_cases ec ON ec.ROW_ID = c.ROW_ID
-  LEFT JOIN stg_icm_legal_authority_admin la
-    ON la.LGL_AUTH_CD = c.ROW_ID
-  LEFT JOIN stg_legal_authority leg
-    ON leg.PAR_ROW_ID = c.CONTACT_ROW_ID
-  LEFT JOIN contacts mc
-    ON mc.person_id_icm = c.CONTACT_ROW_ID
-  LEFT JOIN icm_placements_agg ipa ON ipa.CASE_ROW_ID = c.ROW_ID
-  LEFT JOIN icm_orders_agg ioa ON ioa.CASE_ROW_ID = c.ROW_ID
-  LEFT JOIN icm_agreements_agg iaa ON iaa.CASE_ROW_ID = c.ROW_ID
-  LEFT JOIN mis_payments_agg mpa ON mpa.person_id_mis = ec.person_id_mis
-  LEFT JOIN mis_placements_agg mpla ON mpla.person_id_mis = ec.person_id_mis
-  ORDER BY c.CONTACT_ROW_ID
+    cases.CONTACT_ROW_ID    AS "personIdIcm",
+    cases.SUBJECT_FST_NAME  AS "firstName",
+    cases.SUBJECT_LAST_NAME AS "lastName",
+    cases.SUBJECT_MID_NAME  AS "middleName",
+    cases.FST_NAME          AS "akaFirstName",
+    cases.LAST_NAME         AS "akaLastName",
+    cases.BIRTH_DT          AS "dateOfBirth",
+    cases.X_AGE::INTEGER    AS "age",
+    cases.SEX_MF            AS "gender",
+    cases.CASE_NUM          AS "caseNumber",
+    cases.TYPE_CD           AS "caseType",
+    cases.STATUS_CD         AS "caseStatus",
+    cases.X_CASELOAD        AS "caseLoad",
+    cases.X_LEGACY_FILE_NUM AS "legacyFileNumber",
+    cases.NAME              AS "serviceOffice",
+    cases.LOGIN             AS "assignedTo",
+    cases.X_CSA_DIN         AS "din",
+    cases.X_CSA_SENT_DATE   AS "csaSentDate",
+    cases.X_BIRTH_CITY      AS "birthCity",
+    cases.X_BIRTH_PROV_CD   AS "birthProvince",
+    cases.BIRTH_PLACE       AS "birthCountry",
+    legal_admin.MIS_LGL_AUTH_CD  AS "misLegalAuthCode",
+    legal_admin.X_ENROLL_CSA     AS "enrollForCsa",
+    legal_admin.LGL_AUTH_CD      AS "legalAuthorityCode",
+    legal_auth.EFF_LGL_STATUS    AS "effectiveLegalStatus",
+    legal_auth.EXPIRY_DT         AS "legalExpiryDate",
+    legal_auth.START_DT          AS "effectiveDate",
+    master_contacts.id               AS "existingContactId",
+    master_contacts.csa_status       AS "csaStatus",
+    master_contacts.person_id_mis    AS "personIdMis",
+    master_contacts.is_in_eligible   AS "isInEligible",
+    cases.X_DECEASED        AS "deceased",
+    COALESCE(icm_plc.data, '[]'::json)  AS "icmPlacements",
+    COALESCE(icm_ord.data, '[]'::json)  AS "icmOrders",
+    COALESCE(icm_agr.data, '[]'::json)  AS "icmAgreements",
+    COALESCE(mis_pay.data, '[]'::json)  AS "misPayments",
+    COALESCE(mis_con.data, '[]'::json)  AS "misContracts",
+    COALESCE(mis_plc.data, '[]'::json)  AS "misPlacements"
+  FROM stg_icm_cases cases
+  INNER JOIN eligible_cases ON eligible_cases.ROW_ID = cases.ROW_ID
+  LEFT JOIN latest_legal_auth legal_auth
+    ON legal_auth.PAR_ROW_ID = cases.ROW_ID
+  LEFT JOIN stg_icm_legal_authority_admin legal_admin
+    ON legal_admin.LGL_AUTH_CD = legal_auth.LGL_AUTH_CD
+  LEFT JOIN contacts master_contacts
+    ON master_contacts.person_id_icm = cases.CONTACT_ROW_ID
+  LEFT JOIN icm_placements_agg icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
+  LEFT JOIN icm_orders_agg icm_ord ON icm_ord.CASE_ROW_ID = cases.ROW_ID
+  LEFT JOIN icm_agreements_agg icm_agr ON icm_agr.CASE_ROW_ID = cases.ROW_ID
+  LEFT JOIN mis_payments_agg mis_pay ON mis_pay.person_id_mis = eligible_cases.person_id_mis
+  LEFT JOIN mis_contracts_agg mis_con ON mis_con.person_id_mis = eligible_cases.person_id_mis
+  LEFT JOIN mis_placements_agg mis_plc ON mis_plc.person_id_mis = eligible_cases.person_id_mis
+  ORDER BY cases.CONTACT_ROW_ID
 `

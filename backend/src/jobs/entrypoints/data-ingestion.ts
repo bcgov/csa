@@ -22,11 +22,6 @@ async function bootstrap() {
     const jobRunner = app.get(JobRunner)
 
     // Run INGEST_DATA job
-    jobRunner.runJobType = async () => ({
-      success: true,
-      message: 'Fake job completed',
-      metadata: {},
-    })
     const result = await jobRunner.runJobType(JobType.INGEST_DATA, JobTrigger.CRON)
 
     await app.close()
@@ -38,7 +33,7 @@ async function bootstrap() {
     }
 
     // Always exit with 0 - job success/failure is tracked in the job_runs
-    // Exit 1 only for infra failure to infra failure to allow Openshift CronJob to start
+    // Exit 1 only for infra failure to allow OpenShift CronJob to restart
     process.exit(0)
   } catch (error) {
     logger.error(`Fatal error: ${error.message}`, error.stack)

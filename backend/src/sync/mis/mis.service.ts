@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { Readable } from 'stream'
-import { pipeline } from 'stream/promises'
 import { from as copyFrom } from 'pg-copy-streams'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { Readable } from 'stream'
+import { pipeline } from 'stream/promises'
 import { FileStorageService } from './file-storage/file-storage.service'
-import { MisFileConfig, MIS_FILE_CONFIGS } from './mis-file.config'
+import { MIS_FILE_CONFIGS, MisFileConfig } from './mis-file.config'
 
 export interface MisResult {
   name: string
@@ -24,6 +24,11 @@ export class MisService {
   ) {}
 
   async ingestAll(): Promise<MisResult[]> {
+    // TODO mock to remove
+    if (this.configService.get<string>('MIS_INGESTION_ENABLED') === 'false') {
+      this.logger.log('MIS ingestion disabled, skipping')
+      return []
+    }
     const prefix = this.configService.get<string>('sync.misS3Prefix') || ''
 
     const results: MisResult[] = []

@@ -80,4 +80,84 @@ describe('EligibilityService', () => {
     const result = await service.run()
     expect(result.processed).toBe(1)
   })
+
+  // Helper to build a valid over-18 contact that triggers step10 (newStatus = 'over_18')
+  function makeOver18Contact(overrides: Record<string, unknown> = {}) {
+    return {
+      personIdIcm: 'ICM-1',
+      firstName: 'John',
+      lastName: 'Doe',
+      middleName: '',
+      dateOfBirth: new Date('2000-01-01'),
+      age: 26,
+      gender: 'M',
+      caseNumber: 'CS-001',
+      caseType: 'Child Services',
+      caseStatus: 'Open',
+      caseLoad: 'CL-1',
+      din: null,
+      csaSentDate: null,
+      misLegalAuthCode: null,
+      enrollForCsa: null,
+      legalAuthorityCode: null,
+      effectiveLegalStatus: null,
+      legalExpiryDate: null,
+      existingContactId: null,
+      csaStatus: 'eligible',
+      personIdMis: 'MIS-1',
+      isInEligible: false,
+      deceased: null,
+      akaFirstName: null,
+      akaLastName: null,
+      legacyFileNumber: null,
+      serviceOffice: null,
+      assignedTo: null,
+      birthCity: null,
+      birthProvince: null,
+      birthCountry: null,
+      effectiveDate: null,
+      icmPlacements: [],
+      icmOrders: [],
+      icmAgreements: [],
+      misPayments: [],
+      misPlacements: [],
+      ...overrides,
+    }
+  }
+
+  it('should skip contacts with null required fields and log warning', async () => {
+    const logSpy = vi.spyOn(service['logger'], 'warn')
+
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeOver18Contact({ personIdIcm: null })])
+
+    const result = await service.run()
+
+    expect(result.statusChanges).toBe(1) // eligibility still determined a change
+    expect(result.skipped).toBe(1)
+    expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled()
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('empty/null in required fields'))
+  })
+
+  it('should skip invalid contacts and upsert valid ones in same batch', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+      makeOver18Contact({ personIdIcm: 'ICM-VALID' }),
+      makeOver18Contact({ personIdIcm: null }), // invalid: null person_id_icm
+    ])
+
+    const result = await service.run()
+
+    expect(result.statusChanges).toBe(2)
+    expect(result.skipped).toBe(1)
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1) // only the valid one
+  })
+
+  it('should report which fields are null in the warning', async () => {
+    const logSpy = vi.spyOn(service['logger'], 'warn')
+
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeOver18Contact({ personIdIcm: null })])
+
+    await service.run()
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('person_id_icm'))
+  })
 })

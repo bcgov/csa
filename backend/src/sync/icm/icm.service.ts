@@ -43,38 +43,36 @@ export class IcmService {
     return results
   }
 
-  // Batch upsert records into the staging table.
+  // Batch upsert records into the staging table using unnest arrays.
   private async batchUpsert(config: IcmApiConfig, records: IcmApiRecord[]): Promise<void> {
-    const table = config.stagingTable
-    const { fieldMap, primaryKey } = config
+    const { stagingTable, fieldMap, primaryKey } = config
 
-    // Build multi-row parameterized INSERT ON CONFLICT
-    const allValues: unknown[] = []
-    const valueGroups: string[] = []
-
-    for (const record of records) {
-      const placeholders = fieldMap.map((entry) => {
+    // Build one array per column from the field map
+    const arrays = fieldMap.map((entry) =>
+      records.map((record) => {
         const raw = record[entry.sourceLabel]
-        allValues.push(raw === '' || raw == null ? null : raw)
-        return `$${allValues.length}`
-      })
-      valueGroups.push(`(${placeholders.join(', ')}, NOW())`)
-    }
+        return raw === '' || raw == null ? null : raw
+      }),
+    )
 
     const colList = fieldMap.map((e) => e.sourceField).join(', ')
+    const selectList = fieldMap.map((e) => `t.${e.sourceField}`).join(', ')
+    const unnestParams = fieldMap.map((_, i) => `$${i + 1}::text[]`).join(', ')
     const updateSet = fieldMap
       .filter((e) => e.sourceField !== primaryKey)
       .map((e) => `${e.sourceField} = EXCLUDED.${e.sourceField}`)
       .join(', ')
 
     const sql = `
-      INSERT INTO ${table} (${colList}, ingested_at)
-      VALUES ${valueGroups.join(', ')}
+      INSERT INTO ${stagingTable} (${colList}, ingested_at)
+      SELECT ${selectList}, NOW()
+      FROM unnest(${unnestParams})
+      AS t(${colList})
       ON CONFLICT (${primaryKey}) DO UPDATE SET
         ${updateSet},
         ingested_at = NOW()
     `
 
-    await this.prisma.$executeRawUnsafe(sql, ...allValues)
+    await this.prisma.$executeRawUnsafe(sql, ...arrays)
   }
 }

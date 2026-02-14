@@ -45,7 +45,7 @@ export class IcmApiDataSource extends IcmDataSource {
             'X-ICM-TrustedUsername': icmTrustedUsername,
             'Content-Type': 'application/json',
           },
-          validateStatus: (status) => status === 200 || status === 404 || status === 500,
+          validateStatus: () => true,
         }),
       )
 
@@ -54,13 +54,10 @@ export class IcmApiDataSource extends IcmDataSource {
         break
       }
 
-      if (response.status === 500) {
-        this.logger.log(`Response status: ${response.status}`)
-        this.logger.log(`Response headers: ${JSON.stringify(response.headers)}`)
-        this.logger.error(
+      if (response.status !== 200) {
+        throw new Error(
           `ICM API error for ${config.name}: status=${response.status}, body=${JSON.stringify(response.data)}`,
         )
-        throw new Error(`ICM API returned ${response.status} for ${config.name}`)
       }
 
       const items: IcmApiRecord[] = response.data?.items ?? []

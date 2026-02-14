@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS csa.contacts (
   middle_name                 TEXT        NOT NULL,
   aka_last_name               TEXT        NOT NULL,
   aka_first_name              TEXT        NOT NULL,
-  person_id_icm               TEXT        NOT NULL,
+  person_id_icm               TEXT        NOT NULL UNIQUE,
   person_id_mis               TEXT        NOT NULL,
   gender                      TEXT,
   date_of_birth               DATE,
@@ -158,18 +158,18 @@ CREATE TABLE IF NOT EXISTS csa.transfer_files (
 
 CREATE TABLE IF NOT EXISTS csa.stg_icm_cases (
     ROW_ID TEXT PRIMARY KEY,
-    LAST_UPD TIMESTAMP,
+    LAST_UPD TEXT,
     FST_NAME TEXT,
     LAST_NAME TEXT,
     X_AGE TEXT,
     X_BIRTH_CITY TEXT,
-    BIRTH_DT DATE,
+    BIRTH_DT TEXT,
     X_BIRTH_PROV_CD TEXT,
-    X_CSA_SENT_DATE TIMESTAMP,
+    X_CSA_SENT_DATE TEXT,
     X_CSA_PAY_STATUS TEXT,
-    X_CSA_EFF_DATE TIMESTAMP,
+    X_CSA_EFF_DATE TEXT,
     X_CSA_DIN TEXT,
-    CONTACT_LAST_UPD TIMESTAMP,
+    CONTACT_LAST_UPD TEXT,
     SEX_MF TEXT,
     BIRTH_PLACE TEXT,
     CONTACT_ROW_ID TEXT,
@@ -191,13 +191,13 @@ CREATE TABLE IF NOT EXISTS csa.stg_icm_cases (
 
 CREATE TABLE IF NOT EXISTS csa.stg_icm_placements (
     ROW_ID TEXT PRIMARY KEY,
-    LAST_UPD TIMESTAMP,
+    LAST_UPD TEXT,
     X_PLACEMENT_NUM TEXT,
     X_TYPE TEXT,
     X_SERVICE_TYPE TEXT,
     X_STATUS TEXT,
-    X_START_DATE TIMESTAMP,
-    X_END_DATE TIMESTAMP,
+    X_START_DATE TEXT,
+    X_END_DATE TEXT,
     X_SRV_PLC_NAME TEXT,
     X_ORIG_PLMT_PAID_UNPAID TEXT,
     X_SRV_PROV_NAME TEXT,
@@ -213,18 +213,18 @@ CREATE TABLE IF NOT EXISTS csa.stg_icm_legal_authority_admin (
     ROW_ID TEXT PRIMARY KEY,
     LGL_AUTH_CD TEXT,
     MIS_LGL_AUTH_CD TEXT,
-    LAST_UPD TIMESTAMP,
+    LAST_UPD TEXT,
     X_ENROLL_CSA TEXT,
     INGESTED_AT TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS csa.stg_legal_authority (
     ROW_ID TEXT PRIMARY KEY,
-    LAST_UPD TIMESTAMP,
+    LAST_UPD TEXT,
     LGL_AUTH_CD TEXT,
     EFF_LGL_STATUS TEXT,
-    START_DT TIMESTAMP,
-    EXPIRY_DT TIMESTAMP,
+    START_DT TEXT,
+    EXPIRY_DT TEXT,
     PAR_ROW_ID TEXT,
     INGESTED_AT TIMESTAMP DEFAULT NOW()
 );
@@ -235,11 +235,11 @@ CREATE TABLE IF NOT EXISTS csa.stg_icm_agreement (
     OU_NUM TEXT,
     X_PCMS_CONTRACT_NUM TEXT,
     STAT_CD TEXT,
-    EFF_START_DT TIMESTAMP,
-    EFF_END_DT TIMESTAMP,
+    EFF_START_DT TEXT,
+    EFF_END_DT TEXT,
     AGREE_CD TEXT,
-    X_TERMINATION_DT TIMESTAMP,
-    LAST_UPD TIMESTAMP,
+    X_TERMINATION_DT TEXT,
+    LAST_UPD TEXT,
     INGESTED_AT TIMESTAMP DEFAULT NOW()
 );
 
@@ -248,12 +248,12 @@ CREATE TABLE IF NOT EXISTS csa.stg_icm_orders (
     ORDER_NUM               TEXT,
     NAME                    TEXT,
     STATUS_CD               TEXT,
-    TOTAL_AMT               NUMERIC,
-    X_EFF_START_DT          TIMESTAMP,
+    TOTAL_AMT               TEXT,
+    X_EFF_START_DT          TEXT,
     PRODUCT_NAME            TEXT,
     X_PCMS_CONTRACT_NUM     TEXT,
     AGREEMENT_ROW_ID        TEXT,
-    LAST_UPD                TIMESTAMP,
+    LAST_UPD                TEXT,
     INGESTED_AT             TIMESTAMP DEFAULT NOW()
 );
 
@@ -311,6 +311,22 @@ CREATE TABLE IF NOT EXISTS csa.stg_mis_placements (
     process_dt DATE,
     ingested_at TIMESTAMP DEFAULT NOW()
 );
+
+-------------------------------
+-- staging table indexes     --
+-------------------------------
+
+-- ICM staging indexes (eligibility query joins)
+CREATE INDEX idx_stg_icm_placements_case ON csa.stg_icm_placements (CASE_ROW_ID);
+CREATE INDEX idx_stg_icm_placements_agreement ON csa.stg_icm_placements (AGREEMENT_ROW_ID);
+CREATE INDEX idx_stg_icm_orders_agreement ON csa.stg_icm_orders (AGREEMENT_ROW_ID);
+CREATE INDEX idx_stg_legal_authority_parent ON csa.stg_legal_authority (PAR_ROW_ID);
+
+-- MIS staging indexes (eligibility query joins)
+CREATE INDEX idx_stg_mis_payments_person ON csa.stg_mis_payments (person_id_mis);
+CREATE INDEX idx_stg_mis_placements_person ON csa.stg_mis_placements (client_fileid_dep_no);
+CREATE INDEX idx_stg_mis_placements_contract ON csa.stg_mis_placements (contract_no);
+CREATE INDEX idx_stg_mis_contracts_number ON csa.stg_mis_contracts (contract_number);
 
 -------------------------
 -- db users permissons --

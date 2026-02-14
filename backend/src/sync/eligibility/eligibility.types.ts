@@ -82,15 +82,17 @@ export interface OrderRecord {
   agreementRowId?: string | null
 }
 
-// Agreement from ICM staging
+// Agreement (ICM) or Contract (MIS) staging
 export interface AgreementRecord {
-  rowId: string
+  rowId: string | null // ICM agreement ROW_ID (link key for ICM)
+  contractNumber: string | null // MIS contract_number (link key for MIS)
   agreementType: string | null
   agreementStatus: string | null
   agreementStartDate: Date | null
   agreementEndDate: Date | null
   terminationDate: Date | null
   mcfdContract: string | null
+  source: 'ICM' | 'MIS'
 }
 
 // Result of running the eligibility decision tree on one contact/case
@@ -106,6 +108,7 @@ export interface EligibilityRunResult {
   processed: number
   statusChanges: number
   newContacts: number
+  skipped: number // rows skipped due to invalid staging data (null in required fields)
   stepCounts: {
     step7: number
     step8: number

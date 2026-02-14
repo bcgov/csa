@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'fs'
-import { ResponseFileService } from './response-file.service'
+import { InboundResponseService } from './inbound-response.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 
 vi.mock('fs', () => ({
@@ -9,11 +9,11 @@ vi.mock('fs', () => ({
 
 const { RESPONSE_FILE } = CRA_DATA_HANDLING_CONSTANT
 
-describe('ResponseFileService', () => {
-  let service: ResponseFileService
+describe('InboundResponseService', () => {
+  let service: InboundResponseService
 
   beforeEach(() => {
-    service = new ResponseFileService()
+    service = new InboundResponseService()
   })
 
   afterEach(() => {

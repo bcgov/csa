@@ -66,6 +66,8 @@ CREATE TABLE IF NOT EXISTS csa.contacts (
   source_order                TEXT        NOT NULL,
   resume_status               TEXT,
   hold_by                     TEXT,
+  prev_recipient_first_name   TEXT,
+  prev_recipient_last_name    TEXT,
   cancel_reason_code          TEXT,
   care_end_date               DATE,
   is_in_eligible              BOOLEAN     DEFAULT FALSE,

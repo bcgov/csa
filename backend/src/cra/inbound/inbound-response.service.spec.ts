@@ -44,8 +44,8 @@ describe('InboundResponseService', () => {
 
     const detail = result.details[0]
     expect(detail.tranCode).toBe(RESPONSE_FILE.DETAILS_TRAN_CODE)
-    expect(detail.fileStatCd).toBe(1)
-    expect(detail.tranStatCd).toBe(0)
+    expect(detail.fileStatCd).toBe('01')
+    expect(detail.tranStatCd).toBe('0')
     expect(detail.rejectCd1).toBe('ABC')
     expect(detail.referenceNum).toBeDefined()
     expect(detail.businessNum).toBeDefined()

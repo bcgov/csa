@@ -63,6 +63,7 @@ async function seedContacts() {
     const age = new Date().getFullYear() - birthDate.getFullYear()
     const firstName = faker.person.firstName()
     const middle = faker.person.middleName()
+    const searchText = `${firstName} ${middle} ${faker.person.lastName()} ${faker.string.alphanumeric(5).toUpperCase()}`
 
     const effectiveDate = faker.date.past({ years: 2 })
     const expiryDate = ensureAfter(effectiveDate, 730) // DATE after effective_date
@@ -94,6 +95,7 @@ async function seedContacts() {
       middleName: middle, // NOT NULL
       akaLastName: faker.person.lastName(),
       akaFirstName: faker.person.firstName(),
+      searchText,
 
       personIdIcm: faker.string.alphanumeric(10).toUpperCase(),
       personIdMis: faker.string.alphanumeric(10).toUpperCase(),
@@ -204,6 +206,7 @@ async function seedBatches() {
       status: batchStatuses[i],
       recordCount: faker.number.int({ min: 5, max: 50 }),
       createdAt: batchDate,
+      updatedAt: batchDate,
       systemComments: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.5 }),
     })
   }

@@ -5,7 +5,9 @@ process.env.FILE_STORAGE_PATH = '/tmp'
 process.env.USE_MOCK_DATA = 'true'
 process.env.CRA_ENVIRONMENT = 'test'
 
-// NestJS's TestingLogger silences log/warn/debug/verbose
-// but passes error() through to ConsoleLogger.
-// Silence errors in tests too.
+// Silence all NestJS logger output in tests
+ConsoleLogger.prototype.log = function () {}
+ConsoleLogger.prototype.warn = function () {}
 ConsoleLogger.prototype.error = function () {}
+ConsoleLogger.prototype.debug = function () {}
+ConsoleLogger.prototype.verbose = function () {}

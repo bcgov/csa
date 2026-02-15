@@ -14,6 +14,7 @@
 *.dylib
 *.txt
 /temp/
+!craUserId.VRSP0001.txt
 # Test binary, built with `go test -c`
 *.test
 

@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common'
 import { readFileSync } from 'fs'
-import { CRA_DATA_HANDLING_CONSTANT } from '../common/constants/cra.constant'
-import { CraResHeader, CraResDetail, CraResTrailer } from '../interfaces/response-file.interface'
+import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
+import { CraResHeader, CraResDetail, CraResTrailer } from './inbound.interface'
 
 const { RESPONSE_FILE } = CRA_DATA_HANDLING_CONSTANT
 
 @Injectable()
-export class ResponseFileService {
+export class InboundResponseService {
   // Helper method to slice field values
 
   parseFile(filePath: string): {
@@ -22,6 +22,10 @@ export class ResponseFileService {
     if (tranCode === RESPONSE_FILE.HEADER_TRAN_CODE) {
       return this.parseResponseFile(lines)
     }
+
+    throw new Error(
+      `Unrecognized CRA response file format: expected header tran code ${RESPONSE_FILE.HEADER_TRAN_CODE}, got ${tranCode}`,
+    )
   }
 
   private parseResponseFile(lines: string[]): {
@@ -43,7 +47,7 @@ export class ResponseFileService {
         trailer = this.parseTrailer(line)
       }
     }
-    return { header: header, details: details, trailer: trailer }
+    return { header, details, trailer }
   }
 
   private slice(line: string, start: number, length: number): string {
@@ -52,18 +56,18 @@ export class ResponseFileService {
 
   private parseHeader(line: string): CraResHeader {
     return {
-      tranCode: parseInt(this.slice(line, 0, 4), 10), // 6118
+      tranCode: this.slice(line, 0, 4), // 6118
       versionNum: this.slice(line, 4, 5),
       processDate: this.slice(line, 9, 8),
       businessNum: this.slice(line, 17, 15),
       recordCount: parseInt(this.slice(line, 32, 8), 10),
     }
   }
-  private parseDetail(line: string): any {
+  private parseDetail(line: string): CraResDetail {
     return {
       tranCode: parseInt(this.slice(line, 0, 4), 10),
-      fileStatCd: parseInt(this.slice(line, 4, 2), 10),
-      tranStatCd: parseInt(this.slice(line, 6, 1), 10),
+      fileStatCd: this.slice(line, 4, 2),
+      tranStatCd: this.slice(line, 6, 1),
       rejectCd1: this.slice(line, 7, 3),
       rejectCd2: this.slice(line, 10, 3),
       rejectCd3: this.slice(line, 13, 3),
@@ -105,7 +109,7 @@ export class ResponseFileService {
 
   private parseTrailer(line: string): CraResTrailer {
     return {
-      tranCode: parseInt(this.slice(line, 0, 4), 10), // 6120
+      tranCode: this.slice(line, 0, 4), // 6120
       versionNum: this.slice(line, 4, 5),
       processDate: this.slice(line, 9, 8),
       businessNum: this.slice(line, 17, 15),

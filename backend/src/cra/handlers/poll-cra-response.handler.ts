@@ -1,36 +1,35 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
+import { HttpService } from '@nestjs/axios'
+import { ConfigService } from '@nestjs/config'
+import path from 'path'
+import fs from 'fs'
+import { writeFile } from 'fs/promises'
+import { firstValueFrom } from 'rxjs'
+import { BatchesService } from 'src/api/batches/batches.service'
+import { ContactsService } from 'src/api/contacts/contacts.service'
+import { PrismaService } from 'src/common/database/prisma.service'
+import {
+  BATCH_DETAIL_EVENT,
+  BATCH_DETAIL_STATUS,
+  BATCH_EVENT,
+  CSA_EVENT,
+} from 'src/common/state-machine/constants'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
-import { ResponseFileService } from '../inbound-file/response-file.service'
-import { HttpService } from '@nestjs/axios'
-import { ConfigService } from '@nestjs/config'
-import path from 'path'
-import { PrismaService } from 'src/common/database/prisma.service'
-import { CRA_DATA_HANDLING_CONSTANT } from '../common/constants/cra.constant'
-import { firstValueFrom } from 'rxjs'
+import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
+import { InboundResponseService } from '../inbound/inbound-response.service'
 import {
-  // returnDownloadableFile,
   createDirIfNotExist,
-  createCurrentDate,
   getBatchSystemCommentByCode,
   getErrorMessageByRejectCode,
   returnAllRejectCode,
-} from '../common/helpers/inbound.helper'
-import { writeFile } from 'fs/promises'
-import fs from 'fs'
-import { StateMachineService } from 'src/common/state-machine/state-machine.service'
+} from '../inbound/inbound.helper'
+import type { CraResDetail } from '../inbound/inbound.interface'
 
-const {
-  DESTINATION_ID,
-  LOCAL_DIR,
-  FILE_DIRECTION,
-  UPDATED_BY,
-  CSA_EVENT_BY_TRAN_CD,
-  BATCH_EVENT_BY_FILE_STAT_CODE,
-  RESPONSE_FILE_TYPE,
-} = CRA_DATA_HANDLING_CONSTANT
+const { DESTINATION_ID, TRAN_STAT_CODE, FILE_STAT_CODE, FILE_DIRECTION, UPDATED_BY } =
+  CRA_DATA_HANDLING_CONSTANT
 
 /*
  * Checks for response files from CRA and processes them
@@ -39,16 +38,23 @@ const {
 @Injectable()
 export class PollCraResponseHandler extends BaseJob {
   readonly jobType = JobType.POLL_CRA_RESPONSE
+
   private readonly fileStoragePath: string
   private readonly fileTransferServiceUrl: string
-  logger = new Logger(PollCraResponseHandler.name)
+
+  // Per-run state shared across private methods
+  private processedBatchIds!: Set<number>
+  private recordsAccepted!: number
+  private recordsRejected!: number
+  private recordsRecycled!: number
 
   constructor(
-    private readonly responseFileService: ResponseFileService,
+    private readonly inboundResponseService: InboundResponseService,
     private readonly prisma: PrismaService,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
-    private readonly stateMachine: StateMachineService,
+    private readonly batchesService: BatchesService,
+    private readonly contactsService: ContactsService,
   ) {
     super()
     this.fileStoragePath = this.configService.get<string>('app.fileStoragePath')
@@ -56,184 +62,291 @@ export class PollCraResponseHandler extends BaseJob {
   }
 
   async execute(_context: JobContext): Promise<JobResult> {
-    // TODO: Implement CRA response polling
-    // 1. Poll CRA endpoint for response files
-    // 2. Download new response files
-    // 3. Parse and validate response data
-    // 4. Update contact records with CRA responses
-    // 5. Return metadata: { files_processed, records_updated, errors }
+    // Reset per-run state (handler instance is reused across retries)
+    this.processedBatchIds = new Set<number>()
+    this.recordsAccepted = 0
+    this.recordsRejected = 0
+    this.recordsRecycled = 0
 
-    const referenceNumbers = []
-    const uniqueBatchIds = {}
-    let recordUpdated = 0
-    const allFilesFromDB = await this.prisma.transferFile.findMany()
+    // 1. List remote files and find new ones
+    const existingFiles = await this.prisma.transferFile.findMany({
+      where: { direction: FILE_DIRECTION.INBOUND },
+    })
 
-    const listRemoteFilesResponse = await firstValueFrom(
+    const listResponse = await firstValueFrom(
       this.httpService.get(
         `${this.fileTransferServiceUrl}/api/destinations/${DESTINATION_ID}/remote-files`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        },
+        { headers: { 'Content-Type': 'application/json' } },
       ),
     )
 
-    const allRemoteFiles = listRemoteFilesResponse?.data?.files
+    const remoteFiles = listResponse?.data?.files ?? []
+    this.logger.log(`Polled CRA: ${existingFiles.length} in DB, ${remoteFiles.length} remote`)
 
-    this.logger.log(
-      `Polled CRA response files. Files in DB: ${allFilesFromDB.length}, Files in remote: ${allRemoteFiles.length}`,
+    // 2. Find first downloadable file not already in DB
+    const downloadableFile = remoteFiles.find(
+      (remote: { fileName: string }) =>
+        !existingFiles.some((db) => db.fileName === remote.fileName),
     )
 
-    // const downloadableFile = returnDownloadableFile(allFilesFromDB, allRemoteFiles)
-    const downloadableFile = { fileName: 'craUserId.VRSP0001.txt' }
     if (!downloadableFile) {
-      this.logger.log('No new CRA response files to process')
       return {
         success: true,
-        message: 'CRA response polling completed - no new files to process',
-        metadata: { files_processed: 0, records_updated: recordUpdated, errors: [] },
+        message: 'No new CRA response files to process',
+        metadata: { files_processed: 0, records_updated: 0 },
       }
     }
 
-    const responseFileFlag = downloadableFile.fileName.split('.')[1].slice(1, 4)
-    const fileEnvFlag = downloadableFile.fileName.split('.')[1].slice(0, 1)
-    const responseFileEnv = process.env.NODE_ENV === 'production' ? 'P' : 'V'
-    if (responseFileFlag === RESPONSE_FILE_TYPE.RSP && fileEnvFlag === responseFileEnv) {
-      this.logger.log(`Found new CRA response file to process: ${downloadableFile.fileName}`)
-      const downloadResponse = await firstValueFrom(
-        this.httpService.get(
-          `${this.fileTransferServiceUrl}/api/destinations/${DESTINATION_ID}/local/inbound/files/${downloadableFile?.fileName}`,
+    // 3. Validate file name format: {userId}.{env}RSP{seq}.txt
+    const fileMiddle = downloadableFile.fileName.split('.')[1] ?? ''
+    const fileEnvFlag = fileMiddle.slice(0, 1)
+    const fileTypeFlag = fileMiddle.slice(1, 4)
+    const expectedEnv = process.env.NODE_ENV === 'production' ? 'P' : 'V'
+
+    if (fileTypeFlag !== 'RSP' || fileEnvFlag !== expectedEnv) {
+      this.logger.log(
+        `Skipping ${downloadableFile.fileName}: not a valid response file for this environment`,
+      )
+      return {
+        success: true,
+        message: 'No valid CRA response files to process',
+        metadata: { files_processed: 0, records_updated: 0 },
+      }
+    }
+
+    // 4. Download file from file transfer service
+    this.logger.log(`Downloading CRA response file: ${downloadableFile.fileName}`)
+    const downloadResponse = await firstValueFrom(
+      this.httpService.get(
+        `${this.fileTransferServiceUrl}/api/destinations/${DESTINATION_ID}/local/inbound/files/${downloadableFile.fileName}`,
+        { headers: { 'Content-Type': 'text/plain' }, responseType: 'arraybuffer' },
+      ),
+    )
+
+    // 5. Save to local storage
+    const inboundDir = path.join(this.fileStoragePath, DESTINATION_ID, 'inbound')
+    createDirIfNotExist(inboundDir)
+    const localFilePath = path.join(inboundDir, downloadableFile.fileName)
+
+    await writeFile(
+      localFilePath,
+      Buffer.isBuffer(downloadResponse.data)
+        ? downloadResponse.data
+        : Buffer.from(downloadResponse.data),
+    )
+    this.logger.log(`Saved response file to ${localFilePath}`)
+
+    // 6. Parse file
+    const { header, details } = this.inboundResponseService.parseFile(localFilePath)
+    this.logger.log(
+      `Parsed: ${details.length} detail records, header recordCount=${header.recordCount}`,
+    )
+
+    // 7. Process each detail
+    for (const detail of details) {
+      await this.processDetail(detail)
+    }
+
+    // 8. Aggregate batch statuses
+    for (const batchId of this.processedBatchIds) {
+      await this.aggregateBatchStatus(batchId)
+    }
+
+    // 9. Create inbound TransferFile record
+    await this.prisma.transferFile.create({
+      data: {
+        destinationId: DESTINATION_ID,
+        direction: FILE_DIRECTION.INBOUND,
+        fileName: downloadableFile.fileName,
+        fileSize: String(fs.statSync(localFilePath).size),
+        deliveredAt: new Date(),
+        downloadedAt: new Date(),
+        referenceNumbers: details.map((d) => parseInt(d.referenceNum)),
+      },
+    })
+
+    const totalUpdated = this.recordsAccepted + this.recordsRejected
+    return {
+      success: true,
+      message: `Processed ${details.length} CRA response records`,
+      metadata: {
+        files_processed: 1,
+        records_updated: totalUpdated,
+        records_accepted: this.recordsAccepted,
+        records_rejected: this.recordsRejected,
+        records_recycled: this.recordsRecycled,
+      },
+    }
+  }
+
+  private buildSystemComment(
+    newMessage: string | null,
+    existingComments: string | null,
+  ): string | null {
+    if (!newMessage) return existingComments
+    const date = new Date().toISOString().split('T')[0]
+    const dated = `[${date}] ${newMessage}`
+    return existingComments ? `${dated}\n${existingComments}` : dated
+  }
+
+  private async processDetail(detail: CraResDetail): Promise<void> {
+    const detailId = parseInt(detail.referenceNum)
+
+    const batchDetail = await this.prisma.contactBatchDetail.findUnique({
+      where: { id: detailId },
+      select: {
+        id: true,
+        contactId: true,
+        batchId: true,
+        transactionType: true,
+        systemComments: true,
+      },
+    })
+
+    if (!batchDetail) {
+      this.logger.warn(`Batch detail not found for referenceNum ${detail.referenceNum}`)
+      return
+    }
+
+    this.processedBatchIds.add(batchDetail.batchId)
+
+    // File-level validation: if FILE_STAT_CD != FILE_OK, reject the detail
+    if (detail.fileStatCd !== FILE_STAT_CODE.FILE_OK) {
+      const fileError = getBatchSystemCommentByCode(detail.fileStatCd)
+      const systemComments = this.buildSystemComment(fileError, batchDetail.systemComments)
+      await this.batchesService.updateBatchDetailStatus(detailId, BATCH_DETAIL_EVENT.CRA_REJECTED, {
+        additionalData: { systemComments },
+      })
+      await this.contactsService.updateCsaStatus(
+        batchDetail.contactId,
+        CSA_EVENT.CRA_REJECTED,
+        UPDATED_BY.SYSTEM,
+      )
+      this.recordsRejected++
+      return
+    }
+
+    const rejectCodes = returnAllRejectCode(detail)
+    const errorMessage = getErrorMessageByRejectCode(rejectCodes)
+    const systemComments = this.buildSystemComment(errorMessage || null, batchDetail.systemComments)
+
+    if (
+      detail.tranStatCd === TRAN_STAT_CODE.TRAN_ACCEPTED ||
+      detail.tranStatCd === TRAN_STAT_CODE.PROBLEM_DEDUCTED
+    ) {
+      // Accepted or Problem Deducted
+      await this.batchesService.updateBatchDetailStatus(detailId, BATCH_DETAIL_EVENT.CRA_ACCEPTED, {
+        additionalData: { systemComments },
+      })
+
+      const additionalData: Record<string, unknown> = {}
+      if (detail.ccraDinNum?.trim()) {
+        const contact = await this.prisma.contact.findUnique({
+          where: { id: batchDetail.contactId },
+          select: { din: true },
+        })
+        if (!contact?.din) {
+          additionalData.din = detail.ccraDinNum.trim()
+        }
+      }
+
+      await this.contactsService.updateCsaStatus(
+        batchDetail.contactId,
+        CSA_EVENT.CRA_ACCEPTED,
+        UPDATED_BY.SYSTEM,
+        { additionalData },
+      )
+      this.recordsAccepted++
+    } else if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_REJECTED) {
+      const isRecycled = rejectCodes.includes('998')
+
+      if (isRecycled) {
+        // Recycled — no state change, just update system comments
+        this.logger.log(`Detail ${detailId} recycled (code 998), no status change`)
+        await this.prisma.contactBatchDetail.update({
+          where: { id: detailId },
+          data: { systemComments, lastUpdatedBy: UPDATED_BY.SYSTEM },
+        })
+        this.recordsRecycled++
+      } else {
+        // Rejected
+        await this.batchesService.updateBatchDetailStatus(
+          detailId,
+          BATCH_DETAIL_EVENT.CRA_REJECTED,
           {
-            headers: { 'Content-Type': 'text/plain' },
-            responseType: 'arraybuffer',
+            additionalData: { systemComments },
           },
-        ),
-      )
-      const fileDownlodedAt = createCurrentDate()
-      const inboundDir = path.join(this.fileStoragePath, DESTINATION_ID, LOCAL_DIR.INBOUND)
-      // Ensure inbound directory exists
-      createDirIfNotExist(inboundDir)
-      const localFilePath = `${inboundDir}/${downloadableFile?.fileName}`
-      // Save write into file in local storage
-      await writeFile(
-        localFilePath,
-        Buffer.isBuffer(downloadResponse.data)
-          ? downloadResponse.data
-          : Buffer.from(downloadResponse.data),
-      )
-      this.logger.log(`Downloaded CRA response file saved to local file system at ${localFilePath}`)
-
-      const { header, details, trailer } = this.responseFileService.parseFile(localFilePath)
-      this.logger.log(
-        `Parsed CRA response file. Header: ${JSON.stringify(header)}, Trailer: ${JSON.stringify(trailer)}, Number of details records: ${details.length}`,
-      )
-      console.log('Response file data', header, details, trailer)
-      // update batch_details records
-
-      for (const detail of details) {
-        referenceNumbers.push(parseInt(detail.referenceNum))
-        const allRejectCode = returnAllRejectCode(detail)
-        const batchDetailsSystemComments = getErrorMessageByRejectCode(allRejectCode)
-        const getCurrentCsaStatus = await this.prisma.contactBatchDetail.findUnique({
-          where: { id: parseInt(detail.referenceNum) },
-          select: { status: true },
-        })
-        recordUpdated++
-        const nextCsaStatus = this.stateMachine.getNextState(
-          'csaStatus',
-          getCurrentCsaStatus?.status,
-          CSA_EVENT_BY_TRAN_CD[detail.tranStatCd],
-        ) as string
-        this.logger.log(
-          `Processing detail record with referenceNum ${detail.referenceNum}. Current CSA status: ${getCurrentCsaStatus?.status}, CRA transaction status code: ${detail.tranStatCd}, Next CSA status: ${nextCsaStatus}, System comments: ${batchDetailsSystemComments}`,
         )
-        const batchDetailsUpdateRes = await this.prisma.contactBatchDetail.update({
-          where: { id: parseInt(detail.referenceNum) },
-          data: {
-            status: nextCsaStatus,
-            systemComments: batchDetailsSystemComments,
-            lastUpdatedBy: UPDATED_BY.SYSTEM,
-          },
-        })
-
-        await this.prisma.contact.update({
-          where: { id: batchDetailsUpdateRes.contactId },
-          data: {
-            csaStatus: nextCsaStatus,
-            lastUpdatedBy: UPDATED_BY.SYSTEM,
-          },
-        })
-
-        if (!uniqueBatchIds[batchDetailsUpdateRes?.batchId]) {
-          uniqueBatchIds[batchDetailsUpdateRes?.batchId] = {}
-          const currentBatchStatus = await this.prisma.batch.findUnique({
-            where: { id: batchDetailsUpdateRes.batchId },
-            select: { status: true },
-          })
-
-          const nextBatchStatus = this.stateMachine.getNextState(
-            'batch',
-            currentBatchStatus?.status,
-            BATCH_EVENT_BY_FILE_STAT_CODE[detail.fileStatCd],
-          ) as string
-
-          const batchSystemComments = getBatchSystemCommentByCode(detail.fileStatCd)
-          uniqueBatchIds[batchDetailsUpdateRes?.batchId]['nextBatchStatus'] = nextBatchStatus
-          uniqueBatchIds[batchDetailsUpdateRes?.batchId]['batchSystemComments'] =
-            batchSystemComments
-        }
+        await this.contactsService.updateCsaStatus(
+          batchDetail.contactId,
+          CSA_EVENT.CRA_REJECTED,
+          UPDATED_BY.SYSTEM,
+        )
+        this.recordsRejected++
       }
-
-      // update batch status and insert transfer file record
-
-      for (const [batchId, batchData] of Object.entries(uniqueBatchIds)) {
-        const fileTransferObj = {
-          batchId: parseInt(batchId),
-          destinationId: DESTINATION_ID,
-          direction: FILE_DIRECTION.INBOUND,
-          fileName: downloadableFile?.fileName || 'unknown',
-          fileSize: String(fs.statSync(localFilePath).size),
-          deliveredAt: createCurrentDate(),
-          downloadedAt: fileDownlodedAt,
-          referenceNumbers,
-        }
-        await Promise.all([
-          this.prisma.batch.update({
-            where: { id: parseInt(batchId) },
-            data: {
-              status: batchData['nextBatchStatus'],
-              systemComments: batchData['batchSystemComments'],
-            },
-          }),
-          this.prisma.transferFile.create({
-            data: fileTransferObj,
-          }),
-        ])
-      }
-
-      return {
-        success: true,
-        message: 'CRA response polling stub',
-        metadata: {
-          files_processed: details.length + 2,
-          records_updated: recordUpdated,
-          errors: [],
-        },
-      }
+    } else if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_RECYCLED) {
+      // Recycled — no state change
+      this.logger.log(`Detail ${detailId} recycled (tranStatCd=3), no status change`)
+      await this.prisma.contactBatchDetail.update({
+        where: { id: detailId },
+        data: { systemComments, lastUpdatedBy: UPDATED_BY.SYSTEM },
+      })
+      this.recordsRecycled++
     } else {
-      this.logger.log(
-        `No valid CRA response files to process. Found file: ${downloadableFile?.fileName}, but it does not match expected format or environment.`,
+      // TODO: Verify with spec whether NOT_SET (0) should be treated as rejected or handled differently
+      // Unhandled tranStatCd — treat as rejected
+      this.logger.warn(
+        `Detail ${detailId} has unexpected tranStatCd=${detail.tranStatCd}, treating as rejected`,
       )
-      return {
-        success: true,
-        message: 'CRA response polling completed - no valid response files to process',
-        metadata: {
-          files_processed: 0,
-          records_updated: recordUpdated,
-          errors: [],
-        },
-      }
+      await this.batchesService.updateBatchDetailStatus(detailId, BATCH_DETAIL_EVENT.CRA_REJECTED, {
+        additionalData: { systemComments },
+      })
+      await this.contactsService.updateCsaStatus(
+        batchDetail.contactId,
+        CSA_EVENT.CRA_REJECTED,
+        UPDATED_BY.SYSTEM,
+      )
+      this.recordsRejected++
     }
+  }
+
+  private async aggregateBatchStatus(batchId: number): Promise<void> {
+    const allDetails = await this.prisma.contactBatchDetail.findMany({
+      where: { batchId },
+      select: { status: true },
+    })
+
+    const statuses = allDetails.map((d) => d.status)
+    const hasProcessed = statuses.includes(BATCH_DETAIL_STATUS.PROCESSED)
+    const hasError = statuses.includes(BATCH_DETAIL_STATUS.ERROR)
+    const hasInProgress = statuses.includes(BATCH_DETAIL_STATUS.IN_PROGRESS)
+
+    if (hasInProgress) {
+      this.logger.log(`Batch ${batchId}: some details still in_progress, batch stays in_progress`)
+      return
+    }
+
+    let batchEvent: string
+    let batchMessage: string | null = null
+    if (hasProcessed && hasError) {
+      batchEvent = BATCH_EVENT.CRA_PARTIAL_REJECTED
+      batchMessage = 'At least one of the child record(s) in the Batch Details is in Error.'
+    } else if (hasProcessed && !hasError) {
+      batchEvent = BATCH_EVENT.CRA_ACCEPTED
+    } else {
+      batchEvent = BATCH_EVENT.CRA_ALL_REJECTED
+      batchMessage = 'All child(ren) in the Batch Details are in Error.'
+    }
+
+    const batch = await this.prisma.batch.findUnique({
+      where: { id: batchId },
+      select: { systemComments: true },
+    })
+
+    const systemComments = this.buildSystemComment(batchMessage, batch?.systemComments ?? null)
+
+    await this.batchesService.updateBatchStatus(batchId, batchEvent, {
+      additionalData: systemComments != null ? { systemComments } : {},
+    })
   }
 }

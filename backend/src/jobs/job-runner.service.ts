@@ -39,7 +39,14 @@ export class JobRunner {
       metadata: job.metadata as Record<string, unknown> | undefined,
     }
 
-    await handler.onStart?.(context)
+    try {
+      await handler.onStart?.(context)
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error))
+      this.logger.error(`Job ${jobId} onStart hook failed: ${err.message}`, err.stack)
+      await this.safeMarkFailed(jobId, err)
+      return { success: false, message: `onStart failed: ${err.message}` }
+    }
 
     // Inline retry loop
     let lastError: Error | null = null
@@ -48,7 +55,6 @@ export class JobRunner {
         if (attempt > 0) {
           this.logger.log(`Inline retry attempt ${attempt} for job ${jobId}`)
           // Short delay between inline retries (exponential: 1s, 2s, 4s)
-          // TODO: to increase ?
           await this.sleep(1000 * Math.pow(2, attempt - 1))
         }
 
@@ -63,15 +69,21 @@ export class JobRunner {
         }
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error))
-        this.logger.warn(
-          `Job ${jobId} inline attempt ${attempt + 1} failed: ${lastError.message} stack:${error?.stack}`,
+        this.logger.error(
+          `Job ${jobId} attempt ${attempt + 1}/${handler.inlineRetryAttempts + 1} failed: ${lastError.message}`,
+          lastError.stack,
         )
       }
     }
 
     // All inline retries exhausted - mark as failed
-    await this.jobsService.markFailed(jobId, lastError!.message)
-    await handler.onFailure?.(context, lastError!)
+    await this.safeMarkFailed(jobId, lastError!)
+
+    try {
+      await handler.onFailure?.(context, lastError!)
+    } catch (hookError) {
+      this.logger.error(`Job ${jobId} onFailure hook threw: ${hookError}`)
+    }
 
     return {
       success: false,
@@ -130,6 +142,17 @@ export class JobRunner {
       } catch (error) {
         this.logger.error(`Error retrying job ${job.id}: ${error}`)
       }
+    }
+  }
+
+  private async safeMarkFailed(jobId: number, error: Error): Promise<void> {
+    const errorDetail = error.stack || error.message
+    try {
+      await this.jobsService.markFailed(jobId, errorDetail)
+    } catch (dbError) {
+      this.logger.error(
+        `Failed to mark job ${jobId} as FAILED in DB: ${dbError}. Original error: ${errorDetail}`,
+      )
     }
   }
 

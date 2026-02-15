@@ -11,12 +11,12 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
   {
     sourceField: 'FST_NAME',
     sourceLabel: 'Key Player AKA First Name',
-    masterField: 'aka_last_name',
+    masterField: 'aka_first_name',
   },
   {
     sourceField: 'LAST_NAME',
     sourceLabel: 'Key Player AKA Last Name',
-    masterField: 'aka_first_name',
+    masterField: 'aka_last_name',
   },
   { sourceField: 'X_AGE', sourceLabel: 'Key Player Age', masterField: 'age' },
 
@@ -93,6 +93,7 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
     masterField: 'adm_first_name',
   },
   { sourceField: 'X_ADM_LAST_NAME', sourceLabel: 'Admn Last Name', masterField: 'adm_last_name' },
+  { sourceField: 'X_DECEASED', sourceLabel: 'Deceased', masterField: 'deceased_flag' },
 ]
 
 export const STG_ICM_CONTACTS_MAP: FieldMapEntry[] = [
@@ -229,7 +230,7 @@ export const STG_ORDER_MAP: FieldMapEntry[] = [
     sourceLabel: 'MCFD Contract Num',
     masterField: 'mcfd_contract',
   },
-  { sourceField: 'AGREE_ID', sourceLabel: 'Agreement Id', masterField: 'agreement_id_icm' },
+  { sourceField: 'AGREEMENT_ROW_ID', sourceLabel: 'Agreement Id', masterField: 'agreement_id_icm' },
   { sourceField: 'LAST_UPD', sourceLabel: 'Order Updated', masterField: 'last_upd_dt_order_icm' },
   { sourceField: 'ROW_ID', sourceLabel: 'Id', masterField: 'order_id_icm' },
 ]

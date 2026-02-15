@@ -57,6 +57,8 @@ services:
     environment:
       <<: *postgres-vars
       NODE_ENV: development
+      CRA_ENVIRONMENT: test
+      ENABLE_SWAGGER: "true"
     image: *node-image
     ports: ["3001:3000"]
     healthcheck:
@@ -92,6 +94,7 @@ services:
     environment:
       <<: *postgres-vars
       NODE_ENV: production
+      CRA_ENVIRONMENT: test
     ports: ["3001:3000"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api"]

@@ -9,13 +9,13 @@ export interface CraResHeader {
 }
 export interface CraResDetail {
   tranCode: number | string // 9(04) 6134 Record type (detail)
-  fileStatCd: number // 9(02)
-  tranStatCd: number // 9(01)
-  rejectCd1: number // 9(03)
-  rejectCd2: number // 9(03)
-  rejectCd3: number // 9(03)
-  rejectCd4: number // 9(03)
-  rejectCd5: number // 9(03)
+  fileStatCd: string // 9(02)
+  tranStatCd: string // 9(01)
+  rejectCd1: string // 9(03)
+  rejectCd2: string // 9(03)
+  rejectCd3: string // 9(03)
+  rejectCd4: string // 9(03)
+  rejectCd5: string // 9(03)
   outTranCode: number // 9(4)
   referenceNum: string // X(20) Ministry file reference ID
   businessNum: string //X(15) CRA business number

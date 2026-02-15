@@ -12,7 +12,6 @@ describe('S3Service', () => {
         const values: Record<string, unknown> = {
           'sync.s3Uri': 'http://minioadmin:minioadmin@localhost:9000',
           'sync.s3Bucket': 'test-bucket',
-          'sync.misStalenessThresholdHours': 48,
         }
         return values[key]
       }),
@@ -25,31 +24,55 @@ describe('S3Service', () => {
     service = module.get<S3Service>(S3Service)
   })
 
-  describe('isStale', () => {
-    it('should return true when file is older than threshold', async () => {
-      const threeDaysAgo = new Date(Date.now() - 72 * 60 * 60 * 1000)
-
-      vi.spyOn(service, 'getFileInfo').mockResolvedValue({
-        key: 'test.csv',
-        lastModified: threeDaysAgo,
+  describe('exists', () => {
+    it('should return true when file exists', async () => {
+      vi.spyOn(service as any, 'getClient').mockReturnValue({
+        statObject: vi.fn().mockResolvedValue({ size: 100, lastModified: new Date() }),
       })
 
-      const result = await service.isStale('test.csv')
+      const result = await service.exists('test.csv')
 
       expect(result).toBe(true)
     })
 
-    it('should return false when file is within threshold', async () => {
-      const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000)
-
-      vi.spyOn(service, 'getFileInfo').mockResolvedValue({
-        key: 'test.csv',
-        lastModified: oneHourAgo,
+    it('should return false when file is not found', async () => {
+      vi.spyOn(service as any, 'getClient').mockReturnValue({
+        statObject: vi.fn().mockRejectedValue(new Error('Not Found')),
       })
 
-      const result = await service.isStale('test.csv')
+      const result = await service.exists('missing.csv')
 
       expect(result).toBe(false)
+    })
+
+    it('should rethrow unexpected errors', async () => {
+      vi.spyOn(service as any, 'getClient').mockReturnValue({
+        statObject: vi.fn().mockRejectedValue(new Error('Access Denied')),
+      })
+
+      await expect(service.exists('test.csv')).rejects.toThrow('Access Denied')
+    })
+  })
+
+  describe('move', () => {
+    it('should copy then remove the source object', async () => {
+      const mockCopy = vi.fn().mockResolvedValue({})
+      const mockRemove = vi.fn().mockResolvedValue(undefined)
+
+      vi.spyOn(service as any, 'getClient').mockReturnValue({
+        copyObject: mockCopy,
+        removeObject: mockRemove,
+      })
+
+      await service.move('csas3/file.csv', 'csas3/processed/2026-02-10/file.csv')
+
+      expect(mockCopy).toHaveBeenCalledWith(
+        'test-bucket',
+        'csas3/processed/2026-02-10/file.csv',
+        '/test-bucket/csas3/file.csv',
+        expect.any(Object),
+      )
+      expect(mockRemove).toHaveBeenCalledWith('test-bucket', 'csas3/file.csv')
     })
   })
 })

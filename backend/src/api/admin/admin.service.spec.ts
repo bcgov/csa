@@ -1,16 +1,17 @@
-import { Test, TestingModule } from '@nestjs/testing'
+import { HttpService } from '@nestjs/axios'
 import { UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { HttpService } from '@nestjs/axios'
-import { AdminService } from './admin.service'
-import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
+import { Test, TestingModule } from '@nestjs/testing'
 import * as jwt from 'jsonwebtoken'
+import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
+import { AdminService } from './admin.service'
 
 describe('AdminService', () => {
   let service: AdminService
 
   const mockHttpService = {
     post: vi.fn(),
+    get: vi.fn(),
   }
 
   const mockConfigService = {
@@ -62,7 +63,7 @@ describe('AdminService', () => {
       const result = service.decodeToken(token)
 
       expect(result).toBeDefined()
-      expect(result.username).toBe('john.doe')
+      expect(result.username).toBe('JOHN.DOE')
       expect(result.email).toBe('john.doe@example.com')
       expect(result.firstName).toBe('John')
       expect(result.lastName).toBe('Doe')
@@ -79,7 +80,7 @@ describe('AdminService', () => {
       const bearerToken = `Bearer ${token}`
       const result = service.decodeToken(bearerToken)
 
-      expect(result.username).toBe('jane.doe')
+      expect(result.username).toBe('JANE.DOE')
     })
 
     it('should throw UnauthorizedException for invalid token', () => {
@@ -99,7 +100,7 @@ describe('AdminService', () => {
       const token = jwt.sign(mockPayload, 'secret')
       const result = service.decodeToken(token)
 
-      expect(result.username).toBe('user@example.com')
+      expect(result.username).toBe('USER')
     })
 
     it('should use sub as username if both preferred_username and email are not present', () => {
@@ -110,7 +111,7 @@ describe('AdminService', () => {
       const token = jwt.sign(mockPayload, 'secret')
       const result = service.decodeToken(token)
 
-      expect(result.username).toBe('user789')
+      expect(result.username).toBe('USER789')
     })
   })
 
@@ -123,7 +124,7 @@ describe('AdminService', () => {
       const token = jwt.sign(mockPayload, 'secret')
       const username = service.extractUsername(token)
 
-      expect(username).toBe('test.user')
+      expect(username).toBe('TEST.USER')
     })
   })
 
@@ -166,7 +167,7 @@ describe('AdminService', () => {
       const result = await service.getPermissionsFromToken(token)
 
       expect(result).toBeDefined()
-      expect(result.username).toBe('admin.user')
+      expect(result.username).toBe('ADMIN.USER')
       expect(result.responsibilities).toContain('admin')
     })
   })

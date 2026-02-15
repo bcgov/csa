@@ -17,8 +17,14 @@ class PrismaService
     if (PrismaService.instance) {
       return PrismaService.instance
     }
-    console.log('Initializing PrismaService with database URL:', databaseConfig.url)
-    const pool = new Pool({ connectionString: databaseConfig.url })
+    const pool = new Pool({
+      connectionString: databaseConfig.url,
+    })
+    // Set search_path on each new connection (compatible with Openshift Crunchy DB that
+    // block startup parameters like `-c search_path=` in the options field)
+    pool.on('connect', (client) => {
+      client.query(`SET search_path TO ${databaseConfig.schema}`)
+    })
     const adapter = new PrismaPg(pool)
     super({
       adapter,

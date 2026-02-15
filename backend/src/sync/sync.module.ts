@@ -5,6 +5,7 @@ import { KeycloakAuthModule } from 'src/common/auth/keycloak-auth.module'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { PrismaModule } from 'src/common/database/prisma.module'
 import { adminConfig } from 'src/config/admin.config'
+import { icmConfig } from 'src/config/icm.config'
 import { syncConfig } from 'src/config/sync.config'
 import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
@@ -20,13 +21,14 @@ import { IcmService } from './icm/icm.service'
 import { FileStorageService } from './mis/file-storage/file-storage.service'
 import { MockFileStorageService } from './mis/file-storage/mock-file-storage.service'
 import { S3Service } from './mis/file-storage/s3.service'
+import { EligibilityService } from './eligibility/eligibility.service'
 import { MisService } from './mis/mis.service'
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [syncConfig, adminConfig],
+      load: [syncConfig, adminConfig, icmConfig],
     }),
     HttpModule,
     PrismaModule,
@@ -60,6 +62,7 @@ import { MisService } from './mis/mis.service'
     },
     IcmService,
     MisService,
+    EligibilityService,
     IngestDataHandler,
     IngestIcmHandler,
     IngestMisHandler,

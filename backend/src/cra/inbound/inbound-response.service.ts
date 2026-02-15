@@ -18,10 +18,14 @@ export class InboundResponseService {
     const lines = content.split('\n').filter(Boolean)
 
     // Response File Type checking
-    const tranCode = parseInt(lines[0].substring(0, 4))
+    const tranCode = parseInt(lines[0]?.substring(0, 4))
     if (tranCode === RESPONSE_FILE.HEADER_TRAN_CODE) {
       return this.parseResponseFile(lines)
     }
+
+    throw new Error(
+      `Unrecognized CRA response file format: expected header tran code ${RESPONSE_FILE.HEADER_TRAN_CODE}, got ${tranCode}`,
+    )
   }
 
   private parseResponseFile(lines: string[]): {
@@ -33,7 +37,7 @@ export class InboundResponseService {
     let trailer!: CraResTrailer
     const details: CraResDetail[] = []
     for (const line of lines) {
-      const tranCode = parseInt(line.substring(0, 4))
+      const tranCode = parseInt(line?.substring(0, 4))
 
       if (tranCode === RESPONSE_FILE.HEADER_TRAN_CODE) {
         header = this.parseHeader(line)
@@ -43,12 +47,11 @@ export class InboundResponseService {
         trailer = this.parseTrailer(line)
       }
     }
-
     return { header, details, trailer }
   }
 
   private slice(line: string, start: number, length: number): string {
-    return line.substring(start, start + length).trim()
+    return line?.substring(start, start + length).trim()
   }
 
   private parseHeader(line: string): CraResHeader {
@@ -60,21 +63,21 @@ export class InboundResponseService {
       recordCount: parseInt(this.slice(line, 32, 8), 10),
     }
   }
-  private parseDetail(line: string): any {
+  private parseDetail(line: string): CraResDetail {
     return {
-      tranCode: parseInt(this.slice(line, 0, 4)),
-      fileStatCd: parseInt(this.slice(line, 4, 2)),
-      tranStatCd: parseInt(this.slice(line, 6, 1)),
+      tranCode: parseInt(this.slice(line, 0, 4), 10),
+      fileStatCd: this.slice(line, 4, 2),
+      tranStatCd: this.slice(line, 6, 1),
       rejectCd1: this.slice(line, 7, 3),
       rejectCd2: this.slice(line, 10, 3),
       rejectCd3: this.slice(line, 13, 3),
       rejectCd4: this.slice(line, 16, 3),
       rejectCd5: this.slice(line, 19, 3),
 
-      outTranCode: parseInt(this.slice(line, 22, 4)),
+      outTranCode: parseInt(this.slice(line, 22, 4), 10),
       referenceNum: this.slice(line, 26, 20),
       businessNum: this.slice(line, 46, 15),
-      tranType: parseInt(this.slice(line, 61, 1)),
+      tranType: parseInt(this.slice(line, 61, 1), 10),
 
       childGivenName: this.slice(line, 62, 30),
       childInitial: this.slice(line, 92, 1),

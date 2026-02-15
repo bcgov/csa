@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import { HttpModule } from '@nestjs/axios'
 import { Module, OnModuleInit } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
@@ -8,8 +9,7 @@ import { StateMachineModule } from 'src/common/state-machine/state-machine.modul
 import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
 import { appConfig } from '../config/app.config'
-import { craConfig } from './cra.config'
-
+import { craConfig } from '../config/cra.config'
 import { PollCraResponseHandler } from './handlers/poll-cra-response.handler'
 import { SendCraFileHandler } from './handlers/send-cra-file.handler'
 import { OutboundFileService } from './outbound/outbound-file.service'

@@ -1,5 +1,25 @@
 export const CRA_DATA_HANDLING_CONSTANT = {
   FILE_NAME_PREFIX: 'HT',
+  CRA_USERID: 'craUserId',
+  DESTINATION_ID: 'cra-ftp',
+  RESPONSE_FILE_TYPE: {
+    RSP: 'RSP',
+    WKL: 'WKL',
+    MRR: 'MRR',
+    MTC: 'MTC',
+  },
+  LOCAL_DIR: {
+    INBOUND: 'inbound',
+    OUTBOUND: 'outbound',
+  },
+  FILE_DIRECTION: {
+    INBOUND: 'INBOUND',
+    OUTBOUND: 'OUTBOUND',
+  },
+  UPDATED_BY: {
+    SYSTEM: 'SYSTEM',
+  },
+
   REQUEST_FILE: {
     HEADER_TRAN_CODE: 6133,
     DETAIL_TRAN_CODE: 6134,
@@ -13,38 +33,42 @@ export const CRA_DATA_HANDLING_CONSTANT = {
     DETAILS_TRAN_CODE: 6119,
     TRAILER_TRAN_CODE: 6120,
   },
+  // CRA spec: fileStatCd is 9(02) — 2-digit zero-padded string
   FILE_STAT_CODE: {
-    FILE_NOT_SET: 0,
-    FILE_OK: 1,
-    INVALID_EMPTY_FILE: 90,
-    INVALID_RECORD_COUNT: 91,
-    INVALID_NO_HEADER: 92,
-    INVALID_NO_TRAILER: 93,
-    INVALID_NO_DETAILS: 94,
-    RECS_OUT_OF_SEQ: 95,
+    FILE_NOT_SET: '00',
+    FILE_OK: '01',
+    INVALID_EMPTY_FILE: '90',
+    INVALID_RECORD_COUNT: '91',
+    INVALID_NO_HEADER: '92',
+    INVALID_NO_TRAILER: '93',
+    INVALID_NO_DETAILS: '94',
+    RECS_OUT_OF_SEQ: '95',
   },
+  // CRA spec: tranStatCd is 9(01) — 1-digit string
   TRAN_STAT_CODE: {
-    TRAN_ACCEPTED: 1,
-    TRAN_REJECTED: 2,
-    TRAN_RECYCLED: 3,
-    PROBLEM_DEDUCTED: 4,
+    TRAN_NOT_SET: '0',
+    TRAN_ACCEPTED: '1',
+    TRAN_REJECTED: '2',
+    TRAN_RECYCLED: '3',
+    PROBLEM_DEDUCTED: '4',
   },
   ERROR_MESSAGE: {
     FILE_STAT_MESSAGE: {
-      0: 'FILE NOT SET',
-      1: 'FILE OK',
-      90: ' INVALID EMPTY FILE',
-      91: 'INVALID RECORD COUNT',
-      92: 'INVALID NO HEADER',
-      93: 'INVALID NO TRAILER',
-      94: 'INVALID NO DETAILS',
-      95: 'RECS OUT OF SEQ',
+      '00': 'FILE NOT SET',
+      '01': 'FILE OK',
+      '90': 'INVALID EMPTY FILE',
+      '91': 'INVALID RECORD COUNT',
+      '92': 'INVALID NO HEADER',
+      '93': 'INVALID NO TRAILER',
+      '94': 'INVALID NO DETAILS',
+      '95': 'RECS OUT OF SEQ',
     },
     TRAN_STAT_MESSAGE: {
-      1: ' Transaction Accepted',
-      2: 'Transaction Rejected',
-      3: 'Transaction Recycled',
-      4: 'Problem deducted',
+      '0': 'Transaction Not Set',
+      '1': 'Transaction Accepted',
+      '2': 'Transaction Rejected',
+      '3': 'Transaction Recycled',
+      '4': 'Problem deducted',
     },
     REJECT_CODE: {
       '001':
@@ -104,6 +128,4 @@ export const CRA_DATA_HANDLING_CONSTANT = {
     COMPLETED: 'COMPLETED',
     PENDING: 'PENDING',
   },
-  CRA_USERID: 'craUserId',
-  DESTINATION_ID: 'cra-ftp',
-}
+} as const

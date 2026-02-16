@@ -18,7 +18,7 @@ import { UserPermissionsDto } from './dto/user-permissions.dto'
 @Controller({ path: 'admin', version: '1' })
 @UseGuards(AuthGuard)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(private readonly adminService: AdminService) { }
 
   @Get('user/info')
   @ApiOperation({
@@ -219,7 +219,7 @@ export class AdminController {
   @ApiOperation({
     summary: 'Verify user has CSA access',
     description:
-      'Validates the auth token, extracts username, and queries ICM to verify user has CSA Application responsibility',
+      'Validates the auth token (including expiration), extracts username, and queries ICM to verify user has CSA Application responsibility',
   })
   @ApiHeader({
     name: 'Authorization',
@@ -236,6 +236,7 @@ export class AdminController {
         userInfo: { type: 'object' },
         message: { type: 'string' },
         icmResponsibility: { type: 'string' },
+        tokenExpired: { type: 'boolean' },
       },
     },
   })
@@ -249,6 +250,7 @@ export class AdminController {
     userInfo: UserInfoDto
     message: string
     icmResponsibility?: string
+    tokenExpired?: boolean
   }> {
     return this.adminService.verifyCSAAccess(authHeader)
   }

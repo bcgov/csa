@@ -15,6 +15,7 @@ export interface CSAAccessResponse {
   userInfo: UserInfo
   message: string
   icmResponsibility?: string
+  tokenExpired?: boolean
 }
 
 export interface UserPermissions {

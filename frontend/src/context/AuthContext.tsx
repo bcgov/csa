@@ -1,5 +1,5 @@
 import type Keycloak from 'keycloak-js'
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { initializeKeycloak } from '../config/keycloak.config'
 import { verifyCSAAccess } from '../service/admin-service'
 
@@ -8,6 +8,8 @@ interface AuthContextType {
   isLoading: boolean
   hasCSAAccess: boolean | null
   csaAccessError: string | null
+  csaAccessAlert: string | null
+  clearCsaAccessAlert: () => void
   user: {
     name?: string
     email?: string
@@ -26,8 +28,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true)
   const [hasCSAAccess, setHasCSAAccess] = useState<boolean | null>(null)
   const [csaAccessError, setCsaAccessError] = useState<string | null>(null)
+  const [csaAccessAlert, setCsaAccessAlert] = useState<string | null>(null)
   const [user, setUser] = useState<AuthContextType['user']>(null)
   const [keycloak, setKeycloak] = useState<Keycloak | null>(null)
+
+  const clearCsaAccessAlert = useCallback(() => {
+    setCsaAccessAlert(null)
+  }, [])
 
   useEffect(() => {
     // Initialize Keycloak with runtime config
@@ -45,17 +52,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // redirectUri: window.location.origin + '/',
           })
           .then(async (authenticated) => {
-            setIsAuthenticated(authenticated)
             setIsLoading(false)
 
             if (authenticated && keycloakInstance.tokenParsed) {
-              setUser({
-                name: keycloakInstance.tokenParsed.name,
-                email: keycloakInstance.tokenParsed.email,
-                username: keycloakInstance.tokenParsed.preferred_username,
-                roles: keycloakInstance.tokenParsed.realm_access?.roles || [],
-              })
-
               // Store token in localStorage
               if (keycloakInstance.token) {
                 localStorage.setItem('authToken', keycloakInstance.token)
@@ -66,17 +65,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // Verify CSA access via admin API
                 try {
                   const csaAccessResponse = await verifyCSAAccess()
-                  setHasCSAAccess(csaAccessResponse.hasAccess)
-                  if (!csaAccessResponse.hasAccess) {
-                    setCsaAccessError(
-                      csaAccessResponse.message || 'You do not have access to CSA application',
-                    )
+
+                  // Check if token is expired
+                  if (csaAccessResponse.tokenExpired) {
+                    console.warn('Token expired, prompting re-login')
+                    setIsAuthenticated(false)
+                    setHasCSAAccess(false)
+                    setCsaAccessAlert('Your session has expired. Please login again.')
+                    localStorage.removeItem('authToken')
+                    keycloakInstance.logout({ redirectUri: window.location.origin })
+                    return
+                  }
+
+                  // Only grant access if message is exactly 'User has CSA access'
+                  if (csaAccessResponse.message === 'User has CSA access') {
+                    setIsAuthenticated(true)
+                    setHasCSAAccess(true)
+                    setUser({
+                      name: keycloakInstance.tokenParsed.name,
+                      email: keycloakInstance.tokenParsed.email,
+                      username: keycloakInstance.tokenParsed.preferred_username,
+                      roles: keycloakInstance.tokenParsed.realm_access?.roles || [],
+                    })
+                  } else {
+                    // User is not authorized to access CSA
+                    setIsAuthenticated(false)
+                    setHasCSAAccess(false)
+                    setCsaAccessError(csaAccessResponse.message || 'You do not have access to CSA application')
+                    setCsaAccessAlert('User not authorised to access CSA')
+                    localStorage.removeItem('authToken')
+                    // Logout from Keycloak and redirect to landing page
+                    keycloakInstance.logout({ redirectUri: window.location.origin })
                   }
                 } catch (error) {
                   console.error('Failed to verify CSA access:', error)
+                  setIsAuthenticated(false)
                   setHasCSAAccess(false)
                   setCsaAccessError('Failed to verify CSA access. Please try again.')
+                  setCsaAccessAlert('User not authorised to access CSA')
+                  localStorage.removeItem('authToken')
+                  keycloakInstance.logout({ redirectUri: window.location.origin })
                 }
+              } else {
+                setIsAuthenticated(false)
               }
 
               // Set up token refresh
@@ -126,6 +157,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         hasCSAAccess,
         csaAccessError,
+        csaAccessAlert,
+        clearCsaAccessAlert,
         user,
         login,
         logout,

@@ -22,7 +22,7 @@ export class AdminService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly keycloakAuthService: KeycloakAuthService,
-  ) {}
+  ) { }
   /**
    * Decode JWT token and extract user information
    * @param token - JWT token from Authorization header
@@ -127,9 +127,25 @@ export class AdminService {
     userInfo: UserInfoDto
     message: string
     icmResponsibility?: string
+    tokenExpired?: boolean
   }> {
     const userInfo = this.decodeToken(token)
     const username = userInfo.username
+
+    // Verify token is not expired
+    if (userInfo.exp) {
+      const currentTimeInSeconds = Math.floor(Date.now() / 1000)
+      if (userInfo.exp < currentTimeInSeconds) {
+        this.logger.warn(`Token expired for user ${username}. Expiry: ${userInfo.exp}, Current: ${currentTimeInSeconds}`)
+        return {
+          hasAccess: false,
+          username,
+          userInfo,
+          message: 'Token has expired. Please login again.',
+          tokenExpired: true,
+        }
+      }
+    }
 
     try {
       const icmData = await this.fetchUserFromICM(username)

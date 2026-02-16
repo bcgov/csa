@@ -237,12 +237,13 @@ const childBatchHistory = [
 
 function App() {
   // Use Keycloak authentication
-  const { isAuthenticated: keycloakAuthenticated, isLoading, user, login, logout, csaAccessAlert, clearCsaAccessAlert } = useAuth()
+  const { isAuthenticated: keycloakAuthenticated, isLoading, hasCSAAccess, user, login, logout, csaAccessAlert, clearCsaAccessAlert } = useAuth()
 
   // Log Keycloak authentication token (for testing in deployed version)
   console.log('=== KEYCLOAK AUTH TOKEN ===')
   console.log('Auth Token from localStorage:', localStorage.getItem('authToken'))
   console.log('Keycloak Authenticated:', keycloakAuthenticated)
+  console.log('Has CSA Access:', hasCSAAccess)
   console.log('User Info:', user)
   console.log('==========================')
 
@@ -275,8 +276,11 @@ function App() {
     return () => window.removeEventListener('storage', checkLoginState)
   }, [isLoading, isLoggedIn])
 
-  // User is authenticated if either Keycloak or mock login is active
-  const isAuthenticated = keycloakAuthenticated || isLoggedIn
+  // User is authenticated only if:
+  // 1. Keycloak is authenticated AND has CSA access (hasCSAAccess === true), OR
+  // 2. Mock login is active (isLoggedIn is true - mock login already verifies CSA access)
+  // Note: hasCSAAccess is null during loading, false when denied, true when granted
+  const isAuthenticated = (keycloakAuthenticated && hasCSAAccess === true) || isLoggedIn
 
   const [selectedTab, setSelectedTab] = useState(0)
   const [selected, setSelected] = useState<number[]>([])
@@ -842,13 +846,17 @@ function App() {
         return
       }
 
-      // Only grant access if message is exactly 'User has CSA access'
-      if (csaAccessResponse.message === 'User has CSA access') {
+      // Only grant access if BOTH hasAccess is true AND message is exactly 'User has CSA access'
+      const hasValidAccess = csaAccessResponse.hasAccess === true &&
+        csaAccessResponse.message === 'User has CSA access'
+
+      if (hasValidAccess) {
         setIsLoggedIn(true)
         localStorage.setItem('isLoggedIn', 'true')
         setShowIdirLogin(false)
       } else {
         // User is not authorized to access CSA
+        console.warn('CSA access denied:', csaAccessResponse)
         localStorage.removeItem('authToken')
         localStorage.removeItem('isLoggedIn')
         localStorage.removeItem('username')

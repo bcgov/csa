@@ -80,8 +80,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     return
                   }
 
-                  // Only grant access if message is exactly 'User has CSA access'
-                  if (csaAccessResponse.message === 'User has CSA access') {
+                  // Only grant access if BOTH:
+                  // 1. hasAccess is true AND
+                  // 2. message is exactly 'User has CSA access'
+                  const hasValidAccess = csaAccessResponse.hasAccess === true &&
+                    csaAccessResponse.message === 'User has CSA access'
+
+                  if (hasValidAccess) {
                     setIsAuthenticated(true)
                     setHasCSAAccess(true)
                     setUser({
@@ -108,6 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     }, 60000) // Check every minute
                   } else {
                     // User is not authorized to access CSA
+                    console.warn('CSA access denied:', csaAccessResponse)
                     setIsAuthenticated(false)
                     setHasCSAAccess(false)
                     setCsaAccessError(csaAccessResponse.message || 'You do not have access to CSA application')

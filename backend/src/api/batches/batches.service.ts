@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { BATCH_STATUS } from 'src/common/state-machine/constants'
+import { BATCH_STATUS, BATCH_DETAIL_STATUS, BATCH_EVENT } from 'src/common/state-machine/constants'
 import type { TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
@@ -222,6 +222,56 @@ export class BatchesService {
     })
 
     return result
+  }
+
+  async aggregateBatchStatus(batchId: number): Promise<void> {
+    const allDetails = await this.prisma.contactBatchDetail.findMany({
+      where: { batchId },
+      select: { status: true },
+    })
+
+    const statuses = allDetails.map((d) => d.status)
+    const hasProcessed = statuses.includes(BATCH_DETAIL_STATUS.PROCESSED)
+    const hasError = statuses.includes(BATCH_DETAIL_STATUS.ERROR)
+    const hasInProgress = statuses.includes(BATCH_DETAIL_STATUS.IN_PROGRESS)
+
+    if (hasInProgress) {
+      this.logger.log(`Batch ${batchId}: some details still in_progress, batch stays in_progress`)
+      return
+    }
+
+    let batchEvent: string
+    let batchMessage: string | null = null
+    if (hasProcessed && hasError) {
+      batchEvent = BATCH_EVENT.CRA_PARTIAL_REJECTED
+      batchMessage = 'At least one of the child record(s) in the Batch Details is in Error.'
+    } else if (hasProcessed && !hasError) {
+      batchEvent = BATCH_EVENT.CRA_ACCEPTED
+    } else {
+      batchEvent = BATCH_EVENT.CRA_ALL_REJECTED
+      batchMessage = 'All child(ren) in the Batch Details are in Error.'
+    }
+
+    const batch = await this.prisma.batch.findUnique({
+      where: { id: batchId },
+      select: { systemComments: true },
+    })
+
+    const systemComments = this.buildSystemComment(batchMessage, batch?.systemComments ?? null)
+
+    await this.updateBatchStatus(batchId, batchEvent, {
+      additionalData: systemComments != null ? { systemComments } : {},
+    })
+  }
+
+  private buildSystemComment(
+    newMessage: string | null,
+    existingComments: string | null,
+  ): string | null {
+    if (!newMessage) return existingComments
+    const date = new Date().toISOString().split('T')[0]
+    const dated = `[${date}] ${newMessage}`
+    return existingComments ? `${dated}\n${existingComments}` : dated
   }
 
   async removeContactFromPendingBatch(contactId: number): Promise<void> {

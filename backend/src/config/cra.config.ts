@@ -11,5 +11,6 @@ export const craConfig = registerAs('cra', () => {
   return {
     environmentCode: isProduction ? 'PCSAIN' : 'ACSAIN',
     fileTypeCode: isProduction ? 'PAPL' : 'AAPL',
+    responseEnvFlag: isProduction ? 'P' : 'V',
   }
 })

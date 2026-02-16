@@ -52,9 +52,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // redirectUri: window.location.origin + '/',
           })
           .then(async (authenticated) => {
-            setIsLoading(false)
-
             if (authenticated && keycloakInstance.tokenParsed) {
+              // Clear any mock login state when using Keycloak SSO
+              localStorage.removeItem('isLoggedIn')
+
               // Store token in localStorage
               if (keycloakInstance.token) {
                 localStorage.setItem('authToken', keycloakInstance.token)
@@ -73,6 +74,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     setHasCSAAccess(false)
                     setCsaAccessAlert('Your session has expired. Please login again.')
                     localStorage.removeItem('authToken')
+                    localStorage.removeItem('isLoggedIn') // Clear mock login state as well
+                    setIsLoading(false)
                     keycloakInstance.logout({ redirectUri: window.location.origin })
                     return
                   }
@@ -87,6 +90,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                       username: keycloakInstance.tokenParsed.preferred_username,
                       roles: keycloakInstance.tokenParsed.realm_access?.roles || [],
                     })
+                    setIsLoading(false)
+
+                    // Set up token refresh only when access is granted
+                    setInterval(() => {
+                      keycloakInstance
+                        .updateToken(70)
+                        .then((refreshed) => {
+                          if (refreshed && keycloakInstance.token) {
+                            localStorage.setItem('authToken', keycloakInstance.token)
+                            console.log('Token refreshed')
+                          }
+                        })
+                        .catch(() => {
+                          console.error('Failed to refresh token')
+                        })
+                    }, 60000) // Check every minute
                   } else {
                     // User is not authorized to access CSA
                     setIsAuthenticated(false)
@@ -94,6 +113,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     setCsaAccessError(csaAccessResponse.message || 'You do not have access to CSA application')
                     setCsaAccessAlert('User not authorised to access CSA')
                     localStorage.removeItem('authToken')
+                    localStorage.removeItem('isLoggedIn') // Clear mock login state as well
+                    setIsLoading(false)
                     // Logout from Keycloak and redirect to landing page
                     keycloakInstance.logout({ redirectUri: window.location.origin })
                   }
@@ -104,26 +125,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   setCsaAccessError('Failed to verify CSA access. Please try again.')
                   setCsaAccessAlert('User not authorised to access CSA')
                   localStorage.removeItem('authToken')
+                  localStorage.removeItem('isLoggedIn') // Clear mock login state as well
+                  setIsLoading(false)
                   keycloakInstance.logout({ redirectUri: window.location.origin })
                 }
               } else {
                 setIsAuthenticated(false)
+                setIsLoading(false)
               }
-
-              // Set up token refresh
-              setInterval(() => {
-                keycloakInstance
-                  .updateToken(70)
-                  .then((refreshed) => {
-                    if (refreshed && keycloakInstance.token) {
-                      localStorage.setItem('authToken', keycloakInstance.token)
-                      console.log('Token refreshed')
-                    }
-                  })
-                  .catch(() => {
-                    console.error('Failed to refresh token')
-                  })
-              }, 60000) // Check every minute
+            } else {
+              // Not authenticated via Keycloak
+              setIsLoading(false)
             }
           })
           .catch((error) => {

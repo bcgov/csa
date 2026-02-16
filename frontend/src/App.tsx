@@ -35,6 +35,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { useAuth } from './context/AuthContext'
 import logo from './icons/image.png'
+import { verifyCSAAccess } from './service/admin-service'
 import {
   addContactsToBatch,
   fullTextSearchContacts,
@@ -253,6 +254,26 @@ function App() {
   const [showIdirLogin, setShowIdirLogin] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+
+  // Sync isLoggedIn state with localStorage (for when AuthContext clears it)
+  useEffect(() => {
+    const checkLoginState = () => {
+      const saved = localStorage.getItem('isLoggedIn')
+      const shouldBeLoggedIn = saved === 'true'
+      if (isLoggedIn !== shouldBeLoggedIn) {
+        setIsLoggedIn(shouldBeLoggedIn)
+      }
+    }
+
+    // Check immediately when loading state changes (Keycloak auth completed)
+    if (!isLoading) {
+      checkLoginState()
+    }
+
+    // Also listen for storage changes
+    window.addEventListener('storage', checkLoginState)
+    return () => window.removeEventListener('storage', checkLoginState)
+  }, [isLoading, isLoggedIn])
 
   // User is authenticated if either Keycloak or mock login is active
   const isAuthenticated = keycloakAuthenticated || isLoggedIn
@@ -792,18 +813,64 @@ function App() {
   }
 
   // Mock IDIR login handler
-  const handleIdirLogin = () => {
+  const handleIdirLogin = async () => {
     // Simple validation - just check if fields are not empty
     // if (username.trim() && password.trim()) {
-    setIsLoggedIn(true)
-    localStorage.setItem('isLoggedIn', 'true')
     const mockToken = `mock-token-${Date.now()}`
     localStorage.setItem('authToken', mockToken)
     localStorage.setItem('username', username)
     console.log('=== MOCK LOGIN - AUTH TOKEN SET ===')
     console.log('Mock Token:', mockToken)
     console.log('===================================')
-    setShowIdirLogin(false)
+
+    // Verify CSA access before granting login
+    try {
+      const csaAccessResponse = await verifyCSAAccess()
+
+      // Check if token is expired
+      if (csaAccessResponse.tokenExpired) {
+        console.warn('Token expired')
+        localStorage.removeItem('authToken')
+        localStorage.removeItem('isLoggedIn')
+        localStorage.removeItem('username')
+        setSnackbar({
+          open: true,
+          message: 'Your session has expired. Please login again.',
+          severity: 'error',
+        })
+        setShowIdirLogin(false)
+        return
+      }
+
+      // Only grant access if message is exactly 'User has CSA access'
+      if (csaAccessResponse.message === 'User has CSA access') {
+        setIsLoggedIn(true)
+        localStorage.setItem('isLoggedIn', 'true')
+        setShowIdirLogin(false)
+      } else {
+        // User is not authorized to access CSA
+        localStorage.removeItem('authToken')
+        localStorage.removeItem('isLoggedIn')
+        localStorage.removeItem('username')
+        setSnackbar({
+          open: true,
+          message: 'User not authorised to access CSA',
+          severity: 'error',
+        })
+        setShowIdirLogin(false)
+      }
+    } catch (error) {
+      console.error('Failed to verify CSA access:', error)
+      localStorage.removeItem('authToken')
+      localStorage.removeItem('isLoggedIn')
+      localStorage.removeItem('username')
+      setSnackbar({
+        open: true,
+        message: 'User not authorised to access CSA',
+        severity: 'error',
+      })
+      setShowIdirLogin(false)
+    }
     // }
   }
 

@@ -1,14 +1,19 @@
 import { Injectable } from '@nestjs/common'
 import { readFileSync } from 'fs'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
-import { CraResHeader, CraResDetail, CraResTrailer } from './inbound.interface'
+import {
+  CraResDetail,
+  CraResHeader,
+  CraResTrailer,
+  DETAIL_OUTCOME,
+  DetailResult,
+} from './inbound.interface'
 
-const { RESPONSE_FILE } = CRA_DATA_HANDLING_CONSTANT
+const { RESPONSE_FILE, ERROR_MESSAGE, FILE_STAT_CODE, TRAN_STAT_CODE } = CRA_DATA_HANDLING_CONSTANT
+const { FILE_STAT_MESSAGE, REJECT_CODE } = ERROR_MESSAGE
 
 @Injectable()
 export class InboundResponseService {
-  // Helper method to slice field values
-
   parseFile(filePath: string): {
     header: CraResHeader
     details: CraResDetail[]
@@ -115,5 +120,82 @@ export class InboundResponseService {
       businessNum: this.slice(line, 17, 15),
       recordCount: parseInt(this.slice(line, 32, 8), 10),
     }
+  }
+
+  isFileStatusOk(detail: CraResDetail): boolean {
+    return detail.fileStatCd === FILE_STAT_CODE.FILE_OK
+  }
+
+  returnAllRejectCode(detail: CraResDetail): string[] {
+    const rejectCodes: string[] = []
+    const keys = ['rejectCd1', 'rejectCd2', 'rejectCd3', 'rejectCd4', 'rejectCd5'] as const
+    for (const key of keys) {
+      if (detail[key]) {
+        rejectCodes.push(detail[key])
+      }
+    }
+    return rejectCodes
+  }
+
+  getErrorMessageByRejectCode(rejectCodes: string[]): string {
+    const errorMessages: string[] = []
+    for (const rejectCode of rejectCodes) {
+      if (REJECT_CODE[rejectCode]) {
+        errorMessages.push(REJECT_CODE[rejectCode])
+      }
+    }
+    return errorMessages.join('; ')
+  }
+
+  buildSystemComment(newMessage: string | null, existingComments: string | null): string | null {
+    if (!newMessage) return existingComments
+    const date = new Date().toISOString().split('T')[0]
+    const dated = `[${date}] ${newMessage}`
+    return existingComments ? `${dated}\n${existingComments}` : dated
+  }
+
+  getBatchSystemCommentByCode(fileStatCd: string): string {
+    if (FILE_STAT_MESSAGE[fileStatCd]) {
+      return FILE_STAT_MESSAGE[fileStatCd]
+    }
+    return 'Unknown error code'
+  }
+
+  classifyDetail(detail: CraResDetail, existingComments: string | null): DetailResult {
+    // TODO: FILE_ERROR not covered in FD — confirm how file-level CRA errors should be handled
+    // Currently treated as REJECTED.
+    if (!this.isFileStatusOk(detail)) {
+      const fileError = this.getBatchSystemCommentByCode(detail.fileStatCd)
+      return {
+        outcome: DETAIL_OUTCOME.FILE_ERROR,
+        systemComments: this.buildSystemComment(fileError, existingComments),
+        din: null,
+      }
+    }
+
+    const rejectCodes = this.returnAllRejectCode(detail)
+    const errorMessage = this.getErrorMessageByRejectCode(rejectCodes)
+    const systemComments = this.buildSystemComment(errorMessage || null, existingComments)
+    const din = detail.ccraDinNum?.trim() || null
+
+    // TODO: PROBLEM_DEDUCTED (tranStatCd=4) not covered in spec —
+    // should it be treated as ACCEPTED or handled differently ?
+    if (
+      detail.tranStatCd === TRAN_STAT_CODE.TRAN_ACCEPTED ||
+      detail.tranStatCd === TRAN_STAT_CODE.PROBLEM_DEDUCTED
+    ) {
+      return { outcome: DETAIL_OUTCOME.ACCEPTED, systemComments, din }
+    }
+
+    if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_REJECTED) {
+      return { outcome: DETAIL_OUTCOME.REJECTED, systemComments, din: null }
+    }
+
+    if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_RECYCLED) {
+      return { outcome: DETAIL_OUTCOME.RECYCLED, systemComments, din: null }
+    }
+
+    // TODO: Verify with spec whether NOT_SET (0) should be treated as rejected or handled differently
+    return { outcome: DETAIL_OUTCOME.REJECTED, systemComments, din: null }
   }
 }

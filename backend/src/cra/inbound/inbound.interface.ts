@@ -1,6 +1,6 @@
 export interface CraResHeader {
-  // header = 6133V00.020260110885633354RA000100000002
-  tranCode: number | string // 9(04) 6133
+  // header = 6118V00.020260110885633354RA000100000002
+  tranCode: number | string // 9(04) 6118
   versionNum: string // V00.0
   processDate: string // X(8) YYYYMMDD
   businessNum: string // X(15)
@@ -8,7 +8,7 @@ export interface CraResHeader {
   filler?: string // 25 space
 }
 export interface CraResDetail {
-  tranCode: number | string // 9(04) 6134 Record type (detail)
+  tranCode: number | string // 9(04) 6119 Record type (detail)
   fileStatCd: string // 9(02)
   tranStatCd: string // 9(01)
   rejectCd1: string // 9(03)
@@ -58,6 +58,21 @@ export interface CraResTrailer {
   businessNum: string
   recordCount: number
   filler?: string
+}
+
+export const DETAIL_OUTCOME = {
+  ACCEPTED: 'accepted',
+  REJECTED: 'rejected',
+  RECYCLED: 'recycled',
+  FILE_ERROR: 'file_error',
+} as const
+
+export type DetailOutcome = (typeof DETAIL_OUTCOME)[keyof typeof DETAIL_OUTCOME]
+
+export interface DetailResult {
+  outcome: DetailOutcome
+  systemComments: string | null
+  din: string | null
 }
 
 export interface CreateFileTransferObj {

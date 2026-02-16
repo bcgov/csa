@@ -325,6 +325,72 @@ function App() {
     }
   }, [csaAccessAlert, clearCsaAccessAlert])
 
+  // Effect to re-verify CSA access on page load/refresh for IDIR login sessions
+  useEffect(() => {
+    const verifyExistingLogin = async () => {
+      const savedLoginState = localStorage.getItem('isLoggedIn')
+      const savedToken = localStorage.getItem('authToken')
+
+      // Only verify if there's an existing login session with a token (IDIR login - not Keycloak SSO)
+      // Keycloak SSO is handled by AuthContext
+      if (savedLoginState === 'true' && savedToken) {
+        console.log('Re-verifying CSA access for existing login session...')
+
+        try {
+          const csaAccessResponse = await verifyCSAAccess()
+
+          // Check if token is expired
+          if (csaAccessResponse.tokenExpired) {
+            console.warn('Token expired during re-verification')
+            localStorage.removeItem('authToken')
+            localStorage.removeItem('isLoggedIn')
+            localStorage.removeItem('username')
+            setIsLoggedIn(false)
+            setSnackbar({
+              open: true,
+              message: 'Your session has expired. Please login again.',
+              severity: 'error',
+            })
+            return
+          }
+
+          // Only keep access if BOTH hasAccess is true AND message is exactly 'User has CSA access'
+          const hasValidAccess = csaAccessResponse.hasAccess === true &&
+            csaAccessResponse.message === 'User has CSA access'
+
+          if (!hasValidAccess) {
+            console.warn('CSA access denied during re-verification:', csaAccessResponse)
+            localStorage.removeItem('authToken')
+            localStorage.removeItem('isLoggedIn')
+            localStorage.removeItem('username')
+            setIsLoggedIn(false)
+            setSnackbar({
+              open: true,
+              message: 'User not authorised to access CSA',
+              severity: 'error',
+            })
+          } else {
+            console.log('CSA access verified successfully')
+          }
+        } catch (error) {
+          console.error('Failed to re-verify CSA access:', error)
+          localStorage.removeItem('authToken')
+          localStorage.removeItem('isLoggedIn')
+          localStorage.removeItem('username')
+          setIsLoggedIn(false)
+          setSnackbar({
+            open: true,
+            message: 'User not authorised to access CSA',
+            severity: 'error',
+          })
+        }
+      }
+    }
+
+    // Run verification on component mount (page load/refresh)
+    verifyExistingLogin()
+  }, []) // Empty dependency array - runs only once on mount
+
   // Batch history state for selected contact
   const [contactBatchHistory, setContactBatchHistory] = useState<ContactBatchDetail[]>([])
   const [loadingBatchHistory, setLoadingBatchHistory] = useState(false)

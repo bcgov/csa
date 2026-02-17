@@ -162,7 +162,7 @@ export class InboundResponseService {
   }
 
   classifyDetail(detail: CraResDetail, existingComments: string | null): DetailResult {
-    // TODO: FILE_ERROR not covered in FD — confirm how file-level CRA errors should be handled
+    // TODO: FILE_ERROR not covered in FD. Confirm how file-level CRA errors should be handled
     // Currently treated as REJECTED.
     if (!this.isFileStatusOk(detail)) {
       const fileError = this.getBatchSystemCommentByCode(detail.fileStatCd)
@@ -178,7 +178,7 @@ export class InboundResponseService {
     const systemComments = this.buildSystemComment(errorMessage || null, existingComments)
     const din = detail.ccraDinNum?.trim() || null
 
-    // TODO: PROBLEM_DEDUCTED (tranStatCd=4) not covered in spec —
+    // TODO: PROBLEM_DEDUCTED (tranStatCd=4) not covered in spec
     // should it be treated as ACCEPTED or handled differently ?
     if (
       detail.tranStatCd === TRAN_STAT_CODE.TRAN_ACCEPTED ||

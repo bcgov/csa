@@ -187,7 +187,7 @@ export class PollCraResponseHandler extends BaseJob {
       )
       this.recordsRejected++
     } else {
-      // recycled — no state change, just update system comments
+      // recycled: no state change, just update system comments
       this.logger.log(`Detail ${detailId} recycled, no status change`)
       await this.prisma.contactBatchDetail.update({
         where: { id: detailId },

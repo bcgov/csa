@@ -7,7 +7,7 @@ export function step10_UpdateOver18(currentStatus: CsaStatus | null): Eligibilit
     currentStatus === CSA_STATUS.ELIGIBLE ||
     currentStatus === CSA_STATUS.IN_PAY ||
     currentStatus === CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY ||
-    currentStatus === CSA_STATUS.NOT_ELIGIBLE_IN_PAY // TODO: verify with business — should aging out from not_eligible_in_pay trigger cancellation flow first?
+    currentStatus === CSA_STATUS.NOT_ELIGIBLE_IN_PAY // TODO: verify with business. Should aging out from not_eligible_in_pay trigger cancellation flow first?
   ) {
     newStatus = CSA_STATUS.OVER_18
   }

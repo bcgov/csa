@@ -117,7 +117,7 @@ describe('MisService', () => {
       expect(mockFileStorage.move).toHaveBeenCalledTimes(3)
       const moveCalls = mockFileStorage.move.mock.calls
       expect(moveCalls[0][0]).toBe('csas3/CSAS3_Payments.csv')
-      expect(moveCalls[0][1]).toMatch(/^csas3\/processed\/\d{4}-\d{2}-\d{2}\/CSAS3_Payments\.csv$/)
+      expect(moveCalls[0][1]).toMatch(/^csas3\/PROCESSED\/\d{4}-\d{2}-\d{2}\/CSAS3_Payments\.csv$/)
     })
 
     it('should not move files when they are skipped', async () => {

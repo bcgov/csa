@@ -3,9 +3,9 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
 import 'dotenv/config'
 import { TRANSACTION_TYPES } from '../src/api/contacts/constants'
-import { CSA_STATUS } from '../src/common/state-machine/constants/csa-status.constants'
-import { BATCH_STATUS } from '../src/common/state-machine/constants/batch-status.constants'
 import { BATCH_DETAIL_STATUS } from '../src/common/state-machine/constants/batch-detail-status.constants'
+import { BATCH_STATUS } from '../src/common/state-machine/constants/batch-status.constants'
+import { CSA_STATUS } from '../src/common/state-machine/constants/csa-status.constants'
 import { databaseConfig } from '../src/config/database.config'
 
 const adapter = new PrismaPg({ connectionString: databaseConfig.url })
@@ -242,7 +242,8 @@ async function seedBatches() {
   console.log('Seeding 6 batches...')
   const now = new Date()
 
-  // One batch per status — covers all state machine values
+  // One batch per status
+  // covers all state machine values
   const batchStatuses = [
     BATCH_STATUS.PENDING,
     BATCH_STATUS.IN_PROGRESS,

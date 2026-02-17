@@ -1,7 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { TRANSACTION_TYPES } from 'src/api/contacts/constants'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { ELIGIBILITY_CONFIG } from './eligibility.config'
-import { LOAD_CONTACT_PROFILES_SQL } from './eligibility.queries'
+import { BATCH_STATUS } from 'src/common/state-machine/constants/batch-status.constants'
+import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
+import { JobType } from 'src/jobs/enums/job-type.enum'
+import { JobsService } from 'src/jobs/jobs.service'
+import { ELIGIBILITY_CONFIG, PROTECTED_STATUSES } from './eligibility.config'
+import { buildLoadContactProfilesSql } from './eligibility.queries'
 import {
   AgreementRecord,
   ContactProfile,
@@ -40,13 +46,14 @@ interface UpsertContext {
   primaryAgreement: AgreementRecord | null
 }
 
+// skip: conflict key (excluded from ON CONFLICT SET),
+//   coalesce: preserve existing when new is null
+// required?: Column has a NOT NULL constraint in the database
 interface ContactColumnDef {
   dbColumn: string
   pgType: string
   extract: (ctx: UpsertContext) => unknown
-  /** 'skip' = conflict key (excluded from ON CONFLICT SET), 'coalesce' = preserve existing when new is null */
   conflictMode?: 'skip' | 'coalesce'
-  /** Column has a NOT NULL constraint in the database */
   required?: boolean
 }
 
@@ -197,6 +204,11 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
     pgType: 'date',
     extract: (c) => c.primaryOrder?.effectiveStartDate ?? null,
   },
+  {
+    dbColumn: 'order_effective_end_date',
+    pgType: 'date',
+    extract: (c) => c.primaryOrder?.effectiveEndDate ?? null,
+  },
   { dbColumn: 'product', pgType: 'text', extract: (c) => c.primaryOrder?.product ?? null },
   { dbColumn: 'source_order', pgType: 'text', extract: (c) => c.primaryOrder?.source ?? 'ICM' },
   {
@@ -254,7 +266,10 @@ const UPSERT_SQL = `
   AS t(${COL_LIST})
   ON CONFLICT (person_id_icm) DO UPDATE SET
     ${UPDATE_SET},
-    csa_status_effective_date = NOW(),
+    csa_status_effective_date = CASE
+      WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN NOW()
+      ELSE contacts.csa_status_effective_date
+    END,
     icm_integration_status = false,
     last_updated_at = NOW(),
     last_updated_by = 'SYSTEM'
@@ -264,10 +279,21 @@ const UPSERT_SQL = `
 export class EligibilityService {
   private readonly logger = new Logger(EligibilityService.name)
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jobsService: JobsService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async run(): Promise<EligibilityRunResult> {
-    const profiles = await this.loadContactProfiles()
+    const threshold = await this.computeThreshold()
+    this.logger.log(
+      threshold
+        ? `Incremental mode: threshold ${threshold.toISOString()}`
+        : 'Full load mode (no previous successful run)',
+    )
+
+    const profiles = await this.loadContactProfiles(threshold)
 
     this.logger.log(`Loaded ${profiles.length} contact profiles from staging`)
 
@@ -276,12 +302,25 @@ export class EligibilityService {
       statusChanges: 0,
       newContacts: 0,
       skipped: 0,
+      autoBatched: { application: 0, cancellation: 0 },
       stepCounts: { step7: 0, step8: 0, step9: 0, step10: 0, noChange: 0 },
     }
 
     const updates: Array<{ profile: ContactProfile; result: EligibilityResult }> = []
 
     for (const profile of profiles) {
+      // Protected statuses: preserve existing csa_status, still upsert data
+      if (
+        profile.csaStatus &&
+        (PROTECTED_STATUSES as readonly string[]).includes(profile.csaStatus)
+      ) {
+        updates.push({
+          profile,
+          result: { newStatus: profile.csaStatus, cancelReasonCode: null, careEndDate: null },
+        })
+        continue
+      }
+
       const result = runEligibility(profile, RULES)
       if (!result) continue
 
@@ -299,20 +338,39 @@ export class EligibilityService {
       }
     }
 
-    // 3. Batch upsert contacts
+    this.logger.log(`Step counts: ${JSON.stringify(stats.stepCounts)}, updates: ${updates.length}`)
+
+    // Batch upsert contacts
+    let validRows: UpsertContext[] = []
     if (updates.length > 0) {
-      stats.skipped = await this.upsertContacts(updates)
+      const upsertResult = await this.upsertContacts(updates)
+      stats.skipped = upsertResult.skipped
+      validRows = upsertResult.validRows
+    }
+
+    // Auto-add eligible/not_eligible_in_pay contacts to pending batch
+    if (validRows.length > 0) {
+      stats.autoBatched = await this.autoBatchContacts(validRows)
     }
 
     this.logger.log(
-      `Eligibility complete: ${stats.processed} processed, ${stats.statusChanges} updated, ${stats.newContacts} new, ${stats.skipped} skipped`,
+      `Eligibility complete: ${stats.processed} processed, ${stats.statusChanges} updated, ${stats.newContacts} new, ${stats.skipped} skipped, ${stats.autoBatched.application} batched (application), ${stats.autoBatched.cancellation} batched (cancellation)`,
     )
 
     return stats
   }
 
-  private async loadContactProfiles(): Promise<ContactProfile[]> {
-    const rows = await this.prisma.$queryRawUnsafe<any[]>(LOAD_CONTACT_PROFILES_SQL)
+  private async computeThreshold(): Promise<Date | null> {
+    const lastSuccess = await this.jobsService.getLastSuccessTimestamp(JobType.INGEST_DATA)
+    if (!lastSuccess) return null
+
+    const lookbackDays = this.configService.get<number>('sync.eligibilityLookbackDays')!
+    return new Date(lastSuccess.getTime() - lookbackDays * 24 * 60 * 60 * 1000)
+  }
+
+  private async loadContactProfiles(threshold: Date | null): Promise<ContactProfile[]> {
+    const { sql, params } = buildLoadContactProfilesSql(threshold)
+    const rows = await this.prisma.$queryRawUnsafe<any[]>(sql, ...params)
 
     return rows.map((raw) => {
       // Parse ICM placements from pre-aggregated JSON
@@ -346,6 +404,11 @@ export class EligibilityService {
           agreementRowId: null,
           paidUnpaid: null,
           source: 'MIS',
+          placementNumber: placement.placementNumber ?? null,
+          serviceType: placement.serviceType ?? null,
+          placeOfServiceName: placement.placeOfServiceName ?? null,
+          serviceProviderName: placement.serviceProviderName ?? null,
+          providerId: placement.providerId ?? null,
         }),
       )
 
@@ -372,9 +435,12 @@ export class EligibilityService {
           effectiveStartDate: payment.effectiveStartDate
             ? new Date(payment.effectiveStartDate)
             : null,
+          effectiveEndDate: payment.effectiveEndDate ? new Date(payment.effectiveEndDate) : null,
           amount: Number(payment.amount) || 0,
           contractNumber: payment.contractNumber,
           source: 'MIS',
+          orderNumber: payment.orderNumber ?? null,
+          product: payment.product ?? null,
         }),
       )
 
@@ -413,6 +479,7 @@ export class EligibilityService {
       )
 
       return {
+        caseRowId: raw.caseRowId,
         personIdIcm: raw.personIdIcm,
         personIdMis: raw.personIdMis ?? '',
         firstName: raw.firstName ?? '',
@@ -502,13 +569,11 @@ export class EligibilityService {
 
   private async upsertContacts(
     updates: Array<{ profile: ContactProfile; result: EligibilityResult }>,
-  ): Promise<number> {
+  ): Promise<{ skipped: number; validRows: UpsertContext[] }> {
     const batchSize = ELIGIBILITY_CONFIG.BATCH_SIZE
     let skipped = 0
 
-    // Build full context, validate, and deduplicate by personIdIcm
-    // TODO: check db staging tables
-    const rowMap = new Map<string, UpsertContext>()
+    const validRows: UpsertContext[] = []
     for (const { profile, result } of updates) {
       const row: UpsertContext = {
         profile,
@@ -518,14 +583,13 @@ export class EligibilityService {
       const invalidFields = getInvalidRequiredFields(row)
       if (invalidFields.length > 0) {
         this.logger.warn(
-          `Skipping contact ${profile.personIdIcm || 'unknown'}: empty/null in required fields [${invalidFields.join(', ')}]`,
+          `[ALERT:DATA_QUALITY] Skipping contact (caseRowId=${profile.caseRowId}): empty/null in required fields [${invalidFields.join(', ')}]`,
         )
         skipped++
         continue
       }
-      rowMap.set(profile.personIdIcm, row)
+      validRows.push(row)
     }
-    const validRows = Array.from(rowMap.values())
 
     for (let i = 0; i < validRows.length; i += batchSize) {
       const batch = validRows.slice(i, i + batchSize)
@@ -533,7 +597,164 @@ export class EligibilityService {
       this.logger.log(`Upserted batch ${Math.floor(i / batchSize) + 1} (${batch.length} contacts)`)
     }
 
-    return skipped
+    return { skipped, validRows }
+  }
+
+  private async autoBatchContacts(
+    validRows: UpsertContext[],
+  ): Promise<{ application: number; cancellation: number }> {
+    const applicationPersonIds = validRows
+      .filter((r) => r.result.newStatus === CSA_STATUS.ELIGIBLE)
+      .map((r) => r.profile.personIdIcm)
+
+    const cancellationPersonIds = validRows
+      .filter((r) => r.result.newStatus === CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
+      .map((r) => r.profile.personIdIcm)
+
+    this.logger.log(
+      `Auto-batch candidates: ${applicationPersonIds.length} application, ${cancellationPersonIds.length} cancellation (from ${validRows.length} validRows)`,
+    )
+
+    if (applicationPersonIds.length === 0 && cancellationPersonIds.length === 0) {
+      return { application: 0, cancellation: 0 }
+    }
+
+    const allPersonIds = [...applicationPersonIds, ...cancellationPersonIds]
+
+    // Get contact database IDs (needed for batch detail FK)
+    const contactRows = await this.prisma.$queryRawUnsafe<{ id: number; person_id_icm: string }[]>(
+      `SELECT id, person_id_icm FROM contacts WHERE person_id_icm = ANY($1)`,
+      allPersonIds,
+    )
+    const idMap = new Map(contactRows.map((c) => [c.person_id_icm, c.id]))
+
+    // Find or create pending batch
+    const [existingBatch] = await this.prisma.$queryRawUnsafe<{ id: number }[]>(
+      `SELECT id FROM batches WHERE status = $1 LIMIT 1`,
+      BATCH_STATUS.PENDING,
+    )
+    let batchId: number
+    if (existingBatch) {
+      batchId = existingBatch.id
+    } else {
+      const [newBatch] = await this.prisma.$queryRawUnsafe<{ id: number }[]>(
+        `INSERT INTO batches (batch_date, status, record_count, created_at)
+         VALUES (CURRENT_DATE, $1, 0, NOW()) RETURNING id`,
+        BATCH_STATUS.PENDING,
+      )
+      batchId = newBatch.id
+    }
+
+    // Filter out contacts already in the pending batch
+    const allDbIds = allPersonIds
+      .map((pid) => idMap.get(pid))
+      .filter((id): id is number => id != null)
+    const alreadyInBatch = await this.prisma.$queryRawUnsafe<{ contact_id: number }[]>(
+      `SELECT contact_id FROM contact_batch_details
+       WHERE batch_id = $1 AND contact_id = ANY($2)`,
+      batchId,
+      allDbIds,
+    )
+    const alreadyInBatchIds = new Set(alreadyInBatch.map((r) => r.contact_id))
+
+    // Build arrays for batch insert
+    const contactIds: number[] = []
+    const batchIds: number[] = []
+    const transactionTypes: string[] = []
+    const statuses: string[] = []
+    const systemComments: (string | null)[] = []
+    const createdBys: string[] = []
+    const lastUpdatedBys: string[] = []
+
+    const applicationSet = new Set(applicationPersonIds)
+
+    for (const personIdIcm of allPersonIds) {
+      const contactId = idMap.get(personIdIcm)
+      if (!contactId || alreadyInBatchIds.has(contactId)) continue
+
+      contactIds.push(contactId)
+      batchIds.push(batchId)
+      transactionTypes.push(
+        applicationSet.has(personIdIcm)
+          ? TRANSACTION_TYPES.APPLICATION
+          : TRANSACTION_TYPES.CANCELLATION,
+      )
+      statuses.push(BATCH_STATUS.PENDING)
+      systemComments.push(null)
+      createdBys.push('SYSTEM')
+      lastUpdatedBys.push('SYSTEM')
+    }
+
+    if (contactIds.length === 0) {
+      return { application: 0, cancellation: 0 }
+    }
+
+    // Bulk insert batch details
+    await this.prisma.$executeRawUnsafe(
+      `INSERT INTO contact_batch_details
+         (contact_id, batch_id, transaction_type, status, system_comments,
+          created_at, created_by, last_updated_at, last_updated_by)
+       SELECT * FROM unnest(
+         $1::int[], $2::int[], $3::text[], $4::text[], $5::text[],
+         $6::timestamp[], $7::text[], $8::timestamp[], $9::text[]
+       )`,
+      contactIds,
+      batchIds,
+      transactionTypes,
+      statuses,
+      systemComments,
+      contactIds.map(() => new Date()),
+      createdBys,
+      contactIds.map(() => new Date()),
+      lastUpdatedBys,
+    )
+
+    // Update CSA status for application contacts
+    const appDbIds = contactIds.filter(
+      (_, i) => transactionTypes[i] === TRANSACTION_TYPES.APPLICATION,
+    )
+    const cancelDbIds = contactIds.filter(
+      (_, i) => transactionTypes[i] === TRANSACTION_TYPES.CANCELLATION,
+    )
+
+    if (appDbIds.length > 0) {
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE contacts SET
+           csa_status = $1,
+           csa_status_effective_date = NOW(),
+           last_updated_at = NOW(),
+           last_updated_by = 'SYSTEM'
+         WHERE id = ANY($2)`,
+        CSA_STATUS.IN_BATCH_APPLICATION,
+        appDbIds,
+      )
+    }
+
+    if (cancelDbIds.length > 0) {
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE contacts SET
+           csa_status = $1,
+           csa_status_effective_date = NOW(),
+           last_updated_at = NOW(),
+           last_updated_by = 'SYSTEM'
+         WHERE id = ANY($2)`,
+        CSA_STATUS.IN_BATCH_CANCELLATION,
+        cancelDbIds,
+      )
+    }
+
+    // Update batch record count
+    await this.prisma.$executeRawUnsafe(
+      `UPDATE batches SET record_count = record_count + $1 WHERE id = $2`,
+      contactIds.length,
+      batchId,
+    )
+
+    this.logger.log(
+      `Auto-batched ${appDbIds.length} application + ${cancelDbIds.length} cancellation contacts into batch ${batchId}`,
+    )
+
+    return { application: appDbIds.length, cancellation: cancelDbIds.length }
   }
 
   private async batchUpsertRows(rows: UpsertContext[]): Promise<void> {

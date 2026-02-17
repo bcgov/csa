@@ -64,7 +64,7 @@ export class MisService {
     const date = new Date().toISOString().split('T')[0]
     const prefix = this.configService.get<string>('sync.misS3Prefix') || ''
     const filename = key.replace(prefix, '')
-    const processedKey = `${prefix}processed/${date}/${filename}`
+    const processedKey = `${prefix}PROCESSED/${date}/${filename}`
 
     try {
       await this.fileStorage.move(key, processedKey)

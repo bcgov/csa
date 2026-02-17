@@ -121,9 +121,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     setCsaAccessAlert('User not authorised to access CSA')
                     localStorage.removeItem('authToken')
                     localStorage.removeItem('isLoggedIn') // Clear mock login state as well
+                    // Clear Keycloak token locally without triggering IdP logout
+                    keycloakInstance.clearToken()
                     setIsLoading(false)
-                    // Logout from Keycloak and redirect to landing page
-                    keycloakInstance.logout({ redirectUri: window.location.origin })
+                    // Redirect to landing page
+                    window.location.href = window.location.origin
                   }
                 } catch (error) {
                   console.error('Failed to verify CSA access:', error)
@@ -133,8 +135,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   setCsaAccessAlert('User not authorised to access CSA')
                   localStorage.removeItem('authToken')
                   localStorage.removeItem('isLoggedIn') // Clear mock login state as well
+                  // Clear Keycloak token locally without triggering IdP logout
+                  keycloakInstance.clearToken()
                   setIsLoading(false)
-                  keycloakInstance.logout({ redirectUri: window.location.origin })
+                  // Redirect to landing page
+                  window.location.href = window.location.origin
                 }
               } else {
                 setIsAuthenticated(false)

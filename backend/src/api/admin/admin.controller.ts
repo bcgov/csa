@@ -9,16 +9,17 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
-import { AuthGuard } from '../common/guards/auth.guard'
+import { SkipCSACheck } from '../common/decorators/skip-csa-check.decorator'
+import { CSAGuard } from '../common/guards/csa.guard'
 import { AdminService } from './admin.service'
 import { UserInfoDto } from './dto/user-info.dto'
 import { UserPermissionsDto } from './dto/user-permissions.dto'
 
 @ApiTags('admin')
 @Controller({ path: 'admin', version: '1' })
-@UseGuards(AuthGuard)
+@UseGuards(CSAGuard)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(private readonly adminService: AdminService) { }
 
   @Get('user/info')
   @ApiOperation({
@@ -216,6 +217,7 @@ export class AdminController {
   }
 
   @Get('verify-csa-access')
+  @SkipCSACheck() // This endpoint verifies CSA access itself, so skip the guard check
   @ApiOperation({
     summary: 'Verify user has CSA access',
     description:

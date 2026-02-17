@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Patch, Post } from '@nestjs/common'
+import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common'
 import { ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { CSAGuard } from '../common/guards/csa.guard'
 import {
   UpdateBatchStatusDto,
   UpdateContactStatusDto,
@@ -9,8 +10,9 @@ import { StatusUpdateService } from './status-update.service'
 
 @ApiTags('status-update')
 @Controller('status-update')
+@UseGuards(CSAGuard)
 export class StatusUpdateController {
-  constructor(private readonly statusUpdateService: StatusUpdateService) {}
+  constructor(private readonly statusUpdateService: StatusUpdateService) { }
 
   @Patch('contact')
   @ApiBody({ type: UpdateContactStatusDto })

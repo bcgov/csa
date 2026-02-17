@@ -88,7 +88,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   // Only grant access if BOTH:
                   // 1. hasAccess is true AND
                   // 2. message is exactly 'User has CSA access'
-                  const hasValidAccess = csaAccessResponse.hasAccess === true &&
+                  const hasValidAccess =
+                    csaAccessResponse.hasAccess === true &&
                     csaAccessResponse.message === 'User has CSA access'
 
                   if (hasValidAccess) {
@@ -123,7 +124,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     console.warn('CSA access denied:', csaAccessResponse)
                     setIsAuthenticated(false)
                     setHasCSAAccess(false)
-                    setCsaAccessError(csaAccessResponse.message || 'You do not have access to CSA application')
+                    setCsaAccessError(
+                      csaAccessResponse.message || 'You do not have access to CSA application',
+                    )
                     setCsaAccessAlert('User not authorised to access CSA')
                     localStorage.removeItem('authToken')
                     localStorage.removeItem('isLoggedIn') // Clear mock login state as well

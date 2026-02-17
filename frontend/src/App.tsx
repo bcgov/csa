@@ -237,7 +237,16 @@ const childBatchHistory = [
 
 function App() {
   // Use Keycloak authentication
-  const { isAuthenticated: keycloakAuthenticated, isLoading, hasCSAAccess, user, login, logout, csaAccessAlert, clearCsaAccessAlert } = useAuth()
+  const {
+    isAuthenticated: keycloakAuthenticated,
+    isLoading,
+    hasCSAAccess,
+    user,
+    login,
+    logout,
+    csaAccessAlert,
+    clearCsaAccessAlert,
+  } = useAuth()
 
   // Log Keycloak authentication token (for testing in deployed version)
   console.log('=== KEYCLOAK AUTH TOKEN ===')
@@ -284,7 +293,8 @@ function App() {
   // Note: hasCSAAccess is null during loading, false when denied, true when granted
   // IMPORTANT: We must wait for isLoading to be false before trusting isLoggedIn,
   // because AuthContext may clear isLoggedIn during Keycloak SSO flow
-  const isAuthenticated = !isLoading && ((keycloakAuthenticated && hasCSAAccess === true) || isLoggedIn)
+  const isAuthenticated =
+    !isLoading && ((keycloakAuthenticated && hasCSAAccess === true) || isLoggedIn)
 
   const [selectedTab, setSelectedTab] = useState(0)
   const [selected, setSelected] = useState<number[]>([])
@@ -359,7 +369,8 @@ function App() {
           }
 
           // Only keep access if BOTH hasAccess is true AND message is exactly 'User has CSA access'
-          const hasValidAccess = csaAccessResponse.hasAccess === true &&
+          const hasValidAccess =
+            csaAccessResponse.hasAccess === true &&
             csaAccessResponse.message === 'User has CSA access'
 
           if (!hasValidAccess) {
@@ -917,8 +928,8 @@ function App() {
       }
 
       // Only grant access if BOTH hasAccess is true AND message is exactly 'User has CSA access'
-      const hasValidAccess = csaAccessResponse.hasAccess === true &&
-        csaAccessResponse.message === 'User has CSA access'
+      const hasValidAccess =
+        csaAccessResponse.hasAccess === true && csaAccessResponse.message === 'User has CSA access'
 
       if (hasValidAccess) {
         setIsLoggedIn(true)
@@ -1524,10 +1535,10 @@ function App() {
         case 'batchDate':
           return batch.batchDate
             ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: '2-digit',
-            })
+                year: 'numeric',
+                month: 'short',
+                day: '2-digit',
+              })
             : ''
         case 'status':
           return batch.status
@@ -1608,49 +1619,49 @@ function App() {
     ]
     let data = apiFilters.includes(preDefinedFilter)
       ? contacts.map((contact) => ({
-        id: contact.id,
-        firstName: contact.firstName || '',
-        middleName: contact.middleName || '',
-        lastName: contact.lastName || '',
-        gender: contact.gender || '',
-        dob: contact.dateOfBirth ? new Date(contact.dateOfBirth).toLocaleDateString() : '',
-        age: contact.age || 0,
-        din: contact.din || '',
-        csaStatus: contact.csaStatus || '',
-        statusEffective: contact.csaStatusEffectiveDate
-          ? new Date(contact.csaStatusEffectiveDate).toLocaleDateString()
-          : '',
-        caseNumber: contact.caseNumber || '',
-        caseStatus: contact.caseStatus || '',
-        legacyFile: contact.legacyFileNumber || '',
-        cgwrks3: '',
-        lastUpdated: contact.lastUpdatedAt
-          ? new Date(contact.lastUpdatedAt).toLocaleString()
-          : '',
-        lastUpdatedBy: contact.lastUpdatedBy || '',
-      }))
+          id: contact.id,
+          firstName: contact.firstName || '',
+          middleName: contact.middleName || '',
+          lastName: contact.lastName || '',
+          gender: contact.gender || '',
+          dob: contact.dateOfBirth ? new Date(contact.dateOfBirth).toLocaleDateString() : '',
+          age: contact.age || 0,
+          din: contact.din || '',
+          csaStatus: contact.csaStatus || '',
+          statusEffective: contact.csaStatusEffectiveDate
+            ? new Date(contact.csaStatusEffectiveDate).toLocaleDateString()
+            : '',
+          caseNumber: contact.caseNumber || '',
+          caseStatus: contact.caseStatus || '',
+          legacyFile: contact.legacyFileNumber || '',
+          cgwrks3: '',
+          lastUpdated: contact.lastUpdatedAt
+            ? new Date(contact.lastUpdatedAt).toLocaleString()
+            : '',
+          lastUpdatedBy: contact.lastUpdatedBy || '',
+        }))
       : eligibilityData.filter((row) => {
-        // Apply global search
-        if (searchTerm) {
-          const searchLower = searchTerm.toLowerCase()
-          const matchesSearch = Object.values(row).some((value) =>
-            String(value).toLowerCase().includes(searchLower),
-          )
-          if (!matchesSearch) return false
-        }
+          // Apply global search
+          if (searchTerm) {
+            const searchLower = searchTerm.toLowerCase()
+            const matchesSearch = Object.values(row).some((value) =>
+              String(value).toLowerCase().includes(searchLower),
+            )
+            if (!matchesSearch) return false
+          }
 
-        // Apply column filters
-        for (const [column, filters] of Object.entries(columnFilters)) {
-          if (filters.length > 0) {
-            const columnValue = String(row[column as keyof typeof row])
-            if (!filters.includes(columnValue)) {
-              return false
+          // Apply column filters
+          for (const [column, filters] of Object.entries(columnFilters)) {
+            if (filters.length > 0) {
+              const columnValue = String(row[column as keyof typeof row])
+              if (!filters.includes(columnValue)) {
+                return false
+              }
             }
           }
-        }
 
-        return true
-      })
+          return true
+        })
 
     // Apply sorting (only for non-API data)
     if (sortConfig && preDefinedFilter !== 'All Records') {
@@ -1810,10 +1821,10 @@ function App() {
       batchId: `1-${batch.id}`, // Format as "1-{id}"
       batchDate: batch.batchDate
         ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: '2-digit',
-        })
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit',
+          })
         : '',
       status: batch.status,
       recordCount: batch.recordCount,
@@ -2716,30 +2727,30 @@ function App() {
                   'Children within a batch',
                   'Children over 18 years (never eligible)',
                 ].includes(preDefinedFilter) && (
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        mt: 2,
-                        px: 2,
-                      }}
-                    >
-                      <Typography variant="body2" color="text.secondary">
-                        {loadingContacts
-                          ? 'Loading...'
-                          : `Showing ${contacts.length} of ${totalRecords} records`}
-                      </Typography>
-                      <Pagination
-                        count={totalPages}
-                        page={currentPage}
-                        onChange={handlePageChange}
-                        color="primary"
-                        showFirstButton
-                        showLastButton
-                      />
-                    </Box>
-                  )}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      mt: 2,
+                      px: 2,
+                    }}
+                  >
+                    <Typography variant="body2" color="text.secondary">
+                      {loadingContacts
+                        ? 'Loading...'
+                        : `Showing ${contacts.length} of ${totalRecords} records`}
+                    </Typography>
+                    <Pagination
+                      count={totalPages}
+                      page={currentPage}
+                      onChange={handlePageChange}
+                      color="primary"
+                      showFirstButton
+                      showLastButton
+                    />
+                  </Box>
+                )}
 
                 {/* Error message */}
                 {contactsError && preDefinedFilter === 'All Records' && (

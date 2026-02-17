@@ -66,6 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // Verify CSA access via admin API
                 try {
                   const csaAccessResponse = await verifyCSAAccess()
+                  console.log('CSA access response:', csaAccessResponse)
 
                   // Check if token is expired
                   if (csaAccessResponse.tokenExpired) {
@@ -155,7 +156,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     initAuth()
-  }, [])
+  }, [hasCSAAccess])
 
   const login = () => {
     keycloak?.login()

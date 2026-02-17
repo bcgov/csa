@@ -37,7 +37,9 @@ export interface UserPermissions {
  * @returns CSA access verification result
  */
 export const verifyCSAAccess = async (): Promise<CSAAccessResponse> => {
+  console.log('Calling verifyCSAAccess API...')
   const response = await APIService.getAxiosInstance().get('/admin/verify-csa-access')
+  console.log('CSA access verification API response:', response.data)
   return response.data
 }
 

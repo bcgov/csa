@@ -270,7 +270,7 @@ describe('SendCraFileHandler', () => {
         data: {
           batchId: 10,
           destinationId: DESTINATION_ID,
-          direction: 'outbound',
+          direction: 'OUTBOUND',
           fileName: 'testfile.txt',
           deliveredAt: expect.any(Date),
           referenceNumbers: [1, 2],

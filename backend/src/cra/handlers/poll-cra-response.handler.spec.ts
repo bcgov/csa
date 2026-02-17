@@ -1,7 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { of } from 'rxjs'
-import fs from 'fs'
-import * as fsPromises from 'fs/promises'
 import { PollCraResponseHandler } from './poll-cra-response.handler'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
@@ -9,13 +6,10 @@ import { JobContext } from 'src/jobs/interfaces/job.interface'
 import {
   BATCH_DETAIL_EVENT,
   BATCH_DETAIL_STATUS,
-  BATCH_EVENT,
   CSA_EVENT,
 } from 'src/common/state-machine/constants'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
-
-vi.mock('fs')
-vi.mock('fs/promises')
+import { DETAIL_OUTCOME } from '../inbound/inbound.interface'
 
 const DESTINATION_ID = CRA_DATA_HANDLING_CONSTANT.DESTINATION_ID
 const { TRAN_STAT_CODE, FILE_STAT_CODE } = CRA_DATA_HANDLING_CONSTANT
@@ -48,22 +42,54 @@ const VALID_FILE_NAME = 'craUserId.VRSP0001.txt'
 
 describe('PollCraResponseHandler', () => {
   let handler: PollCraResponseHandler
+  let mockInboundFileService: any
   let mockInboundResponseService: any
   let mockPrisma: any
-  let mockHttpService: any
-  let mockConfigService: any
   let mockBatchesService: any
   let mockContactsService: any
 
   beforeEach(() => {
+    mockInboundFileService = {
+      downloadNewResponseFiles: vi.fn().mockResolvedValue([]),
+      getLocalFilePath: vi.fn().mockReturnValue('/tmp/cra-ftp/inbound/default.txt'),
+    }
+
     mockInboundResponseService = {
       parseFile: vi.fn(),
+      classifyDetail: vi.fn().mockImplementation((detail) => {
+        if (detail.fileStatCd !== FILE_STAT_CODE.FILE_OK) {
+          return { outcome: DETAIL_OUTCOME.FILE_ERROR, systemComments: 'File error', din: null }
+        }
+
+        const rejectCodes = ['rejectCd1', 'rejectCd2', 'rejectCd3', 'rejectCd4', 'rejectCd5']
+          .map((k: string) => detail[k])
+          .filter(Boolean)
+        const systemComments = rejectCodes.length > 0 ? rejectCodes.join('; ') : null
+        const din = detail.ccraDinNum?.trim() || null
+
+        if (
+          detail.tranStatCd === TRAN_STAT_CODE.TRAN_ACCEPTED ||
+          detail.tranStatCd === TRAN_STAT_CODE.PROBLEM_DEDUCTED
+        ) {
+          return { outcome: DETAIL_OUTCOME.ACCEPTED, systemComments, din }
+        }
+
+        if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_REJECTED) {
+          return { outcome: DETAIL_OUTCOME.REJECTED, systemComments, din: null }
+        }
+
+        if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_RECYCLED) {
+          return { outcome: DETAIL_OUTCOME.RECYCLED, systemComments, din: null }
+        }
+
+        return { outcome: DETAIL_OUTCOME.REJECTED, systemComments, din: null }
+      }),
     }
 
     mockPrisma = {
       transferFile: {
         findMany: vi.fn().mockResolvedValue([]),
-        create: vi.fn().mockResolvedValue({ id: 1 }),
+        update: vi.fn().mockResolvedValue({}),
       },
       contactBatchDetail: {
         findUnique: vi.fn(),
@@ -78,36 +104,20 @@ describe('PollCraResponseHandler', () => {
       },
     }
 
-    mockHttpService = {
-      get: vi.fn(),
-    }
-
-    mockConfigService = {
-      get: vi.fn((key: string) => {
-        if (key === 'app.fileStoragePath') return '/tmp'
-        if (key === 'app.fileTransferServiceUrl') return 'http://file-transfer'
-      }),
-    }
-
     mockBatchesService = {
       updateBatchStatus: vi.fn().mockResolvedValue({ success: true }),
       updateBatchDetailStatus: vi.fn().mockResolvedValue({ success: true }),
+      aggregateBatchStatus: vi.fn().mockResolvedValue(undefined),
     }
 
     mockContactsService = {
       updateCsaStatus: vi.fn().mockResolvedValue({ success: true }),
     }
 
-    // Default fs mocks
-    ;(fs.statSync as any).mockReturnValue({ size: 100 })
-    ;(fs.existsSync as any).mockReturnValue(true)
-    ;(fsPromises.writeFile as any).mockResolvedValue(undefined)
-
     handler = new PollCraResponseHandler(
+      mockInboundFileService,
       mockInboundResponseService,
       mockPrisma,
-      mockHttpService,
-      mockConfigService,
       mockBatchesService,
       mockContactsService,
     )
@@ -120,12 +130,14 @@ describe('PollCraResponseHandler', () => {
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
   /**
-   * Sets up httpService.get to return a list of remote files and then a download response.
+   * Sets up an unprocessed file in the DB (simulates a previously downloaded file).
+   * The handler queries transferFile.findMany for unprocessed files.
    */
-  function setupHttpForFile(fileName: string) {
-    mockHttpService.get
-      .mockReturnValueOnce(of({ data: { files: [{ fileName }] } }))
-      .mockReturnValueOnce(of({ data: Buffer.from('dummy-file-content') }))
+  function setupUnprocessedFile(fileName: string, id = 1) {
+    mockPrisma.transferFile.findMany.mockResolvedValue([
+      { id, fileName, isDetailsProcessed: false, valid: true },
+    ])
+    mockInboundFileService.getLocalFilePath.mockReturnValue(`/tmp/cra-ftp/inbound/${fileName}`)
   }
 
   /**
@@ -154,8 +166,8 @@ describe('PollCraResponseHandler', () => {
   // ─── No new files ─────────────────────────────────────────────────────────
 
   describe('No new files', () => {
-    it('should return success with files_processed: 0 when no remote files exist', async () => {
-      mockHttpService.get.mockReturnValueOnce(of({ data: { files: [] } }))
+    it('should return success with files_processed: 0 when no unprocessed files', async () => {
+      // Default: transferFile.findMany returns [] (no unprocessed files)
 
       const result = await handler.execute(mockContext)
 
@@ -164,36 +176,19 @@ describe('PollCraResponseHandler', () => {
       expect(mockInboundResponseService.parseFile).not.toHaveBeenCalled()
     })
 
-    it('should return success with files_processed: 0 when all remote files are already in DB', async () => {
-      mockPrisma.transferFile.findMany.mockResolvedValue([{ fileName: VALID_FILE_NAME }])
+    it('should still call downloadNewResponseFiles to download new files', async () => {
+      await handler.execute(mockContext)
 
-      mockHttpService.get.mockReturnValueOnce(
-        of({ data: { files: [{ fileName: VALID_FILE_NAME }] } }),
-      )
-
-      const result = await handler.execute(mockContext)
-
-      expect(result.success).toBe(true)
-      expect(result.metadata.files_processed).toBe(0)
-      expect(mockInboundResponseService.parseFile).not.toHaveBeenCalled()
+      expect(mockInboundFileService.downloadNewResponseFiles).toHaveBeenCalledWith(DESTINATION_ID)
     })
   })
 
   // ─── Invalid file format ──────────────────────────────────────────────────
 
   describe('Invalid file format', () => {
-    it('should skip file with wrong env flag (P instead of V in test)', async () => {
-      setupHttpForFile('craUserId.PRSP0001.txt')
-
-      const result = await handler.execute(mockContext)
-
-      expect(result.success).toBe(true)
-      expect(result.metadata.files_processed).toBe(0)
-      expect(mockInboundResponseService.parseFile).not.toHaveBeenCalled()
-    })
-
-    it('should skip file with wrong type flag (WKL instead of RSP)', async () => {
-      setupHttpForFile('craUserId.VWKL0001.txt')
+    it('should return files_processed: 0 when no valid response file found', async () => {
+      // downloadNewResponseFiles handles validation internally
+      // No unprocessed files in DB (default mock returns [])
 
       const result = await handler.execute(mockContext)
 
@@ -211,7 +206,7 @@ describe('PollCraResponseHandler', () => {
         referenceNum: '100',
         fileStatCd: FILE_STAT_CODE.INVALID_RECORD_COUNT,
       })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
@@ -237,7 +232,7 @@ describe('PollCraResponseHandler', () => {
         referenceNum: '100',
         fileStatCd: FILE_STAT_CODE.INVALID_EMPTY_FILE,
       })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
@@ -256,7 +251,7 @@ describe('PollCraResponseHandler', () => {
   describe('Accepted transaction (tranStatCd=1)', () => {
     it('should call updateBatchDetailStatus with CRA_ACCEPTED', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
@@ -275,7 +270,7 @@ describe('PollCraResponseHandler', () => {
 
     it('should call updateCsaStatus with CRA_ACCEPTED', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
@@ -299,7 +294,7 @@ describe('PollCraResponseHandler', () => {
         tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED,
         ccraDinNum: '123456789',
       })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
@@ -323,7 +318,7 @@ describe('PollCraResponseHandler', () => {
         tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED,
         ccraDinNum: '123456789',
       })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: '999999999' })
@@ -341,28 +336,21 @@ describe('PollCraResponseHandler', () => {
       )
     })
 
-    it('should aggregate batch with CRA_ACCEPTED when all details are processed', async () => {
+    it('should call aggregateBatchStatus for the batch', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
-      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
-      ])
 
       await handler.execute(mockContext)
 
-      expect(mockBatchesService.updateBatchStatus).toHaveBeenCalledWith(
-        10,
-        BATCH_EVENT.CRA_ACCEPTED,
-        { additionalData: {} },
-      )
+      expect(mockBatchesService.aggregateBatchStatus).toHaveBeenCalledWith(10)
     })
 
     it('should return metadata with records_accepted: 1', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
@@ -387,7 +375,7 @@ describe('PollCraResponseHandler', () => {
         tranStatCd: TRAN_STAT_CODE.TRAN_REJECTED,
         rejectCd1: '007',
       })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
@@ -409,7 +397,7 @@ describe('PollCraResponseHandler', () => {
         tranStatCd: TRAN_STAT_CODE.TRAN_REJECTED,
         rejectCd1: '007',
       })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
@@ -425,26 +413,19 @@ describe('PollCraResponseHandler', () => {
       )
     })
 
-    it('should aggregate batch with CRA_ALL_REJECTED when all details are errors', async () => {
+    it('should call aggregateBatchStatus for the batch', async () => {
       const detail = makeDetail({
         referenceNum: '100',
         tranStatCd: TRAN_STAT_CODE.TRAN_REJECTED,
         rejectCd1: '007',
       })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
-      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.ERROR },
-      ])
 
       await handler.execute(mockContext)
 
-      expect(mockBatchesService.updateBatchStatus).toHaveBeenCalledWith(
-        10,
-        BATCH_EVENT.CRA_ALL_REJECTED,
-        { additionalData: { systemComments: expect.any(String) } },
-      )
+      expect(mockBatchesService.aggregateBatchStatus).toHaveBeenCalledWith(10)
     })
 
     it('should return metadata with records_rejected: 1', async () => {
@@ -453,7 +434,7 @@ describe('PollCraResponseHandler', () => {
         tranStatCd: TRAN_STAT_CODE.TRAN_REJECTED,
         rejectCd1: '007',
       })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
@@ -468,112 +449,12 @@ describe('PollCraResponseHandler', () => {
     })
   })
 
-  // ─── Recycled (tranStatCd='2' with reject code 998) ─────────────────────────
-
-  describe('Recycled (tranStatCd=2 with reject code 998)', () => {
-    it('should NOT call updateBatchDetailStatus', async () => {
-      const detail = makeDetail({
-        referenceNum: '100',
-        tranStatCd: TRAN_STAT_CODE.TRAN_REJECTED,
-        rejectCd1: '998',
-      })
-      setupHttpForFile(VALID_FILE_NAME)
-      setupParseFile([detail])
-      setupBatchDetail(100, 1, 10)
-      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.IN_PROGRESS },
-      ])
-
-      await handler.execute(mockContext)
-
-      expect(mockBatchesService.updateBatchDetailStatus).not.toHaveBeenCalled()
-    })
-
-    it('should NOT call updateCsaStatus', async () => {
-      const detail = makeDetail({
-        referenceNum: '100',
-        tranStatCd: TRAN_STAT_CODE.TRAN_REJECTED,
-        rejectCd1: '998',
-      })
-      setupHttpForFile(VALID_FILE_NAME)
-      setupParseFile([detail])
-      setupBatchDetail(100, 1, 10)
-      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.IN_PROGRESS },
-      ])
-
-      await handler.execute(mockContext)
-
-      expect(mockContactsService.updateCsaStatus).not.toHaveBeenCalled()
-    })
-
-    it('should update systemComments directly via prisma', async () => {
-      const detail = makeDetail({
-        referenceNum: '100',
-        tranStatCd: TRAN_STAT_CODE.TRAN_REJECTED,
-        rejectCd1: '998',
-      })
-      setupHttpForFile(VALID_FILE_NAME)
-      setupParseFile([detail])
-      setupBatchDetail(100, 1, 10)
-      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.IN_PROGRESS },
-      ])
-
-      await handler.execute(mockContext)
-
-      expect(mockPrisma.contactBatchDetail.update).toHaveBeenCalledWith({
-        where: { id: 100 },
-        data: { systemComments: expect.any(String), lastUpdatedBy: 'SYSTEM' },
-      })
-    })
-
-    it('should keep batch in_progress (no batch status transition)', async () => {
-      const detail = makeDetail({
-        referenceNum: '100',
-        tranStatCd: TRAN_STAT_CODE.TRAN_REJECTED,
-        rejectCd1: '998',
-      })
-      setupHttpForFile(VALID_FILE_NAME)
-      setupParseFile([detail])
-      setupBatchDetail(100, 1, 10)
-      // Only in_progress details remain — aggregateBatchStatus returns early
-      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.IN_PROGRESS },
-      ])
-
-      await handler.execute(mockContext)
-
-      expect(mockBatchesService.updateBatchStatus).not.toHaveBeenCalled()
-    })
-
-    it('should return metadata with records_recycled: 1', async () => {
-      const detail = makeDetail({
-        referenceNum: '100',
-        tranStatCd: TRAN_STAT_CODE.TRAN_REJECTED,
-        rejectCd1: '998',
-      })
-      setupHttpForFile(VALID_FILE_NAME)
-      setupParseFile([detail])
-      setupBatchDetail(100, 1, 10)
-      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.IN_PROGRESS },
-      ])
-
-      const result = await handler.execute(mockContext)
-
-      expect(result.metadata.records_recycled).toBe(1)
-      expect(result.metadata.records_accepted).toBe(0)
-      expect(result.metadata.records_rejected).toBe(0)
-    })
-  })
-
   // ─── Recycled (tranStatCd='3') ──────────────────────────────────────────────
 
   describe('Recycled (tranStatCd=3)', () => {
     it('should NOT call updateBatchDetailStatus', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_RECYCLED })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
@@ -587,7 +468,7 @@ describe('PollCraResponseHandler', () => {
 
     it('should NOT call updateCsaStatus', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_RECYCLED })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
@@ -601,7 +482,7 @@ describe('PollCraResponseHandler', () => {
 
     it('should update systemComments directly via prisma', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_RECYCLED })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
@@ -618,7 +499,7 @@ describe('PollCraResponseHandler', () => {
 
     it('should return metadata with records_recycled: 1', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_RECYCLED })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
@@ -639,7 +520,7 @@ describe('PollCraResponseHandler', () => {
         referenceNum: '100',
         tranStatCd: TRAN_STAT_CODE.PROBLEM_DEDUCTED,
       })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
@@ -661,7 +542,7 @@ describe('PollCraResponseHandler', () => {
         referenceNum: '100',
         tranStatCd: TRAN_STAT_CODE.PROBLEM_DEDUCTED,
       })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
@@ -684,7 +565,7 @@ describe('PollCraResponseHandler', () => {
         referenceNum: '100',
         tranStatCd: TRAN_STAT_CODE.PROBLEM_DEDUCTED,
       })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
@@ -704,7 +585,7 @@ describe('PollCraResponseHandler', () => {
   describe('Unknown tranStatCd (fallthrough)', () => {
     it('should treat unknown tranStatCd as rejected', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_NOT_SET })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
@@ -727,7 +608,7 @@ describe('PollCraResponseHandler', () => {
 
     it('should count unknown tranStatCd in records_rejected', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_NOT_SET })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
@@ -743,7 +624,7 @@ describe('PollCraResponseHandler', () => {
   // ─── Mixed batch results ──────────────────────────────────────────────────
 
   describe('Mixed batch results', () => {
-    it('should aggregate with CRA_PARTIAL_REJECTED when batch has accepted and rejected', async () => {
+    it('should call aggregateBatchStatus for the batch after processing mixed details', async () => {
       const acceptedDetail = makeDetail({
         referenceNum: '100',
         tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED,
@@ -754,29 +635,17 @@ describe('PollCraResponseHandler', () => {
         rejectCd1: '007',
       })
 
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([acceptedDetail, rejectedDetail])
 
-      // Two sequential findUnique calls for the two details
       setupBatchDetail(100, 1, 10)
       setupBatchDetail(101, 2, 10)
 
-      // For accepted detail DIN check
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
-
-      // After processing both, aggregation sees mixed statuses
-      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
-        { status: BATCH_DETAIL_STATUS.ERROR },
-      ])
 
       await handler.execute(mockContext)
 
-      expect(mockBatchesService.updateBatchStatus).toHaveBeenCalledWith(
-        10,
-        BATCH_EVENT.CRA_PARTIAL_REJECTED,
-        { additionalData: { systemComments: expect.any(String) } },
-      )
+      expect(mockBatchesService.aggregateBatchStatus).toHaveBeenCalledWith(10)
     })
 
     it('should count both accepted and rejected records in metadata', async () => {
@@ -790,7 +659,7 @@ describe('PollCraResponseHandler', () => {
         rejectCd1: '007',
       })
 
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([acceptedDetail, rejectedDetail])
       setupBatchDetail(100, 1, 10)
       setupBatchDetail(101, 2, 10)
@@ -808,12 +677,12 @@ describe('PollCraResponseHandler', () => {
     })
   })
 
-  // ─── TransferFile record ──────────────────────────────────────────────────
+  // ─── Mark file as processed ───────────────────────────────────────────────
 
-  describe('TransferFile record', () => {
-    it('should create TransferFile with direction INBOUND and correct data', async () => {
+  describe('Mark file as processed', () => {
+    it('should mark TransferFile as processed after processing details', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
@@ -823,14 +692,11 @@ describe('PollCraResponseHandler', () => {
 
       await handler.execute(mockContext)
 
-      expect(mockPrisma.transferFile.create).toHaveBeenCalledWith({
+      expect(mockPrisma.transferFile.update).toHaveBeenCalledWith({
+        where: { id: 1 },
         data: {
-          destinationId: DESTINATION_ID,
-          direction: 'INBOUND',
-          fileName: VALID_FILE_NAME,
-          fileSize: '100',
+          isDetailsProcessed: true,
           deliveredAt: expect.any(Date),
-          downloadedAt: expect.any(Date),
           referenceNumbers: [100],
         },
       })
@@ -840,7 +706,7 @@ describe('PollCraResponseHandler', () => {
       const detail1 = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
       const detail2 = makeDetail({ referenceNum: '200', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
 
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail1, detail2])
       setupBatchDetail(100, 1, 10)
       setupBatchDetail(200, 2, 10)
@@ -851,7 +717,8 @@ describe('PollCraResponseHandler', () => {
 
       await handler.execute(mockContext)
 
-      expect(mockPrisma.transferFile.create).toHaveBeenCalledWith({
+      expect(mockPrisma.transferFile.update).toHaveBeenCalledWith({
+        where: { id: 1 },
         data: expect.objectContaining({
           referenceNumbers: [100, 200],
         }),
@@ -865,7 +732,7 @@ describe('PollCraResponseHandler', () => {
     it('should reset counters at start of execute (handler reuse across retries)', async () => {
       // First execution: accepted detail
       const detail1 = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail1])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
@@ -882,9 +749,7 @@ describe('PollCraResponseHandler', () => {
         tranStatCd: TRAN_STAT_CODE.TRAN_REJECTED,
         rejectCd1: '007',
       })
-      mockHttpService.get
-        .mockReturnValueOnce(of({ data: { files: [{ fileName: 'craUserId.VRSP0002.txt' }] } }))
-        .mockReturnValueOnce(of({ data: Buffer.from('dummy-file-content-2') }))
+      setupUnprocessedFile('craUserId.VRSP0002.txt', 2)
       setupParseFile([detail2])
       setupBatchDetail(200, 2, 20)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
@@ -905,7 +770,7 @@ describe('PollCraResponseHandler', () => {
   describe('Batch detail not found', () => {
     it('should skip detail when batch detail is not found in DB', async () => {
       const detail = makeDetail({ referenceNum: '999', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       mockPrisma.contactBatchDetail.findUnique.mockResolvedValue(null)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([])
@@ -918,12 +783,12 @@ describe('PollCraResponseHandler', () => {
     })
   })
 
-  // ─── File download and save ───────────────────────────────────────────────
+  // ─── File download and processing ─────────────────────────────────────────
 
-  describe('File download and save', () => {
-    it('should download the file from file transfer service', async () => {
+  describe('File download and processing', () => {
+    it('should call downloadNewResponseFiles with destination', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
@@ -933,40 +798,48 @@ describe('PollCraResponseHandler', () => {
 
       await handler.execute(mockContext)
 
-      // First call: list remote files
-      expect(mockHttpService.get).toHaveBeenCalledWith(
-        `http://file-transfer/api/destinations/${DESTINATION_ID}/remote-files`,
-        { headers: { 'Content-Type': 'application/json' } },
-      )
+      expect(mockInboundFileService.downloadNewResponseFiles).toHaveBeenCalledWith(DESTINATION_ID)
+    })
 
-      // Second call: download file
-      expect(mockHttpService.get).toHaveBeenCalledWith(
-        `http://file-transfer/api/destinations/${DESTINATION_ID}/local/inbound/files/${VALID_FILE_NAME}`,
-        { headers: { 'Content-Type': 'text/plain' }, responseType: 'arraybuffer' },
+    it('should call getLocalFilePath with destination and fileName', async () => {
+      const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
+      setupUnprocessedFile(VALID_FILE_NAME)
+      setupParseFile([detail])
+      setupBatchDetail(100, 1, 10)
+      mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
+        { status: BATCH_DETAIL_STATUS.PROCESSED },
+      ])
+
+      await handler.execute(mockContext)
+
+      expect(mockInboundFileService.getLocalFilePath).toHaveBeenCalledWith(
+        DESTINATION_ID,
+        VALID_FILE_NAME,
       )
     })
 
-    it('should save the file to local storage', async () => {
-      const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
-      setupHttpForFile(VALID_FILE_NAME)
-      setupParseFile([detail])
-      setupBatchDetail(100, 1, 10)
-      mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
-      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
-      ])
+    it('should mark file as processed and continue when parseFile throws', async () => {
+      setupUnprocessedFile(VALID_FILE_NAME)
+      mockInboundResponseService.parseFile.mockImplementation(() => {
+        throw new Error('Unrecognized CRA response file format')
+      })
 
-      await handler.execute(mockContext)
+      const result = await handler.execute(mockContext)
 
-      expect(fsPromises.writeFile).toHaveBeenCalledWith(
-        expect.stringContaining(VALID_FILE_NAME),
-        expect.any(Buffer),
-      )
+      expect(result.success).toBe(true)
+      expect(result.metadata.files_processed).toBe(1)
+      expect(result.metadata.records_updated).toBe(0)
+      expect(mockPrisma.transferFile.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { valid: false, isDetailsProcessed: true },
+      })
+      expect(mockBatchesService.updateBatchDetailStatus).not.toHaveBeenCalled()
     })
 
     it('should return files_processed: 1 on success', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
@@ -983,21 +856,16 @@ describe('PollCraResponseHandler', () => {
   // ─── Batch with in_progress details remaining ─────────────────────────────
 
   describe('Batch with in_progress details remaining', () => {
-    it('should not call updateBatchStatus when some details are still in_progress', async () => {
+    it('should call aggregateBatchStatus for the batch', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
-      setupHttpForFile(VALID_FILE_NAME)
+      setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
-      // Some details are still in_progress (not all responses received yet)
-      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
-        { status: BATCH_DETAIL_STATUS.IN_PROGRESS },
-      ])
 
       await handler.execute(mockContext)
 
-      expect(mockBatchesService.updateBatchStatus).not.toHaveBeenCalled()
+      expect(mockBatchesService.aggregateBatchStatus).toHaveBeenCalledWith(10)
     })
   })
 })

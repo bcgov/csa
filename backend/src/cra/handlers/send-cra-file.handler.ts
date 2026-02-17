@@ -18,7 +18,7 @@ import { OutboundDataService } from '../outbound/outbound-data.service'
 import { OutboundFileService } from '../outbound/outbound-file.service'
 import { OutboundTransferService } from '../outbound/outbound-transfer.service'
 
-const { DESTINATION_ID } = CRA_DATA_HANDLING_CONSTANT
+const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
 @Injectable()
 export class SendCraFileHandler extends BaseJob {
@@ -100,7 +100,7 @@ export class SendCraFileHandler extends BaseJob {
       data: {
         batchId: this.batch.id,
         destinationId: DESTINATION_ID,
-        direction: 'outbound',
+        direction: FILE_DIRECTION.OUTBOUND,
         fileName,
         deliveredAt: new Date(),
         referenceNumbers: this.batchDetails.map((d) => d.contactId),
@@ -130,7 +130,11 @@ export class SendCraFileHandler extends BaseJob {
 
     // 8. Update contact CSA statuses
     for (const detail of this.batchDetails) {
-      await this.contactsService.updateCsaStatus(detail.contactId, CSA_EVENT.SEND_TO_CRA, 'SYSTEM')
+      await this.contactsService.updateCsaStatus(
+        detail.contactId,
+        CSA_EVENT.SEND_TO_CRA,
+        UPDATED_BY.SYSTEM,
+      )
     }
 
     // 9. Set batchDate
@@ -146,6 +150,8 @@ export class SendCraFileHandler extends BaseJob {
     if (this.batch) {
       this.logger.error(`File transfer failed for batch ${this.batch.id}`, error)
       await this.batchesService.updateBatchStatus(this.batch.id, BATCH_EVENT.SEND_FAILED)
+      // TODO: Revert each contact's CSA status via FAILURE_IN_BATCH_TBD
+      // (in_batch_application → eligible_tbd, in_batch_cancellation → not_eligible_ip_tbd)
     }
   }
 }

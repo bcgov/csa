@@ -14,6 +14,7 @@ import { PollCraResponseHandler } from './handlers/poll-cra-response.handler'
 import { SendCraFileHandler } from './handlers/send-cra-file.handler'
 import { OutboundFileService } from './outbound/outbound-file.service'
 import { OutboundTransferService } from './outbound/outbound-transfer.service'
+import { InboundFileService } from './inbound/inbound-file.service'
 import { InboundResponseService } from './inbound/inbound-response.service'
 import { OutboundDataService } from './outbound/outbound-data.service'
 
@@ -39,6 +40,7 @@ import { OutboundDataService } from './outbound/outbound-data.service'
     PollCraResponseHandler,
     OutboundFileService,
     OutboundTransferService,
+    InboundFileService,
     InboundResponseService,
     OutboundDataService,
     BatchesService,

@@ -2,6 +2,7 @@ import { CsaStatus } from 'src/common/state-machine/constants/csa-status.constan
 
 // Denormalized contact loaded from staging tables + existing master data
 export interface ContactProfile {
+  caseRowId: string
   personIdIcm: string
   personIdMis: string
 
@@ -72,6 +73,7 @@ export interface OrderRecord {
   orderType: string
   orderStatus: string
   effectiveStartDate: Date | null
+  effectiveEndDate?: Date | null
   amount: number
   contractNumber: string | null
   source: 'ICM' | 'MIS'
@@ -97,7 +99,7 @@ export interface AgreementRecord {
 
 // Result of running the eligibility decision tree on one contact/case
 export interface EligibilityResult {
-  step: 7 | 8 | 9 | 10
+  step?: 7 | 8 | 9 | 10
   newStatus: CsaStatus | null // null = no change (current status not in update conditions)
   cancelReasonCode: string | null
   careEndDate: Date | null
@@ -109,6 +111,7 @@ export interface EligibilityRunResult {
   statusChanges: number
   newContacts: number
   skipped: number // rows skipped due to invalid staging data (null in required fields)
+  autoBatched: { application: number; cancellation: number }
   stepCounts: {
     step7: number
     step8: number

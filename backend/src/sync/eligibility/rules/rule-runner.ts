@@ -9,7 +9,9 @@ export function runEligibility(
 
   for (const rule of rules) {
     const result = rule.evaluate(ctx)
-    if (result) return result
+    if (result) {
+      return result
+    }
   }
 
   return null

@@ -35,7 +35,7 @@ export interface CancellationResult {
  *   2. Code 22 - Child Missing/AWOL (ICM sub-type 'Absent/Unknown Location' Active, OR MIS type 'AW' Active)
  *   3. Code 29 - Adoption (ICM sub-type 'Adoption Home' Active, OR MIS type 'AD' Active)
  *
- * Code 21 (default) is NOT set here — it's applied by Step 9 when no specific code is present.
+ * Code 21 (default) is NOT set here. It's applied by Step 9 when no specific code is present.
  * Returns isInEligible=false when no cancellation conditions are met.
  */
 export function determineCancellationReason(input: CancellationInput): CancellationResult {

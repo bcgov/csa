@@ -22,7 +22,7 @@ export class AdminService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly keycloakAuthService: KeycloakAuthService,
-  ) { }
+  ) {}
   /**
    * Decode JWT token and extract user information
    * @param token - JWT token from Authorization header
@@ -136,7 +136,9 @@ export class AdminService {
     if (userInfo.exp) {
       const currentTimeInSeconds = Math.floor(Date.now() / 1000)
       if (userInfo.exp < currentTimeInSeconds) {
-        this.logger.warn(`Token expired for user ${username}. Expiry: ${userInfo.exp}, Current: ${currentTimeInSeconds}`)
+        this.logger.warn(
+          `Token expired for user ${username}. Expiry: ${userInfo.exp}, Current: ${currentTimeInSeconds}`,
+        )
         return {
           hasAccess: false,
           username,

@@ -277,10 +277,14 @@ function App() {
   }, [isLoading, isLoggedIn])
 
   // User is authenticated only if:
-  // 1. Keycloak is authenticated AND has CSA access (hasCSAAccess === true), OR
-  // 2. Mock login is active (isLoggedIn is true - mock login already verifies CSA access)
+  // 1. Loading is complete (isLoading is false) AND
+  // 2. Either:
+  //    a. Keycloak is authenticated AND has CSA access (hasCSAAccess === true), OR
+  //    b. Mock login is active (isLoggedIn is true - mock login already verifies CSA access)
   // Note: hasCSAAccess is null during loading, false when denied, true when granted
-  const isAuthenticated = (keycloakAuthenticated && hasCSAAccess === true) || isLoggedIn
+  // IMPORTANT: We must wait for isLoading to be false before trusting isLoggedIn,
+  // because AuthContext may clear isLoggedIn during Keycloak SSO flow
+  const isAuthenticated = !isLoading && ((keycloakAuthenticated && hasCSAAccess === true) || isLoggedIn)
 
   const [selectedTab, setSelectedTab] = useState(0)
   const [selected, setSelected] = useState<number[]>([])

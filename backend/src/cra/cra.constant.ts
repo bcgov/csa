@@ -33,7 +33,7 @@ export const CRA_DATA_HANDLING_CONSTANT = {
     DETAILS_TRAN_CODE: 6119,
     TRAILER_TRAN_CODE: 6120,
   },
-  // CRA spec: fileStatCd is 9(02) — 2-digit zero-padded string
+  // CRA spec: fileStatCd is 9(02). 2-digit zero-padded string
   FILE_STAT_CODE: {
     FILE_NOT_SET: '00',
     FILE_OK: '01',
@@ -44,7 +44,7 @@ export const CRA_DATA_HANDLING_CONSTANT = {
     INVALID_NO_DETAILS: '94',
     RECS_OUT_OF_SEQ: '95',
   },
-  // CRA spec: tranStatCd is 9(01) — 1-digit string
+  // CRA spec: tranStatCd is 9(01). 1-digit string
   TRAN_STAT_CODE: {
     TRAN_NOT_SET: '0',
     TRAN_ACCEPTED: '1',

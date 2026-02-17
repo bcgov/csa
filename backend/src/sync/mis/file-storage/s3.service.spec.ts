@@ -54,6 +54,50 @@ describe('S3Service', () => {
     })
   })
 
+  describe('parseS3Uri', () => {
+    it('should parse a simple URI', () => {
+      const result = (service as any).parseS3Uri('http://minioadmin:minioadmin@localhost:9000')
+
+      expect(result).toEqual({
+        endPoint: 'localhost',
+        port: 9000,
+        useSSL: false,
+        accessKey: 'minioadmin',
+        secretKey: 'minioadmin',
+      })
+    })
+
+    it('should handle password with / and special chars', () => {
+      const result = (service as any).parseS3Uri('https://mykey:pass/word@host.objectstore.ca')
+
+      expect(result).toEqual({
+        endPoint: 'host.objectstore.ca',
+        port: undefined,
+        useSSL: true,
+        accessKey: 'mykey',
+        secretKey: 'pass/word',
+      })
+    })
+
+    it('should handle password with multiple special chars (: / @)', () => {
+      const result = (service as any).parseS3Uri('https://key123:p@ss:w/rd@storage.example.ca')
+
+      expect(result).toEqual({
+        endPoint: 'storage.example.ca',
+        port: undefined,
+        useSSL: true,
+        accessKey: 'key123',
+        secretKey: 'p@ss:w/rd',
+      })
+    })
+
+    it('should throw on missing scheme', () => {
+      expect(() => (service as any).parseS3Uri('localhost:9000')).toThrow(
+        'missing http(s):// scheme',
+      )
+    })
+  })
+
   describe('move', () => {
     it('should copy then remove the source object', async () => {
       const mockCopy = vi.fn().mockResolvedValue({})
@@ -64,11 +108,11 @@ describe('S3Service', () => {
         removeObject: mockRemove,
       })
 
-      await service.move('csas3/file.csv', 'csas3/processed/2026-02-10/file.csv')
+      await service.move('csas3/file.csv', 'csas3/PROCESSED/2026-02-10/file.csv')
 
       expect(mockCopy).toHaveBeenCalledWith(
         'test-bucket',
-        'csas3/processed/2026-02-10/file.csv',
+        'csas3/PROCESSED/2026-02-10/file.csv',
         '/test-bucket/csas3/file.csv',
         expect.any(Object),
       )

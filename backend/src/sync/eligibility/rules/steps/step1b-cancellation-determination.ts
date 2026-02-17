@@ -15,7 +15,7 @@ import { EligibilityContext, EligibilityRule } from '../rule.interface'
  * the next step (Step 1B cancellation check) can route to Step 9 with the
  * correct code.
  *
- * Always returns null (never short-circuits) — this is a context-enrichment step.
+ * Always returns null (never short-circuits). This is a context-enrichment step.
  */
 export const step1B_CancellationDetermination: EligibilityRule = {
   name: 'step1B_CancellationDetermination',

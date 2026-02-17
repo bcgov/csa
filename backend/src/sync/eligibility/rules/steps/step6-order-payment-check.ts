@@ -53,7 +53,7 @@ export const step6_OrderPaymentCheck: EligibilityRule & {
       }
     }
 
-    // No order passed all 4 criteria — find the "best" match (fewest failures)
+    // No order passed all 4 criteria. Find the "best" match (fewest failures)
     const bestResult = findBestOrderResult(matchingOrders, prevMonth)
 
     if (bestResult.onlyAmountFailed) {

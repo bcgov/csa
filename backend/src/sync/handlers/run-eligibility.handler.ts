@@ -18,7 +18,7 @@ export class RunEligibilityHandler extends BaseJob {
 
     return {
       success: true,
-      message: `Eligibility complete: ${result.processed} processed, ${result.statusChanges} updated`,
+      message: `Eligibility complete: ${result.processed} processed, ${result.statusChanges} updated, ${result.autoBatched.application} batched (application), ${result.autoBatched.cancellation} batched (cancellation)`,
       metadata: result as unknown as Record<string, unknown>,
     }
   }

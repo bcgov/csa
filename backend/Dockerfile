@@ -23,6 +23,9 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/dist ./dist
 
+# Install curl for debugging
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 # Nonroot user, limit heap size to 50 MB
 RUN chown -R 1001:0 /app && chmod -R g=u /app
 USER 1001

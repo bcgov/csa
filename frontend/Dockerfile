@@ -34,13 +34,17 @@ RUN setcap -r /usr/bin/caddy \
 COPY --from=build /app/dist /srv
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY coraza.conf /etc/caddy/coraza.conf
+COPY inject-env.sh /usr/local/bin/inject-env.sh
+
+# Make the injection script executable
+RUN chmod +x /usr/local/bin/inject-env.sh
 
 # OpenShift random UID compatibility:
 # - OpenShift runs with random UID and typically GID 0
 # - Make runtime dirs group-owned by 0 and group-writable
-RUN mkdir -p /data /config /tmp/coraza \
-  && chgrp -R 0 /srv /etc/caddy /data /config /tmp \
-  && chmod -R g=u /srv /etc/caddy /data /config /tmp \
+RUN mkdir -p /data /config /tmp/coraza /runtime-config \
+  && chgrp -R 0 /srv /etc/caddy /data /config /tmp /runtime-config \
+  && chmod -R g=u /srv /etc/caddy /data /config /tmp /runtime-config \
   && chmod 0755 /usr/bin/caddy
 
 # Validate/format Caddyfile at build time
@@ -48,6 +52,9 @@ RUN caddy fmt --overwrite /etc/caddy/Caddyfile
 
 # Non-root (OpenShift will often override to a random UID anyway)
 USER 1001
+
+# Use the injection script as the entrypoint
+ENTRYPOINT ["/usr/local/bin/inject-env.sh"]
 
 EXPOSE 3000 3001
 

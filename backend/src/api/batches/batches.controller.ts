@@ -8,7 +8,7 @@ import { BatchesService } from './batches.service'
 @Controller('batches')
 @UseGuards(CSAGuard)
 export class BatchesController {
-  constructor(private readonly batchesService: BatchesService) { }
+  constructor(private readonly batchesService: BatchesService) {}
 
   @Get()
   @ApiResponse({ status: 200, description: 'List of all batches' })

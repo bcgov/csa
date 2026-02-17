@@ -1,9 +1,9 @@
 import {
-    CanActivate,
-    ExecutionContext,
-    Injectable,
-    Logger,
-    UnauthorizedException,
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  Logger,
+  UnauthorizedException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { Request } from 'express'
@@ -11,13 +11,13 @@ import * as jwt from 'jsonwebtoken'
 import { AdminService } from '../../admin/admin.service'
 
 interface JwtPayload {
-    exp?: number
-    iat?: number
-    sub?: string
-    idir_username?: string
-    preferred_username?: string
-    email?: string
-    [key: string]: unknown
+  exp?: number
+  iat?: number
+  sub?: string
+  idir_username?: string
+  preferred_username?: string
+  email?: string
+  [key: string]: unknown
 }
 
 // In-memory cache for CSA access results
@@ -33,115 +33,115 @@ export const SKIP_CSA_CHECK_KEY = 'skipCSACheck'
  */
 @Injectable()
 export class CSAGuard implements CanActivate {
-    private readonly logger = new Logger(CSAGuard.name)
+  private readonly logger = new Logger(CSAGuard.name)
 
-    constructor(
-        private readonly adminService: AdminService,
-        private readonly reflector: Reflector,
-    ) { }
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly reflector: Reflector,
+  ) {}
 
-    async canActivate(context: ExecutionContext): Promise<boolean> {
-        // Check if route is marked to skip CSA check
-        const skipCSACheck = this.reflector.getAllAndOverride<boolean>(SKIP_CSA_CHECK_KEY, [
-            context.getHandler(),
-            context.getClass(),
-        ])
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Check if route is marked to skip CSA check
+    const skipCSACheck = this.reflector.getAllAndOverride<boolean>(SKIP_CSA_CHECK_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ])
 
-        const request = context.switchToHttp().getRequest<Request>()
-        const authHeader = request.headers.authorization
+    const request = context.switchToHttp().getRequest<Request>()
+    const authHeader = request.headers.authorization
 
-        // Validate Authorization header exists
-        if (!authHeader) {
-            throw new UnauthorizedException('Authorization header is required')
-        }
-
-        // Validate Bearer token format
-        if (!authHeader.startsWith('Bearer ')) {
-            throw new UnauthorizedException('Invalid token format. Expected: Bearer <token>')
-        }
-
-        // Extract and decode token
-        const token = authHeader.slice(7)
-        const decoded = this.decodeAndValidateToken(token)
-
-            // Attach decoded token to request for use in route handlers
-            ; (request as any).user = decoded
-
-        // If skipCSACheck is set, only validate token (don't check ICM)
-        if (skipCSACheck) {
-            return true
-        }
-
-        // Get username from token
-        const username = this.extractUsername(decoded)
-
-        // Check cache first
-        const cached = csaAccessCache.get(username)
-        if (cached && cached.expiresAt > Date.now()) {
-            this.logger.debug(`CSA access cache hit for user: ${username}`)
-            if (!cached.hasAccess) {
-                throw new UnauthorizedException('User does not have CSA access')
-            }
-            return true
-        }
-
-        // Verify CSA access via admin service
-        this.logger.debug(`Verifying CSA access for user: ${username}`)
-        const csaAccessResult = await this.adminService.verifyCSAAccess(authHeader)
-
-        // Cache the result
-        csaAccessCache.set(username, {
-            hasAccess: csaAccessResult.hasAccess,
-            expiresAt: Date.now() + CACHE_TTL_MS,
-        })
-
-        if (csaAccessResult.tokenExpired) {
-            throw new UnauthorizedException('Token has expired. Please login again.')
-        }
-
-        if (!csaAccessResult.hasAccess) {
-            this.logger.warn(`CSA access denied for user: ${username} - ${csaAccessResult.message}`)
-            throw new UnauthorizedException(csaAccessResult.message || 'User does not have CSA access')
-        }
-
-        return true
+    // Validate Authorization header exists
+    if (!authHeader) {
+      throw new UnauthorizedException('Authorization header is required')
     }
 
-    private decodeAndValidateToken(token: string): JwtPayload {
-        try {
-            const decoded = jwt.decode(token) as JwtPayload
-
-            if (!decoded) {
-                throw new UnauthorizedException('Invalid token: Unable to decode')
-            }
-
-            // Check if token has expiration claim
-            if (decoded.exp) {
-                const currentTime = Math.floor(Date.now() / 1000)
-
-                if (decoded.exp < currentTime) {
-                    throw new UnauthorizedException('Token has expired. Please login again.')
-                }
-            }
-
-            return decoded
-        } catch (error) {
-            if (error instanceof UnauthorizedException) {
-                throw error
-            }
-            throw new UnauthorizedException('Invalid token: Failed to decode')
-        }
+    // Validate Bearer token format
+    if (!authHeader.startsWith('Bearer ')) {
+      throw new UnauthorizedException('Invalid token format. Expected: Bearer <token>')
     }
 
-    private extractUsername(decoded: JwtPayload): string {
-        let username = decoded.idir_username as string
-        if (!username && decoded.preferred_username) {
-            username = (decoded.preferred_username as string).split('@')[0]
-        }
-        username =
-            username || (decoded.email as string)?.split('@')[0] || (decoded.sub as string) || 'unknown'
-        return username.toUpperCase()
+    // Extract and decode token
+    const token = authHeader.slice(7)
+    const decoded = this.decodeAndValidateToken(token)
+
+    // Attach decoded token to request for use in route handlers
+    ;(request as any).user = decoded
+
+    // If skipCSACheck is set, only validate token (don't check ICM)
+    if (skipCSACheck) {
+      return true
     }
+
+    // Get username from token
+    const username = this.extractUsername(decoded)
+
+    // Check cache first
+    const cached = csaAccessCache.get(username)
+    if (cached && cached.expiresAt > Date.now()) {
+      this.logger.debug(`CSA access cache hit for user: ${username}`)
+      if (!cached.hasAccess) {
+        throw new UnauthorizedException('User does not have CSA access')
+      }
+      return true
+    }
+
+    // Verify CSA access via admin service
+    this.logger.debug(`Verifying CSA access for user: ${username}`)
+    const csaAccessResult = await this.adminService.verifyCSAAccess(authHeader)
+
+    // Cache the result
+    csaAccessCache.set(username, {
+      hasAccess: csaAccessResult.hasAccess,
+      expiresAt: Date.now() + CACHE_TTL_MS,
+    })
+
+    if (csaAccessResult.tokenExpired) {
+      throw new UnauthorizedException('Token has expired. Please login again.')
+    }
+
+    if (!csaAccessResult.hasAccess) {
+      this.logger.warn(`CSA access denied for user: ${username} - ${csaAccessResult.message}`)
+      throw new UnauthorizedException(csaAccessResult.message || 'User does not have CSA access')
+    }
+
+    return true
+  }
+
+  private decodeAndValidateToken(token: string): JwtPayload {
+    try {
+      const decoded = jwt.decode(token) as JwtPayload
+
+      if (!decoded) {
+        throw new UnauthorizedException('Invalid token: Unable to decode')
+      }
+
+      // Check if token has expiration claim
+      if (decoded.exp) {
+        const currentTime = Math.floor(Date.now() / 1000)
+
+        if (decoded.exp < currentTime) {
+          throw new UnauthorizedException('Token has expired. Please login again.')
+        }
+      }
+
+      return decoded
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error
+      }
+      throw new UnauthorizedException('Invalid token: Failed to decode')
+    }
+  }
+
+  private extractUsername(decoded: JwtPayload): string {
+    let username = decoded.idir_username as string
+    if (!username && decoded.preferred_username) {
+      username = (decoded.preferred_username as string).split('@')[0]
+    }
+    username =
+      username || (decoded.email as string)?.split('@')[0] || (decoded.sub as string) || 'unknown'
+    return username.toUpperCase()
+  }
 }
 
 /**
@@ -149,9 +149,9 @@ export class CSAGuard implements CanActivate {
  * Useful for testing or when user permissions change
  */
 export function clearCSAAccessCache(username?: string): void {
-    if (username) {
-        csaAccessCache.delete(username.toUpperCase())
-    } else {
-        csaAccessCache.clear()
-    }
+  if (username) {
+    csaAccessCache.delete(username.toUpperCase())
+  } else {
+    csaAccessCache.clear()
+  }
 }

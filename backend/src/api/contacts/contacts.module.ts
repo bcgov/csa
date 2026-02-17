@@ -10,4 +10,4 @@ import { ContactsService } from './contacts.service'
   providers: [ContactsService],
   imports: [PrismaModule, StateMachineModule, AdminModule],
 })
-export class ContactsModule { }
+export class ContactsModule {}

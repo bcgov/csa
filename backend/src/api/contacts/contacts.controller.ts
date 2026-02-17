@@ -10,7 +10,7 @@ import { BulkOperationResponse } from './interfaces'
 @Controller('contacts')
 @UseGuards(CSAGuard)
 export class ContactsController {
-  constructor(private readonly contactsService: ContactsService) { }
+  constructor(private readonly contactsService: ContactsService) {}
 
   @Get()
   @ApiQuery({

@@ -19,7 +19,7 @@ import { UserPermissionsDto } from './dto/user-permissions.dto'
 @Controller({ path: 'admin', version: '1' })
 @UseGuards(CSAGuard)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) { }
+  constructor(private readonly adminService: AdminService) {}
 
   @Get('user/info')
   @ApiOperation({

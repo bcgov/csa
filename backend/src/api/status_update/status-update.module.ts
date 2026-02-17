@@ -10,4 +10,4 @@ import { StatusUpdateService } from './status-update.service'
   providers: [StatusUpdateService],
   exports: [StatusUpdateService],
 })
-export class StatusUpdateModule { }
+export class StatusUpdateModule {}

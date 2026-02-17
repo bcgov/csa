@@ -1,2 +1,1 @@
-export * from './skip-csa-check.decorator';
-
+export * from './skip-csa-check.decorator'

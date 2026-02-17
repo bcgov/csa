@@ -11,4 +11,4 @@ import { BatchesService } from './batches.service'
   providers: [BatchesService],
   exports: [BatchesService],
 })
-export class BatchesModule { }
+export class BatchesModule {}

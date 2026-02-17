@@ -12,7 +12,7 @@ import { StatusUpdateService } from './status-update.service'
 @Controller('status-update')
 @UseGuards(CSAGuard)
 export class StatusUpdateController {
-  constructor(private readonly statusUpdateService: StatusUpdateService) { }
+  constructor(private readonly statusUpdateService: StatusUpdateService) {}
 
   @Patch('contact')
   @ApiBody({ type: UpdateContactStatusDto })

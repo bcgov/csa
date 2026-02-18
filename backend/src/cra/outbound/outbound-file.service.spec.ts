@@ -25,6 +25,7 @@ const mockConfigService = {
       'app.fileStoragePath': './temp/',
       'cra.environmentCode': 'ACSAIN',
       'cra.fileTypeCode': 'AAPL',
+      'cra.userId': 'TST0001',
     }
     return config[key]
   }),
@@ -88,7 +89,7 @@ describe('OutboundFileService', () => {
       message: 'Success',
     })
 
-    service.createFile(header, details, trailer, 'test-destination', 'testuser')
+    service.createFile(header, details, trailer, 'test-destination', 1)
     expect(writeFileSync).toHaveBeenCalled()
   })
 })
@@ -182,7 +183,7 @@ describe('CRA Detail format', () => {
   })
 })
 
-describe('OutboundDataService → OutboundFileService integration', () => {
+describe('OutboundDataService->OutboundFileService integration', () => {
   let fileCreateService: OutboundFileService
   let craDataService: OutboundDataService
 

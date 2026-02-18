@@ -57,7 +57,7 @@ export class IcmService {
 
     const colList = fieldMap.map((e) => e.sourceField).join(', ')
     const selectList = fieldMap.map((e) => `t.${e.sourceField}`).join(', ')
-    const unnestParams = fieldMap.map((_, i) => `$${i + 1}::text[]`).join(', ')
+    const unnestParams = fieldMap.map((e, i) => `$${i + 1}::${e.dbType ?? 'text'}[]`).join(', ')
     const updateSet = fieldMap
       .filter((e) => e.sourceField !== primaryKey)
       .map((e) => `${e.sourceField} = EXCLUDED.${e.sourceField}`)

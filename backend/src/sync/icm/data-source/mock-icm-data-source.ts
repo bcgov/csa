@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import * as fs from 'fs'
 import * as path from 'path'
 import { IcmApiConfig } from '../icm.config'
-import { IcmApiRecord, IcmDataSource } from './icm-data-source'
+import { IcmApiRecord, IcmContactUpdatePayload, IcmDataSource } from './icm-data-source'
 
 @Injectable()
 export class MockIcmDataSource extends IcmDataSource {
@@ -37,6 +37,10 @@ export class MockIcmDataSource extends IcmDataSource {
       `Loaded ${filtered.length}/${items.length} mock records for ${config.name} (after ${lastUpdated.toISOString()})`,
     )
     return filtered
+  }
+
+  async updateContacts(contacts: IcmContactUpdatePayload[]): Promise<void> {
+    this.logger.log(`Mock: would sync ${contacts.length} contacts to ICM`)
   }
 
   private parseIcmDate(dateStr: string): Date | null {

@@ -52,12 +52,16 @@ export class MisService {
   private async ingestFile(config: MisFileConfig, prefix: string): Promise<MisResult> {
     const key = `${prefix}${config.s3Key}`
     const readable = await this.fileStorage.download(key)
-    const rows = await this.truncateAndCopy(config, readable)
+    this.logger.log(`${config.name}: S3 download successful for ${key}`)
 
-    await this.moveToProcessed(key)
+    // TODO: re-enable DB load once MIS CSV import is finalized
+    // const rows = await this.truncateAndCopy(config, readable)
+    // await this.moveToProcessed(key)
+    // this.logger.log(`${config.name}: loaded ${rows} rows via COPY`)
+    // return { name: config.name, rows }
+    readable.destroy()
 
-    this.logger.log(`${config.name}: loaded ${rows} rows via COPY`)
-    return { name: config.name, rows }
+    return { name: config.name, rows: 0, skipped: true }
   }
 
   private async moveToProcessed(key: string): Promise<void> {

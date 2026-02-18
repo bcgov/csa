@@ -91,7 +91,7 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
 export const ICM_SYNC_CONFIGS: IcmApiConfig[] = [
   {
     name: 'contacts',
-    endpoint: '/Contact/Contact',
+    endpoint: '/ICMContact/ICMContact',
     stagingTable: 'stg_icm_contacts',
     primaryKey: 'id',
     cursorLabel: 'Updated',

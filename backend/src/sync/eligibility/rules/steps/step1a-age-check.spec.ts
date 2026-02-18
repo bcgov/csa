@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest'
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
-import { step1A_AgeCheck } from './step1a-age-check'
-import { EligibilityContext } from '../rule.interface'
+import { describe, expect, it } from 'vitest'
 import { ContactProfile } from '../../eligibility.types'
+import { EligibilityContext } from '../rule.interface'
+import { step1A_AgeCheck } from './step1a-age-check'
 
 const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile => ({
   personIdIcm: 'ICM-1',
@@ -58,14 +58,14 @@ describe('step1A_AgeCheck', () => {
   })
 
   it('should return null when child turns 18 in current month (still eligible through end of birth month)', () => {
-    // Born Feb 2008, ref date Feb 2026 → eligible through end of Feb 2026
+    // Born Feb 2008, ref date Feb 2026->eligible through end of Feb 2026
     const ctx = makeCtx({ dateOfBirth: new Date('2008-02-10') })
     const result = step1A_AgeCheck.evaluate(ctx, REF_DATE)
     expect(result).toBeNull()
   })
 
   it('should route to step 10 when child is over 18 and status is not over_18', () => {
-    // Born Jan 2008 → turned 18 in Jan 2026 → eligible through Jan 31, 2026 → over 18 by Feb 2026
+    // Born Jan 2008->turned 18 in Jan 2026->eligible through Jan 31, 2026->over 18 by Feb 2026
     const ctx = makeCtx({
       dateOfBirth: new Date('2008-01-10'),
       csaStatus: CSA_STATUS.ELIGIBLE,
@@ -92,7 +92,7 @@ describe('step1A_AgeCheck', () => {
   })
 
   it('should handle child born on last day of month correctly', () => {
-    // Born Jan 31, 2008 → eligible through Jan 31, 2026
+    // Born Jan 31, 2008->eligible through Jan 31, 2026
     const ctx = makeCtx({
       dateOfBirth: new Date('2008-01-31'),
       csaStatus: CSA_STATUS.ELIGIBLE,

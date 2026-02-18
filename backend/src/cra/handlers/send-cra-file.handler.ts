@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import type { Batch, Contact, ContactBatchDetail } from '@prisma/client'
 import { BatchesService } from 'src/api/batches/batches.service'
 import { ContactsService } from 'src/api/contacts/contacts.service'
@@ -26,9 +27,11 @@ export class SendCraFileHandler extends BaseJob {
 
   private batch: Batch | null = null
   private batchDetails: (ContactBatchDetail & { contact: Contact })[] = []
+  private readonly lastSequenceNumber: number
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
     private readonly batchesService: BatchesService,
     private readonly contactsService: ContactsService,
     private readonly outboundDataService: OutboundDataService,
@@ -36,12 +39,13 @@ export class SendCraFileHandler extends BaseJob {
     private readonly outboundTransferService: OutboundTransferService,
   ) {
     super()
+    this.lastSequenceNumber = this.configService.get<number>('cra.lastSequenceNumber')!
   }
 
   async onStart(context: JobContext): Promise<void> {
     await super.onStart(context)
 
-    // 1. Find actionable batch (system_error prioritized for retry, then pending)
+    // Find actionable batch (system_error prioritized for retry, then pending)
     this.batch = await this.prisma.batch.findFirst({
       where: { status: { in: [BATCH_STATUS.SYSTEM_ERROR, BATCH_STATUS.PENDING] } },
       orderBy: { createdAt: 'asc' },
@@ -52,7 +56,7 @@ export class SendCraFileHandler extends BaseJob {
       return
     }
 
-    // 2. Get batch details with contacts
+    // Get batch details with contacts
     this.batchDetails = await this.prisma.contactBatchDetail.findMany({
       where: { batchId: this.batch.id },
       include: { contact: true },
@@ -63,10 +67,10 @@ export class SendCraFileHandler extends BaseJob {
       return
     }
 
-    // 3. Transition batch → in_progress
+    // Transition batch->in_progress
     await this.batchesService.updateBatchStatus(this.batch.id, BATCH_EVENT.SEND_TO_CRA)
 
-    // 4. Transition batch details → in_progress (skip if already in_progress on retry)
+    // Transition batch details->in_progress (skip if already in_progress on retry)
     for (const detail of this.batchDetails) {
       if (detail.status !== BATCH_DETAIL_STATUS.IN_PROGRESS) {
         await this.batchesService.updateBatchDetailStatus(detail.id, BATCH_EVENT.SEND_TO_CRA)
@@ -79,23 +83,31 @@ export class SendCraFileHandler extends BaseJob {
       return { success: true, message: 'No batch to process' }
     }
 
-    // 5. Build CRA file data
+    // Build CRA file data
     const { header, details, trailer } = this.outboundDataService.buildCraFileData(
       this.batchDetails,
     )
 
-    // 6. Create file on local storage
+    // Get next sequence number (wraps 9999->1)
+    const lastSequence = await this.prisma.transferFile.aggregate({
+      _max: { sequenceNumber: true },
+      where: { direction: FILE_DIRECTION.OUTBOUND },
+    })
+    const nextSequence = ((lastSequence._max.sequenceNumber ?? this.lastSequenceNumber) % 9999) + 1
+
+    // Create file on local storage
     const { filePath, fileName, recordCount } = this.outboundFileService.createFile(
       header,
       details,
       trailer,
       DESTINATION_ID,
+      nextSequence,
     )
 
-    // 7. Transfer file
+    // Transfer file
     await this.outboundTransferService.sendFileToTransferService(filePath, fileName, DESTINATION_ID)
 
-    // 10. Create TransferFile record
+    // Create TransferFile record
     await this.prisma.transferFile.create({
       data: {
         batchId: this.batch.id,
@@ -106,6 +118,7 @@ export class SendCraFileHandler extends BaseJob {
         referenceNumbers: this.batchDetails
           .map((d) => d.referenceNumber)
           .filter(Boolean) as string[],
+        sequenceNumber: nextSequence,
       },
     })
 
@@ -130,7 +143,7 @@ export class SendCraFileHandler extends BaseJob {
 
     if (!this.batch) return
 
-    // 8. Update contact CSA statuses
+    // Update contact CSA statuses
     for (const detail of this.batchDetails) {
       await this.contactsService.updateCsaStatus(
         detail.contactId,
@@ -139,7 +152,7 @@ export class SendCraFileHandler extends BaseJob {
       )
     }
 
-    // 9. Set batchDate
+    // Set batchDate
     await this.prisma.batch.update({
       where: { id: this.batch.id },
       data: { batchDate: new Date() },

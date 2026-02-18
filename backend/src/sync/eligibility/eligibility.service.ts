@@ -261,7 +261,7 @@ const UPSERT_SQL = `
   )
   SELECT
     ${SELECT_LIST},
-    NOW(), false, NOW(), 'SYSTEM', NOW(), 'SYSTEM'
+    NOW(), true, NOW(), 'SYSTEM', NOW(), 'SYSTEM'
   FROM unnest(${UNNEST_PARAMS})
   AS t(${COL_LIST})
   ON CONFLICT (person_id_icm) DO UPDATE SET
@@ -270,7 +270,7 @@ const UPSERT_SQL = `
       WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN NOW()
       ELSE contacts.csa_status_effective_date
     END,
-    icm_integration_status = false,
+    icm_integration_status = true,
     last_updated_at = NOW(),
     last_updated_by = 'SYSTEM'
 `

@@ -4,6 +4,7 @@ import { PrismaService } from 'src/common/database/prisma.service'
 import { CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
+import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { ALLOWED_FILTER_SORT_FIELDS, BULK_OPERATION_SKIP_REASONS } from './constants'
 import { ContactDto } from './dto/contact.dto'
 import type {
@@ -20,6 +21,7 @@ export class ContactsService {
   constructor(
     private prisma: PrismaService,
     private stateMachine: StateMachineService,
+    private icmSyncBackService: IcmSyncBackService,
   ) {}
 
   async findAll(
@@ -224,6 +226,7 @@ export class ContactsService {
     const updateData: Record<string, unknown> = {
       csaStatus: nextState,
       csaStatusEffectiveDate: new Date(),
+      icmIntegrationStatus: true,
       lastUpdatedBy: options?.userId ?? 'SYSTEM',
       lastUpdatedAt: new Date(),
       ...options?.additionalData,
@@ -261,7 +264,15 @@ export class ContactsService {
       data: updateData,
     })
 
-    this.logger.log(`Contact ${contactId}: ${currentState} → ${nextState} [${event}] by ${actor}`)
+    this.logger.log(`Contact ${contactId}: ${currentState}->${nextState} [${event}] by ${actor}`)
+
+    if (actor === 'USER') {
+      this.icmSyncBackService.syncSingleContact(contactId).catch((err) => {
+        this.logger.warn(
+          `Immediate ICM sync failed for contact ${contactId}: ${(err as Error).message}`,
+        )
+      })
+    }
 
     return { success: true, from: currentState, to: nextState }
   }

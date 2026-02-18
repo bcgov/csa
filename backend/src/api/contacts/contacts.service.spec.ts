@@ -3,6 +3,7 @@ import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
+import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { ContactsService } from './contacts.service'
 
 describe('ContactsService', () => {
@@ -54,6 +55,12 @@ describe('ContactsService', () => {
       providers: [
         ContactsService,
         StateMachineService,
+        {
+          provide: IcmSyncBackService,
+          useValue: {
+            syncSingleContact: vi.fn().mockResolvedValue(true),
+          },
+        },
         {
           provide: PrismaService,
           useValue: {
@@ -1002,6 +1009,44 @@ describe('ContactsService', () => {
         const updateCall = updateSpy.mock.calls[0][0] as any
         expect(updateCall.data).not.toHaveProperty('preBatchStatus')
       })
+    })
+
+    it('should set icmIntegrationStatus to true on status change', async () => {
+      const contact = { id: 1, csaStatus: 'eligible', resumeStatus: null }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      await service.updateCsaStatus(1, 'ADD_TO_BATCH', 'USER', { userId: 'user1' })
+
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            icmIntegrationStatus: true,
+          }),
+        }),
+      )
+    })
+
+    it('should call syncSingleContact for USER actor', async () => {
+      const contact = { id: 1, csaStatus: 'eligible', resumeStatus: null }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+      const icmSync = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
+
+      await service.updateCsaStatus(1, 'ADD_TO_BATCH', 'USER', { userId: 'user1' })
+
+      expect(icmSync).toHaveBeenCalledWith(1)
+    })
+
+    it('should not call syncSingleContact for SYSTEM actor', async () => {
+      const contact = { id: 1, csaStatus: 'eligible', resumeStatus: null }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+      const icmSync = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
+
+      await service.updateCsaStatus(1, 'ADD_TO_BATCH', 'SYSTEM')
+
+      expect(icmSync).not.toHaveBeenCalled()
     })
   })
 

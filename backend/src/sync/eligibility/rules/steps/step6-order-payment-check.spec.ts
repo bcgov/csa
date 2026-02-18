@@ -139,7 +139,7 @@ describe('step6_OrderPaymentCheck', () => {
       orders: [makeOrder({ effectiveStartDate: new Date('2025-12-15') })], // Dec 2025, not prev month
     })
     const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
-    // Order date is wrong → more than amount failed → step 9 (no non-placement)
+    // Order date is wrong->more than amount failed->step 9 (no non-placement)
     expect(result!.step).toBe(9)
   })
 

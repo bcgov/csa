@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { formatDate } from 'src/common/utils'
 import { IcmApiConfig } from '../icm.config'
-import { IcmApiRecord, IcmDataSource } from './icm-data-source'
+import { IcmApiRecord, IcmContactUpdatePayload, IcmDataSource } from './icm-data-source'
 
 const PAGE_SIZE = 100
 
@@ -70,6 +70,48 @@ export class IcmApiDataSource extends IcmDataSource {
 
     this.logger.log(`Fetched ${allRecords.length} ${config.name} records total`)
     return allRecords
+  }
+
+  async updateContacts(contacts: IcmContactUpdatePayload[]): Promise<void> {
+    if (contacts.length === 0) return
+    if (contacts.length > 100) {
+      throw new Error(`ICM batch limit is 100 contacts, got ${contacts.length}`)
+    }
+
+    const bearerToken = await this.keycloakAuthService.getBearerToken()
+    const icmApiUrl = this.configService.get<string>('admin.icmApiUrl')!
+    const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
+
+    const params = new URLSearchParams({
+      ViewMode: 'Catalog',
+      recordcountneeded: 'true',
+    })
+
+    const workspace = this.configService.get<string>('icm.workspace')
+    if (workspace) {
+      params.set('workspace', workspace)
+    }
+
+    const url = `${icmApiUrl}/ICMContact/ICMContact?${params.toString()}`
+
+    const response = await firstValueFrom(
+      this.httpService.put(url, contacts, {
+        headers: {
+          Authorization: `Bearer ${bearerToken}`,
+          'X-ICM-TrustedUsername': icmTrustedUsername,
+          'Content-Type': 'application/json',
+        },
+        validateStatus: () => true,
+      }),
+    )
+
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(
+        `ICM PUT /ICMContact/ICMContact failed: status=${response.status}, body=${JSON.stringify(response.data)}`,
+      )
+    }
+
+    this.logger.log(`Synced ${contacts.length} contacts to ICM`)
   }
 
   private buildUrl(baseUrl: string, config: IcmApiConfig, lastUpdated?: Date): string {

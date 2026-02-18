@@ -285,14 +285,14 @@ All base and reviewer permissions plus:
 
 The current implementation uses username patterns to assign permissions:
 
-- Usernames containing "admin" → Admin permissions
-- Usernames containing "reviewer" → Reviewer permissions
-- Other users → Base permissions only
+- Usernames containing "admin"->Admin permissions
+- Usernames containing "reviewer"->Reviewer permissions
+- Other users->Base permissions only
 
 **Example**:
-- `admin.user@example.com` → Admin permissions
-- `reviewer.jane@example.com` → Reviewer permissions
-- `john.doe@example.com` → Base permissions
+- `admin.user@example.com`->Admin permissions
+- `reviewer.jane@example.com`->Reviewer permissions
+- `john.doe@example.com`->Base permissions
 
 ## Integration with Frontend
 

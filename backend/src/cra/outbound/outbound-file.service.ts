@@ -22,18 +22,20 @@ export class OutboundFileService {
   private readonly fileStoragePath: string
   private readonly environmentCode: string
   private readonly fileTypeCode: string
+  private readonly craUserId: string
 
   constructor(private readonly configService: ConfigService) {
     this.fileStoragePath = this.configService.get<string>('app.fileStoragePath')!
     this.environmentCode = this.configService.get<string>('cra.environmentCode')!
     this.fileTypeCode = this.configService.get<string>('cra.fileTypeCode')!
+    this.craUserId = this.configService.get<string>('cra.userId')!
   }
   createFile(
     header: CraHeader,
     details: CraDetail[],
     trailer: CraTrailer,
     destinationId: string,
-    craUserId: string = 'testuser',
+    sequenceNumber: number,
   ): { filePath: string; fileName: string; recordCount: number } {
     const lines: string[] = []
 
@@ -52,7 +54,7 @@ export class OutboundFileService {
     if (!existsSync(destinationPath)) {
       mkdirSync(destinationPath, { recursive: true })
     }
-    const fileName = this.createfileName(craUserId)
+    const fileName = this.createFileName(sequenceNumber)
     const outputPath = join(destinationPath, fileName)
 
     writeFileSync(outputPath, lines.join('\n'), 'utf8')
@@ -156,9 +158,9 @@ export class OutboundFileService {
 
   /*================= FILE NAME CREATION ================*/
 
-  createfileName(craUserId: string): string {
-    const incrementNumber = String(Date.now()).slice(-4)
+  createFileName(sequenceNumber: number): string {
+    const paddedSequence = String(sequenceNumber).padStart(4, '0')
 
-    return `${FILE_NAME_PREFIX}.${this.environmentCode}.${craUserId}.${this.fileTypeCode}${incrementNumber}.txt`
+    return `${FILE_NAME_PREFIX}.${this.environmentCode}.${this.craUserId}.${this.fileTypeCode}${paddedSequence}.txt`
   }
 }

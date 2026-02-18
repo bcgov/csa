@@ -303,8 +303,8 @@ export const updateNotEligibleStatus = async (
 
 /**
  * Update to not eligible status with alternative transitions
- * Eligible-TBD or On Hold → Not Eligible - Out of Pay
- * In Pay → Not Eligible - IP - TBD
+ * Eligible-TBD or On Hold->Not Eligible - Out of Pay
+ * In Pay->Not Eligible - IP - TBD
  * @param contactIds - Array of contact IDs to update
  * @param action - Action to perform (e.g., 'SET_NOT_ELIGIBLE')
  */
@@ -321,7 +321,7 @@ export const updateNotEligibleStatusAlt = async (
 
 /**
  * Update to "Over 18" status for multiple contacts
- * Eligible-TBD or Not Eligible-IP-TBD → Over 18
+ * Eligible-TBD or Not Eligible-IP-TBD->Over 18
  * @param contactIds - Array of contact IDs to update
  * @param action - Action to perform (e.g., 'AGE_OUT')
  */

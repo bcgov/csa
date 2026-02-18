@@ -16,10 +16,10 @@ interface OrderCriteriaResult {
  * STEP 6: Fetch Order (ICM) / Payment (MIS) details
  * Checks 4 criteria on orders linked to placements via contract number.
  *
- * All 4 met → Step 7
- * Only amount fails (or no order found) → Step 8
- * More than one fails + hasNonPlacement → Step 8
- * More than one fails, no non-placement → Step 9
+ * All 4 met->Step 7
+ * Only amount fails (or no order found)->Step 8
+ * More than one fails + hasNonPlacement->Step 8
+ * More than one fails, no non-placement->Step 9
  */
 export const step6_OrderPaymentCheck: EligibilityRule & {
   evaluate(ctx: EligibilityContext, referenceDate?: Date): EligibilityResult | null
@@ -37,7 +37,7 @@ export const step6_OrderPaymentCheck: EligibilityRule & {
     )
 
     if (matchingOrders.length === 0) {
-      // No orders found → same as "only amount fails"
+      // No orders found->same as "only amount fails"
       return step8_UpdateEligibleTbd(csaStatus)
     }
 

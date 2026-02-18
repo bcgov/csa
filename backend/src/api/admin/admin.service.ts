@@ -372,8 +372,8 @@ export class AdminService {
         StartRowNum: '0',
         GetChildren: 'false',
         childlinks: 'None',
+        workspace: 'int_release_5.4',
         QueryHierarchy: JSON.stringify(queryHierarchy),
-        workspace: 'int_release_5.4'
       })
 
       // const workspace = this.configService.get<string>('icm.workspace')

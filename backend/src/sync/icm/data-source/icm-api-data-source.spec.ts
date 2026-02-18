@@ -5,6 +5,7 @@ import { of } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { IcmApiConfig } from '../icm.config'
 import { IcmApiDataSource } from './icm-api-data-source'
+import { IcmContactUpdatePayload } from './icm-data-source'
 
 const mockConfig: IcmApiConfig = {
   name: 'cases',
@@ -17,12 +18,12 @@ const mockConfig: IcmApiConfig = {
 
 describe('IcmApiDataSource', () => {
   let service: IcmApiDataSource
-  let httpService: { get: ReturnType<typeof vi.fn> }
+  let httpService: { get: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn> }
   let configService: { get: ReturnType<typeof vi.fn> }
   let keycloakAuthService: { getBearerToken: ReturnType<typeof vi.fn> }
 
   beforeEach(async () => {
-    httpService = { get: vi.fn() }
+    httpService = { get: vi.fn(), put: vi.fn() }
 
     keycloakAuthService = {
       getBearerToken: vi.fn().mockResolvedValue('test-token'),
@@ -181,6 +182,80 @@ describe('IcmApiDataSource', () => {
       await service.fetchAll(mockConfig)
 
       expect(keycloakAuthService.getBearerToken).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('updateContacts', () => {
+    const payload: IcmContactUpdatePayload = {
+      Id: 'ICM-001',
+      'CSA Status': 'eligible',
+      'CSA Status Effective Date': '01/15/2026',
+      'CSA DIN': '12345',
+      'CSA Sent Date': null,
+    }
+
+    it('should send PUT to /ICMContact/ICMContact with query params and auth headers', async () => {
+      httpService.put.mockReturnValue(of({ status: 200, data: {} }))
+
+      await service.updateContacts([payload])
+
+      const callUrl = httpService.put.mock.calls[0][0]
+      expect(callUrl).toContain('http://icm-api/ICMContact/ICMContact?')
+      expect(callUrl).toContain('ViewMode=Catalog')
+      expect(callUrl).toContain('recordcountneeded=true')
+
+      expect(httpService.put).toHaveBeenCalledWith(
+        callUrl,
+        [payload],
+        expect.objectContaining({
+          headers: {
+            Authorization: 'Bearer test-token',
+            'X-ICM-TrustedUsername': 'trusted-user',
+            'Content-Type': 'application/json',
+          },
+        }),
+      )
+    })
+
+    it('should include workspace param when configured', async () => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === 'icm.workspace') return 'int_release_5.4'
+        if (key === 'admin.icmApiUrl') return 'http://icm-api'
+        if (key === 'admin.icmTrustedUsername') return 'trusted-user'
+        return undefined
+      })
+
+      httpService.put.mockReturnValue(of({ status: 200, data: {} }))
+
+      await service.updateContacts([payload])
+
+      const callUrl = httpService.put.mock.calls[0][0]
+      expect(callUrl).toContain('workspace=int_release_5.4')
+    })
+
+    it('should throw on non-2xx response', async () => {
+      httpService.put.mockReturnValue(of({ status: 500, data: { error: 'Server Error' } }))
+
+      await expect(service.updateContacts([payload])).rejects.toThrow(
+        'ICM PUT /ICMContact/ICMContact failed: status=500',
+      )
+    })
+
+    it('should be a no-op for empty array', async () => {
+      await service.updateContacts([])
+
+      expect(httpService.put).not.toHaveBeenCalled()
+    })
+
+    it('should throw when batch exceeds 100 contacts', async () => {
+      const largePayload = Array.from({ length: 101 }, (_, i) => ({
+        ...payload,
+        Id: `ICM-${i}`,
+      }))
+
+      await expect(service.updateContacts(largePayload)).rejects.toThrow(
+        'ICM batch limit is 100 contacts, got 101',
+      )
     })
   })
 })

@@ -83,6 +83,7 @@ describe('SendCraFileHandler', () => {
       },
       transferFile: {
         create: vi.fn(),
+        aggregate: vi.fn().mockResolvedValue({ _max: { sequenceNumber: null } }),
       },
     }
 
@@ -115,8 +116,16 @@ describe('SendCraFileHandler', () => {
       sendFileToTransferService: vi.fn().mockResolvedValue({ statusCode: 226 }),
     }
 
+    const mockConfigService = {
+      get: vi.fn((key: string) => {
+        const config: Record<string, number> = { 'cra.lastSequenceNumber': 0 }
+        return config[key]
+      }),
+    }
+
     handler = new SendCraFileHandler(
       mockPrisma,
+      mockConfigService as any,
       mockBatchesService,
       mockContactsService,
       mockOutboundDataService,
@@ -258,6 +267,7 @@ describe('SendCraFileHandler', () => {
         [{ tranCode: 6134 }],
         { tranCode: 6135 },
         DESTINATION_ID,
+        1,
       )
 
       expect(mockOutboundTransferService.sendFileToTransferService).toHaveBeenCalledWith(
@@ -278,6 +288,7 @@ describe('SendCraFileHandler', () => {
           fileName: 'testfile.txt',
           deliveredAt: expect.any(Date),
           referenceNumbers: ['LFN001-100', 'LFN001-101'],
+          sequenceNumber: 1,
         },
       })
     })
@@ -293,6 +304,20 @@ describe('SendCraFileHandler', () => {
         record_count: 3,
         contacts_count: 2,
       })
+    })
+
+    it('should wrap sequence number from 9999 to 1', async () => {
+      mockPrisma.transferFile.aggregate.mockResolvedValue({ _max: { sequenceNumber: 9999 } })
+
+      await handler.execute(mockContext)
+
+      expect(mockOutboundFileService.createFile).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        DESTINATION_ID,
+        1,
+      )
     })
   })
 

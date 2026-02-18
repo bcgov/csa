@@ -2,10 +2,9 @@ import 'dotenv/config'
 import { HttpModule } from '@nestjs/axios'
 import { Module, OnModuleInit } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
-import { BatchesService } from 'src/api/batches/batches.service'
-import { ContactsService } from 'src/api/contacts/contacts.service'
+import { BatchesModule } from 'src/api/batches/batches.module'
+import { ContactsModule } from 'src/api/contacts/contacts.module'
 import { PrismaModule } from 'src/common/database/prisma.module'
-import { StateMachineModule } from 'src/common/state-machine/state-machine.module'
 import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
 import { appConfig } from '../config/app.config'
@@ -30,7 +29,8 @@ import { OutboundDataService } from './outbound/outbound-data.service'
     }),
     JobsModule,
     PrismaModule,
-    StateMachineModule,
+    BatchesModule,
+    ContactsModule,
     HttpModule.register({
       timeout: 60000,
     }),
@@ -43,8 +43,6 @@ import { OutboundDataService } from './outbound/outbound-data.service'
     InboundFileService,
     InboundResponseService,
     OutboundDataService,
-    BatchesService,
-    ContactsService,
   ],
   exports: [SendCraFileHandler, PollCraResponseHandler],
 })

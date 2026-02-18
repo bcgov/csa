@@ -3,24 +3,31 @@ import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
+import { IcmSyncBackService } from '../icm/icm-sync-back.service'
 
-// Pushes eligibility status and other updates back to ICM
 @Injectable()
 export class SyncIcmHandler extends BaseJob {
   readonly jobType = JobType.SYNC_ICM
 
-  async execute(_context: JobContext): Promise<JobResult> {
-    // TODO: Implement ICM sync logic
+  constructor(private readonly icmSyncBackService: IcmSyncBackService) {
+    super()
+  }
 
-    this.logger.log('SYNC_ICM stub - not yet implemented')
+  async execute(_context: JobContext): Promise<JobResult> {
+    const result = await this.icmSyncBackService.syncFlaggedContacts()
+
+    if (result.failed > 0 && result.synced === 0) {
+      return {
+        success: false,
+        message: `ICM sync failed: all ${result.failed} contacts failed`,
+        metadata: { ...result },
+      }
+    }
 
     return {
       success: true,
-      message: 'ICM sync stub',
-      metadata: {
-        records_synced: 0,
-        failures: 0,
-      },
+      message: `ICM sync complete: ${result.synced} synced, ${result.failed} failed`,
+      metadata: { ...result },
     }
   }
 }

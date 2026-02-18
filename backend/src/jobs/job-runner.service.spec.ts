@@ -1,5 +1,6 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
+import { Prisma } from '@prisma/client'
 import { JobStatus } from './enums/job-status.enum'
 import { JobTrigger } from './enums/job-trigger.enum'
 import { JobType } from './enums/job-type.enum'
@@ -195,6 +196,28 @@ describe('JobRunner', () => {
       await runner.runJobType(JobType.INGEST_DATA, JobTrigger.CRON, { metadata })
 
       expect(jobsService.createJob).toHaveBeenCalledWith(expect.objectContaining({ metadata }))
+    })
+
+    it('should return failure when job of same type is already running', async () => {
+      const uniqueError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0',
+      })
+      vi.mocked(jobsService.createJob).mockRejectedValue(uniqueError)
+
+      const result = await runner.runJobType(JobType.INGEST_DATA, JobTrigger.CRON)
+
+      expect(result.success).toBe(false)
+      expect(result.message).toContain('already running')
+      expect(mockHandler.execute).not.toHaveBeenCalled()
+    })
+
+    it('should rethrow non-unique-constraint errors from createJob', async () => {
+      vi.mocked(jobsService.createJob).mockRejectedValue(new Error('DB connection lost'))
+
+      await expect(runner.runJobType(JobType.INGEST_DATA, JobTrigger.CRON)).rejects.toThrow(
+        'DB connection lost',
+      )
     })
   })
 

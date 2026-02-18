@@ -136,8 +136,9 @@ model TransferFile {
   downloadedAt     DateTime? @map("downloaded_at")
   referenceNumbers String[]  @map("reference_numbers")
   fileSize         String?   @map("file_size")
-  isDetailsProcessed Boolean  @default(false) @map("is_details_processed")
-  valid            Boolean   @default(true)
+  isDetailsProcessed Boolean  @default(false) @map("is_processed")
+  valid            Boolean   @default(true) @map("is_valid")
+  sequenceNumber   Int?      @map("sequence_number")
   batch            Batch?    @relation(fields: [batchId], references: [id])
 
   @@map("transfer_files")

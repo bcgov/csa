@@ -52,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             onLoad: csaAccessDenied ? undefined : 'check-sso',
             silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
             pkceMethod: 'S256',
-            redirectUri: 'https://csa-frontend-dec59b-dev.apps.silver.devops.gov.bc.ca/',
+            redirectUri: 'https://csa-frontend-dec59b-test.apps.silver.devops.gov.bc.ca/',
             // redirectUri: window.location.origin + '/',
           })
           .then(async (authenticated) => {

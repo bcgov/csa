@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
-import { EligibilityService } from './eligibility.service'
+import { Test, TestingModule } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { JobsService } from 'src/jobs/jobs.service'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildLoadContactProfilesSql } from './eligibility.queries'
+import { EligibilityService } from './eligibility.service'
 
 describe('EligibilityService', () => {
   let service: EligibilityService
@@ -232,7 +232,7 @@ describe('EligibilityService', () => {
 
   // -- Auto-batch tests --
 
-  // Helper: contact that reaches step 7 → eligible (under 18, valid placement + order)
+  // Helper: contact that reaches step 7->eligible (under 18, valid placement + order)
   function makeEligibleContact(overrides: Record<string, unknown> = {}) {
     const prevMonth = new Date()
     prevMonth.setMonth(prevMonth.getMonth() - 1)
@@ -306,7 +306,7 @@ describe('EligibilityService', () => {
     }
   }
 
-  // Helper: in_pay contact that triggers step 9 → not_eligible_in_pay (deceased)
+  // Helper: in_pay contact that triggers step 9->not_eligible_in_pay (deceased)
   function makeInPayCancelContact(overrides: Record<string, unknown> = {}) {
     return {
       caseRowId: 'CASE-C',
@@ -393,7 +393,7 @@ describe('EligibilityService', () => {
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([makeEligibleContact()]) // loadContactProfiles
       .mockResolvedValueOnce([{ id: 1, person_id_icm: 'ICM-ELIG' }]) // get contact DB IDs
-      .mockResolvedValueOnce([]) // find pending batch → none
+      .mockResolvedValueOnce([]) // find pending batch->none
       .mockResolvedValueOnce([{ id: 200 }]) // INSERT batch RETURNING id
       .mockResolvedValueOnce([]) // check already in batch
 

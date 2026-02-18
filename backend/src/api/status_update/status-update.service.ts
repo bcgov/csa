@@ -113,8 +113,8 @@ export class StatusUpdateService {
   /**
    * Update eligibility status for multiple contacts
    * Rules:
-   * - "Not Eligible - Out of Pay" → "Eligible - TBD"
-   * - "Not Eligible - IP - TBD" → "In Pay"
+   * - "Not Eligible - Out of Pay"->"Eligible - TBD"
+   * - "Not Eligible - IP - TBD"->"In Pay"
    * @param dto - Update eligibility status DTO
    * @returns Bulk operation result
    */
@@ -191,9 +191,9 @@ export class StatusUpdateService {
   /**
    * Update to not eligible status for multiple contacts
    * Rules:
-   * - "eligible_tbd" → "not_eligible_ip_tbd"
-   * - "in_pay" → "not_eligible_ip_tbd"
-   * - "on_hold" → "not_eligible_ip_tbd"
+   * - "eligible_tbd"->"not_eligible_ip_tbd"
+   * - "in_pay"->"not_eligible_ip_tbd"
+   * - "on_hold"->"not_eligible_ip_tbd"
    * @param dto - Update not eligible status DTO
    * @returns Bulk operation result
    */
@@ -270,9 +270,9 @@ export class StatusUpdateService {
   /**
    * Update contacts to not eligible status with specific transitions
    * Rules:
-   * - "eligible_tbd" → "not_eligible_out_of_pay"
-   * - "on_hold" → "not_eligible_out_of_pay"
-   * - "in_pay" → "not_eligible_ip_tbd"
+   * - "eligible_tbd"->"not_eligible_out_of_pay"
+   * - "on_hold"->"not_eligible_out_of_pay"
+   * - "in_pay"->"not_eligible_ip_tbd"
    * @param dto - Update not eligible status DTO
    * @returns Bulk operation result
    */
@@ -349,8 +349,8 @@ export class StatusUpdateService {
   /**
    * Update contacts to "Over 18" status
    * Rules:
-   * - "eligible_tbd" → "Over 18"
-   * - "not_eligible_ip_tbd" → "Over 18"
+   * - "eligible_tbd"->"Over 18"
+   * - "not_eligible_ip_tbd"->"Over 18"
    * @param dto - Update status DTO
    * @returns Bulk operation result
    */

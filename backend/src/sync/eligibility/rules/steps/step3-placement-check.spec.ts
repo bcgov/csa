@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest'
-import { step3_PlacementCheck } from './step3-placement-check'
-import { EligibilityContext } from '../rule.interface'
+import { describe, expect, it } from 'vitest'
 import { ContactProfile, PlacementRecord } from '../../eligibility.types'
+import { EligibilityContext } from '../rule.interface'
+import { step3_PlacementCheck } from './step3-placement-check'
 
 const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile => ({
   personIdIcm: 'ICM-1',
@@ -145,6 +145,6 @@ describe('step3_PlacementCheck', () => {
       placements: [makePlacement({ type: 'Placement', status: 'Ended' })],
     })
     const result = step3_PlacementCheck.evaluate(ctx)
-    expect(result!.step).toBe(8) // no active/interrupted → step 8
+    expect(result!.step).toBe(8) // no active/interrupted->step 8
   })
 })

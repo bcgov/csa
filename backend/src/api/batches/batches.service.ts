@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { BATCH_STATUS, BATCH_DETAIL_STATUS, BATCH_EVENT } from 'src/common/state-machine/constants'
+import { BATCH_DETAIL_STATUS, BATCH_EVENT, BATCH_STATUS } from 'src/common/state-machine/constants'
 import type { TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
@@ -76,7 +76,7 @@ export class BatchesService {
       },
     })
 
-    this.logger.log(`Batch ${batchId}: ${currentState} → ${nextState} [${event}]`)
+    this.logger.log(`Batch ${batchId}: ${currentState}->${nextState} [${event}]`)
 
     return { success: true, from: currentState, to: nextState }
   }
@@ -113,7 +113,7 @@ export class BatchesService {
       },
     })
 
-    this.logger.log(`BatchDetail ${detailId}: ${currentState} → ${nextState} [${event}]`)
+    this.logger.log(`BatchDetail ${detailId}: ${currentState}->${nextState} [${event}]`)
 
     return { success: true, from: currentState, to: nextState }
   }

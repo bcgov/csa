@@ -2,11 +2,17 @@ export interface FieldMapEntry {
   sourceField: string
   sourceLabel: string
   masterField: string
+  dbType?: 'timestamp' | 'date' | 'numeric'
 }
 
 export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
   { sourceField: 'ROW_ID', sourceLabel: 'Id', masterField: 'case_row_id_icm' },
-  { sourceField: 'LAST_UPD', sourceLabel: 'Updated Date', masterField: 'last_upd_case_icm' },
+  {
+    sourceField: 'LAST_UPD',
+    sourceLabel: 'Updated Date',
+    masterField: 'last_upd_case_icm',
+    dbType: 'timestamp',
+  },
 
   {
     sourceField: 'FST_NAME',
@@ -21,7 +27,12 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
   { sourceField: 'X_AGE', sourceLabel: 'Key Player Age', masterField: 'age' },
 
   { sourceField: 'X_BIRTH_CITY', sourceLabel: 'Key Player Birth City', masterField: 'birth_city' },
-  { sourceField: 'BIRTH_DT', sourceLabel: 'Key Player Birth Date', masterField: 'date_of_birth' },
+  {
+    sourceField: 'BIRTH_DT',
+    sourceLabel: 'Key Player Birth Date',
+    masterField: 'date_of_birth',
+    dbType: 'date',
+  },
   {
     sourceField: 'X_BIRTH_PROV_CD',
     sourceLabel: 'Key Player Birth Province',
@@ -32,6 +43,7 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
     sourceField: 'X_CSA_SENT_DATE',
     sourceLabel: 'Key Player CSA Sent Date',
     masterField: 'csa_sent_date',
+    dbType: 'timestamp',
   },
   {
     sourceField: 'X_CSA_PAY_STATUS',
@@ -42,6 +54,7 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
     sourceField: 'X_CSA_EFF_DATE',
     sourceLabel: 'Key Player CSA Status Effective Date',
     masterField: 'csa_status_effective_date',
+    dbType: 'timestamp',
   },
   { sourceField: 'X_CSA_DIN', sourceLabel: 'Key Player DIN', masterField: 'din' },
 
@@ -49,6 +62,7 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
     sourceField: 'CONTACT_LAST_UPD',
     sourceLabel: 'Key Player Last Updated Date',
     masterField: 'last_upd_dt_contact_icm',
+    dbType: 'timestamp',
   },
   { sourceField: 'SEX_MF', sourceLabel: 'Key Player M/F', masterField: 'gender' },
   {
@@ -99,18 +113,29 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
 export const STG_ICM_CONTACTS_MAP: FieldMapEntry[] = [
   { sourceField: 'Id', sourceLabel: 'Id', masterField: 'contact_id_icm' },
   { sourceField: 'X_CSA_DIN', sourceLabel: 'CSA DIN', masterField: 'din' },
-  { sourceField: 'X_CSA_SENT_DATE', sourceLabel: 'CSA Sent Date', masterField: 'csa_sent_date' },
+  {
+    sourceField: 'X_CSA_SENT_DATE',
+    sourceLabel: 'CSA Sent Date',
+    masterField: 'csa_sent_date',
+    dbType: 'timestamp',
+  },
   { sourceField: 'X_CSA_PAY_STATUS', sourceLabel: 'CSA Status', masterField: 'csa_status' },
   {
     sourceField: 'X_CSA_EFF_DATE',
     sourceLabel: 'CSA Status Effective Date',
     masterField: 'csa_status_effective_date',
+    dbType: 'timestamp',
   },
 ]
 
 export const STG_ICM_PLACEMENTS_MAP: FieldMapEntry[] = [
   { sourceField: 'ROW_ID', sourceLabel: 'Id', masterField: 'placement_id_icm' },
-  { sourceField: 'LAST_UPD', sourceLabel: 'Updated', masterField: 'last_upd_placement_icm' },
+  {
+    sourceField: 'LAST_UPD',
+    sourceLabel: 'Updated',
+    masterField: 'last_upd_placement_icm',
+    dbType: 'timestamp',
+  },
   {
     sourceField: 'X_PLACEMENT_NUM',
     sourceLabel: 'Placement Number',
@@ -119,8 +144,18 @@ export const STG_ICM_PLACEMENTS_MAP: FieldMapEntry[] = [
   { sourceField: 'X_TYPE', sourceLabel: 'Type', masterField: 'location_type' },
   { sourceField: 'X_SERVICE_TYPE', sourceLabel: 'Service Type', masterField: 'location_sub_type' },
   { sourceField: 'X_STATUS', sourceLabel: 'Status', masterField: 'placement_status' },
-  { sourceField: 'X_START_DATE', sourceLabel: 'Start Date', masterField: 'actual_start_date' },
-  { sourceField: 'X_END_DATE', sourceLabel: 'End Date', masterField: 'actual_end_date' },
+  {
+    sourceField: 'X_START_DATE',
+    sourceLabel: 'Start Date',
+    masterField: 'actual_start_date',
+    dbType: 'timestamp',
+  },
+  {
+    sourceField: 'X_END_DATE',
+    sourceLabel: 'End Date',
+    masterField: 'actual_end_date',
+    dbType: 'timestamp',
+  },
   {
     sourceField: 'X_SRV_PLC_NAME',
     sourceLabel: 'Place of Service',
@@ -163,13 +198,23 @@ export const STG_LEGAL_ADMIN_MAP: FieldMapEntry[] = [
     masterField: 'mis_legal_authority_code',
   },
   { sourceField: 'ROW_ID', sourceLabel: 'Id', masterField: 'legal_admin_id' },
-  { sourceField: 'LAST_UPD', sourceLabel: 'Updated', masterField: 'last_upd_dt_legal_admin' },
+  {
+    sourceField: 'LAST_UPD',
+    sourceLabel: 'Updated',
+    masterField: 'last_upd_dt_legal_admin',
+    dbType: 'timestamp',
+  },
   { sourceField: 'X_ENROLL_CSA', sourceLabel: 'Enroll for CSA', masterField: 'enroll_for_csa' },
 ]
 
 export const STG_LEGAL_AUTHORITY_MAP: FieldMapEntry[] = [
   { sourceField: 'ROW_ID', sourceLabel: 'Id', masterField: 'legal_authority_code' },
-  { sourceField: 'LAST_UPD', sourceLabel: 'Updated', masterField: 'last_upd_dt_legal_authority' },
+  {
+    sourceField: 'LAST_UPD',
+    sourceLabel: 'Updated',
+    masterField: 'last_upd_dt_legal_authority',
+    dbType: 'timestamp',
+  },
   {
     sourceField: 'LGL_AUTH_CD',
     sourceLabel: 'Legal Authority Code',
@@ -180,8 +225,18 @@ export const STG_LEGAL_AUTHORITY_MAP: FieldMapEntry[] = [
     sourceLabel: 'Effective Legal Status',
     masterField: 'effective_legal_status',
   },
-  { sourceField: 'START_DT', sourceLabel: 'Effective Date', masterField: 'effective_date' },
-  { sourceField: 'EXPIRY_DT', sourceLabel: 'Expiry Date', masterField: 'expiry_date' },
+  {
+    sourceField: 'START_DT',
+    sourceLabel: 'Effective Date',
+    masterField: 'effective_date',
+    dbType: 'timestamp',
+  },
+  {
+    sourceField: 'EXPIRY_DT',
+    sourceLabel: 'Expiry Date',
+    masterField: 'expiry_date',
+    dbType: 'timestamp',
+  },
   { sourceField: 'PAR_ROW_ID', sourceLabel: 'Parent Contact Id', masterField: 'parent_contact_id' },
 ]
 
@@ -198,11 +253,13 @@ export const STG_AGREEMENT_MAP: FieldMapEntry[] = [
     sourceField: 'EFF_START_DT',
     sourceLabel: 'Agreement Start Date',
     masterField: 'agreement_start_date',
+    dbType: 'timestamp',
   },
   {
     sourceField: 'EFF_END_DT',
     sourceLabel: 'Agreement End Date',
     masterField: 'agreement_end_date',
+    dbType: 'timestamp',
   },
   { sourceField: 'AGREE_CD', sourceLabel: 'Agreement Type', masterField: 'agreement_type' },
   { sourceField: 'ROW_ID', sourceLabel: 'Id', masterField: 'agreement_id_icm' },
@@ -210,19 +267,31 @@ export const STG_AGREEMENT_MAP: FieldMapEntry[] = [
     sourceField: 'X_TERMINATION_DT',
     sourceLabel: 'ICM Termination Date',
     masterField: 'termination_date',
+    dbType: 'timestamp',
   },
-  { sourceField: 'LAST_UPD', sourceLabel: 'Updated', masterField: 'last_upd_dt_agreement' },
+  {
+    sourceField: 'LAST_UPD',
+    sourceLabel: 'Updated',
+    masterField: 'last_upd_dt_agreement',
+    dbType: 'timestamp',
+  },
 ]
 
 export const STG_ORDER_MAP: FieldMapEntry[] = [
   { sourceField: 'ORDER_NUM', sourceLabel: 'Order Number', masterField: 'order_number' },
   { sourceField: 'NAME', sourceLabel: 'Order Type', masterField: 'order_type' },
   { sourceField: 'STATUS_CD', sourceLabel: 'Order Status', masterField: 'order_status' },
-  { sourceField: 'TOTAL_AMT', sourceLabel: 'Order Amount', masterField: 'order_amount' },
+  {
+    sourceField: 'TOTAL_AMT',
+    sourceLabel: 'Order Amount',
+    masterField: 'order_amount',
+    dbType: 'numeric',
+  },
   {
     sourceField: 'X_EFF_START_DT',
     sourceLabel: 'Order Effective Start Date',
     masterField: 'order_effective_start_date',
+    dbType: 'timestamp',
   },
   { sourceField: 'PRODUCT_NAME', sourceLabel: 'Product', masterField: 'product' },
   {
@@ -231,6 +300,11 @@ export const STG_ORDER_MAP: FieldMapEntry[] = [
     masterField: 'mcfd_contract',
   },
   { sourceField: 'AGREEMENT_ROW_ID', sourceLabel: 'Agreement Id', masterField: 'agreement_id_icm' },
-  { sourceField: 'LAST_UPD', sourceLabel: 'Order Updated', masterField: 'last_upd_dt_order_icm' },
+  {
+    sourceField: 'LAST_UPD',
+    sourceLabel: 'Order Updated',
+    masterField: 'last_upd_dt_order_icm',
+    dbType: 'timestamp',
+  },
   { sourceField: 'ROW_ID', sourceLabel: 'Id', masterField: 'order_id_icm' },
 ]

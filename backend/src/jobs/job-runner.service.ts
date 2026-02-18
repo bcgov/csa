@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { JobRun, Prisma } from '@prisma/client'
 import { JobTrigger } from './enums/job-trigger.enum'
 import { JobType } from './enums/job-type.enum'
 import { JobResult } from './interfaces/job-result.interface'
@@ -105,12 +106,21 @@ export class JobRunner {
     }
 
     // Create a new job run record (starts as RUNNING)
-    const jobRun = await this.jobsService.createJob({
-      jobType,
-      jobTrigger,
-      parentJobId: options?.parentJobId,
-      metadata: options?.metadata,
-    })
+    let jobRun: JobRun
+    try {
+      jobRun = await this.jobsService.createJob({
+        jobType,
+        jobTrigger,
+        parentJobId: options?.parentJobId,
+        metadata: options?.metadata,
+      })
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        this.logger.warn(`Job ${jobType} is already running, skipping`)
+        return { success: false, message: `Job ${jobType} is already running` }
+      }
+      throw error
+    }
 
     this.logger.log(`Created job run ${jobRun.id} for ${jobType}`)
 

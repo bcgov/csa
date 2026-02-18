@@ -6,9 +6,9 @@ import { step10_UpdateOver18 } from './step10-update-over18'
 
 /**
  * STEP 1A: Age Check
- * - age <= 18 (through end of birth month) → continue to Step 1B
- * - age > 18 AND csa_status != over_18 → Step 10
- * - already over_18 → no change (null)
+ * - age <= 18 (through end of birth month)->continue to Step 1B
+ * - age > 18 AND csa_status != over_18->Step 10
+ * - already over_18->no change (null)
  */
 export const step1A_AgeCheck: EligibilityRule & {
   evaluate(ctx: EligibilityContext, referenceDate?: Date): EligibilityResult | null

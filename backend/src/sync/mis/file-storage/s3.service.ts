@@ -90,6 +90,6 @@ export class S3Service extends FileStorageService {
 
     await client.copyObject(bucket, toKey, `/${bucket}/${fromKey}`, new Minio.CopyConditions())
     await client.removeObject(bucket, fromKey)
-    this.logger.log(`Moved ${fromKey} → ${toKey}`)
+    this.logger.log(`Moved ${fromKey}->${toKey}`)
   }
 }

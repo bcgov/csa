@@ -6,12 +6,12 @@ import { step9_UpdateNotEligible } from './step9-update-not-eligible'
 
 /**
  * STEP 2: Check Latest Legal Status
- * - MIS Legal Auth Code = OPC/OPO/OPT → Step 8
+ * - MIS Legal Auth Code = OPC/OPO/OPT->Step 8
  * - Legal Authority Expiry >= today OR null:
- *   - Enroll for CSA = Yes → Step 3 (continue chain)
- *   - Enroll for CSA = TBD → Step 8
- *   - Enroll for CSA = No → Step 9
- * - Expired → Step 9
+ *   - Enroll for CSA = Yes->Step 3 (continue chain)
+ *   - Enroll for CSA = TBD->Step 8
+ *   - Enroll for CSA = No->Step 9
+ * - Expired->Step 9
  */
 export const step2_LegalStatusCheck: EligibilityRule & {
   evaluate(ctx: EligibilityContext, referenceDate?: Date): EligibilityResult | null

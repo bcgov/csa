@@ -49,15 +49,19 @@ const makeContact = (overrides = {}) => ({
   ...overrides,
 })
 
-const makeBatchDetail = (overrides = {}) => ({
-  id: 100,
-  contactId: 1,
-  batchId: 10,
-  transactionType: 'application',
-  status: 'pending',
-  contact: makeContact(),
-  ...overrides,
-})
+const makeBatchDetail = (overrides: Record<string, any> = {}) => {
+  const id = overrides.id ?? 100
+  return {
+    id,
+    contactId: 1,
+    batchId: 10,
+    transactionType: 'application',
+    referenceNumber: `LFN001-${id}`,
+    status: 'pending',
+    contact: makeContact(),
+    ...overrides,
+  }
+}
 
 describe('SendCraFileHandler', () => {
   let handler: SendCraFileHandler
@@ -273,7 +277,7 @@ describe('SendCraFileHandler', () => {
           direction: 'OUTBOUND',
           fileName: 'testfile.txt',
           deliveredAt: expect.any(Date),
-          referenceNumbers: [1, 2],
+          referenceNumbers: ['LFN001-100', 'LFN001-101'],
         },
       })
     })

@@ -621,12 +621,15 @@ export class EligibilityService {
 
     const allPersonIds = [...applicationPersonIds, ...cancellationPersonIds]
 
-    // Get contact database IDs (needed for batch detail FK)
-    const contactRows = await this.prisma.$queryRawUnsafe<{ id: number; person_id_icm: string }[]>(
-      `SELECT id, person_id_icm FROM contacts WHERE person_id_icm = ANY($1)`,
+    // Get contact database IDs and case numbers (needed for batch detail FK + reference number)
+    const contactRows = await this.prisma.$queryRawUnsafe<
+      { id: number; person_id_icm: string; case_number: string | null }[]
+    >(
+      `SELECT id, person_id_icm, case_number FROM contacts WHERE person_id_icm = ANY($1)`,
       allPersonIds,
     )
     const idMap = new Map(contactRows.map((c) => [c.person_id_icm, c.id]))
+    const caseNumberMap = new Map(contactRows.map((c) => [c.id, c.case_number ?? '']))
 
     // Find or create pending batch
     const [existingBatch] = await this.prisma.$queryRawUnsafe<{ id: number }[]>(
@@ -689,15 +692,25 @@ export class EligibilityService {
       return { application: 0, cancellation: 0 }
     }
 
-    // Bulk insert batch details
+    // Bulk insert batch details and set reference numbers (single atomic CTE)
+    const caseNumbers = contactIds.map((cid) => caseNumberMap.get(cid) ?? '')
     await this.prisma.$executeRawUnsafe(
-      `INSERT INTO contact_batch_details
-         (contact_id, batch_id, transaction_type, status, system_comments,
-          created_at, created_by, last_updated_at, last_updated_by)
-       SELECT * FROM unnest(
-         $1::int[], $2::int[], $3::text[], $4::text[], $5::text[],
-         $6::timestamp[], $7::text[], $8::timestamp[], $9::text[]
-       )`,
+      `WITH inserted AS (
+         INSERT INTO contact_batch_details
+           (contact_id, batch_id, transaction_type, status, system_comments,
+            created_at, created_by, last_updated_at, last_updated_by)
+         SELECT * FROM unnest(
+           $1::int[], $2::int[], $3::text[], $4::text[], $5::text[],
+           $6::timestamp[], $7::text[], $8::timestamp[], $9::text[]
+         )
+         RETURNING id, contact_id
+       )
+       UPDATE contact_batch_details cbd
+       SET reference_number = v.case_number || '-' || i.id
+       FROM inserted i
+       JOIN unnest($10::int[], $11::text[]) AS v(contact_id, case_number)
+         ON i.contact_id = v.contact_id
+       WHERE cbd.id = i.id`,
       contactIds,
       batchIds,
       transactionTypes,
@@ -707,6 +720,8 @@ export class EligibilityService {
       createdBys,
       contactIds.map(() => new Date()),
       lastUpdatedBys,
+      contactIds,
+      caseNumbers,
     )
 
     // Update CSA status for application contacts

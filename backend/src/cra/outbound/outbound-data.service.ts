@@ -17,6 +17,7 @@ export interface CraFileData {
 export interface BatchDetailWithContact {
   id: number
   transactionType: string
+  referenceNumber: string | null
   contact: {
     id: number
     firstName: string
@@ -73,7 +74,7 @@ export class OutboundDataService {
 
     return {
       tranCode: DETAIL_TRAN_CODE,
-      referenceNum: isApplication ? String(bd.id) : (contact.legacyFileNumber ?? ''),
+      referenceNum: bd.referenceNumber ?? '',
       businessNum: BUSINESS_NUM,
       tranType: isApplication ? TRAN_TYPE.APPLICATION : TRAN_TYPE.CANCELLATION,
 

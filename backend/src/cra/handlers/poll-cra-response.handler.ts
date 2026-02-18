@@ -121,7 +121,7 @@ export class PollCraResponseHandler extends BaseJob {
       data: {
         isDetailsProcessed: true,
         deliveredAt: new Date(),
-        referenceNumbers: details.map((d) => parseInt(d.referenceNum)),
+        referenceNumbers: details.map((d) => d.referenceNum),
       },
     })
 
@@ -129,10 +129,8 @@ export class PollCraResponseHandler extends BaseJob {
   }
 
   private async processResponseDetail(detail: CraResDetail): Promise<void> {
-    const detailId = parseInt(detail.referenceNum)
-
     const batchDetail = await this.prisma.contactBatchDetail.findUnique({
-      where: { id: detailId },
+      where: { referenceNumber: detail.referenceNum },
       select: {
         id: true,
         contactId: true,
@@ -154,9 +152,13 @@ export class PollCraResponseHandler extends BaseJob {
     )
 
     if (outcome === DETAIL_OUTCOME.ACCEPTED) {
-      await this.batchesService.updateBatchDetailStatus(detailId, BATCH_DETAIL_EVENT.CRA_ACCEPTED, {
-        additionalData: { systemComments },
-      })
+      await this.batchesService.updateBatchDetailStatus(
+        batchDetail.id,
+        BATCH_DETAIL_EVENT.CRA_ACCEPTED,
+        {
+          additionalData: { systemComments },
+        },
+      )
 
       const additionalData: Record<string, unknown> = {}
       if (din) {
@@ -176,21 +178,39 @@ export class PollCraResponseHandler extends BaseJob {
         { additionalData },
       )
       this.recordsAccepted++
-    } else if (outcome === DETAIL_OUTCOME.REJECTED || outcome === DETAIL_OUTCOME.FILE_ERROR) {
-      await this.batchesService.updateBatchDetailStatus(detailId, BATCH_DETAIL_EVENT.CRA_REJECTED, {
-        additionalData: { systemComments },
-      })
+    } else if (outcome === DETAIL_OUTCOME.FILE_ERROR) {
+      await this.batchesService.updateBatchDetailStatus(
+        batchDetail.id,
+        BATCH_DETAIL_EVENT.CRA_FILE_REJECTED,
+        {
+          additionalData: { systemComments },
+        },
+      )
       await this.contactsService.updateCsaStatus(
         batchDetail.contactId,
-        CSA_EVENT.CRA_REJECTED,
+        CSA_EVENT.CRA_FILE_REJECTED,
+        UPDATED_BY.SYSTEM,
+      )
+      this.recordsRejected++
+    } else if (outcome === DETAIL_OUTCOME.REJECTED) {
+      await this.batchesService.updateBatchDetailStatus(
+        batchDetail.id,
+        BATCH_DETAIL_EVENT.CRA_RECORD_REJECTED,
+        {
+          additionalData: { systemComments },
+        },
+      )
+      await this.contactsService.updateCsaStatus(
+        batchDetail.contactId,
+        CSA_EVENT.CRA_RECORD_REJECTED,
         UPDATED_BY.SYSTEM,
       )
       this.recordsRejected++
     } else {
       // recycled: no state change, just update system comments
-      this.logger.log(`Detail ${detailId} recycled, no status change`)
+      this.logger.log(`Detail ${batchDetail.id} recycled, no status change`)
       await this.prisma.contactBatchDetail.update({
-        where: { id: detailId },
+        where: { id: batchDetail.id },
         data: { systemComments, lastUpdatedBy: UPDATED_BY.SYSTEM },
       })
       this.recordsRecycled++

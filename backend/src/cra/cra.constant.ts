@@ -50,7 +50,7 @@ export const CRA_DATA_HANDLING_CONSTANT = {
     TRAN_ACCEPTED: '1',
     TRAN_REJECTED: '2',
     TRAN_RECYCLED: '3',
-    PROBLEM_DEDUCTED: '4',
+    PROBLEM_DETECTED: '4',
   },
   ERROR_MESSAGE: {
     FILE_STAT_MESSAGE: {
@@ -68,7 +68,7 @@ export const CRA_DATA_HANDLING_CONSTANT = {
       '1': 'Transaction Accepted',
       '2': 'Transaction Rejected',
       '3': 'Transaction Recycled',
-      '4': 'Problem deducted',
+      '4': 'Problem Detected',
     },
     REJECT_CODE: {
       '001':

@@ -35,6 +35,7 @@ const makeDetail = (overrides = {}) => ({
   contactId: 1,
   batchId: 1,
   transactionType: 'application',
+  referenceNumber: 'LFN001-100',
   status: 'pending',
   contact: makeContact(),
   ...overrides,
@@ -116,11 +117,11 @@ describe('OutboundDataService', () => {
       expect(result.details[0].tranType).toBe(2)
     })
 
-    it('should set referenceNum to the batch detail ID (as string)', () => {
-      const batchDetails = [makeDetail({ id: 42, transactionType: 'application' })]
+    it('should set referenceNum from batch detail referenceNumber', () => {
+      const batchDetails = [makeDetail({ referenceNumber: 'LFN001-42' })]
       const result = service.buildCraFileData(batchDetails)
 
-      expect(result.details[0].referenceNum).toBe('42')
+      expect(result.details[0].referenceNum).toBe('LFN001-42')
     })
 
     it('should map contact fields correctly', () => {
@@ -204,20 +205,13 @@ describe('OutboundDataService', () => {
       expect(result.details[0].tranType).toBe(1)
     })
 
-    it('should set referenceNum to contact.legacyFileNumber for cancellations', () => {
-      const contact = makeContact({ legacyFileNumber: 'LFN001' })
-      const batchDetails = [makeDetail({ transactionType: 'cancellation', contact })]
+    it('should set referenceNum from batch detail referenceNumber for cancellations', () => {
+      const batchDetails = [
+        makeDetail({ transactionType: 'cancellation', referenceNumber: 'LFN001-200' }),
+      ]
       const result = service.buildCraFileData(batchDetails)
 
-      expect(result.details[0].referenceNum).toBe('LFN001')
-    })
-
-    it('should use empty string when legacyFileNumber is null for cancellations', () => {
-      const contact = makeContact({ legacyFileNumber: null })
-      const batchDetails = [makeDetail({ transactionType: 'cancellation', contact })]
-      const result = service.buildCraFileData(batchDetails)
-
-      expect(result.details[0].referenceNum).toBe('')
+      expect(result.details[0].referenceNum).toBe('LFN001-200')
     })
 
     it('should set cancelEndDate from contact.careEndDate', () => {

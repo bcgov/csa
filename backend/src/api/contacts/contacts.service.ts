@@ -203,7 +203,13 @@ export class ContactsService {
     const currentState = contact.csaStatus ?? ''
 
     // For RESUME, pass the stored resumeStatus as the target state
-    const targetState = event === CSA_EVENT.RESUME ? (contact.resumeStatus ?? undefined) : undefined
+    // For CRA_FILE_REJECTED, pass the stored preBatchStatus as the target state
+    const targetState =
+      event === CSA_EVENT.RESUME
+        ? (contact.resumeStatus ?? undefined)
+        : event === CSA_EVENT.CRA_FILE_REJECTED
+          ? (contact.preBatchStatus ?? undefined)
+          : undefined
 
     // Use state machine to validate and get next state
     const result = this.stateMachine.transitionContact(currentState, event, actor, targetState)
@@ -223,16 +229,31 @@ export class ContactsService {
       ...options?.additionalData,
     }
 
-    // Handle HOLD - save current state to resumeStatus
+    // save current state to resumeStatus
     if (event === CSA_EVENT.HOLD) {
       updateData.resumeStatus = currentState
       updateData.holdBy = options?.userId
     }
 
-    // Handle RESUME - clear resume fields
+    // clear resume fields
     if (event === CSA_EVENT.RESUME) {
       updateData.resumeStatus = null
       updateData.holdBy = null
+    }
+
+    // save current state to preBatchStatus (only if not already set)
+    if (event === CSA_EVENT.ADD_TO_BATCH && !contact.preBatchStatus) {
+      updateData.preBatchStatus = currentState
+    }
+
+    // clear preBatchStatus (batch flow succeeded)
+    if (event === CSA_EVENT.CRA_ACCEPTED) {
+      updateData.preBatchStatus = null
+    }
+
+    // clear preBatchStatus (rolled back)
+    if (event === CSA_EVENT.CRA_FILE_REJECTED) {
+      updateData.preBatchStatus = null
     }
 
     await this.prisma.contact.update({

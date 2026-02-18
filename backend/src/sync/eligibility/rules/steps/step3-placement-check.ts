@@ -8,10 +8,10 @@ const ACTIVE_STATUSES = ['Active', 'Interrupted']
  * STEP 3: Check Placement / Non-Placement Location
  * Analyzes placements and enriches context for downstream rules.
  *
- * - Active/Interrupted Placement found → Step 4 (continue chain)
- * - Only Non-Placement Location found → Step 8
- * - Both Placement + Non-Placement → Step 4 (flag hasNonPlacement)
- * - No placement found → Step 8
+ * - Active/Interrupted Placement found->Step 4 (continue chain)
+ * - Only Non-Placement Location found->Step 8
+ * - Both Placement + Non-Placement->Step 4 (flag hasNonPlacement)
+ * - No placement found->Step 8
  */
 export const step3_PlacementCheck: EligibilityRule = {
   name: 'step3_PlacementCheck',

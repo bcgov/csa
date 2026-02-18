@@ -183,7 +183,7 @@ describe('CRA Detail format', () => {
   })
 })
 
-describe('OutboundDataService → OutboundFileService integration', () => {
+describe('OutboundDataService->OutboundFileService integration', () => {
   let fileCreateService: OutboundFileService
   let craDataService: OutboundDataService
 

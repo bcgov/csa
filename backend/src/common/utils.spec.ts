@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
+  firstDayOfPreviousMonth,
   formatDate,
   formatDateTime,
-  firstDayOfPreviousMonth,
   getAgeCutoffDate,
   isEligibleAge,
 } from './utils'
@@ -67,10 +67,10 @@ describe('getAgeCutoffDate', () => {
     expect(result.getMonth()).toBe(1)
   })
 
-  it('should handle leap day reference (Feb 29 → non-leap year)', () => {
-    // Feb 29, 2024 → 18 years back = 2006, which has no Feb 29
-    // Without fix: setFullYear rolls to Mar 1 2006, setDate(1) → Mar 1
-    // With fix: setDate(1) → Feb 1 2024, setFullYear → Feb 1 2006 ✓
+  it('should handle leap day reference (Feb 29->non-leap year)', () => {
+    // Feb 29, 2024->18 years back = 2006, which has no Feb 29
+    // Without fix: setFullYear rolls to Mar 1 2006, setDate(1)->Mar 1
+    // With fix: setDate(1)->Feb 1 2024, setFullYear->Feb 1 2006 ✓
     const result = getAgeCutoffDate(new Date(2024, 1, 29))
     expect(result.getFullYear()).toBe(2006)
     expect(result.getMonth()).toBe(1) // February
@@ -86,17 +86,17 @@ describe('isEligibleAge', () => {
   })
 
   it('should return true for child turning 18 in current month', () => {
-    // Born Feb 5, 2008 → eligible through end of Feb 2026
+    // Born Feb 5, 2008->eligible through end of Feb 2026
     expect(isEligibleAge(new Date(2008, 1, 5), REF_DATE)).toBe(true)
   })
 
   it('should return true for child born on first of cutoff month', () => {
-    // Born Feb 1, 2008 → cutoff is Feb 1, 2008 → eligible (>=)
+    // Born Feb 1, 2008->cutoff is Feb 1, 2008->eligible (>=)
     expect(isEligibleAge(new Date(2008, 1, 1), REF_DATE)).toBe(true)
   })
 
   it('should return false for child born before cutoff month', () => {
-    // Born Jan 31, 2008 → cutoff is Feb 1, 2008 → not eligible
+    // Born Jan 31, 2008->cutoff is Feb 1, 2008->not eligible
     expect(isEligibleAge(new Date(2008, 0, 31), REF_DATE)).toBe(false)
   })
 

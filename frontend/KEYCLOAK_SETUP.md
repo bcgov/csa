@@ -75,13 +75,13 @@ Contact your Keycloak administrator to obtain:
 
 ### 5. How Authentication Works
 
-1. **User visits the app** → AuthProvider initializes Keycloak
-2. **Check SSO status** → Keycloak checks if user is already authenticated
-3. **If not authenticated** → User sees "Login with IDIR (SSO)" button
-4. **User clicks login** → Redirected to Keycloak login page
-5. **User authenticates** → Redirected back to app with token
-6. **Token stored** → Token stored in localStorage and refreshed automatically
-7. **User info available** → User details available via `useAuth` hook
+1. **User visits the app**->AuthProvider initializes Keycloak
+2. **Check SSO status**->Keycloak checks if user is already authenticated
+3. **If not authenticated**->User sees "Login with IDIR (SSO)" button
+4. **User clicks login**->Redirected to Keycloak login page
+5. **User authenticates**->Redirected back to app with token
+6. **Token stored**->Token stored in localStorage and refreshed automatically
+7. **User info available**->User details available via `useAuth` hook
 
 ### 6. Using Authentication in Components
 

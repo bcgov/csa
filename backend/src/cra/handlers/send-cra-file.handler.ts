@@ -67,10 +67,10 @@ export class SendCraFileHandler extends BaseJob {
       return
     }
 
-    // Transition batch → in_progress
+    // Transition batch->in_progress
     await this.batchesService.updateBatchStatus(this.batch.id, BATCH_EVENT.SEND_TO_CRA)
 
-    // Transition batch details → in_progress (skip if already in_progress on retry)
+    // Transition batch details->in_progress (skip if already in_progress on retry)
     for (const detail of this.batchDetails) {
       if (detail.status !== BATCH_DETAIL_STATUS.IN_PROGRESS) {
         await this.batchesService.updateBatchDetailStatus(detail.id, BATCH_EVENT.SEND_TO_CRA)
@@ -88,7 +88,7 @@ export class SendCraFileHandler extends BaseJob {
       this.batchDetails,
     )
 
-    // Get next sequence number (wraps 9999 → 1)
+    // Get next sequence number (wraps 9999->1)
     const lastSequence = await this.prisma.transferFile.aggregate({
       _max: { sequenceNumber: true },
       where: { direction: FILE_DIRECTION.OUTBOUND },

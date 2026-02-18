@@ -34,7 +34,7 @@ const PRODUCTS = [
   'Maintenance',
 ] as const
 
-// Valid resume targets from the state machine (ON_HOLD → RESUME → one of these)
+// Valid resume targets from the state machine (ON_HOLD->RESUME->one of these)
 const VALID_RESUME_TARGETS = [
   CSA_STATUS.ELIGIBLE_TBD,
   CSA_STATUS.APPLICATION_REFUSED_CRA,
@@ -269,7 +269,7 @@ async function seedBatches() {
   console.log('Seeded 6 batches.')
 }
 
-// Maps CSA status → { batchStatus, detailStatus, transactionType }
+// Maps CSA status->{ batchStatus, detailStatus, transactionType }
 const STATUS_BATCH_MAP: Record<
   string,
   { batchStatus: string; detailStatus: string; transactionType: string }

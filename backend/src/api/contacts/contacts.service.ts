@@ -264,7 +264,7 @@ export class ContactsService {
       data: updateData,
     })
 
-    this.logger.log(`Contact ${contactId}: ${currentState} → ${nextState} [${event}] by ${actor}`)
+    this.logger.log(`Contact ${contactId}: ${currentState}->${nextState} [${event}] by ${actor}`)
 
     if (actor === 'USER') {
       this.icmSyncBackService.syncSingleContact(contactId).catch((err) => {

@@ -884,6 +884,125 @@ describe('ContactsService', () => {
       expect(result.success).toBe(false)
       expect(result.reason).toBe('Contact not found')
     })
+
+    describe('preBatchStatus lifecycle', () => {
+      it('should set preBatchStatus on ADD_TO_BATCH when null', async () => {
+        const contact = { id: 1, csaStatus: 'eligible', preBatchStatus: null, resumeStatus: null }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'ADD_TO_BATCH', 'USER', { userId: 'user1' })
+
+        expect(result.success).toBe(true)
+        expect(result.to).toBe('in_batch_application')
+        expect(updateSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              preBatchStatus: 'eligible',
+            }),
+          }),
+        )
+      })
+
+      it('should NOT overwrite preBatchStatus on ADD_TO_BATCH when already set', async () => {
+        const contact = {
+          id: 1,
+          csaStatus: 'application_refused_cra',
+          preBatchStatus: 'eligible',
+          resumeStatus: null,
+        }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'ADD_TO_BATCH', 'USER', { userId: 'user1' })
+
+        expect(result.success).toBe(true)
+        expect(result.to).toBe('in_batch_application')
+        // preBatchStatus should NOT be in the update data
+        const updateCall = updateSpy.mock.calls[0][0] as any
+        expect(updateCall.data).not.toHaveProperty('preBatchStatus')
+      })
+
+      it('should clear preBatchStatus on CRA_ACCEPTED', async () => {
+        const contact = {
+          id: 1,
+          csaStatus: 'batch_sent_application',
+          preBatchStatus: 'eligible',
+          resumeStatus: null,
+        }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'CRA_ACCEPTED', 'SYSTEM')
+
+        expect(result.success).toBe(true)
+        expect(result.to).toBe('in_pay')
+        expect(updateSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              preBatchStatus: null,
+            }),
+          }),
+        )
+      })
+
+      it('should resolve CRA_FILE_REJECTED from preBatchStatus and clear it', async () => {
+        const contact = {
+          id: 1,
+          csaStatus: 'batch_sent_application',
+          preBatchStatus: 'eligible',
+          resumeStatus: null,
+        }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'CRA_FILE_REJECTED', 'SYSTEM')
+
+        expect(result.success).toBe(true)
+        expect(result.to).toBe('eligible')
+        expect(updateSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              csaStatus: 'eligible',
+              preBatchStatus: null,
+            }),
+          }),
+        )
+      })
+
+      it('should fail CRA_FILE_REJECTED when preBatchStatus is null', async () => {
+        const contact = {
+          id: 1,
+          csaStatus: 'batch_sent_application',
+          preBatchStatus: null,
+          resumeStatus: null,
+        }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+
+        const result = await service.updateCsaStatus(1, 'CRA_FILE_REJECTED', 'SYSTEM')
+
+        expect(result.success).toBe(false)
+      })
+
+      it('should NOT modify preBatchStatus on CRA_RECORD_REJECTED', async () => {
+        const contact = {
+          id: 1,
+          csaStatus: 'batch_sent_application',
+          preBatchStatus: 'eligible',
+          resumeStatus: null,
+        }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'CRA_RECORD_REJECTED', 'SYSTEM')
+
+        expect(result.success).toBe(true)
+        expect(result.to).toBe('application_refused_cra')
+        // preBatchStatus should NOT be in the update data
+        const updateCall = updateSpy.mock.calls[0][0] as any
+        expect(updateCall.data).not.toHaveProperty('preBatchStatus')
+      })
+    })
   })
 
   describe('findContactBatches', () => {

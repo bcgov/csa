@@ -46,10 +46,10 @@ describe('csaStatusMachine', () => {
       expect(state).toBe(CSA_STATUS.IN_PAY)
     })
 
-    it('should handle CRA rejection flow', () => {
+    it('should handle CRA record-level rejection flow', () => {
       let state = CSA_STATUS.BATCH_SENT_APPLICATION as string
 
-      state = getNextCsaState(state, CSA_EVENT.CRA_REJECTED) as string
+      state = getNextCsaState(state, CSA_EVENT.CRA_RECORD_REJECTED) as string
       expect(state).toBe(CSA_STATUS.APPLICATION_REFUSED_CRA)
 
       // Can retry by adding to batch again
@@ -110,6 +110,28 @@ describe('csaStatusMachine', () => {
 
       state = getNextCsaState(state, CSA_EVENT.CRA_ACCEPTED) as string
       expect(state).toBe(CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY)
+    })
+  })
+
+  describe('file-level rejection flow', () => {
+    it('should return array of valid targets for CRA_FILE_REJECTED from batch_sent_application', () => {
+      const targets = getNextCsaState(
+        CSA_STATUS.BATCH_SENT_APPLICATION,
+        CSA_EVENT.CRA_FILE_REJECTED,
+      )
+      expect(Array.isArray(targets)).toBe(true)
+      expect(targets).toContain(CSA_STATUS.ELIGIBLE)
+      expect(targets).toContain(CSA_STATUS.ELIGIBLE_TBD)
+    })
+
+    it('should return array of valid targets for CRA_FILE_REJECTED from batch_sent_cancellation', () => {
+      const targets = getNextCsaState(
+        CSA_STATUS.BATCH_SENT_CANCELLATION,
+        CSA_EVENT.CRA_FILE_REJECTED,
+      )
+      expect(Array.isArray(targets)).toBe(true)
+      expect(targets).toContain(CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
+      expect(targets).toContain(CSA_STATUS.NOT_ELIGIBLE_IP_TBD)
     })
   })
 

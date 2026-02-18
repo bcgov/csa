@@ -67,21 +67,15 @@ describe('PollCraResponseHandler', () => {
         const systemComments = rejectCodes.length > 0 ? rejectCodes.join('; ') : null
         const din = detail.ccraDinNum?.trim() || null
 
-        if (
-          detail.tranStatCd === TRAN_STAT_CODE.TRAN_ACCEPTED ||
-          detail.tranStatCd === TRAN_STAT_CODE.PROBLEM_DEDUCTED
-        ) {
+        if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_ACCEPTED) {
           return { outcome: DETAIL_OUTCOME.ACCEPTED, systemComments, din }
-        }
-
-        if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_REJECTED) {
-          return { outcome: DETAIL_OUTCOME.REJECTED, systemComments, din: null }
         }
 
         if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_RECYCLED) {
           return { outcome: DETAIL_OUTCOME.RECYCLED, systemComments, din: null }
         }
 
+        // REJECTED, PROBLEM_DETECTED, NOT_SET, or any unknown code
         return { outcome: DETAIL_OUTCOME.REJECTED, systemComments, din: null }
       }),
     }
@@ -217,12 +211,12 @@ describe('PollCraResponseHandler', () => {
 
       expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
         100,
-        BATCH_DETAIL_EVENT.CRA_REJECTED,
+        BATCH_DETAIL_EVENT.CRA_FILE_REJECTED,
         { additionalData: { systemComments: expect.any(String) } },
       )
       expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
         1,
-        CSA_EVENT.CRA_REJECTED,
+        CSA_EVENT.CRA_FILE_REJECTED,
         'SYSTEM',
       )
     })
@@ -369,7 +363,7 @@ describe('PollCraResponseHandler', () => {
   // ─── Rejected transaction (tranStatCd='2', not 998) ─────────────────────────
 
   describe('Rejected transaction (tranStatCd=2, not 998)', () => {
-    it('should call updateBatchDetailStatus with CRA_REJECTED and systemComments', async () => {
+    it('should call updateBatchDetailStatus with CRA_RECORD_REJECTED and systemComments', async () => {
       const detail = makeDetail({
         referenceNum: '100',
         tranStatCd: TRAN_STAT_CODE.TRAN_REJECTED,
@@ -386,12 +380,12 @@ describe('PollCraResponseHandler', () => {
 
       expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
         100,
-        BATCH_DETAIL_EVENT.CRA_REJECTED,
+        BATCH_DETAIL_EVENT.CRA_RECORD_REJECTED,
         { additionalData: { systemComments: expect.any(String) } },
       )
     })
 
-    it('should call updateCsaStatus with CRA_REJECTED', async () => {
+    it('should call updateCsaStatus with CRA_RECORD_REJECTED', async () => {
       const detail = makeDetail({
         referenceNum: '100',
         tranStatCd: TRAN_STAT_CODE.TRAN_REJECTED,
@@ -408,7 +402,7 @@ describe('PollCraResponseHandler', () => {
 
       expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
         1,
-        CSA_EVENT.CRA_REJECTED,
+        CSA_EVENT.CRA_RECORD_REJECTED,
         'SYSTEM',
       )
     })
@@ -514,69 +508,65 @@ describe('PollCraResponseHandler', () => {
 
   // ─── Problem deducted (tranStatCd='4') ──────────────────────────────────────
 
-  describe('Problem deducted (tranStatCd=4)', () => {
-    it('should treat as accepted and call updateBatchDetailStatus with CRA_ACCEPTED', async () => {
+  describe('Problem detected (tranStatCd=4)', () => {
+    it('should treat as rejected and call updateBatchDetailStatus with CRA_RECORD_REJECTED', async () => {
       const detail = makeDetail({
         referenceNum: '100',
-        tranStatCd: TRAN_STAT_CODE.PROBLEM_DEDUCTED,
+        tranStatCd: TRAN_STAT_CODE.PROBLEM_DETECTED,
       })
       setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
-      mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.ERROR },
       ])
 
       await handler.execute(mockContext)
 
       expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
         100,
-        BATCH_DETAIL_EVENT.CRA_ACCEPTED,
+        BATCH_DETAIL_EVENT.CRA_RECORD_REJECTED,
         { additionalData: { systemComments: null } },
       )
     })
 
-    it('should treat as accepted and call updateCsaStatus with CRA_ACCEPTED', async () => {
+    it('should treat as rejected and call updateCsaStatus with CRA_RECORD_REJECTED', async () => {
       const detail = makeDetail({
         referenceNum: '100',
-        tranStatCd: TRAN_STAT_CODE.PROBLEM_DEDUCTED,
+        tranStatCd: TRAN_STAT_CODE.PROBLEM_DETECTED,
       })
       setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
-      mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.ERROR },
       ])
 
       await handler.execute(mockContext)
 
       expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
         1,
-        CSA_EVENT.CRA_ACCEPTED,
+        CSA_EVENT.CRA_RECORD_REJECTED,
         'SYSTEM',
-        { additionalData: {} },
       )
     })
 
-    it('should increment records_accepted (not records_rejected)', async () => {
+    it('should increment records_rejected (not records_accepted)', async () => {
       const detail = makeDetail({
         referenceNum: '100',
-        tranStatCd: TRAN_STAT_CODE.PROBLEM_DEDUCTED,
+        tranStatCd: TRAN_STAT_CODE.PROBLEM_DETECTED,
       })
       setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
-      mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.ERROR },
       ])
 
       const result = await handler.execute(mockContext)
 
-      expect(result.metadata.records_accepted).toBe(1)
-      expect(result.metadata.records_rejected).toBe(0)
+      expect(result.metadata.records_rejected).toBe(1)
+      expect(result.metadata.records_accepted).toBe(0)
     })
   })
 
@@ -596,12 +586,12 @@ describe('PollCraResponseHandler', () => {
 
       expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
         100,
-        BATCH_DETAIL_EVENT.CRA_REJECTED,
+        BATCH_DETAIL_EVENT.CRA_RECORD_REJECTED,
         { additionalData: { systemComments: null } },
       )
       expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
         1,
-        CSA_EVENT.CRA_REJECTED,
+        CSA_EVENT.CRA_RECORD_REJECTED,
         'SYSTEM',
       )
     })
@@ -697,7 +687,7 @@ describe('PollCraResponseHandler', () => {
         data: {
           isDetailsProcessed: true,
           deliveredAt: expect.any(Date),
-          referenceNumbers: [100],
+          referenceNumbers: ['100'],
         },
       })
     })
@@ -720,7 +710,7 @@ describe('PollCraResponseHandler', () => {
       expect(mockPrisma.transferFile.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: expect.objectContaining({
-          referenceNumbers: [100, 200],
+          referenceNumbers: ['100', '200'],
         }),
       })
     })

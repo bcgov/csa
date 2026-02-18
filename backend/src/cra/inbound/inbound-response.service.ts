@@ -178,24 +178,15 @@ export class InboundResponseService {
     const systemComments = this.buildSystemComment(errorMessage || null, existingComments)
     const din = detail.ccraDinNum?.trim() || null
 
-    // TODO: PROBLEM_DEDUCTED (tranStatCd=4) not covered in spec
-    // should it be treated as ACCEPTED or handled differently ?
-    if (
-      detail.tranStatCd === TRAN_STAT_CODE.TRAN_ACCEPTED ||
-      detail.tranStatCd === TRAN_STAT_CODE.PROBLEM_DEDUCTED
-    ) {
+    if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_ACCEPTED) {
       return { outcome: DETAIL_OUTCOME.ACCEPTED, systemComments, din }
-    }
-
-    if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_REJECTED) {
-      return { outcome: DETAIL_OUTCOME.REJECTED, systemComments, din: null }
     }
 
     if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_RECYCLED) {
       return { outcome: DETAIL_OUTCOME.RECYCLED, systemComments, din: null }
     }
 
-    // TODO: Verify with spec whether NOT_SET (0) should be treated as rejected or handled differently
+    // REJECTED, PROBLEM_DETECTED, NOT_SET, or any unknown code
     return { outcome: DETAIL_OUTCOME.REJECTED, systemComments, din: null }
   }
 }

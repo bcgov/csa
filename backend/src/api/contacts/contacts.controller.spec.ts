@@ -3,8 +3,14 @@ import { NotFoundException } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
+import { CSAGuard } from '../common/guards/csa.guard'
 import { ContactsController } from './contacts.controller'
 import { ContactsService } from './contacts.service'
+
+// Mock guard that always allows access
+const mockCSAGuard = {
+  canActivate: () => true,
+}
 
 describe('ContactsController', () => {
   let controller: ContactsController
@@ -45,7 +51,10 @@ describe('ContactsController', () => {
           useValue: mockContactsService,
         },
       ],
-    }).compile()
+    })
+      .overrideGuard(CSAGuard)
+      .useValue(mockCSAGuard)
+      .compile()
 
     controller = module.get<ContactsController>(ContactsController)
     service = module.get<ContactsService>(ContactsService)

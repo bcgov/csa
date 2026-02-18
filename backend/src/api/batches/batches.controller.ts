@@ -1,10 +1,12 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post } from '@nestjs/common'
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common'
 import { ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { AddContactsDto } from '../batches/dto/add-contact.dto'
+import { CSAGuard } from '../common/guards/csa.guard'
 import { BatchesService } from './batches.service'
 
 @ApiTags('batches')
 @Controller('batches')
+@UseGuards(CSAGuard)
 export class BatchesController {
   constructor(private readonly batchesService: BatchesService) {}
 

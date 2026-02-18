@@ -2,9 +2,15 @@ import type { INestApplication } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
+import { CSAGuard } from '../common/guards/csa.guard'
 import { BATCH_STATUSES } from '../contacts/constants'
 import { BatchesController } from './batches.controller'
 import { BatchesService } from './batches.service'
+
+// Mock guard that always allows access
+const mockCSAGuard = {
+  canActivate: () => true,
+}
 
 describe('BatchesController', () => {
   let app: INestApplication
@@ -23,7 +29,10 @@ describe('BatchesController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [BatchesController],
       providers: [{ provide: BatchesService, useValue: mockBatchesService }],
-    }).compile()
+    })
+      .overrideGuard(CSAGuard)
+      .useValue(mockCSAGuard)
+      .compile()
 
     app = module.createNestApplication()
     await app.init()

@@ -22,7 +22,7 @@ export class AdminService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly keycloakAuthService: KeycloakAuthService,
-  ) {}
+  ) { }
   /**
    * Decode JWT token and extract user information
    * @param token - JWT token from Authorization header
@@ -373,12 +373,13 @@ export class AdminService {
         GetChildren: 'false',
         childlinks: 'None',
         QueryHierarchy: JSON.stringify(queryHierarchy),
+        workspace: "int_release_5.4"
       })
 
-      const workspace = this.configService.get<string>('icm.workspace')
-      if (workspace) {
-        params.set('workspace', workspace)
-      }
+      // const workspace = this.configService.get<string>('icm.workspace')
+      // if (workspace) {
+      //   params.set('workspace', workspace)
+      // }
 
       const response = await firstValueFrom(
         this.httpService.get(`${icmApiUrl}/Employee/Employee?${params.toString()}`, {

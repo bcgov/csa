@@ -1,12 +1,14 @@
-import { Body, Controller, Get, HttpException, Param, Post, Query } from '@nestjs/common'
+import { Body, Controller, Get, HttpException, Param, Post, Query, UseGuards } from '@nestjs/common'
 import { ApiBody, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
+import { CSAGuard } from '../common/guards/csa.guard'
 import { ContactsService } from './contacts.service'
 import { ContactDto } from './dto/contact.dto'
 import { BulkOperationResponse } from './interfaces'
 
 @ApiTags('contacts')
 @Controller('contacts')
+@UseGuards(CSAGuard)
 export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
 

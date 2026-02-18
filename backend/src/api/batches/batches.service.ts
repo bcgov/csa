@@ -176,9 +176,10 @@ export class BatchesService {
 
     const existingContacts = await this.prisma.contact.findMany({
       where: { id: { in: contactIds } },
-      select: { id: true },
+      select: { id: true, caseNumber: true },
     })
     const existingContactIds = new Set(existingContacts.map((c) => c.id))
+    const contactCaseMap = new Map(existingContacts.map((c) => [c.id, c.caseNumber]))
 
     const alreadyInBatch = await this.prisma.contactBatchDetail.findMany({
       where: {
@@ -196,17 +197,24 @@ export class BatchesService {
       } else if (alreadyInBatchIds.has(contactId)) {
         result.skipped.push({ id: contactId, reason: BULK_OPERATION_SKIP_REASONS.ALREADY_IN_BATCH })
       } else {
-        await this.prisma.contactBatchDetail.create({
-          data: {
-            contactId,
-            batchId: pendingBatch.id,
-            transactionType: TRANSACTION_TYPES.APPLICATION,
-            status: BATCH_STATUS.PENDING,
-            createdAt: now,
-            createdBy: userId,
-            lastUpdatedAt: now,
-            lastUpdatedBy: userId,
-          },
+        const caseNumber = contactCaseMap.get(contactId) ?? ''
+        await this.prisma.$transaction(async (tx) => {
+          const batchDetail = await tx.contactBatchDetail.create({
+            data: {
+              contactId,
+              batchId: pendingBatch.id,
+              transactionType: TRANSACTION_TYPES.APPLICATION,
+              status: BATCH_STATUS.PENDING,
+              createdAt: now,
+              createdBy: userId,
+              lastUpdatedAt: now,
+              lastUpdatedBy: userId,
+            },
+          })
+          await tx.contactBatchDetail.update({
+            where: { id: batchDetail.id },
+            data: { referenceNumber: `${caseNumber}-${batchDetail.id}` },
+          })
         })
         result.success.push(contactId)
       }

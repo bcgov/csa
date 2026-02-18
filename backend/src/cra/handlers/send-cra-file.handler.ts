@@ -103,7 +103,9 @@ export class SendCraFileHandler extends BaseJob {
         direction: FILE_DIRECTION.OUTBOUND,
         fileName,
         deliveredAt: new Date(),
-        referenceNumbers: this.batchDetails.map((d) => d.contactId),
+        referenceNumbers: this.batchDetails
+          .map((d) => d.referenceNumber)
+          .filter(Boolean) as string[],
       },
     })
 
@@ -150,8 +152,8 @@ export class SendCraFileHandler extends BaseJob {
     if (this.batch) {
       this.logger.error(`File transfer failed for batch ${this.batch.id}`, error)
       await this.batchesService.updateBatchStatus(this.batch.id, BATCH_EVENT.SEND_FAILED)
-      // TODO: Revert each contact's CSA status via FAILURE_IN_BATCH_TBD
-      // (in_batch_application → eligible_tbd, in_batch_cancellation → not_eligible_ip_tbd)
+      // TODO: Revert each contact's CSA status via CRA_FILE_REJECTED
+      // State transition to confirm
     }
   }
 }

@@ -219,6 +219,7 @@ describe('OutboundDataService → OutboundFileService integration', () => {
       {
         id: 100,
         transactionType: 'application',
+        referenceNumber: 'LFN001-100',
         contact: makeContact(),
       },
     ]
@@ -231,7 +232,7 @@ describe('OutboundDataService → OutboundFileService integration', () => {
 
     // Field positions (cumulative offsets)
     expect(line.substring(0, 4)).toBe('6134') // tranCode
-    expect(line.substring(4, 24).trim()).toBe('100') // referenceNum = batch detail ID
+    expect(line.substring(4, 24).trim()).toBe('LFN001-100') // referenceNum
     expect(line.substring(24, 39).trim()).toBe('885633354RA0001') // businessNum
     expect(line.substring(39, 40)).toBe('2') // tranType = application
     expect(line.substring(40, 70).trim()).toBe('EMILY') // childGivenName
@@ -260,6 +261,7 @@ describe('OutboundDataService → OutboundFileService integration', () => {
       {
         id: 200,
         transactionType: 'cancellation',
+        referenceNumber: 'LFN001-200',
         contact: makeContact(),
       },
     ]
@@ -271,7 +273,7 @@ describe('OutboundDataService → OutboundFileService integration', () => {
     expect(line.length).toBe(305)
 
     expect(line.substring(0, 4)).toBe('6134') // tranCode
-    expect(line.substring(4, 24).trim()).toBe('LFN001') // referenceNum = legacyFileNumber
+    expect(line.substring(4, 24).trim()).toBe('LFN001-200') // referenceNum
     expect(line.substring(39, 40)).toBe('1') // tranType = cancellation
     expect(line.substring(40, 70).trim()).toBe('EMILY') // childGivenName
     expect(line.substring(202, 277).trim()).toBe('') // 75-char filler (preceding recipient block)
@@ -287,6 +289,7 @@ describe('OutboundDataService → OutboundFileService integration', () => {
       {
         id: 100,
         transactionType: 'application',
+        referenceNumber: 'LFN001-100',
         contact: makeContact({ gender: 'Non-Binary' }),
       },
     ]

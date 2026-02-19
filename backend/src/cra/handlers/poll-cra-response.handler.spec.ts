@@ -1,15 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { PollCraResponseHandler } from './poll-cra-response.handler'
-import { JobType } from 'src/jobs/enums/job-type.enum'
-import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
-import { JobContext } from 'src/jobs/interfaces/job.interface'
 import {
   BATCH_DETAIL_EVENT,
   BATCH_DETAIL_STATUS,
   CSA_EVENT,
 } from 'src/common/state-machine/constants'
+import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
+import { JobType } from 'src/jobs/enums/job-type.enum'
+import { JobContext } from 'src/jobs/interfaces/job.interface'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { DETAIL_OUTCOME } from '../inbound/inbound.interface'
+import { PollCraResponseHandler } from './poll-cra-response.handler'
 
 const DESTINATION_ID = CRA_DATA_HANDLING_CONSTANT.DESTINATION_ID
 const { TRAN_STAT_CODE, FILE_STAT_CODE } = CRA_DATA_HANDLING_CONSTANT
@@ -47,6 +47,7 @@ describe('PollCraResponseHandler', () => {
   let mockPrisma: any
   let mockBatchesService: any
   let mockContactsService: any
+  let mockJobRunner: any
 
   beforeEach(() => {
     mockInboundFileService = {
@@ -108,12 +109,17 @@ describe('PollCraResponseHandler', () => {
       updateCsaStatus: vi.fn().mockResolvedValue({ success: true }),
     }
 
+    mockJobRunner = {
+      runJobType: vi.fn().mockResolvedValue({ success: true }),
+    }
+
     handler = new PollCraResponseHandler(
       mockInboundFileService,
       mockInboundResponseService,
       mockPrisma,
       mockBatchesService,
       mockContactsService,
+      mockJobRunner,
     )
   })
 
@@ -121,12 +127,9 @@ describe('PollCraResponseHandler', () => {
     expect(handler.jobType).toBe(JobType.POLL_CRA_RESPONSE)
   })
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
+  // Helpers
 
-  /**
-   * Sets up an unprocessed file in the DB (simulates a previously downloaded file).
-   * The handler queries transferFile.findMany for unprocessed files.
-   */
+  // Simulates a previously downloaded file.
   function setupUnprocessedFile(fileName: string, id = 1) {
     mockPrisma.transferFile.findMany.mockResolvedValue([
       { id, fileName, isDetailsProcessed: false, valid: true },
@@ -134,9 +137,7 @@ describe('PollCraResponseHandler', () => {
     mockInboundFileService.getLocalFilePath.mockReturnValue(`/tmp/cra-ftp/inbound/${fileName}`)
   }
 
-  /**
-   * Sets up parseFile to return the given details.
-   */
+  // Returns the given details object
   function setupParseFile(details: any[]) {
     mockInboundResponseService.parseFile.mockReturnValue({
       header: { recordCount: details.length + 2 },
@@ -144,9 +145,7 @@ describe('PollCraResponseHandler', () => {
     })
   }
 
-  /**
-   * Sets up a single batch detail lookup. Chain for multiple details.
-   */
+  // Returns a single batch detail lookup. Chain for multiple details.
   function setupBatchDetail(detailId: number, contactId: number, batchId: number) {
     mockPrisma.contactBatchDetail.findUnique.mockResolvedValueOnce({
       id: detailId,
@@ -156,8 +155,6 @@ describe('PollCraResponseHandler', () => {
       systemComments: null,
     })
   }
-
-  // ─── No new files ─────────────────────────────────────────────────────────
 
   describe('No new files', () => {
     it('should return success with files_processed: 0 when no unprocessed files', async () => {
@@ -177,8 +174,6 @@ describe('PollCraResponseHandler', () => {
     })
   })
 
-  // ─── Invalid file format ──────────────────────────────────────────────────
-
   describe('Invalid file format', () => {
     it('should return files_processed: 0 when no valid response file found', async () => {
       // downloadNewResponseFiles handles validation internally
@@ -191,8 +186,6 @@ describe('PollCraResponseHandler', () => {
       expect(mockInboundResponseService.parseFile).not.toHaveBeenCalled()
     })
   })
-
-  // ─── File-level validation (fileStatCd) ─────────────────────────────────
 
   describe('File-level validation (fileStatCd)', () => {
     it('should reject detail when fileStatCd is not FILE_OK', async () => {
@@ -239,8 +232,6 @@ describe('PollCraResponseHandler', () => {
       expect(result.metadata.records_accepted).toBe(0)
     })
   })
-
-  // ─── Accepted transaction (tranStatCd='1') ──────────────────────────────────
 
   describe('Accepted transaction (tranStatCd=1)', () => {
     it('should call updateBatchDetailStatus with CRA_ACCEPTED', async () => {
@@ -360,8 +351,6 @@ describe('PollCraResponseHandler', () => {
     })
   })
 
-  // ─── Rejected transaction (tranStatCd='2', not 998) ─────────────────────────
-
   describe('Rejected transaction (tranStatCd=2, not 998)', () => {
     it('should call updateBatchDetailStatus with CRA_RECORD_REJECTED and systemComments', async () => {
       const detail = makeDetail({
@@ -443,8 +432,6 @@ describe('PollCraResponseHandler', () => {
     })
   })
 
-  // ─── Recycled (tranStatCd='3') ──────────────────────────────────────────────
-
   describe('Recycled (tranStatCd=3)', () => {
     it('should NOT call updateBatchDetailStatus', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_RECYCLED })
@@ -505,8 +492,6 @@ describe('PollCraResponseHandler', () => {
       expect(result.metadata.records_recycled).toBe(1)
     })
   })
-
-  // ─── Problem deducted (tranStatCd='4') ──────────────────────────────────────
 
   describe('Problem detected (tranStatCd=4)', () => {
     it('should treat as rejected and call updateBatchDetailStatus with CRA_RECORD_REJECTED', async () => {
@@ -570,8 +555,6 @@ describe('PollCraResponseHandler', () => {
     })
   })
 
-  // ─── Unknown tranStatCd (fallthrough) ──────────────────────────────────────
-
   describe('Unknown tranStatCd (fallthrough)', () => {
     it('should treat unknown tranStatCd as rejected', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_NOT_SET })
@@ -610,8 +593,6 @@ describe('PollCraResponseHandler', () => {
       expect(result.metadata.records_rejected).toBe(1)
     })
   })
-
-  // ─── Mixed batch results ──────────────────────────────────────────────────
 
   describe('Mixed batch results', () => {
     it('should call aggregateBatchStatus for the batch after processing mixed details', async () => {
@@ -667,7 +648,31 @@ describe('PollCraResponseHandler', () => {
     })
   })
 
-  // ─── Mark file as processed ───────────────────────────────────────────────
+  describe('ICM sync-back trigger', () => {
+    it('should trigger standalone SYNC_ICM job when records were updated', async () => {
+      const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
+      setupUnprocessedFile(VALID_FILE_NAME)
+      setupParseFile([detail])
+      setupBatchDetail(100, 1, 10)
+      mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
+
+      await handler.execute(mockContext)
+
+      expect(mockJobRunner.runJobType).toHaveBeenCalledWith(JobType.SYNC_ICM, JobTrigger.SYSTEM)
+    })
+
+    it('should not trigger SYNC_ICM when no records were updated', async () => {
+      // Only recycled records — no accepted/rejected
+      const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_RECYCLED })
+      setupUnprocessedFile(VALID_FILE_NAME)
+      setupParseFile([detail])
+      setupBatchDetail(100, 1, 10)
+
+      await handler.execute(mockContext)
+
+      expect(mockJobRunner.runJobType).not.toHaveBeenCalled()
+    })
+  })
 
   describe('Mark file as processed', () => {
     it('should mark TransferFile as processed after processing details', async () => {
@@ -716,8 +721,6 @@ describe('PollCraResponseHandler', () => {
     })
   })
 
-  // ─── State reset on retry ─────────────────────────────────────────────────
-
   describe('State reset', () => {
     it('should reset counters at start of execute (handler reuse across retries)', async () => {
       // First execution: accepted detail
@@ -755,8 +758,6 @@ describe('PollCraResponseHandler', () => {
     })
   })
 
-  // ─── Batch detail not found ───────────────────────────────────────────────
-
   describe('Batch detail not found', () => {
     it('should skip detail when batch detail is not found in DB', async () => {
       const detail = makeDetail({ referenceNum: '999', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
@@ -772,8 +773,6 @@ describe('PollCraResponseHandler', () => {
       expect(mockContactsService.updateCsaStatus).not.toHaveBeenCalled()
     })
   })
-
-  // ─── File download and processing ─────────────────────────────────────────
 
   describe('File download and processing', () => {
     it('should call downloadNewResponseFiles with destination', async () => {
@@ -842,8 +841,6 @@ describe('PollCraResponseHandler', () => {
       expect(result.metadata.files_processed).toBe(1)
     })
   })
-
-  // ─── Batch with in_progress details remaining ─────────────────────────────
 
   describe('Batch with in_progress details remaining', () => {
     it('should call aggregateBatchStatus for the batch', async () => {

@@ -4,9 +4,11 @@ import { ContactsService } from 'src/api/contacts/contacts.service'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_DETAIL_EVENT, CSA_EVENT } from 'src/common/state-machine/constants'
 import { BaseJob } from 'src/jobs/base-job'
+import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
+import { JobRunner } from 'src/jobs/job-runner.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { InboundFileService } from '../inbound/inbound-file.service'
 import { InboundResponseService } from '../inbound/inbound-response.service'
@@ -34,6 +36,7 @@ export class PollCraResponseHandler extends BaseJob {
     private readonly prisma: PrismaService,
     private readonly batchesService: BatchesService,
     private readonly contactsService: ContactsService,
+    private readonly jobRunner: JobRunner,
   ) {
     super()
   }
@@ -69,6 +72,13 @@ export class PollCraResponseHandler extends BaseJob {
     // set bacth status based on batch details record
     for (const batchId of this.processedBatchIds) {
       await this.batchesService.aggregateBatchStatus(batchId)
+    }
+
+    // Fire sync flagged contacts to ICM Job
+    if (this.recordsAccepted + this.recordsRejected > 0) {
+      this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM).catch((err) => {
+        this.logger.warn(`Post-CRA ICM sync failed: ${(err as Error).message}`)
+      })
     }
 
     const totalUpdated = this.recordsAccepted + this.recordsRejected

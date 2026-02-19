@@ -52,7 +52,6 @@ describe('EligibilityService', () => {
   })
 
   it('should process contacts from staging and return stats', async () => {
-    // Mock: single query returns contact with pre-aggregated JSON arrays
     mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
       {
         caseRowId: 'CASE-1',
@@ -100,7 +99,6 @@ describe('EligibilityService', () => {
     expect(result.processed).toBe(1)
   })
 
-  // Helper to build a valid over-18 contact that triggers step10 (newStatus = 'over_18')
   function makeOver18Contact(overrides: Record<string, unknown> = {}) {
     return {
       caseRowId: 'CASE-1',
@@ -152,7 +150,7 @@ describe('EligibilityService', () => {
 
     const result = await service.run()
 
-    expect(result.statusChanges).toBe(1) // eligibility still determined a change
+    expect(result.statusChanges).toBe(1)
     expect(result.skipped).toBe(1)
     expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled()
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('empty/null in required fields'))
@@ -161,14 +159,14 @@ describe('EligibilityService', () => {
   it('should skip invalid contacts and upsert valid ones in same batch', async () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
       makeOver18Contact({ personIdIcm: 'ICM-VALID' }),
-      makeOver18Contact({ personIdIcm: null }), // invalid: null person_id_icm
+      makeOver18Contact({ personIdIcm: null }),
     ])
 
     const result = await service.run()
 
     expect(result.statusChanges).toBe(2)
     expect(result.skipped).toBe(1)
-    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1) // only the valid one
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
   })
 
   it('should report caseRowId and null fields in the warning', async () => {
@@ -190,8 +188,8 @@ describe('EligibilityService', () => {
     const result = await service.run()
 
     expect(result.processed).toBe(1)
-    expect(result.statusChanges).toBe(0) // no eligibility-driven status change
-    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1) // still upserted
+    expect(result.statusChanges).toBe(0)
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
   })
 
   it('should preserve protected status and run eligibility for others in same batch', async () => {
@@ -203,8 +201,8 @@ describe('EligibilityService', () => {
     const result = await service.run()
 
     expect(result.processed).toBe(2)
-    expect(result.statusChanges).toBe(1) // only the eligible one triggers a change
-    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1) // both upserted in one batch
+    expect(result.statusChanges).toBe(1)
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
   })
 
   it('should pass threshold to query when last success exists', async () => {
@@ -230,9 +228,9 @@ describe('EligibilityService', () => {
     )
   })
 
-  // -- Auto-batch tests --
+  // Helpers
 
-  // Helper: contact that reaches step 7->eligible (under 18, valid placement + order)
+  //contact that reaches step 7->eligible (under 18, valid placement + order)
   function makeEligibleContact(overrides: Record<string, unknown> = {}) {
     const prevMonth = new Date()
     prevMonth.setMonth(prevMonth.getMonth() - 1)
@@ -306,7 +304,7 @@ describe('EligibilityService', () => {
     }
   }
 
-  // Helper: in_pay contact that triggers step 9->not_eligible_in_pay (deceased)
+  // in_pay contact that triggers step 9->not_eligible_in_pay (deceased)
   function makeInPayCancelContact(overrides: Record<string, unknown> = {}) {
     return {
       caseRowId: 'CASE-C',
@@ -487,7 +485,7 @@ describe('buildLoadContactProfilesSql', () => {
     expect(sql).toContain('DISTINCT ON (cases.CONTACT_ROW_ID)')
 
     // ICM aggregation CTEs group by CONTACT_ROW_ID (not CASE_ROW_ID)
-    expect(sql).toContain('GROUP BY ec.CONTACT_ROW_ID')
+    expect(sql).toContain('GROUP BY eligible_cases.CONTACT_ROW_ID')
 
     // ICM agg joins use CONTACT_ROW_ID
     expect(sql).toContain('icm_plc.CONTACT_ROW_ID = cases.CONTACT_ROW_ID')
@@ -496,5 +494,49 @@ describe('buildLoadContactProfilesSql', () => {
 
     // No remaining CASE_ROW_ID joins in final SELECT
     expect(sql).not.toMatch(/LEFT JOIN.*CASE_ROW_ID = cases\.ROW_ID/)
+  })
+
+  it('should join legal authority on CONTACT_ROW_ID (PersonIcmId), not ROW_ID (CaseId)', () => {
+    const { sql } = buildLoadContactProfilesSql(null)
+
+    // latest_legal_auth joins on PersonIcmId
+    expect(sql).toContain('eligible_cases.CONTACT_ROW_ID = legal_auth.PAR_ROW_ID')
+    // Must NOT join on case ROW_ID
+    expect(sql).not.toContain('eligible_cases.ROW_ID = legal_auth.PAR_ROW_ID')
+  })
+
+  it('should join MIS data via LegacyFile (X_LEGACY_FILE_NUM), not person_id_mis', () => {
+    const { sql } = buildLoadContactProfilesSql(null)
+
+    // eligible_cases carries X_LEGACY_FILE_NUM
+    expect(sql).toContain('cases.X_LEGACY_FILE_NUM')
+
+    // MIS CTEs join through legacy file
+    expect(sql).toContain('eligible_cases.X_LEGACY_FILE_NUM = mis_plc.client_fileid_dep_no')
+
+    // MIS contracts join through placements
+    expect(sql).toContain('mis_con.contract_number = mis_plc.contract_no')
+
+    // MIS payments join through placements
+    expect(sql).toContain('mis_pay.contract_num = mis_plc.contract_no')
+
+    // Final SELECT joins MIS aggs on CONTACT_ROW_ID (not person_id_mis)
+    expect(sql).toContain('mis_pay.CONTACT_ROW_ID = cases.CONTACT_ROW_ID')
+    expect(sql).toContain('mis_con.CONTACT_ROW_ID = cases.CONTACT_ROW_ID')
+    expect(sql).toContain('mis_plc.CONTACT_ROW_ID = cases.CONTACT_ROW_ID')
+
+    // No MIS joins through person_id_mis
+    expect(sql).not.toMatch(/mis_pay\.person_id_mis/)
+    expect(sql).not.toMatch(/mis_con\.person_id_mis/)
+    expect(sql).not.toMatch(/mis_plc\.person_id_mis/)
+  })
+
+  it('should join changed_contacts MIS sections via LegacyFile', () => {
+    const { sql } = buildLoadContactProfilesSql(new Date('2026-02-12'))
+
+    expect(sql).not.toContain('FROM contacts mc')
+
+    expect(sql).toContain('legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID')
+    expect(sql).not.toContain('legal_auth.PAR_ROW_ID = cases.ROW_ID')
   })
 })

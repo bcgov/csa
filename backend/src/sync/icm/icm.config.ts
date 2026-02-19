@@ -87,7 +87,8 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
   },
 ]
 
-/** Configs for syncing data back to ICM */
+export const ICM_UPDATE_BATCH_LIMIT = 100
+
 export const ICM_SYNC_CONFIGS: IcmApiConfig[] = [
   {
     name: 'contacts',

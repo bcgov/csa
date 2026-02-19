@@ -737,6 +737,7 @@ export class EligibilityService {
         `UPDATE contacts SET
            csa_status = $1,
            csa_status_effective_date = NOW(),
+           icm_integration_status = true,
            last_updated_at = NOW(),
            last_updated_by = 'SYSTEM'
          WHERE id = ANY($2)`,
@@ -750,6 +751,7 @@ export class EligibilityService {
         `UPDATE contacts SET
            csa_status = $1,
            csa_status_effective_date = NOW(),
+           icm_integration_status = true,
            last_updated_at = NOW(),
            last_updated_by = 'SYSTEM'
          WHERE id = ANY($2)`,

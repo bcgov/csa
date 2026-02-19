@@ -29,7 +29,7 @@ export class MisService {
       this.logger.log('MIS ingestion disabled, skipping')
       return []
     }
-    const prefix = this.configService.get<string>('sync.misS3Prefix') || ''
+    const prefix = (this.configService.get<string>('sync.misS3Prefix') || '').replace(/^\//, '')
 
     const results: MisResult[] = []
     for (const config of MIS_FILE_CONFIGS) {

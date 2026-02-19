@@ -53,7 +53,7 @@ export class PollCraResponseHandler extends BaseJob {
 
     // newly downloaded + any previously failed
     const unprocessedResponseFiles = await this.prisma.transferFile.findMany({
-      where: { direction: FILE_DIRECTION.INBOUND, isDetailsProcessed: false, valid: true },
+      where: { direction: FILE_DIRECTION.INBOUND, isDetailsProcessed: false, isValid: true },
     })
 
     if (unprocessedResponseFiles.length === 0) {
@@ -111,7 +111,7 @@ export class PollCraResponseHandler extends BaseJob {
       this.logger.error(`Failed to parse response file ${responseFile.fileName}: ${error}`)
       await this.prisma.transferFile.update({
         where: { id: responseFile.id },
-        data: { valid: false, isDetailsProcessed: true },
+        data: { isValid: false, isDetailsProcessed: true },
       })
       return 0
     }

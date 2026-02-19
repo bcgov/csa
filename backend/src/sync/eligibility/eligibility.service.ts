@@ -149,12 +149,13 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
   {
     dbColumn: 'service_provider_name',
     pgType: 'text',
-    extract: (c) => c.primaryPlacement?.serviceProviderName ?? null,
+    extract: (c) =>
+      c.primaryPlacement?.serviceProviderName ?? c.primaryAgreement?.serviceProviderName ?? null,
   },
   {
     dbColumn: 'provider_id',
     pgType: 'text',
-    extract: (c) => c.primaryPlacement?.providerId ?? null,
+    extract: (c) => c.primaryPlacement?.providerId ?? c.primaryAgreement?.providerId ?? null,
   },
   {
     dbColumn: 'place_of_service_name',
@@ -189,7 +190,7 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
   {
     dbColumn: 'mcfd_contract',
     pgType: 'text',
-    extract: (c) => c.primaryAgreement?.mcfdContract ?? null,
+    extract: (c) => c.primaryAgreement?.mcfdContract ?? c.primaryPlacement?.contractNumber ?? null,
   },
   { dbColumn: 'order_number', pgType: 'text', extract: (c) => c.primaryOrder?.orderNumber ?? null },
   { dbColumn: 'order_type', pgType: 'text', extract: (c) => c.primaryOrder?.orderType ?? null },
@@ -224,7 +225,7 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
     conflictMode: 'coalesce',
   },
   { dbColumn: 'is_in_eligible', pgType: 'boolean', extract: (c) => c.profile.isInEligible },
-  { dbColumn: 'deceased_flag', pgType: 'text', extract: (c) => c.profile.deceased },
+  { dbColumn: 'is_deceased', pgType: 'text', extract: (c) => c.profile.deceased },
 ]
 
 // Pre-computed list of required columns for validation
@@ -474,6 +475,8 @@ export class EligibilityService {
           agreementEndDate: contract.endDate ? new Date(contract.endDate) : null,
           terminationDate: contract.terminationDate ? new Date(contract.terminationDate) : null,
           mcfdContract: contract.contractNumber ?? null,
+          serviceProviderName: contract.serviceProviderName ?? null,
+          providerId: contract.providerId ?? null,
           source: 'MIS',
         }),
       )

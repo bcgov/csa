@@ -54,14 +54,10 @@ export class MisService {
     const readable = await this.fileStorage.download(key)
     this.logger.log(`${config.name}: S3 download successful for ${key}`)
 
-    // TODO: re-enable DB load once MIS CSV import is finalized
-    // const rows = await this.truncateAndCopy(config, readable)
-    // await this.moveToProcessed(key)
-    // this.logger.log(`${config.name}: loaded ${rows} rows via COPY`)
-    // return { name: config.name, rows }
-    readable.destroy()
-
-    return { name: config.name, rows: 0, skipped: true }
+    const rows = await this.truncateAndCopy(config, readable)
+    await this.moveToProcessed(key)
+    this.logger.log(`${config.name}: loaded ${rows} rows via COPY`)
+    return { name: config.name, rows }
   }
 
   private async moveToProcessed(key: string): Promise<void> {

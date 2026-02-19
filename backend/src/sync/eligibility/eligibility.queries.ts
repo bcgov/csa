@@ -50,28 +50,26 @@ const CHANGED_CONTACTS_CTE = `
 
       UNION
 
-      -- MIS: payments with recent last_updated_date (via LegacyFile -> placement -> payment)
+      -- MIS: payments with recent last_updated_date (via person_id_mis on cases)
       SELECT DISTINCT cases.CONTACT_ROW_ID
       FROM stg_icm_cases cases
-      INNER JOIN stg_mis_placements mis_plc ON mis_plc.client_fileid_dep_no = cases.X_LEGACY_FILE_NUM
-      INNER JOIN stg_mis_payments mis_pay ON mis_pay.contract_num = mis_plc.contract_no
+      INNER JOIN stg_mis_payments mis_pay ON mis_pay.person_id_mis = cases.PERSON_ID_MIS
       WHERE mis_pay.last_updated_date::DATE >= $1
 
       UNION
 
-      -- MIS: placements with recent last_updated_date (via LegacyFile)
+      -- MIS: placements with recent last_updated_date (via person_id_mis on cases)
       SELECT DISTINCT cases.CONTACT_ROW_ID
       FROM stg_icm_cases cases
-      INNER JOIN stg_mis_placements mis_plc ON mis_plc.client_fileid_dep_no = cases.X_LEGACY_FILE_NUM
+      INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
       WHERE mis_plc.last_updated_date::DATE >= $1
 
       UNION
 
-      -- MIS: contracts with recent last_updated_date (via LegacyFile -> placement -> contract)
+      -- MIS: contracts with recent last_updated_date (via person_id_mis on cases)
       SELECT DISTINCT cases.CONTACT_ROW_ID
       FROM stg_icm_cases cases
-      INNER JOIN stg_mis_placements mis_plc ON mis_plc.client_fileid_dep_no = cases.X_LEGACY_FILE_NUM
-      INNER JOIN stg_mis_contracts mis_con ON mis_con.contract_number = mis_plc.contract_no
+      INNER JOIN stg_mis_contracts mis_con ON mis_con.person_id_mis = cases.PERSON_ID_MIS
       WHERE mis_con.last_updated_date::DATE >= $1
     ),`
 
@@ -93,7 +91,7 @@ const CHANGED_CONTACTS_CTE = `
  * Join topology (matches ICM/MIS data model):
  *  ICM: Cases -[CaseId]-> N Placements -[AgreementID]-> 1 Agreement -[AgreementID]-> N Orders
  *       Cases -[PersonIcmId]-> N LegalAuthority -[code]-> 1 LegalAuthorityAdmin
- *  MIS: Cases -[LegacyFile]-> N Placements -[contract]-> 1 Contract -[contract]-> N Payments
+ *  MIS: Cases -[PERSON_ID_MIS]-> N Payments, N Contracts, N Placements
  *
  * CTEs:
  *  - changed_contacts (incremental only): contacts with recently changed data
@@ -102,13 +100,13 @@ const CHANGED_CONTACTS_CTE = `
  *  - icm_placements_agg: active/interrupted ICM placements grouped by contact
  *  - icm_orders_agg: ICM orders grouped by contact (via placement -> agreement)
  *  - icm_agreements_agg: ICM agreements grouped by contact (via placement)
- *  - mis_payments_agg: MIS payments grouped by contact (via LegacyFile -> placement -> contract)
- *  - mis_contracts_agg: MIS contracts grouped by contact (via LegacyFile -> placement)
- *  - mis_placements_agg: active/interrupted MIS placements grouped by contact (via LegacyFile)
+ *  - mis_payments_agg: MIS payments grouped by contact (via PERSON_ID_MIS)
+ *  - mis_contracts_agg: MIS contracts grouped by contact (via PERSON_ID_MIS)
+ *  - mis_placements_agg: active/interrupted/ended MIS placements grouped by contact (via PERSON_ID_MIS)
  *
  * Join keys:
  *  - ICM data joins on CONTACT_ROW_ID (aggregated across all cases)
- *  - MIS data joins on X_LEGACY_FILE_NUM -> client_fileid_dep_no (via eligible_cases CTE)
+ *  - MIS data joins on PERSON_ID_MIS (via eligible_cases CTE)
  */
 export function buildLoadContactProfilesSql(threshold: Date | null): {
   sql: string
@@ -122,7 +120,8 @@ export function buildLoadContactProfilesSql(threshold: Date | null): {
       SELECT
         cases.ROW_ID,
         cases.CONTACT_ROW_ID,
-        cases.X_LEGACY_FILE_NUM
+        cases.X_LEGACY_FILE_NUM,
+        cases.PERSON_ID_MIS
       FROM stg_icm_cases cases
       ${isIncremental ? 'WHERE cases.CONTACT_ROW_ID IN (SELECT CONTACT_ROW_ID FROM changed_contacts)' : ''}
     ),
@@ -241,15 +240,13 @@ export function buildLoadContactProfilesSql(threshold: Date | null): {
           'effectiveStartDate', mis_pay.payment_effective_start_date,
           'effectiveEndDate', mis_pay.payment_effective_end_date,
           'amount', mis_pay.payment_amount::NUMERIC,
-          'contractNumber', mis_pay.contract_num,
+          'contractNumber', mis_pay.contract_number,
           'orderNumber', mis_pay.payment_number,
           'product', mis_pay.product
         )) AS data
       FROM stg_mis_payments mis_pay
-      INNER JOIN stg_mis_placements mis_plc
-        ON mis_pay.contract_num = mis_plc.contract_no
       INNER JOIN eligible_cases
-        ON eligible_cases.X_LEGACY_FILE_NUM = mis_plc.client_fileid_dep_no
+        ON mis_pay.person_id_mis = eligible_cases.PERSON_ID_MIS
       GROUP BY eligible_cases.CONTACT_ROW_ID
     ),
 
@@ -259,6 +256,7 @@ export function buildLoadContactProfilesSql(threshold: Date | null): {
         json_agg(json_build_object(
           'contractNumber', mis_con.contract_number,
           'serviceProviderName', mis_con.service_provider_name,
+          'providerId', mis_con.service_provider_id,
           'status', mis_con.status,
           'type', mis_con.type,
           'startDate', mis_con.contract_start_date,
@@ -266,10 +264,8 @@ export function buildLoadContactProfilesSql(threshold: Date | null): {
           'terminationDate', mis_con.contract_termination_date
         )) AS data
       FROM stg_mis_contracts mis_con
-      INNER JOIN stg_mis_placements mis_plc
-        ON mis_con.contract_number = mis_plc.contract_no
       INNER JOIN eligible_cases
-        ON eligible_cases.X_LEGACY_FILE_NUM = mis_plc.client_fileid_dep_no
+        ON mis_con.person_id_mis = eligible_cases.PERSON_ID_MIS
       GROUP BY eligible_cases.CONTACT_ROW_ID
     ),
 
@@ -281,7 +277,7 @@ export function buildLoadContactProfilesSql(threshold: Date | null): {
           'status', mis_plc.status,
           'startDate', mis_plc.start_date,
           'endDate', mis_plc.end_date,
-          'contractNumber', mis_plc.contract_no,
+          'contractNumber', mis_plc.contract_number,
           'placementNumber', mis_plc.placement_location_no,
           'serviceType', mis_plc.sub_type,
           'placeOfServiceName', mis_plc.place_of_service_name,
@@ -290,8 +286,8 @@ export function buildLoadContactProfilesSql(threshold: Date | null): {
         )) AS data
       FROM stg_mis_placements mis_plc
       INNER JOIN eligible_cases
-        ON eligible_cases.X_LEGACY_FILE_NUM = mis_plc.client_fileid_dep_no
-      WHERE mis_plc.status IN ('Active', 'Interrupted')
+        ON mis_plc.person_id_mis = eligible_cases.PERSON_ID_MIS
+      WHERE mis_plc.status IN ('Active', 'Interrupted', 'Ended')
       GROUP BY eligible_cases.CONTACT_ROW_ID
     )
 
@@ -326,9 +322,9 @@ export function buildLoadContactProfilesSql(threshold: Date | null): {
     legal_auth.START_DT          AS "effectiveDate",
     master_contacts.id               AS "existingContactId",
     master_contacts.csa_status       AS "csaStatus",
-    master_contacts.person_id_mis    AS "personIdMis",
+    cases.PERSON_ID_MIS              AS "personIdMis",
     master_contacts.is_in_eligible   AS "isInEligible",
-    cases.X_DECEASED        AS "deceased",
+    cases.X_DECEASED                 AS "deceased",
     COALESCE(icm_plc.data, '[]'::json)  AS "icmPlacements",
     COALESCE(icm_ord.data, '[]'::json)  AS "icmOrders",
     COALESCE(icm_agr.data, '[]'::json)  AS "icmAgreements",

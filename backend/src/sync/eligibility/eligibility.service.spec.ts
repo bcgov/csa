@@ -505,36 +505,32 @@ describe('buildLoadContactProfilesSql', () => {
     expect(sql).not.toContain('eligible_cases.ROW_ID = legal_auth.PAR_ROW_ID')
   })
 
-  it('should join MIS data via LegacyFile (X_LEGACY_FILE_NUM), not person_id_mis', () => {
+  it('should join MIS data via PERSON_ID_MIS from eligible_cases', () => {
     const { sql } = buildLoadContactProfilesSql(null)
 
-    // eligible_cases carries X_LEGACY_FILE_NUM
-    expect(sql).toContain('cases.X_LEGACY_FILE_NUM')
+    // eligible_cases carries PERSON_ID_MIS
+    expect(sql).toContain('cases.PERSON_ID_MIS')
 
-    // MIS CTEs join through legacy file
-    expect(sql).toContain('eligible_cases.X_LEGACY_FILE_NUM = mis_plc.client_fileid_dep_no')
+    // MIS CTEs join through PERSON_ID_MIS on eligible_cases
+    expect(sql).toContain('mis_pay.person_id_mis = eligible_cases.PERSON_ID_MIS')
+    expect(sql).toContain('mis_con.person_id_mis = eligible_cases.PERSON_ID_MIS')
+    expect(sql).toContain('mis_plc.person_id_mis = eligible_cases.PERSON_ID_MIS')
 
-    // MIS contracts join through placements
-    expect(sql).toContain('mis_con.contract_number = mis_plc.contract_no')
-
-    // MIS payments join through placements
-    expect(sql).toContain('mis_pay.contract_num = mis_plc.contract_no')
-
-    // Final SELECT joins MIS aggs on CONTACT_ROW_ID (not person_id_mis)
+    // Final SELECT joins MIS aggs on CONTACT_ROW_ID
     expect(sql).toContain('mis_pay.CONTACT_ROW_ID = cases.CONTACT_ROW_ID')
     expect(sql).toContain('mis_con.CONTACT_ROW_ID = cases.CONTACT_ROW_ID')
     expect(sql).toContain('mis_plc.CONTACT_ROW_ID = cases.CONTACT_ROW_ID')
 
-    // No MIS joins through person_id_mis
-    expect(sql).not.toMatch(/mis_pay\.person_id_mis/)
-    expect(sql).not.toMatch(/mis_con\.person_id_mis/)
-    expect(sql).not.toMatch(/mis_plc\.person_id_mis/)
+    // No MIS joins through contacts master table
+    expect(sql).not.toContain('master_contacts.person_id_mis')
   })
 
-  it('should join changed_contacts MIS sections via LegacyFile', () => {
+  it('should join changed_contacts MIS sections via PERSON_ID_MIS on cases', () => {
     const { sql } = buildLoadContactProfilesSql(new Date('2026-02-12'))
 
+    // MIS change detection uses stg_icm_cases, not contacts master table
     expect(sql).not.toContain('FROM contacts mc')
+    expect(sql).toContain('mis_pay.person_id_mis = cases.PERSON_ID_MIS')
 
     expect(sql).toContain('legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID')
     expect(sql).not.toContain('legal_auth.PAR_ROW_ID = cases.ROW_ID')

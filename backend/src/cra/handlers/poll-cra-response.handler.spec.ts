@@ -132,7 +132,7 @@ describe('PollCraResponseHandler', () => {
   // Simulates a previously downloaded file.
   function setupUnprocessedFile(fileName: string, id = 1) {
     mockPrisma.transferFile.findMany.mockResolvedValue([
-      { id, fileName, isDetailsProcessed: false, valid: true },
+      { id, fileName, isDetailsProcessed: false, isValid: true },
     ])
     mockInboundFileService.getLocalFilePath.mockReturnValue(`/tmp/cra-ftp/inbound/${fileName}`)
   }
@@ -821,7 +821,7 @@ describe('PollCraResponseHandler', () => {
       expect(result.metadata.records_updated).toBe(0)
       expect(mockPrisma.transferFile.update).toHaveBeenCalledWith({
         where: { id: 1 },
-        data: { valid: false, isDetailsProcessed: true },
+        data: { isValid: false, isDetailsProcessed: true },
       })
       expect(mockBatchesService.updateBatchDetailStatus).not.toHaveBeenCalled()
     })

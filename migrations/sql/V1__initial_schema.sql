@@ -3,9 +3,7 @@ CREATE SCHEMA IF NOT EXISTS csa;
 -- Trigram extension for substring search (ILIKE '%term%')
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
--------------------
--- master tables --
--------------------
+-- master tables
 CREATE TABLE IF NOT EXISTS csa.contacts (
   id                          SERIAL PRIMARY KEY,
   last_name                   TEXT        NOT NULL,
@@ -152,11 +150,7 @@ CREATE TABLE IF NOT EXISTS csa.transfer_files (
     CONSTRAINT fk_transfer_files_batch FOREIGN KEY (batch_id) REFERENCES csa.batches (id)
 );
 
---------------------
--- staging tables --
---------------------
-
--- ICM staging tables (6)
+-- ICM staging tables
 
 CREATE TABLE IF NOT EXISTS csa.stg_icm_cases (
     ROW_ID TEXT PRIMARY KEY,
@@ -259,7 +253,7 @@ CREATE TABLE IF NOT EXISTS csa.stg_icm_orders (
     INGESTED_AT             TIMESTAMP DEFAULT NOW()
 );
 
--- MIS staging tables (3)
+-- MIS staging tables
 
 CREATE TABLE IF NOT EXISTS csa.stg_mis_payments (
     id INTEGER PRIMARY KEY,
@@ -314,9 +308,8 @@ CREATE TABLE IF NOT EXISTS csa.stg_mis_placements (
     ingested_at TIMESTAMP DEFAULT NOW()
 );
 
--------------------------------
--- staging table indexes     --
--------------------------------
+
+-- staging table indexes
 
 -- ICM staging indexes (eligibility query joins)
 CREATE INDEX idx_stg_icm_placements_case ON csa.stg_icm_placements (CASE_ROW_ID);
@@ -330,13 +323,10 @@ CREATE INDEX idx_stg_mis_placements_person ON csa.stg_mis_placements (client_fil
 CREATE INDEX idx_stg_mis_placements_contract ON csa.stg_mis_placements (contract_no);
 CREATE INDEX idx_stg_mis_contracts_number ON csa.stg_mis_contracts (contract_number);
 
--------------------------
--- db users permissons --
--------------------------
-
+-- db users permissons
 GRANT USAGE ON SCHEMA csa TO "csa-app";
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA csa TO "csa-app";
+GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA csa TO "csa-app";
 
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA csa TO "csa-app";
 

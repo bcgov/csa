@@ -84,8 +84,16 @@ export class MisService {
       const colList = config.columns.join(', ')
       const copyQuery = `COPY ${config.stagingTable} (${colList}) FROM STDIN WITH (FORMAT csv, HEADER true, NULL '')`
 
+      this.logger.log(`COPY query: ${copyQuery}`)
+      this.logger.log(`Column Count: ${config.columns.length}`)
       const copyStream = client.query(copyFrom(copyQuery))
-      await pipeline(readable, copyStream)
+
+      try {
+        await pipeline(readable, copyStream)
+      } catch (error) {
+        this.logger.error(`COPY failed for ${config.name}: ${error.message}`)
+        throw error
+      }
 
       if (copyStream.rowCount === 0) {
         await client.query('ROLLBACK')

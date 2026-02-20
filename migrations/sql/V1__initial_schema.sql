@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS csa.batches (
   batch_date      DATE        NOT NULL,
   status          TEXT        NOT NULL,
   record_count    INTEGER     NOT NULL,
-  system_comments TEXT
+  system_comments TEXT,
   updated_at      TIMESTAMP   NOT NULL,
   created_at      TIMESTAMP   NOT NULL,
 );

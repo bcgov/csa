@@ -5,7 +5,7 @@ export interface RuntimeConfig {
   VITE_KEYCLOAK_REALM: string
   VITE_KEYCLOAK_CLIENT_ID: string
   VITE_API_BASE_URL?: string
-  VITE_APP_REDIRECT_URI?: string
+  VITE_APP_REDIRECT?: string
 }
 
 declare global {
@@ -14,4 +14,5 @@ declare global {
   }
 }
 
-export {}
+export { }
+

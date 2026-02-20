@@ -52,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             onLoad: csaAccessDenied ? undefined : 'check-sso',
             silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
             pkceMethod: 'S256',
-            redirectUri: getRuntimeConfig()?.VITE_APP_REDIRECT_URI || window.location.origin + '/',
+            redirectUri: getRuntimeConfig()?.VITE_APP_REDIRECT || window.location.origin + '/',
           })
           .then(async (authenticated) => {
             if (authenticated && keycloakInstance.tokenParsed) {

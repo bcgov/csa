@@ -3,6 +3,7 @@ import { registerAs } from '@nestjs/config'
 export const adminConfig = registerAs('admin', () => {
   const icmApiUrl = process.env.ICM_API_URL?.replace(/\/Employee\/?$/, '')
   const icmTrustedUsername = process.env.ICM_TRUSTED_USERNAME
+  const icmUsername = process.env.ICM_API_USERNAME
   const keycloakTokenUrl = process.env.ICM_TOKEN_URL
   const keycloakClientId = process.env.ICM_CLIENT_ID
   const keycloakClientSecret = process.env.ICM_CLIENT_SECRET
@@ -12,6 +13,9 @@ export const adminConfig = registerAs('admin', () => {
   }
   if (!icmTrustedUsername) {
     throw new Error('ICM_TRUSTED_USERNAME is required')
+  }
+  if (!icmUsername) {
+    throw new Error('ICM_API_USERNAME is required')
   }
   if (!keycloakTokenUrl) {
     throw new Error('KEYCLOAK_TOKEN_URL is required')
@@ -26,6 +30,7 @@ export const adminConfig = registerAs('admin', () => {
   return {
     icmApiUrl,
     icmTrustedUsername,
+    icmUsername,
     keycloakTokenUrl,
     keycloakClientId,
     keycloakClientSecret,

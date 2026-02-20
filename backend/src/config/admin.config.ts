@@ -30,6 +30,7 @@ export const adminConfig = registerAs('admin', () => {
   return {
     icmApiUrl,
     icmTrustedUsername,
+    icmUsername,
     keycloakTokenUrl,
     keycloakClientId,
     keycloakClientSecret,

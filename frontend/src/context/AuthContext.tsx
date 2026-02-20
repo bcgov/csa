@@ -1,6 +1,6 @@
 import type Keycloak from 'keycloak-js'
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { initializeKeycloak } from '../config/keycloak.config'
+import { getRuntimeConfig, initializeKeycloak } from '../config/keycloak.config'
 import { verifyCSAAccess } from '../service/admin-service'
 
 interface AuthContextType {
@@ -52,8 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             onLoad: csaAccessDenied ? undefined : 'check-sso',
             silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
             pkceMethod: 'S256',
-            redirectUri: 'https://csa-frontend-dec59b-dev.apps.silver.devops.gov.bc.ca/',
-            // redirectUri: window.location.origin + '/',
+            redirectUri: getRuntimeConfig()?.VITE_APP_REDIRECT_URI || window.location.origin + '/',
           })
           .then(async (authenticated) => {
             if (authenticated && keycloakInstance.tokenParsed) {

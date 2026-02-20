@@ -55,8 +55,8 @@ export class JobRunner {
       try {
         if (attempt > 0) {
           this.logger.log(`Inline retry attempt ${attempt} for job ${jobId}`)
-          // Short delay between inline retries (exponential: 1s, 2s, 4s)
-          await this.sleep(1000 * Math.pow(2, attempt - 1))
+          // Exponential backoff: 2s, 4s, 8s
+          await this.sleep(2000 * Math.pow(2, attempt - 1))
         }
 
         const result = await handler.execute(context)

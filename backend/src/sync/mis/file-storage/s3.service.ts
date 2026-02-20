@@ -29,21 +29,24 @@ export class S3Service extends FileStorageService {
     return this.client
   }
 
-  /** Parse s3URI manually — `new URL()` breaks when credentials contain `/` or `@` */
+  // Parse s3URI manually
+  //  `new URL()` breaks when credentials contain `/` or `@`
   private parseS3Uri(uri: string) {
     const schemeMatch = uri.match(/^(https?):\/\/(.+)$/)
     if (!schemeMatch) throw new Error('Invalid s3URI: missing http(s):// scheme')
 
     const [, scheme, rest] = schemeMatch
 
-    // Split on last @ — password may contain @
+    // Split on last `@`
+    //  password may contain @
     const lastAt = rest.lastIndexOf('@')
     if (lastAt === -1) throw new Error('Invalid s3URI: expected user:pass@host')
 
     const credentials = rest.substring(0, lastAt)
     const hostPart = rest.substring(lastAt + 1).split('/')[0] // strip trailing path
 
-    // Split credentials on first : — password may contain :
+    // Split credentials on first `:`
+    //  password may contain :
     const firstColon = credentials.indexOf(':')
     if (firstColon === -1) throw new Error('Invalid s3URI: expected user:pass@host')
 

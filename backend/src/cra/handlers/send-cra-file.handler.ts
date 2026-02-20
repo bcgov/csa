@@ -11,9 +11,11 @@ import {
   CSA_EVENT,
 } from 'src/common/state-machine/constants'
 import { BaseJob } from 'src/jobs/base-job'
+import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
+import { JobRunner } from 'src/jobs/job-runner.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { OutboundDataService } from '../outbound/outbound-data.service'
 import { OutboundFileService } from '../outbound/outbound-file.service'
@@ -37,6 +39,7 @@ export class SendCraFileHandler extends BaseJob {
     private readonly outboundDataService: OutboundDataService,
     private readonly outboundFileService: OutboundFileService,
     private readonly outboundTransferService: OutboundTransferService,
+    private readonly jobRunner: JobRunner,
   ) {
     super()
     this.lastSequenceNumber = this.configService.get<number>('cra.lastSequenceNumber')!
@@ -143,19 +146,27 @@ export class SendCraFileHandler extends BaseJob {
 
     if (!this.batch) return
 
-    // Update contact CSA statuses
+    const now = new Date()
+
+    // Update contact CSA statuses and set csaSentDate
     for (const detail of this.batchDetails) {
       await this.contactsService.updateCsaStatus(
         detail.contactId,
         CSA_EVENT.SEND_TO_CRA,
         UPDATED_BY.SYSTEM,
+        { additionalData: { csaSentDate: now } },
       )
     }
 
     // Set batchDate
     await this.prisma.batch.update({
       where: { id: this.batch.id },
-      data: { batchDate: new Date() },
+      data: { batchDate: now },
+    })
+
+    // Fire sync flagged contacts to ICM Job
+    this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM).catch((err) => {
+      this.logger.warn(`Post-CRA ICM sync failed: ${(err as Error).message}`)
     })
   }
 

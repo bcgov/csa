@@ -28,13 +28,11 @@ async function bootstrap() {
 
     if (result.success) {
       logger.log('Data ingestion completed successfully')
+      process.exit(0)
     } else {
       logger.error(`Data ingestion failed: ${result.message}`)
+      process.exit(1)
     }
-
-    // Always exit with 0 - job success/failure is tracked in the job_runs
-    // Exit 1 only for infra failure to allow OpenShift CronJob to restart
-    process.exit(0)
   } catch (error) {
     logger.error(`Fatal error: ${error.message}`, error.stack)
     process.exit(1)

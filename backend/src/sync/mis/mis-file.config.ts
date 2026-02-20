@@ -6,28 +6,25 @@ export interface MisFileConfig {
 }
 
 // s3Key uses the MIS_S3_PREFIX from environment config
+// Column order must match CSV header order (COPY FROM STDIN with HEADER)
 export const MIS_FILE_CONFIGS: MisFileConfig[] = [
   {
     name: 'payments',
     s3Key: 'CSAS3_Payments.csv',
     stagingTable: 'stg_mis_payments',
     columns: [
-      'payment_number',
       'id',
+      'last_updated_date',
+      'payment_number',
       'payment_type',
       'payment_status',
       'payment_amount',
       'payment_effective_start_date',
       'payment_effective_end_date',
       'product',
-      'agreement_num',
-      'contract_num',
-      'contract_id',
+      'contract_number',
       'payment_updated',
       'person_id_mis',
-      'last_updated_date',
-      'file_stat_cd',
-      'process_dt',
     ],
   },
   {
@@ -36,6 +33,8 @@ export const MIS_FILE_CONFIGS: MisFileConfig[] = [
     stagingTable: 'stg_mis_contracts',
     columns: [
       'id',
+      'last_updated_date',
+      'service_provider_id',
       'service_provider_name',
       'contract_number',
       'status',
@@ -43,9 +42,7 @@ export const MIS_FILE_CONFIGS: MisFileConfig[] = [
       'contract_end_date',
       'type',
       'contract_termination_date',
-      'last_updated_date',
-      'file_stat_cd',
-      'process_dt',
+      'person_id_mis',
     ],
   },
   {
@@ -54,6 +51,7 @@ export const MIS_FILE_CONFIGS: MisFileConfig[] = [
     stagingTable: 'stg_mis_placements',
     columns: [
       'id',
+      'last_updated_date',
       'placement_location_no',
       'type',
       'sub_type',
@@ -63,12 +61,9 @@ export const MIS_FILE_CONFIGS: MisFileConfig[] = [
       'place_of_service_name',
       'service_provider_name',
       'service_provider_id',
-      'contract_no',
-      'client_fileid_dep_no',
+      'contract_number',
+      'legacy_file_number',
       'person_id_mis',
-      'last_updated_date',
-      'file_stat_cd',
-      'process_dt',
     ],
   },
 ]

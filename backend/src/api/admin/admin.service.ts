@@ -156,8 +156,11 @@ export class AdminService {
       let hasCSAResponsibility = false
       let icmResponsibilityName: string | undefined
 
-      if (icmData?.items?.Responsibility && Array.isArray(icmData.items.Responsibility)) {
-        const responsibilities = icmData.items.Responsibility
+      if (icmData?.items?.Responsibility) {
+        // Normalize to array - ICM returns object for single item, array for multiple
+        const responsibilities = Array.isArray(icmData.items.Responsibility)
+          ? icmData.items.Responsibility
+          : [icmData.items.Responsibility]
         const rwResponsibility = responsibilities.find((r) => r.Name === 'ICM CSA Application - RW')
         const roResponsibility = responsibilities.find((r) => r.Name === 'ICM CSA Application - RO')
 
@@ -346,15 +349,21 @@ export class AdminService {
 
       this.logger.log('Requesting ICM API with username:', username)
 
+      this.logger.log(
+        'ICM Username as per config:',
+        this.configService.get<string>('admin.icmUsername'),
+      )
+
       const icmApiUrl = this.configService.get<string>('admin.icmApiUrl')!
       const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
+      const icmApiUsername = this.configService.get<string>('admin.icmUsername') || username
 
       // Build QueryHierarchy parameter
       const queryHierarchy = {
         Employee: {
           fields: 'Login Name, Party Name',
-          searchspec: "[Login Name] = 'UKHAN'",
-          // searchspec: `[Login Name] = '${username}'`,
+          // searchspec: "[Login Name] = 'UKHAN'",
+          searchspec: `[Login Name] = '${icmApiUsername}'`,
           Responsibility: {
             fields: 'Name',
             searchspec:
@@ -425,8 +434,11 @@ export class AdminService {
     ]
 
     // Check if user has ICM CSA Application responsibility
-    if (icmData?.items?.Responsibility && Array.isArray(icmData.items.Responsibility)) {
-      const responsibilities = icmData.items.Responsibility
+    if (icmData?.items?.Responsibility) {
+      // Normalize to array - ICM returns object for single item, array for multiple
+      const responsibilities = Array.isArray(icmData.items.Responsibility)
+        ? icmData.items.Responsibility
+        : [icmData.items.Responsibility]
       const hasRWAccess = responsibilities.some((r) => r.Name === 'ICM CSA Application - RW')
       const hasROAccess = responsibilities.some((r) => r.Name === 'ICM CSA Application - RO')
 
@@ -470,8 +482,11 @@ export class AdminService {
   private extractResponsibilitiesFromICMData(icmData: ICMEmployeeResponse): string[] {
     const responsibilities = ['user'] // Default responsibility
 
-    if (icmData?.items?.Responsibility && Array.isArray(icmData.items.Responsibility)) {
-      const icmResponsibilities = icmData.items.Responsibility
+    if (icmData?.items?.Responsibility) {
+      // Normalize to array - ICM returns object for single item, array for multiple
+      const icmResponsibilities = Array.isArray(icmData.items.Responsibility)
+        ? icmData.items.Responsibility
+        : [icmData.items.Responsibility]
       const hasRWAccess = icmResponsibilities.some((r) => r.Name === 'ICM CSA Application - RW')
       const hasROAccess = icmResponsibilities.some((r) => r.Name === 'ICM CSA Application - RO')
 

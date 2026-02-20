@@ -22,7 +22,7 @@ export class AdminService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly keycloakAuthService: KeycloakAuthService,
-  ) {}
+  ) { }
   /**
    * Decode JWT token and extract user information
    * @param token - JWT token from Authorization header
@@ -349,9 +349,11 @@ export class AdminService {
 
       this.logger.log('Requesting ICM API with username:', username)
 
+      this.logger.log('ICM Username as per config:', this.configService.get<string>('admin.icmUsername'))
+
       const icmApiUrl = this.configService.get<string>('admin.icmApiUrl')!
       const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
-      const icmApiUsername = this.configService.get<string>('admin.icmApiUsername') || username
+      const icmApiUsername = this.configService.get<string>('admin.icmUsername') || username
 
       // Build QueryHierarchy parameter
       const queryHierarchy = {

@@ -46,9 +46,9 @@ describe('IngestDataHandler', () => {
       const result = await handler.execute(mockContext)
 
       expect(result.success).toBe(true)
-      expect(result.message).toBe('Data ingestion and sync completed successfully')
+      expect(result.message).toBe('Data ingestion and eligibility completed successfully')
 
-      // Verify execution order
+      // Verify execution order (ICM + MIS parallel, then eligibility)
       expect(runJobTypeSpy).toHaveBeenNthCalledWith(1, JobType.INGEST_ICM, JobTrigger.CRON, {
         parentJobId: 1,
       })
@@ -58,9 +58,8 @@ describe('IngestDataHandler', () => {
       expect(runJobTypeSpy).toHaveBeenNthCalledWith(3, JobType.RUN_ELIGIBILITY, JobTrigger.CRON, {
         parentJobId: 1,
       })
-      expect(runJobTypeSpy).toHaveBeenNthCalledWith(4, JobType.SYNC_ICM, JobTrigger.CRON, {
-        parentJobId: 1,
-      })
+
+      expect(runJobTypeSpy).toHaveBeenCalledWith(JobType.SYNC_ICM, JobTrigger.SYSTEM)
       expect(runJobTypeSpy).toHaveBeenCalledTimes(4)
     })
   })
@@ -120,21 +119,19 @@ describe('IngestDataHandler', () => {
       expect(runJobTypeSpy).toHaveBeenCalledTimes(3)
     })
 
-    it('should fail if ICM sync fails', async () => {
+    it('should succeed even if SYNC_ICM fire-and-forget rejects', async () => {
       const runJobTypeSpy = vi.mocked(jobRunner.runJobType)
       runJobTypeSpy
         .mockResolvedValueOnce({ success: true }) // ICM
         .mockResolvedValueOnce({ success: true }) // MIS
         .mockResolvedValueOnce({ success: true }) // Eligibility
-        .mockResolvedValueOnce({ success: false, message: 'Sync API error' }) // Sync
+        .mockRejectedValueOnce(new Error('Sync API error')) // Sync (fire-and-forget)
 
       const result = await handler.execute(mockContext)
 
-      expect(result.success).toBe(false)
-      expect(result.message).toBe('ICM sync failed')
-      expect(result.metadata).toEqual({
-        syncResult: { success: false, message: 'Sync API error' },
-      })
+      // SYNC_ICM failure doesn't affect ingestion result
+      expect(result.success).toBe(true)
+      expect(result.message).toBe('Data ingestion and eligibility completed successfully')
     })
 
     it('should handle unexpected errors with stack trace', async () => {

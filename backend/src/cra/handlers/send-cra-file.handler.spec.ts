@@ -71,6 +71,7 @@ describe('SendCraFileHandler', () => {
   let mockOutboundDataService: any
   let mockOutboundFileService: any
   let mockOutboundTransferService: any
+  let mockJobRunner: any
 
   beforeEach(() => {
     mockPrisma = {
@@ -116,6 +117,10 @@ describe('SendCraFileHandler', () => {
       sendFileToTransferService: vi.fn().mockResolvedValue({ statusCode: 226 }),
     }
 
+    mockJobRunner = {
+      runJobType: vi.fn().mockResolvedValue({ success: true }),
+    }
+
     const mockConfigService = {
       get: vi.fn((key: string) => {
         const config: Record<string, number> = { 'cra.lastSequenceNumber': 0 }
@@ -131,6 +136,7 @@ describe('SendCraFileHandler', () => {
       mockOutboundDataService,
       mockOutboundFileService,
       mockOutboundTransferService,
+      mockJobRunner,
     )
   })
 
@@ -348,7 +354,7 @@ describe('SendCraFileHandler', () => {
       await handler.onStart(mockContext)
     })
 
-    it('should update contact CSA statuses via SEND_TO_CRA', async () => {
+    it('should update contact CSA statuses via SEND_TO_CRA with csaSentDate', async () => {
       const result = { success: true, message: 'Batch 10 sent to CRA' }
       await handler.onSuccess(mockContext, result)
 
@@ -357,12 +363,21 @@ describe('SendCraFileHandler', () => {
         1,
         CSA_EVENT.SEND_TO_CRA,
         'SYSTEM',
+        { additionalData: { csaSentDate: expect.any(Date) } },
       )
       expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
         2,
         CSA_EVENT.SEND_TO_CRA,
         'SYSTEM',
+        { additionalData: { csaSentDate: expect.any(Date) } },
       )
+    })
+
+    it('should trigger standalone SYNC_ICM job', async () => {
+      const result = { success: true, message: 'Batch 10 sent to CRA' }
+      await handler.onSuccess(mockContext, result)
+
+      expect(mockJobRunner.runJobType).toHaveBeenCalledWith(JobType.SYNC_ICM, JobTrigger.SYSTEM)
     })
 
     it('should set batchDate on the batch', async () => {

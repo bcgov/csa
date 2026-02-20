@@ -4,6 +4,7 @@ import { EligibilityContext } from '../rule.interface'
 import { step6_OrderPaymentCheck } from './step6-order-payment-check'
 
 const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile => ({
+  caseRowId: 'CASE-1',
   personIdIcm: 'ICM-1',
   personIdMis: 'MIS-1',
   firstName: 'John',
@@ -109,12 +110,12 @@ describe('step6_OrderPaymentCheck', () => {
   it('should only consider orders matching contract numbers from placements', () => {
     const ctx = makeCtx({
       orders: [
-        makeOrder({ contractNumber: 'C-999' }), // wrong contract
-        makeOrder({ contractNumber: 'C-100', amount: 500 }), // right contract, low amount
+        makeOrder({ contractNumber: 'C-999' }),
+        makeOrder({ contractNumber: 'C-100', amount: 500 }),
       ],
     })
     const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
-    expect(result!.step).toBe(8) // only amount failed on matching order
+    expect(result!.step).toBe(8)
   })
 
   it('should accept MIS order types (Fixed Rate, Variable Rate)', () => {
@@ -136,10 +137,9 @@ describe('step6_OrderPaymentCheck', () => {
   it('should check order effective start date is in previous month', () => {
     // REF_DATE is Feb 2026, so previous month is Jan 2026
     const ctx = makeCtx({
-      orders: [makeOrder({ effectiveStartDate: new Date('2025-12-15') })], // Dec 2025, not prev month
+      orders: [makeOrder({ effectiveStartDate: new Date('2025-12-15') })],
     })
     const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
-    // Order date is wrong->more than amount failed->step 9 (no non-placement)
     expect(result!.step).toBe(9)
   })
 
@@ -149,5 +149,33 @@ describe('step6_OrderPaymentCheck', () => {
     })
     const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
     expect(result!.step).toBe(7)
+  })
+
+  it('should pick highest amount order from previous month', () => {
+    const ctx = makeCtx({
+      orders: [makeOrder({ amount: 500 }), makeOrder({ amount: 1600 })],
+    })
+    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    expect(result!.step).toBe(7)
+  })
+
+  it('should ignore high-amount orders outside previous month', () => {
+    const ctx = makeCtx({
+      orders: [
+        makeOrder({ amount: 5000, effectiveStartDate: new Date('2025-12-15') }),
+        makeOrder({ amount: 1000 }),
+      ],
+    })
+    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    expect(result!.step).toBe(8)
+  })
+
+  it('should route to step 8 when no previous-month orders but hasNonPlacement', () => {
+    const ctx = makeCtx(
+      { orders: [makeOrder({ effectiveStartDate: new Date('2025-12-15') })] },
+      { hasNonPlacement: true },
+    )
+    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    expect(result!.step).toBe(8)
   })
 })

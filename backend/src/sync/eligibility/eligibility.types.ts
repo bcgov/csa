@@ -94,6 +94,8 @@ export interface AgreementRecord {
   agreementEndDate: Date | null
   terminationDate: Date | null
   mcfdContract: string | null
+  serviceProviderName?: string | null
+  providerId?: string | null
   source: 'ICM' | 'MIS'
 }
 

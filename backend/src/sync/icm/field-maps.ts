@@ -107,7 +107,12 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
     masterField: 'adm_first_name',
   },
   { sourceField: 'X_ADM_LAST_NAME', sourceLabel: 'Admn Last Name', masterField: 'adm_last_name' },
-  { sourceField: 'X_DECEASED', sourceLabel: 'Deceased', masterField: 'deceased_flag' },
+  { sourceField: 'X_DECEASED', sourceLabel: 'Deceased', masterField: 'is_deceased' },
+  {
+    sourceField: 'PERSON_ID_MIS',
+    sourceLabel: 'Key Player Integration Id',
+    masterField: 'person_id_mis',
+  },
 ]
 
 export const STG_ICM_CONTACTS_MAP: FieldMapEntry[] = [

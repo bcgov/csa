@@ -43,6 +43,9 @@ describe('JobRunner', () => {
   beforeEach(async () => {
     vi.resetAllMocks()
 
+    // Stub sleep to avoid real delays in retry tests
+    vi.spyOn(JobRunner.prototype as any, 'sleep').mockResolvedValue(undefined)
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         JobRunner,

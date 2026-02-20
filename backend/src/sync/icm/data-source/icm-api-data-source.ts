@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config'
 import { firstValueFrom } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { formatDate } from 'src/common/utils'
-import { IcmApiConfig } from '../icm.config'
+import { IcmApiConfig, ICM_UPDATE_BATCH_LIMIT } from '../icm.config'
 import { IcmApiRecord, IcmContactUpdatePayload, IcmDataSource } from './icm-data-source'
 
 const PAGE_SIZE = 100
@@ -74,8 +74,10 @@ export class IcmApiDataSource extends IcmDataSource {
 
   async updateContacts(contacts: IcmContactUpdatePayload[]): Promise<void> {
     if (contacts.length === 0) return
-    if (contacts.length > 100) {
-      throw new Error(`ICM batch limit is 100 contacts, got ${contacts.length}`)
+    if (contacts.length > ICM_UPDATE_BATCH_LIMIT) {
+      throw new Error(
+        `ICM batch limit is ${ICM_UPDATE_BATCH_LIMIT} contacts, got ${contacts.length}`,
+      )
     }
 
     const bearerToken = await this.keycloakAuthService.getBearerToken()

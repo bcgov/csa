@@ -54,14 +54,10 @@ export class MisService {
     const readable = await this.fileStorage.download(key)
     this.logger.log(`${config.name}: S3 download successful for ${key}`)
 
-    // TODO: re-enable DB load once MIS CSV import is finalized
-    // const rows = await this.truncateAndCopy(config, readable)
-    // await this.moveToProcessed(key)
-    // this.logger.log(`${config.name}: loaded ${rows} rows via COPY`)
-    // return { name: config.name, rows }
-    readable.destroy()
-
-    return { name: config.name, rows: 0, skipped: true }
+    const rows = await this.truncateAndCopy(config, readable)
+    await this.moveToProcessed(key)
+    this.logger.log(`${config.name}: loaded ${rows} rows via COPY`)
+    return { name: config.name, rows }
   }
 
   private async moveToProcessed(key: string): Promise<void> {
@@ -88,8 +84,16 @@ export class MisService {
       const colList = config.columns.join(', ')
       const copyQuery = `COPY ${config.stagingTable} (${colList}) FROM STDIN WITH (FORMAT csv, HEADER true, NULL '')`
 
+      this.logger.log(`COPY query: ${copyQuery}`)
+      this.logger.log(`Column Count: ${config.columns.length}`)
       const copyStream = client.query(copyFrom(copyQuery))
-      await pipeline(readable, copyStream)
+
+      try {
+        await pipeline(readable, copyStream)
+      } catch (error) {
+        this.logger.error(`COPY failed for ${config.name}: ${error.message}`)
+        throw error
+      }
 
       if (copyStream.rowCount === 0) {
         await client.query('ROLLBACK')

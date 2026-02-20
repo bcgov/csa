@@ -59,7 +59,7 @@ export class InboundFileService {
           fileName: file.fileName,
           fileSize: String(statSync(localFilePath).size),
           downloadedAt: new Date(),
-          valid,
+          isValid: valid,
           isDetailsProcessed: !valid,
         },
       })

@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS csa.batches (
   record_count    INTEGER     NOT NULL,
   system_comments TEXT,
   updated_at      TIMESTAMP   NOT NULL,
-  created_at      TIMESTAMP   NOT NULL,
+  created_at      TIMESTAMP   NOT NULL
 );
 
 CREATE UNIQUE INDEX batches_pending_unique ON csa.batches (status)

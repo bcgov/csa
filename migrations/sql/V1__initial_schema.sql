@@ -220,6 +220,7 @@ CREATE TABLE IF NOT EXISTS csa.stg_icm_legal_authority_admin (
   INGESTED_AT     TIMESTAMP DEFAULT NOW()
 );
 
+-- TODO: add icm prefix
 CREATE TABLE IF NOT EXISTS csa.stg_legal_authority (
   ROW_ID         TEXT      PRIMARY KEY,
   LAST_UPD       TEXT,

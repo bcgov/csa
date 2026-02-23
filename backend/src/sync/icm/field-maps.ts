@@ -298,6 +298,12 @@ export const STG_ORDER_MAP: FieldMapEntry[] = [
     masterField: 'order_effective_start_date',
     dbType: 'timestamp',
   },
+  {
+    sourceField: 'X_EFF_END_DT',
+    sourceLabel: 'Order Effective End Date',
+    masterField: 'order_effective_end_date',
+    dbType: 'timestamp',
+  },
   { sourceField: 'PRODUCT_NAME', sourceLabel: 'Product', masterField: 'product' },
   {
     sourceField: 'X_PCMS_CONTRACT_NUM',

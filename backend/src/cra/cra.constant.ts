@@ -1,5 +1,4 @@
 export const CRA_DATA_HANDLING_CONSTANT = {
-  FILE_NAME_PREFIX: 'HT',
   DESTINATION_ID: 'cra-ftp',
   RESPONSE_FILE_TYPE: {
     RSP: 'RSP',

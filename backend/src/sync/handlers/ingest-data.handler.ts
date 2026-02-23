@@ -56,15 +56,22 @@ export class IngestDataHandler extends BaseJob {
         }
       }
 
-      // Step 3: Sync back to ICM (fire-and-forget, sync failure shouldn't fail ingestion)
-      this.logger.log('Triggering ICM sync-back...')
-      this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM).catch((err) => {
-        this.logger.warn(`Post-ingestion ICM sync failed: ${(err as Error).message}`)
+      // Step 3: Sync back to ICM (awaited so pod stays alive, but sync failure doesn't fail ingestion)
+      this.logger.log('Syncing flagged contacts back to ICM...')
+      const syncResult = await this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM, {
+        parentJobId,
       })
+
+      if (!syncResult.success) {
+        this.logger.warn(
+          `ICM sync-back failed: ${syncResult.message}. Retry will pick up flagged contacts.`,
+        )
+      }
 
       return {
         success: true,
         message: 'Data ingestion and eligibility completed successfully',
+        metadata: { syncResult },
       }
     } catch (error) {
       this.logger.error(`Unexpected error in INGEST_DATA: ${error.message}`, error.stack)

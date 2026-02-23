@@ -123,7 +123,10 @@ describe('SendCraFileHandler', () => {
 
     const mockConfigService = {
       get: vi.fn((key: string) => {
-        const config: Record<string, number> = { 'cra.lastSequenceNumber': 0 }
+        const config: Record<string, any> = {
+          'cra.lastSequenceNumber': 0,
+          'cra.enabled': true,
+        }
         return config[key]
       }),
     }
@@ -142,6 +145,38 @@ describe('SendCraFileHandler', () => {
 
   it('should have jobType SEND_CRA_FILE', () => {
     expect(handler.jobType).toBe(JobType.SEND_CRA_FILE)
+  })
+
+  describe('CRA disabled', () => {
+    it('should return early when CRA_INTEGRATION_ENABLED is false', async () => {
+      const disabledConfigService = {
+        get: vi.fn((key: string) => {
+          const config: Record<string, any> = {
+            'cra.lastSequenceNumber': 0,
+            'cra.enabled': false,
+          }
+          return config[key]
+        }),
+      }
+
+      const disabledHandler = new SendCraFileHandler(
+        mockPrisma,
+        disabledConfigService as any,
+        mockBatchesService,
+        mockContactsService,
+        mockOutboundDataService,
+        mockOutboundFileService,
+        mockOutboundTransferService,
+        mockJobRunner,
+      )
+
+      const result = await disabledHandler.execute(mockContext)
+
+      expect(result.success).toBe(true)
+      expect(result.message).toContain('CRA sending is disabled')
+      expect(mockOutboundFileService.createFile).not.toHaveBeenCalled()
+      expect(mockOutboundTransferService.sendFileToTransferService).not.toHaveBeenCalled()
+    })
   })
 
   describe('No actionable batch', () => {

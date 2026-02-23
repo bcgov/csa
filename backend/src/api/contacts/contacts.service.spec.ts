@@ -10,6 +10,7 @@ describe('ContactsService', () => {
   let service: ContactsService
   let prisma: PrismaService
 
+  // Raw DB records (what Prisma returns)
   const savedContact1 = {
     id: 1,
     lastName: 'Doe',
@@ -47,8 +48,13 @@ describe('ContactsService', () => {
     orderAmount: null,
   }
 
-  const userArray = [oneContact, twoContact]
   const savedContactArray = [savedContact1, savedContact2]
+
+  // Enriched records (what the service returns — includes csaStatusLabel)
+  const enrichedContact1 = { ...savedContact1, csaStatusLabel: 'Eligible' }
+  const enrichedOneContact = { ...oneContact, csaStatusLabel: 'Eligible' }
+  const enrichedTwoContact = { ...twoContact, csaStatusLabel: 'In Pay' }
+  const enrichedUserArray = [enrichedOneContact, enrichedTwoContact]
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -95,7 +101,7 @@ describe('ContactsService', () => {
       vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
       const result = await service.findAll()
       expect(result).toEqual({
-        data: userArray,
+        data: enrichedUserArray,
         page: 1,
         limit: 10,
         total: 2,
@@ -152,7 +158,7 @@ describe('ContactsService', () => {
         orderBy: [{ lastName: 'asc' }],
         where: { lastName: { contains: 'Doe', mode: 'insensitive' } },
       })
-      expect(result.data).toEqual([savedContact1])
+      expect(result.data).toEqual([enrichedContact1])
     })
 
     it('should sort descending', async () => {
@@ -513,7 +519,7 @@ describe('ContactsService', () => {
 
   describe('findOne', () => {
     it('should get a single contact', async () => {
-      await expect(service.findOne(1)).resolves.toEqual(oneContact)
+      await expect(service.findOne(1)).resolves.toEqual(enrichedContact1)
     })
   })
 
@@ -1008,6 +1014,63 @@ describe('ContactsService', () => {
         // preBatchStatus should NOT be in the update data
         const updateCall = updateSpy.mock.calls[0][0] as any
         expect(updateCall.data).not.toHaveProperty('preBatchStatus')
+      })
+    })
+
+    describe('cancelReasonCode on SET_NOT_ELIGIBLE', () => {
+      it('should default cancelReasonCode to 21 when IN_PAY and not already set', async () => {
+        const contact = { id: 1, csaStatus: 'in_pay', cancelReasonCode: null, resumeStatus: null }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
+          userId: 'user1',
+        })
+
+        expect(result.success).toBe(true)
+        expect(result.to).toBe('not_eligible_ip_tbd')
+        expect(updateSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              cancelReasonCode: '21',
+            }),
+          }),
+        )
+      })
+
+      it('should NOT overwrite cancelReasonCode when already set', async () => {
+        const contact = { id: 1, csaStatus: 'in_pay', cancelReasonCode: '14', resumeStatus: null }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
+          userId: 'user1',
+        })
+
+        expect(result.success).toBe(true)
+        expect(result.to).toBe('not_eligible_ip_tbd')
+        const updateCall = updateSpy.mock.calls[0][0] as any
+        expect(updateCall.data).not.toHaveProperty('cancelReasonCode')
+      })
+
+      it('should NOT set cancelReasonCode for SET_NOT_ELIGIBLE from non-IN_PAY state', async () => {
+        const contact = {
+          id: 1,
+          csaStatus: 'eligible_tbd',
+          cancelReasonCode: null,
+          resumeStatus: null,
+        }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
+          userId: 'user1',
+        })
+
+        expect(result.success).toBe(true)
+        expect(result.to).toBe('not_eligible_out_of_pay')
+        const updateCall = updateSpy.mock.calls[0][0] as any
+        expect(updateCall.data).not.toHaveProperty('cancelReasonCode')
       })
     })
 

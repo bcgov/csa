@@ -1450,6 +1450,9 @@ function App() {
   // Filter handling functions
   const handleFilterClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
     setFilterAnchor({ element: event.currentTarget, column })
+    setFilterSearchTerm('')
+    // Reset column filter active state when switching columns to prevent unwanted data resets
+    setIsColumnFilterActive(false)
   }
 
   const handleFilterClose = () => {
@@ -1950,7 +1953,7 @@ function App() {
               }}
             >
               <Typography variant="body2" sx={{ color: '#666' }}>
-                {user?.username || user?.name || username || 'User'}
+                {user?.idirUsername || user?.email || user?.name || username || 'User'}
               </Typography>
               <Button
                 variant="outlined"

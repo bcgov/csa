@@ -75,130 +75,6 @@ const VALID_BATCH_STATUSES = [
   'cancellation_refused_cra', // Cancellation Refused - CRA
 ]
 
-// Sample data for the eligibility table
-const eligibilityData = [
-  {
-    id: 1,
-    firstName: 'John',
-    middleName: '',
-    lastName: 'Connor',
-    gender: 'Man/Boy',
-    dob: '2022-Jan-18',
-    age: 4,
-    din: '',
-    csaStatus: 'Eligible',
-    statusEffective: '2025-Jan-12',
-    caseNumber: '1-135',
-    caseStatus: 'Open',
-    legacyFile: 'GA128182',
-    lastUpdated: 'yyy-mmm-dd',
-    lastUpdatedBy: 'SYSTEM',
-  },
-  {
-    id: 2,
-    firstName: 'Jane',
-    middleName: '',
-    lastName: 'Markus',
-    gender: 'Woman/Girl',
-    dob: '2018-May-15',
-    age: 8,
-    din: '12345',
-    csaStatus: 'In Pay',
-    statusEffective: '2024-Aug-05',
-    caseNumber: '1-147',
-    caseStatus: 'Open',
-    legacyFile: 'GA61821',
-    lastUpdated: 'yyy-mmm-dd',
-    lastUpdatedBy: 'User IDIR',
-  },
-  {
-    id: 3,
-    firstName: 'Merry',
-    middleName: '',
-    lastName: 'Markus',
-    gender: 'Woman/Girl',
-    dob: '2018-May-15',
-    age: 8,
-    din: '14566',
-    csaStatus: 'In Pay - Cancel...',
-    statusEffective: '2024-May-11',
-    caseNumber: '1-166',
-    caseStatus: 'Open',
-    legacyFile: 'GA798379',
-    lastUpdated: 'yyy-mmm-dd',
-    lastUpdatedBy: 'SYSTEM',
-  },
-  {
-    id: 4,
-    firstName: 'Jamie',
-    middleName: '',
-    lastName: 'Wilson',
-    gender: 'Non Binary',
-    dob: '2023-Sept-14',
-    age: 2,
-    din: '13131',
-    csaStatus: 'Out of Pay',
-    statusEffective: '2024-Dec-15',
-    caseNumber: '1-139',
-    caseStatus: 'Admin Reopen',
-    legacyFile: 'GA73894',
-    lastUpdated: 'yyy-mmm-dd',
-    lastUpdatedBy: 'SYSTEM',
-  },
-  {
-    id: 5,
-    firstName: 'Mark',
-    middleName: 'S',
-    lastName: 'Grey',
-    gender: 'Man/Boy',
-    dob: '2022-Jan-13',
-    age: 4,
-    din: '44112',
-    csaStatus: 'Batch Sent - A...',
-    statusEffective: '2023-Feb-12',
-    caseNumber: '1-118',
-    caseStatus: 'Closed',
-    legacyFile: 'GA686843',
-    lastUpdated: 'yyy-mmm-dd',
-    lastUpdatedBy: 'User IDIR',
-  },
-  {
-    id: 6,
-    firstName: 'Jackie',
-    middleName: '',
-    lastName: 'Hems',
-    gender: 'Woman/Girl',
-    dob: '2012-Nov-25',
-    age: 13,
-    din: '31123',
-    csaStatus: 'On Hold',
-    statusEffective: '2022-Dec-13',
-    caseNumber: '1-118',
-    caseStatus: 'Open',
-    legacyFile: 'GA236816',
-    cgwrks3: 'CGWRKS3',
-    lastUpdated: 'yyy-mmm-dd',
-    lastUpdatedBy: 'SYSTEM',
-  },
-  {
-    id: 7,
-    firstName: 'Brian',
-    middleName: 'Kevin',
-    lastName: 'Jo...',
-    gender: 'Unknown',
-    dob: '2012-Nov-25',
-    age: 13,
-    din: '81190',
-    csaStatus: 'In Batch - Canc...',
-    statusEffective: '2025-Oct-31',
-    caseNumber: '1-183',
-    caseStatus: 'Open',
-    legacyFile: 'Placeholder fo...',
-    lastUpdated: 'yyy-mmm-dd',
-    lastUpdatedBy: 'SYSTEM',
-  },
-]
-
 // Sample data for batch history (child-specific)
 const childBatchHistory = [
   {
@@ -1074,8 +950,6 @@ function App() {
             await fetchContacts(currentPage)
           }
         }
-        // For non-API filters (client-side filtering), the data will update automatically
-        // from the eligibilityData array
       }
     } catch (error) {
       console.error('Hold/Resume error:', error)
@@ -1460,16 +1334,6 @@ function App() {
     setFilterSearchTerm('')
   }
 
-  const handleFilterChange = (column: string, value: string) => {
-    setColumnFilters((prev) => {
-      const currentFilters = prev[column] || []
-      const newFilters = currentFilters.includes(value)
-        ? currentFilters.filter((v) => v !== value)
-        : [...currentFilters, value]
-      return { ...prev, [column]: newFilters }
-    })
-  }
-
   const clearColumnFilter = (column: string) => {
     setColumnFilters((prev) => ({ ...prev, [column]: [] }))
   }
@@ -1601,73 +1465,31 @@ function App() {
     handleSortClose()
   }
 
-  // Get unique values for a column
-  const getUniqueValues = (column: keyof (typeof eligibilityData)[0]) => {
-    const values = eligibilityData.map((row) => row[column])
-    return Array.from(new Set(values)).filter((v) => v !== undefined && v !== '')
-  }
-
-  // Apply filters and sorting to data
+  // Apply filters and sorting to data - always use API data
   const filteredData = useMemo(() => {
-    // Use contacts from API when API-based filters are selected
-    const apiFilters = [
-      'All Records',
-      'Pending User review/action',
-      'All children On Hold from CSA',
-      'Children In Pay',
-      'Children Out of Pay',
-      'CRA Refused CSA List',
-      'Children within a batch',
-      'Children over 18 years (never eligible)',
-    ]
-    let data = apiFilters.includes(preDefinedFilter)
-      ? contacts.map((contact) => ({
-          id: contact.id,
-          firstName: contact.firstName || '',
-          middleName: contact.middleName || '',
-          lastName: contact.lastName || '',
-          gender: contact.gender || '',
-          dob: contact.dateOfBirth ? new Date(contact.dateOfBirth).toLocaleDateString() : '',
-          age: contact.age || 0,
-          din: contact.din || '',
-          csaStatus: contact.csaStatus || '',
-          statusEffective: contact.csaStatusEffectiveDate
-            ? new Date(contact.csaStatusEffectiveDate).toLocaleDateString()
-            : '',
-          caseNumber: contact.caseNumber || '',
-          caseStatus: contact.caseStatus || '',
-          legacyFile: contact.legacyFileNumber || '',
-          cgwrks3: '',
-          lastUpdated: contact.lastUpdatedAt
-            ? new Date(contact.lastUpdatedAt).toLocaleString()
-            : '',
-          lastUpdatedBy: contact.lastUpdatedBy || '',
-        }))
-      : eligibilityData.filter((row) => {
-          // Apply global search
-          if (searchTerm) {
-            const searchLower = searchTerm.toLowerCase()
-            const matchesSearch = Object.values(row).some((value) =>
-              String(value).toLowerCase().includes(searchLower),
-            )
-            if (!matchesSearch) return false
-          }
+    let data = contacts.map((contact) => ({
+      id: contact.id,
+      firstName: contact.firstName || '',
+      middleName: contact.middleName || '',
+      lastName: contact.lastName || '',
+      gender: contact.gender || '',
+      dob: contact.dateOfBirth ? new Date(contact.dateOfBirth).toLocaleDateString() : '',
+      age: contact.age || 0,
+      din: contact.din || '',
+      csaStatus: contact.csaStatus || '',
+      statusEffective: contact.csaStatusEffectiveDate
+        ? new Date(contact.csaStatusEffectiveDate).toLocaleDateString()
+        : '',
+      caseNumber: contact.caseNumber || '',
+      caseStatus: contact.caseStatus || '',
+      legacyFile: contact.legacyFileNumber || '',
+      cgwrks3: '',
+      lastUpdated: contact.lastUpdatedAt ? new Date(contact.lastUpdatedAt).toLocaleString() : '',
+      lastUpdatedBy: contact.lastUpdatedBy || '',
+    }))
 
-          // Apply column filters
-          for (const [column, filters] of Object.entries(columnFilters)) {
-            if (filters.length > 0) {
-              const columnValue = String(row[column as keyof typeof row])
-              if (!filters.includes(columnValue)) {
-                return false
-              }
-            }
-          }
-
-          return true
-        })
-
-    // Apply sorting (only for non-API data)
-    if (sortConfig && preDefinedFilter !== 'All Records') {
+    // Apply sorting
+    if (sortConfig) {
       data = [...data].sort((a, b) => {
         const aValue = a[sortConfig.column as keyof typeof a]
         const bValue = b[sortConfig.column as keyof typeof b]
@@ -1694,7 +1516,7 @@ function App() {
     }
 
     return data
-  }, [searchTerm, columnFilters, sortConfig, contacts, preDefinedFilter])
+  }, [sortConfig, contacts])
 
   // Check if all selected records have valid CSA status for Hold/Resume
   const canHoldResume = useMemo(() => {
@@ -2371,6 +2193,26 @@ function App() {
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
+                              onClick={(e) => handleSortClick(e, 'lastName')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Last Name
+                            </span>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'lastName')}
+                              sx={{
+                                padding: 0.5,
+                                color: columnFilters.lastName?.length > 0 ? '#1976d2' : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <span
                               onClick={(e) => handleSortClick(e, 'firstName')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
@@ -2411,26 +2253,6 @@ function App() {
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
-                              onClick={(e) => handleSortClick(e, 'lastName')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Last Name
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'lastName')}
-                              sx={{
-                                padding: 0.5,
-                                color: columnFilters.lastName?.length > 0 ? '#1976d2' : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
                               onClick={(e) => handleSortClick(e, 'gender')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
@@ -2454,7 +2276,7 @@ function App() {
                               onClick={(e) => handleSortClick(e, 'dob')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              DOB
+                              Date Of Birth
                             </span>
                             <IconButton
                               size="small"
@@ -2534,7 +2356,7 @@ function App() {
                               onClick={(e) => handleSortClick(e, 'statusEffective')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              Status Effective
+                              Status Effective Date
                             </span>
                             <IconButton
                               size="small"
@@ -2555,7 +2377,7 @@ function App() {
                               onClick={(e) => handleSortClick(e, 'caseNumber')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              Case No.
+                              Case Number
                             </span>
                             <IconButton
                               size="small"
@@ -2595,7 +2417,7 @@ function App() {
                               onClick={(e) => handleSortClick(e, 'legacyFile')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              Legacy File
+                              Legacy File No.
                             </span>
                             <IconButton
                               size="small"
@@ -2698,9 +2520,9 @@ function App() {
                               }}
                             />
                           </TableCell>
+                          <TableCell>{row.lastName}</TableCell>
                           <TableCell>{row.firstName}</TableCell>
                           <TableCell>{row.middleName}</TableCell>
-                          <TableCell>{row.lastName}</TableCell>
                           <TableCell>{row.gender}</TableCell>
                           <TableCell>{row.dob}</TableCell>
                           <TableCell>{row.age}</TableCell>
@@ -2817,32 +2639,6 @@ function App() {
                       }}
                       sx={{ mb: 1 }}
                     />
-                    <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                      {filterAnchor.column &&
-                        getUniqueValues(filterAnchor.column as keyof (typeof eligibilityData)[0])
-                          .sort()
-                          .filter((value) =>
-                            String(value).toLowerCase().includes(filterSearchTerm.toLowerCase()),
-                          )
-                          .map((value) => (
-                            <Box
-                              key={String(value)}
-                              sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
-                            >
-                              <Checkbox
-                                size="small"
-                                checked={
-                                  columnFilters[filterAnchor.column]?.includes(String(value)) ||
-                                  false
-                                }
-                                onChange={() =>
-                                  handleFilterChange(filterAnchor.column, String(value))
-                                }
-                              />
-                              <Typography variant="body2">{String(value)}</Typography>
-                            </Box>
-                          ))}
-                    </Box>
                   </Box>
                 </Menu>
 
@@ -2995,9 +2791,7 @@ function App() {
                       </Box>
 
                       {(() => {
-                        const childData = eligibilityData.find(
-                          (child) => child.id === selectedChild,
-                        )
+                        const childData = filteredData.find((child) => child.id === selectedChild)
                         if (!childData) return null
 
                         return (

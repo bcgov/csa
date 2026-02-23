@@ -14,6 +14,7 @@ interface AuthContextType {
     name?: string
     email?: string
     username?: string
+    idirUsername?: string
     roles?: string[]
   } | null
   login: () => void
@@ -100,6 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                       name: keycloakInstance.tokenParsed.name,
                       email: keycloakInstance.tokenParsed.email,
                       username: keycloakInstance.tokenParsed.preferred_username,
+                      idirUsername: keycloakInstance.tokenParsed.idir_username?.toUpperCase(),
                       roles: keycloakInstance.tokenParsed.realm_access?.roles || [],
                     })
                     setIsLoading(false)

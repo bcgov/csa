@@ -19,8 +19,7 @@ import {
 import { runEligibility } from './rules/rule-runner'
 import { EligibilityRule } from './rules/rule.interface'
 import { step1A_AgeCheck } from './rules/steps/step1a-age-check'
-import { step1B_CancellationDetermination } from './rules/steps/step1b-cancellation-determination'
-import { step1C_CancellationCheck } from './rules/steps/step1c-cancellation-check'
+import { step1B_CancellationCheck } from './rules/steps/step1b-cancellation-determination'
 import { step2_LegalStatusCheck } from './rules/steps/step2-legal-status-check'
 import { step3_PlacementCheck } from './rules/steps/step3-placement-check'
 import { step4_FetchAgreementContract } from './rules/steps/step4-fetch-agreement-contract'
@@ -28,8 +27,7 @@ import { step6_OrderPaymentCheck } from './rules/steps/step6-order-payment-check
 
 const RULES: EligibilityRule[] = [
   step1A_AgeCheck,
-  step1B_CancellationDetermination,
-  step1C_CancellationCheck,
+  step1B_CancellationCheck,
   step2_LegalStatusCheck,
   step3_PlacementCheck,
   step4_FetchAgreementContract,
@@ -419,6 +417,7 @@ export class EligibilityService {
           orderType: order.orderType ?? '',
           orderStatus: order.orderStatus ?? '',
           effectiveStartDate: order.effectiveStartDate ? new Date(order.effectiveStartDate) : null,
+          effectiveEndDate: order.effectiveEndDate ? new Date(order.effectiveEndDate) : null,
           amount: Number(order.amount) || 0,
           contractNumber: order.contractNumber,
           source: 'ICM',
@@ -644,8 +643,8 @@ export class EligibilityService {
       batchId = existingBatch.id
     } else {
       const [newBatch] = await this.prisma.$queryRawUnsafe<{ id: number }[]>(
-        `INSERT INTO batches (batch_date, status, record_count, created_at)
-         VALUES (CURRENT_DATE, $1, 0, NOW()) RETURNING id`,
+        `INSERT INTO batches (batch_date, status, record_count, created_at, updated_at)
+         VALUES (CURRENT_DATE, $1, 0, NOW(), NOW()) RETURNING id`,
         BATCH_STATUS.PENDING,
       )
       batchId = newBatch.id

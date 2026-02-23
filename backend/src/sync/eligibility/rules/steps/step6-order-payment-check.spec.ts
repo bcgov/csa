@@ -47,6 +47,7 @@ const makeOrder = (overrides: Partial<OrderRecord> = {}): OrderRecord => ({
   orderType: 'Monthly Family Care Rate',
   orderStatus: 'Closed',
   effectiveStartDate: new Date('2026-01-15'), // previous month
+  effectiveEndDate: null,
   amount: 1600.0,
   contractNumber: 'C-100',
   source: 'ICM',

@@ -78,6 +78,9 @@ export class ContactDto {
   @ApiPropertyOptional({ description: 'CSA status of the contact' })
   csaStatus?: string
 
+  @ApiPropertyOptional({ description: 'Display label for CSA status' })
+  csaStatusLabel?: string
+
   @ApiPropertyOptional({ description: 'Effective date of the CSA status' })
   csaStatusEffectiveDate?: Date
 

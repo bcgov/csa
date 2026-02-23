@@ -73,7 +73,7 @@ export interface OrderRecord {
   orderType: string
   orderStatus: string
   effectiveStartDate: Date | null
-  effectiveEndDate?: Date | null
+  effectiveEndDate: Date | null
   amount: number
   contractNumber: string | null
   source: 'ICM' | 'MIS'

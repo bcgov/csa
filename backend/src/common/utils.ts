@@ -1,3 +1,5 @@
+import { CSA_STATUS_LABELS } from './state-machine/constants'
+
 // Date Helpers
 
 export function formatDate(date: Date): string {
@@ -15,6 +17,18 @@ export function firstDayOfPreviousMonth(referenceDate: Date = new Date()): Date 
   d.setDate(1)
   d.setMonth(d.getMonth() - 1)
   return d
+}
+
+export function enrichLabels<T extends Record<string, any>>(record: T): T {
+  const labels: Record<string, string> = {}
+
+  if ('csaStatus' in record && record.csaStatus) {
+    labels.csaStatusLabel = CSA_STATUS_LABELS[record.csaStatus] ?? record.csaStatus
+  } else if ('csaStatus' in record) {
+    labels.csaStatusLabel = ''
+  }
+
+  return { ...record, ...labels }
 }
 
 // Eligibility helpers

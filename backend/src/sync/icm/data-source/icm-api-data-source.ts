@@ -60,7 +60,8 @@ export class IcmApiDataSource extends IcmDataSource {
         )
       }
 
-      const items: IcmApiRecord[] = response.data?.items ?? []
+      const raw = response.data?.items
+      const items: IcmApiRecord[] = Array.isArray(raw) ? raw : raw ? [raw] : []
       if (items.length === 0) break
 
       allRecords.push(...items)

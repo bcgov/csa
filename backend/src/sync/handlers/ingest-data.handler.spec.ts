@@ -59,7 +59,9 @@ describe('IngestDataHandler', () => {
         parentJobId: 1,
       })
 
-      expect(runJobTypeSpy).toHaveBeenCalledWith(JobType.SYNC_ICM, JobTrigger.SYSTEM)
+      expect(runJobTypeSpy).toHaveBeenNthCalledWith(4, JobType.SYNC_ICM, JobTrigger.SYSTEM, {
+        parentJobId: 1,
+      })
       expect(runJobTypeSpy).toHaveBeenCalledTimes(4)
     })
   })
@@ -119,19 +121,21 @@ describe('IngestDataHandler', () => {
       expect(runJobTypeSpy).toHaveBeenCalledTimes(3)
     })
 
-    it('should succeed even if SYNC_ICM fire-and-forget rejects', async () => {
+    it('should succeed even if SYNC_ICM returns failure', async () => {
       const runJobTypeSpy = vi.mocked(jobRunner.runJobType)
       runJobTypeSpy
         .mockResolvedValueOnce({ success: true }) // ICM
         .mockResolvedValueOnce({ success: true }) // MIS
         .mockResolvedValueOnce({ success: true }) // Eligibility
-        .mockRejectedValueOnce(new Error('Sync API error')) // Sync (fire-and-forget)
+        .mockResolvedValueOnce({ success: false, message: 'all 10 contacts failed' }) // Sync
 
       const result = await handler.execute(mockContext)
 
-      // SYNC_ICM failure doesn't affect ingestion result
       expect(result.success).toBe(true)
       expect(result.message).toBe('Data ingestion and eligibility completed successfully')
+      expect(result.metadata).toEqual({
+        syncResult: { success: false, message: 'all 10 contacts failed' },
+      })
     })
 
     it('should handle unexpected errors with stack trace', async () => {

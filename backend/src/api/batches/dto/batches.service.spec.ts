@@ -1,8 +1,9 @@
 import { NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { BATCH_STATUS } from 'src/common/state-machine/constants'
+import { BATCH_STATUS, CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
+import { ContactsService } from '../../contacts/contacts.service'
 import { BatchesService } from '../batches.service'
 
 describe('BatchesService', () => {
@@ -29,12 +30,17 @@ describe('BatchesService', () => {
     $transaction: vi.fn(),
   }
 
+  const mockContactsService = {
+    updateCsaStatus: vi.fn(),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BatchesService,
         StateMachineService,
         { provide: PrismaService, useValue: mockPrismaService },
+        { provide: ContactsService, useValue: mockContactsService },
       ],
     }).compile()
 
@@ -106,7 +112,15 @@ describe('BatchesService', () => {
 
       const result = await service.findBatchContacts(1)
 
-      expect(result).toEqual(details)
+      expect(result).toEqual(
+        details.map((d) => ({
+          ...d,
+          contact: {
+            ...d.contact,
+            csaStatusLabel: 'Eligible',
+          },
+        })),
+      )
       expect(mockPrismaService.contactBatchDetail.findMany).toHaveBeenCalledWith({
         where: { batchId: 1 },
         include: {
@@ -165,34 +179,106 @@ describe('BatchesService', () => {
   })
 
   describe('addContactsToPendingBatch', () => {
-    it('should add contacts to pending batch', async () => {
+    it('should add contacts to pending batch with correct transaction types', async () => {
       const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 0 }
       const updatedBatch = { ...pendingBatch, recordCount: 2 }
 
       vi.spyOn(service, 'findOrCreatePendingBatch').mockResolvedValue(pendingBatch as any)
 
-      mockPrismaService.contact.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }])
-
+      mockPrismaService.contact.findMany.mockResolvedValue([
+        { id: 1, caseNumber: 'C1', csaStatus: 'eligible' },
+        { id: 2, caseNumber: 'C2', csaStatus: 'not_eligible_in_pay' },
+      ])
       mockPrismaService.contactBatchDetail.findMany.mockResolvedValue([])
 
-      mockPrismaService.contactBatchDetail.create.mockResolvedValue({})
+      mockContactsService.updateCsaStatus
+        .mockResolvedValueOnce({
+          success: true,
+          from: CSA_STATUS.ELIGIBLE,
+          to: CSA_STATUS.IN_BATCH_APPLICATION,
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          from: CSA_STATUS.NOT_ELIGIBLE_IN_PAY,
+          to: CSA_STATUS.IN_BATCH_CANCELLATION,
+        })
 
+      mockPrismaService.$transaction.mockImplementation(async (fn: any) => fn(mockPrismaService))
+      mockPrismaService.contactBatchDetail.create.mockResolvedValue({ id: 10 })
+      mockPrismaService.contactBatchDetail.update.mockResolvedValue({})
       mockPrismaService.batch.update.mockResolvedValue(updatedBatch)
 
-      const result = await service.addContactsToPendingBatch([1, 2, 999], 'user1')
+      const result = await service.addContactsToPendingBatch([1, 2], 'user1')
 
       expect(result.success).toEqual([1, 2])
-      expect(result.skipped).toEqual([{ id: 999, reason: 'not_found' }])
+      expect(result.skipped).toEqual([])
       expect(result.batch.recordCount).toBe(2)
+
+      // Verify CSA transitions were called
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledTimes(2)
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        1,
+        CSA_EVENT.ADD_TO_BATCH,
+        'USER',
+        { userId: 'user1' },
+      )
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        2,
+        CSA_EVENT.ADD_TO_BATCH,
+        'USER',
+        { userId: 'user1' },
+      )
+
+      // Verify transaction types: first call = application, second = cancellation
+      expect(mockPrismaService.contactBatchDetail.create).toHaveBeenCalledTimes(2)
+      const firstCreateCall = mockPrismaService.contactBatchDetail.create.mock.calls[0][0]
+      expect(firstCreateCall.data.transactionType).toBe('application')
+      const secondCreateCall = mockPrismaService.contactBatchDetail.create.mock.calls[1][0]
+      expect(secondCreateCall.data.transactionType).toBe('cancellation')
+    })
+
+    it('should skip contacts not found', async () => {
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 0 }
+      const updatedBatch = { ...pendingBatch, recordCount: 1 }
+
+      vi.spyOn(service, 'findOrCreatePendingBatch').mockResolvedValue(pendingBatch as any)
+      mockPrismaService.contact.findMany.mockResolvedValue([
+        { id: 1, caseNumber: 'C1', csaStatus: 'eligible' },
+      ])
+      mockPrismaService.contactBatchDetail.findMany.mockResolvedValue([])
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: true,
+        from: CSA_STATUS.ELIGIBLE,
+        to: CSA_STATUS.IN_BATCH_APPLICATION,
+      })
+      mockPrismaService.$transaction.mockImplementation(async (fn: any) => fn(mockPrismaService))
+      mockPrismaService.contactBatchDetail.create.mockResolvedValue({ id: 10 })
+      mockPrismaService.contactBatchDetail.update.mockResolvedValue({})
+      mockPrismaService.batch.update.mockResolvedValue(updatedBatch)
+
+      const result = await service.addContactsToPendingBatch([1, 999], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(result.skipped).toEqual([{ id: 999, reason: 'not_found' }])
     })
 
     it('should skip contacts already in batch', async () => {
       const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 1 }
 
       vi.spyOn(service, 'findOrCreatePendingBatch').mockResolvedValue(pendingBatch as any)
-      mockPrismaService.contact.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }])
+      mockPrismaService.contact.findMany.mockResolvedValue([
+        { id: 1, caseNumber: 'C1', csaStatus: 'eligible' },
+        { id: 2, caseNumber: 'C2', csaStatus: 'eligible' },
+      ])
       mockPrismaService.contactBatchDetail.findMany.mockResolvedValue([{ contactId: 1 }])
-      mockPrismaService.contactBatchDetail.create.mockResolvedValue({})
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: true,
+        from: CSA_STATUS.ELIGIBLE,
+        to: CSA_STATUS.IN_BATCH_APPLICATION,
+      })
+      mockPrismaService.$transaction.mockImplementation(async (fn: any) => fn(mockPrismaService))
+      mockPrismaService.contactBatchDetail.create.mockResolvedValue({ id: 10 })
+      mockPrismaService.contactBatchDetail.update.mockResolvedValue({})
       mockPrismaService.batch.update.mockResolvedValue({ ...pendingBatch, recordCount: 2 })
 
       const result = await service.addContactsToPendingBatch([1, 2], 'user1')
@@ -200,18 +286,67 @@ describe('BatchesService', () => {
       expect(result.success).toEqual([2])
       expect(result.skipped).toEqual([{ id: 1, reason: 'already_in_batch' }])
     })
+
+    it('should skip contacts with invalid CSA transition', async () => {
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 0 }
+
+      vi.spyOn(service, 'findOrCreatePendingBatch').mockResolvedValue(pendingBatch as any)
+      mockPrismaService.contact.findMany.mockResolvedValue([
+        { id: 1, caseNumber: 'C1', csaStatus: 'on_hold' },
+      ])
+      mockPrismaService.contactBatchDetail.findMany.mockResolvedValue([])
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: false,
+        reason: 'Invalid transition',
+      })
+      mockPrismaService.batch.update.mockResolvedValue(pendingBatch)
+
+      const result = await service.addContactsToPendingBatch([1], 'user1')
+
+      expect(result.success).toEqual([])
+      expect(result.skipped).toEqual([{ id: 1, reason: 'invalid_transition' }])
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('should catch per-contact errors and skip', async () => {
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 0 }
+
+      vi.spyOn(service, 'findOrCreatePendingBatch').mockResolvedValue(pendingBatch as any)
+      mockPrismaService.contact.findMany.mockResolvedValue([
+        { id: 1, caseNumber: 'C1', csaStatus: 'eligible' },
+      ])
+      mockPrismaService.contactBatchDetail.findMany.mockResolvedValue([])
+      mockContactsService.updateCsaStatus.mockRejectedValue(new Error('DB error'))
+      mockPrismaService.batch.update.mockResolvedValue(pendingBatch)
+
+      const result = await service.addContactsToPendingBatch([1], 'user1')
+
+      expect(result.success).toEqual([])
+      expect(result.skipped).toEqual([{ id: 1, reason: 'error' }])
+    })
   })
 
   describe('removeContactFromPendingBatch', () => {
-    it('should remove contact from pending batch', async () => {
+    it('should remove contact from pending batch and revert CSA status', async () => {
       const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING }
       const detail = { id: 10, contactId: 100, batchId: 1 }
 
       mockPrismaService.batch.findFirst.mockResolvedValue(pendingBatch)
       mockPrismaService.contactBatchDetail.findFirst.mockResolvedValue(detail)
       mockPrismaService.$transaction.mockResolvedValue([])
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: true,
+        from: CSA_STATUS.IN_BATCH_APPLICATION,
+        to: CSA_STATUS.ELIGIBLE_TBD,
+      })
 
       await expect(service.removeContactFromPendingBatch(100)).resolves.toBeUndefined()
+
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        100,
+        CSA_EVENT.REMOVE_FROM_BATCH,
+        'USER',
+      )
     })
 
     it('should throw NotFoundException if no pending batch', async () => {

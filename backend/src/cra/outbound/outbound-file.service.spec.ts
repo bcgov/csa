@@ -25,6 +25,7 @@ const mockConfigService = {
       'app.fileStoragePath': './temp/',
       'cra.environmentCode': 'ACSAIN',
       'cra.fileTypeCode': 'AAPL',
+      'cra.fileNamePrefix': 'II',
       'cra.userId': 'TST0001',
     }
     return config[key]

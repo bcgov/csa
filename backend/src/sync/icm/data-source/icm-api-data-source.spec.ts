@@ -96,6 +96,21 @@ describe('IcmApiDataSource', () => {
       expect(results).toHaveLength(1)
     })
 
+    it('should handle single object response (ICM returns unwrapped item)', async () => {
+      httpService.get.mockReturnValueOnce(
+        of({
+          status: 200,
+          headers: {},
+          data: { items: { Id: 'single-record' } },
+        }),
+      )
+
+      const results = await service.fetchAll(mockConfig)
+
+      expect(results).toHaveLength(1)
+      expect(results[0]).toEqual({ Id: 'single-record' })
+    })
+
     it('should include common query params in URL', async () => {
       httpService.get.mockReturnValue(of({ status: 200, headers: {}, data: { items: [] } }))
 

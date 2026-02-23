@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
+import { enrichLabels } from 'src/common/utils'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
@@ -95,7 +96,7 @@ export class ContactsService {
     ])
 
     return {
-      data,
+      data: data.map(enrichLabels),
       page,
       limit,
       total,
@@ -186,7 +187,7 @@ export class ContactsService {
       throw new NotFoundException(`Contact ${id} not found`)
     }
 
-    return contact
+    return enrichLabels(contact)
   }
 
   // Update a contact's CSA status using the state machine.
@@ -259,6 +260,15 @@ export class ContactsService {
       updateData.preBatchStatus = null
     }
 
+    // default cancel reason code when user sets not eligible from in-pay
+    if (
+      event === CSA_EVENT.SET_NOT_ELIGIBLE &&
+      currentState === CSA_STATUS.IN_PAY &&
+      !contact.cancelReasonCode
+    ) {
+      updateData.cancelReasonCode = '21'
+    }
+
     await this.prisma.contact.update({
       where: { id: contactId },
       data: updateData,
@@ -306,7 +316,7 @@ export class ContactsService {
     ])
 
     return {
-      data,
+      data: data.map(enrichLabels),
       page,
       limit,
       total,

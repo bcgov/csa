@@ -26,6 +26,9 @@ export class ContactSummaryDto {
 
   @ApiProperty({ nullable: true })
   csaStatus: string | null
+
+  @ApiProperty({ description: 'Display label for CSA status' })
+  csaStatusLabel: string
 }
 
 export class ContactBatchDetailDto {

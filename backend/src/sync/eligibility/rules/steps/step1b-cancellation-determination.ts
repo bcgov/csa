@@ -1,24 +1,25 @@
 import { determineCancellationReason } from '../../cancellation/determine-cancellation-reason'
+import { determineCareEndDate } from '../../cancellation/determine-care-end-date'
 import { EligibilityResult } from '../../eligibility.types'
 import { EligibilityContext, EligibilityRule } from '../rule.interface'
+import { step9_UpdateNotEligible } from './step9-update-not-eligible'
 
 /**
- * STEP 1B (pre): Cancellation Reason Determination
+ * STEP 1B: Cancellation Check
  *
- * Derives cancellation reason code from ICM/MIS staging data already loaded
- * in the contact profile:
- *   - Code 14: deceased flag = Y
- *   - Code 22: ICM sub-type 'Absent/Unknown Location' Active OR MIS type 'AW' Active
- *   - Code 29: ICM sub-type 'Adoption Home' Active OR MIS type 'AD' Active
+ * 1. Derives cancellation reason code from ICM/MIS staging data:
+ *    - Code 14: deceased flag = Y
+ *    - Code 22: ICM sub-type 'Absent/Unknown Location' Active OR MIS type 'AW' Active
+ *    - Code 29: ICM sub-type 'Adoption Home' Active OR MIS type 'AD' Active
  *
- * Enriches ctx.contact in-memory (isInEligible + cancelReasonCode) so that
- * the next step (Step 1B cancellation check) can route to Step 9 with the
- * correct code.
+ * 2. If cancellation triggered, computes Care End Date from
+ *    order/payment end dates.
  *
- * Always returns null (never short-circuits). This is a context-enrichment step.
+ * 3. Routes to Step 9 with cancelReasonCode + careEndDate.
+ *    If no cancellation condition → returns null (continue to Step 2).
  */
-export const step1B_CancellationDetermination: EligibilityRule = {
-  name: 'step1B_CancellationDetermination',
+export const step1B_CancellationCheck: EligibilityRule = {
+  name: 'step1B_CancellationCheck',
 
   evaluate(ctx: EligibilityContext): EligibilityResult | null {
     const { contact } = ctx
@@ -34,8 +35,8 @@ export const step1B_CancellationDetermination: EligibilityRule = {
     })
 
     if (result.isInEligible) {
-      contact.isInEligible = true
-      contact.cancelReasonCode = result.cancelReasonCode
+      const careEndDate = determineCareEndDate(contact.orders, contact.placements)
+      return step9_UpdateNotEligible(contact.csaStatus, result.cancelReasonCode, careEndDate)
     }
 
     return null

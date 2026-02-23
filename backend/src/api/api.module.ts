@@ -16,7 +16,7 @@ import { MetricsController } from './metrics/metrics.controller'
 import { MockModule } from './mock/mock.module'
 import { StatusUpdateModule } from './status_update/status-update.module'
 
-const enableMockApi = process.env.NODE_ENV !== 'production'
+const enableMockApi = process.env.USE_MOCK_DATA === 'true'
 @Module({
   imports: [
     ConfigModule.forRoot({

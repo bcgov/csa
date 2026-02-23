@@ -5,7 +5,7 @@ import { join } from 'path'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 import { CraDetail, CraHeader, CraTrailer } from './outbound.interface'
 
-const { FILE_NAME_PREFIX, REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
+const { REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
 
 const {
   HEADER_TRAN_CODE,
@@ -22,12 +22,14 @@ export class OutboundFileService {
   private readonly fileStoragePath: string
   private readonly environmentCode: string
   private readonly fileTypeCode: string
+  private readonly fileNamePrefix: string
   private readonly craUserId: string
 
   constructor(private readonly configService: ConfigService) {
     this.fileStoragePath = this.configService.get<string>('app.fileStoragePath')!
     this.environmentCode = this.configService.get<string>('cra.environmentCode')!
     this.fileTypeCode = this.configService.get<string>('cra.fileTypeCode')!
+    this.fileNamePrefix = this.configService.get<string>('cra.fileNamePrefix')!
     this.craUserId = this.configService.get<string>('cra.userId')!
   }
   createFile(
@@ -161,6 +163,6 @@ export class OutboundFileService {
   createFileName(sequenceNumber: number): string {
     const paddedSequence = String(sequenceNumber).padStart(4, '0')
 
-    return `${FILE_NAME_PREFIX}.${this.environmentCode}.${this.craUserId}.${this.fileTypeCode}${paddedSequence}.txt`
+    return `${this.fileNamePrefix}.${this.environmentCode}.${this.craUserId}.${this.fileTypeCode}${paddedSequence}.txt`
   }
 }

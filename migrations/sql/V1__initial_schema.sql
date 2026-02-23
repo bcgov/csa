@@ -137,6 +137,7 @@ CREATE TABLE IF NOT EXISTS csa.job_runs (
 CREATE INDEX idx_job_runs_status ON csa.job_runs (status);
 CREATE INDEX idx_job_runs_parent ON csa.job_runs (parent_job_id);
 CREATE INDEX idx_job_runs_type_status ON csa.job_runs (job_type, status);
+CREATE UNIQUE INDEX idx_job_runs_one_running_per_type ON csa.job_runs (job_type) WHERE status = 'RUNNING';
 
 CREATE TABLE IF NOT EXISTS csa.transfer_files (
   id                SERIAL      PRIMARY KEY,
@@ -251,6 +252,7 @@ CREATE TABLE IF NOT EXISTS csa.stg_icm_orders (
   STATUS_CD           TEXT,
   TOTAL_AMT           TEXT,
   X_EFF_START_DT      TEXT,
+  X_EFF_END_DT        TEXT,
   PRODUCT_NAME        TEXT,
   X_PCMS_CONTRACT_NUM TEXT,
   AGREEMENT_ROW_ID    TEXT,

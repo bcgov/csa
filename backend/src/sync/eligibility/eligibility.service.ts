@@ -440,7 +440,7 @@ export class EligibilityService {
           contractNumber: payment.contractNumber,
           source: 'MIS',
           orderNumber: payment.orderNumber ?? null,
-          product: payment.product ?? null,
+          product: null,
         }),
       )
 

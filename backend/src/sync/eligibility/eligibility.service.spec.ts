@@ -505,16 +505,20 @@ describe('buildLoadContactProfilesSql', () => {
     expect(sql).not.toContain('eligible_cases.ROW_ID = legal_auth.PAR_ROW_ID')
   })
 
-  it('should join MIS data via PERSON_ID_MIS from eligible_cases', () => {
+  it('should join MIS data via placement - contract - payment', () => {
     const { sql } = buildLoadContactProfilesSql(null)
 
     // eligible_cases carries PERSON_ID_MIS
     expect(sql).toContain('cases.PERSON_ID_MIS')
 
-    // MIS CTEs join through PERSON_ID_MIS on eligible_cases
-    expect(sql).toContain('mis_pay.person_id_mis = eligible_cases.PERSON_ID_MIS')
-    expect(sql).toContain('mis_con.person_id_mis = eligible_cases.PERSON_ID_MIS')
+    // MIS placements join directly through PERSON_ID_MIS on eligible_cases
     expect(sql).toContain('mis_plc.person_id_mis = eligible_cases.PERSON_ID_MIS')
+
+    // MIS contracts join via service_provider_id through placements
+    expect(sql).toContain('mis_con.service_provider_id = mis_plc.service_provider_id')
+
+    // MIS payments join via contract_number through contracts
+    expect(sql).toContain('mis_pay.contract_number = mis_con.contract_number')
 
     // Final SELECT joins MIS aggs on CONTACT_ROW_ID
     expect(sql).toContain('mis_pay.CONTACT_ROW_ID = cases.CONTACT_ROW_ID')
@@ -525,12 +529,13 @@ describe('buildLoadContactProfilesSql', () => {
     expect(sql).not.toContain('master_contacts.person_id_mis')
   })
 
-  it('should join changed_contacts MIS sections via PERSON_ID_MIS on cases', () => {
+  it('should join changed_contacts MIS sections via placement', () => {
     const { sql } = buildLoadContactProfilesSql(new Date('2026-02-12'))
 
     // MIS change detection uses stg_icm_cases, not contacts master table
     expect(sql).not.toContain('FROM contacts mc')
-    expect(sql).toContain('mis_pay.person_id_mis = cases.PERSON_ID_MIS')
+    // Payments change detection goes through contracts - placements - cases
+    expect(sql).toContain('mis_pay.contract_number = mis_con.contract_number')
 
     expect(sql).toContain('legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID')
     expect(sql).not.toContain('legal_auth.PAR_ROW_ID = cases.ROW_ID')

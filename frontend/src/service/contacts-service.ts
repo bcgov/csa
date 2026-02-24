@@ -60,16 +60,22 @@ export interface SortOption {
  * @param page - Page number (default: 1)
  * @param limit - Items per page (default: 10, max: 200)
  * @param filter - Optional filter array, can include SearchFilter objects or objects with OR logic
+ * @param sort - Optional sort array, e.g., [{"lastName": "asc"}]
  */
 export const getAllContacts = async (
   page: number = 1,
   limit: number = 10,
   filter?: any,
+  sort?: Array<{ [key: string]: 'asc' | 'desc' }>,
 ): Promise<PaginatedContactsResponse> => {
   const params: any = { page, limit }
 
   if (filter && (Array.isArray(filter) ? filter.length > 0 : true)) {
     params.filter = JSON.stringify(filter)
+  }
+
+  if (sort && sort.length > 0) {
+    params.sort = JSON.stringify(sort)
   }
 
   const response = await APIService.getAxiosInstance().get('/contacts', {

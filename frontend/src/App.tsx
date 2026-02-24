@@ -527,13 +527,23 @@ function App() {
           filter = [{ key: 'csaStatus', op: 'eq', value: 'Over 18' }]
         }
 
-        const response = await getAllContacts(page, recordsPerPage, filter)
+        // Build sort parameter if sortConfig is set
+        let sort: Array<{ [key: string]: 'asc' | 'desc' }> | undefined
+        if (sortConfig) {
+          const backendField = columnToFieldMapping[sortConfig.column]
+          if (backendField) {
+            sort = [{ [backendField]: sortConfig.direction }]
+          }
+        }
+
+        const response = await getAllContacts(page, recordsPerPage, filter, sort)
         setContacts(response.data)
         setTotalPages(response.totalPages)
         setTotalRecords(response.total)
         console.log('Fetched contacts:', response.data)
         console.log('Total records:', response.total)
         console.log('Applied filter:', filter)
+        console.log('Applied sort:', sort)
       } catch (error) {
         console.error('Failed to fetch contacts:', error)
         setContactsError('Failed to load contacts. Please try again.')
@@ -542,7 +552,7 @@ function App() {
         setLoadingContacts(false)
       }
     },
-    [preDefinedFilter, recordsPerPage],
+    [preDefinedFilter, recordsPerPage, sortConfig, columnToFieldMapping],
   )
 
   // Function to perform column-specific filter search
@@ -1402,10 +1412,10 @@ function App() {
         case 'batchDate':
           return batch.batchDate
             ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: '2-digit',
-              })
+              year: 'numeric',
+              month: 'short',
+              day: '2-digit',
+            })
             : ''
         case 'status':
           return batch.status
@@ -1466,8 +1476,9 @@ function App() {
   }
 
   // Apply filters and sorting to data - always use API data
+  // Note: Sorting is now handled by the backend API, so we just transform the data here
   const filteredData = useMemo(() => {
-    let data = contacts.map((contact) => ({
+    const data = contacts.map((contact) => ({
       id: contact.id,
       firstName: contact.firstName || '',
       middleName: contact.middleName || '',
@@ -1488,35 +1499,8 @@ function App() {
       lastUpdatedBy: contact.lastUpdatedBy || '',
     }))
 
-    // Apply sorting
-    if (sortConfig) {
-      data = [...data].sort((a, b) => {
-        const aValue = a[sortConfig.column as keyof typeof a]
-        const bValue = b[sortConfig.column as keyof typeof b]
-
-        // Handle different data types
-        if (aValue === undefined || aValue === '') return 1
-        if (bValue === undefined || bValue === '') return -1
-
-        // Numeric comparison
-        if (typeof aValue === 'number' && typeof bValue === 'number') {
-          return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue
-        }
-
-        // String comparison
-        const aString = String(aValue).toLowerCase()
-        const bString = String(bValue).toLowerCase()
-
-        if (sortConfig.direction === 'asc') {
-          return aString.localeCompare(bString)
-        } else {
-          return bString.localeCompare(aString)
-        }
-      })
-    }
-
     return data
-  }, [sortConfig, contacts])
+  }, [contacts])
 
   // Check if all selected records have valid CSA status for Hold/Resume
   const canHoldResume = useMemo(() => {
@@ -1646,10 +1630,10 @@ function App() {
       batchId: `1-${batch.id}`, // Format as "1-{id}"
       batchDate: batch.batchDate
         ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: '2-digit',
-          })
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+        })
         : '',
       status: batch.status,
       recordCount: batch.recordCount,
@@ -2550,30 +2534,30 @@ function App() {
                   'Children within a batch',
                   'Children over 18 years (never eligible)',
                 ].includes(preDefinedFilter) && (
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      mt: 2,
-                      px: 2,
-                    }}
-                  >
-                    <Typography variant="body2" color="text.secondary">
-                      {loadingContacts
-                        ? 'Loading...'
-                        : `Showing ${contacts.length} of ${totalRecords} records`}
-                    </Typography>
-                    <Pagination
-                      count={totalPages}
-                      page={currentPage}
-                      onChange={handlePageChange}
-                      color="primary"
-                      showFirstButton
-                      showLastButton
-                    />
-                  </Box>
-                )}
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mt: 2,
+                        px: 2,
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        {loadingContacts
+                          ? 'Loading...'
+                          : `Showing ${contacts.length} of ${totalRecords} records`}
+                      </Typography>
+                      <Pagination
+                        count={totalPages}
+                        page={currentPage}
+                        onChange={handlePageChange}
+                        color="primary"
+                        showFirstButton
+                        showLastButton
+                      />
+                    </Box>
+                  )}
 
                 {/* Error message */}
                 {contactsError && preDefinedFilter === 'All Records' && (

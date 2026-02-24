@@ -5,7 +5,7 @@ import { PrismaService } from 'src/common/database/prisma.service'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import { FileStorageService } from './file-storage/file-storage.service'
-import { MIS_FILE_CONFIGS, MisFileConfig } from './mis-file.config'
+import { MIS_FILE_CONFIGS, MIS_LAST_UPDATED_CONFIG, MisFileConfig } from './mis-file.config'
 
 export interface MisResult {
   name: string
@@ -31,22 +31,54 @@ export class MisService {
     }
     const prefix = this.configService.get<string>('sync.misS3Prefix') || ''
 
-    const results: MisResult[] = []
+    const files: MisResult[] = []
     for (const config of MIS_FILE_CONFIGS) {
       const key = `${prefix}${config.s3Key}`
       const fileExists = await this.fileStorage.exists(key)
 
       if (!fileExists) {
         this.logger.warn(`${config.name}: file not found at ${key}, skipping`)
-        results.push({ name: config.name, rows: 0, skipped: true })
+        files.push({ name: config.name, rows: 0, skipped: true })
         continue
       }
 
       const result = await this.ingestFile(config, prefix)
-      results.push(result)
+      files.push(result)
     }
 
-    return results
+    return files
+  }
+
+  async readLastUpdated(): Promise<string | null> {
+    const prefix = this.configService.get<string>('sync.misS3Prefix') || ''
+    const key = `${prefix}${MIS_LAST_UPDATED_CONFIG.s3Key}`
+    const fileExists = await this.fileStorage.exists(key)
+
+    if (!fileExists) {
+      this.logger.warn(`last_updated: file not found at ${key}`)
+      return null
+    }
+
+    const readable = await this.fileStorage.download(key)
+    const chunks: Buffer[] = []
+    for await (const chunk of readable) {
+      chunks.push(Buffer.from(chunk))
+    }
+    const content = Buffer.concat(chunks).toString('utf-8').trim()
+
+    // Parse CSV: skip header line, read value
+    const lines = content
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+    if (lines.length < 2) {
+      this.logger.warn(`last_updated: file has no data row`)
+      return null
+    }
+
+    const value = lines[1]
+    this.logger.log(`MIS last_updated: ${value}`)
+    return value
   }
 
   private async ingestFile(config: MisFileConfig, prefix: string): Promise<MisResult> {

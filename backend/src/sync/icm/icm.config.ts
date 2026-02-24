@@ -58,7 +58,7 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
   {
     name: 'legal_authority',
     endpoint: '/ContactLegalAuthorities/ContactLegalAuthority',
-    stagingTable: 'stg_legal_authority',
+    stagingTable: 'stg_icm_legal_authority',
     primaryKey: 'ROW_ID',
     cursorLabel: 'Updated',
     searchSpec: () =>

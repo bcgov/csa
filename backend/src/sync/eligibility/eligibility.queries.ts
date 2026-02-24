@@ -18,7 +18,7 @@ const CHANGED_CONTACTS_CTE = `
       -- ICM: legal authority with recent ingested_at (joins on PersonIcmId)
       SELECT DISTINCT cases.CONTACT_ROW_ID
       FROM stg_icm_cases cases
-      INNER JOIN stg_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
+      INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
       WHERE legal_auth.ingested_at >= $1
 
       UNION
@@ -26,7 +26,7 @@ const CHANGED_CONTACTS_CTE = `
       -- ICM: legal authority admin with recent ingested_at (via legal authority on PersonIcmId)
       SELECT DISTINCT cases.CONTACT_ROW_ID
       FROM stg_icm_cases cases
-      INNER JOIN stg_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
+      INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
       INNER JOIN stg_icm_legal_authority_admin legal_admin ON legal_admin.LGL_AUTH_CD = legal_auth.LGL_AUTH_CD
       WHERE legal_admin.ingested_at >= $1
 
@@ -50,14 +50,6 @@ const CHANGED_CONTACTS_CTE = `
 
       UNION
 
-      -- MIS: payments with recent last_updated_date (via person_id_mis on cases)
-      SELECT DISTINCT cases.CONTACT_ROW_ID
-      FROM stg_icm_cases cases
-      INNER JOIN stg_mis_payments mis_pay ON mis_pay.person_id_mis = cases.PERSON_ID_MIS
-      WHERE mis_pay.last_updated_date::DATE >= $1
-
-      UNION
-
       -- MIS: placements with recent last_updated_date (via person_id_mis on cases)
       SELECT DISTINCT cases.CONTACT_ROW_ID
       FROM stg_icm_cases cases
@@ -66,11 +58,22 @@ const CHANGED_CONTACTS_CTE = `
 
       UNION
 
-      -- MIS: contracts with recent last_updated_date (via person_id_mis on cases)
+      -- MIS: contracts with recent last_updated_date (via service_provider_id on placements)
       SELECT DISTINCT cases.CONTACT_ROW_ID
       FROM stg_icm_cases cases
-      INNER JOIN stg_mis_contracts mis_con ON mis_con.person_id_mis = cases.PERSON_ID_MIS
+      INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
+      INNER JOIN stg_mis_contracts mis_con ON mis_con.service_provider_id = mis_plc.service_provider_id
       WHERE mis_con.last_updated_date::DATE >= $1
+
+      UNION
+
+      -- MIS: payments with recent last_updated_date (via contract_number on contracts, service_provider_id on placements)
+      SELECT DISTINCT cases.CONTACT_ROW_ID
+      FROM stg_icm_cases cases
+      INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
+      INNER JOIN stg_mis_contracts mis_con ON mis_con.service_provider_id = mis_plc.service_provider_id
+      INNER JOIN stg_mis_payments mis_pay ON mis_pay.contract_number = mis_con.contract_number
+      WHERE mis_pay.last_updated_date::DATE >= $1
     ),`
 
 /**
@@ -91,7 +94,7 @@ const CHANGED_CONTACTS_CTE = `
  * Join topology (matches ICM/MIS data model):
  *  ICM: Cases -[CaseId]-> N Placements -[AgreementID]-> 1 Agreement -[AgreementID]-> N Orders
  *       Cases -[PersonIcmId]-> N LegalAuthority -[code]-> 1 LegalAuthorityAdmin
- *  MIS: Cases -[PERSON_ID_MIS]-> N Payments, N Contracts, N Placements
+ *  MIS: Cases -[PERSON_ID_MIS]-> N Placements -[service_provider_id]-> 1 Contract -[contract_number]-> N Payments
  *
  * CTEs:
  *  - changed_contacts (incremental only): contacts with recently changed data
@@ -100,13 +103,15 @@ const CHANGED_CONTACTS_CTE = `
  *  - icm_placements_agg: active/interrupted ICM placements grouped by contact
  *  - icm_orders_agg: ICM orders grouped by contact (via placement -> agreement)
  *  - icm_agreements_agg: ICM agreements grouped by contact (via placement)
- *  - mis_payments_agg: MIS payments grouped by contact (via PERSON_ID_MIS)
- *  - mis_contracts_agg: MIS contracts grouped by contact (via PERSON_ID_MIS)
+ *  - mis_payments_agg: MIS payments grouped by contact (via contract -> placement -> PERSON_ID_MIS)
+ *  - mis_contracts_agg: MIS contracts grouped by contact (via placement -> PERSON_ID_MIS)
  *  - mis_placements_agg: active/interrupted/ended MIS placements grouped by contact (via PERSON_ID_MIS)
  *
  * Join keys:
  *  - ICM data joins on CONTACT_ROW_ID (aggregated across all cases)
- *  - MIS data joins on PERSON_ID_MIS (via eligible_cases CTE)
+ *  - MIS placements join on PERSON_ID_MIS (via eligible_cases CTE)
+ *  - MIS contracts join via service_provider_id on placements
+ *  - MIS payments join via contract_number on contracts
  */
 export function buildLoadContactProfilesSql(threshold: Date | null): {
   sql: string
@@ -133,7 +138,7 @@ export function buildLoadContactProfilesSql(threshold: Date | null): {
         legal_auth.EFF_LGL_STATUS,
         legal_auth.EXPIRY_DT,
         legal_auth.START_DT
-      FROM stg_legal_authority legal_auth
+      FROM stg_icm_legal_authority legal_auth
       INNER JOIN eligible_cases ON eligible_cases.CONTACT_ROW_ID = legal_auth.PAR_ROW_ID
       ORDER BY eligible_cases.CONTACT_ROW_ID, legal_auth.START_DT DESC NULLS LAST
     ),
@@ -235,40 +240,65 @@ export function buildLoadContactProfilesSql(threshold: Date | null): {
 
     mis_payments_agg AS (
       SELECT
-        eligible_cases.CONTACT_ROW_ID,
+        CONTACT_ROW_ID,
         json_agg(json_build_object(
-          'orderType', mis_pay.payment_type,
-          'orderStatus', mis_pay.payment_status,
-          'effectiveStartDate', mis_pay.payment_effective_start_date,
-          'effectiveEndDate', mis_pay.payment_effective_end_date,
-          'amount', mis_pay.payment_amount::NUMERIC,
-          'contractNumber', mis_pay.contract_number,
-          'orderNumber', mis_pay.payment_number,
-          'product', mis_pay.product
+          'orderType', payment_type,
+          'orderStatus', payment_status,
+          'effectiveStartDate', payment_effective_start_date,
+          'effectiveEndDate', payment_effective_end_date,
+          'amount', payment_amount::NUMERIC,
+          'contractNumber', contract_number,
+          'orderNumber', payment_number
         )) AS data
-      FROM stg_mis_payments mis_pay
-      INNER JOIN eligible_cases
-        ON mis_pay.person_id_mis = eligible_cases.PERSON_ID_MIS
-      GROUP BY eligible_cases.CONTACT_ROW_ID
+      FROM (
+        SELECT DISTINCT
+          eligible_cases.CONTACT_ROW_ID,
+          mis_pay.payment_type,
+          mis_pay.payment_status,
+          mis_pay.payment_effective_start_date,
+          mis_pay.payment_effective_end_date,
+          mis_pay.payment_amount,
+          mis_pay.contract_number,
+          mis_pay.payment_number
+        FROM stg_mis_payments mis_pay
+        INNER JOIN stg_mis_contracts mis_con ON mis_pay.contract_number = mis_con.contract_number
+        INNER JOIN stg_mis_placements mis_plc ON mis_con.service_provider_id = mis_plc.service_provider_id
+        INNER JOIN eligible_cases
+          ON mis_plc.person_id_mis = eligible_cases.PERSON_ID_MIS
+      ) unique_payments
+      GROUP BY CONTACT_ROW_ID
     ),
 
     mis_contracts_agg AS (
       SELECT
-        eligible_cases.CONTACT_ROW_ID,
+        CONTACT_ROW_ID,
         json_agg(json_build_object(
-          'contractNumber', mis_con.contract_number,
-          'serviceProviderName', mis_con.service_provider_name,
-          'providerId', mis_con.service_provider_id,
-          'status', mis_con.status,
-          'type', mis_con.type,
-          'startDate', mis_con.contract_start_date,
-          'endDate', mis_con.contract_end_date,
-          'terminationDate', mis_con.contract_termination_date
+          'contractNumber', contract_number,
+          'serviceProviderName', service_provider_name,
+          'providerId', service_provider_id,
+          'status', status,
+          'type', contract_type,
+          'startDate', contract_start_date,
+          'endDate', contract_end_date,
+          'terminationDate', termination_date
         )) AS data
-      FROM stg_mis_contracts mis_con
-      INNER JOIN eligible_cases
-        ON mis_con.person_id_mis = eligible_cases.PERSON_ID_MIS
-      GROUP BY eligible_cases.CONTACT_ROW_ID
+      FROM (
+        SELECT DISTINCT
+          eligible_cases.CONTACT_ROW_ID,
+          mis_con.contract_number,
+          mis_con.service_provider_name,
+          mis_con.service_provider_id,
+          mis_con.status,
+          mis_con.contract_type,
+          mis_con.contract_start_date,
+          mis_con.contract_end_date,
+          mis_con.termination_date
+        FROM stg_mis_contracts mis_con
+        INNER JOIN stg_mis_placements mis_plc ON mis_con.service_provider_id = mis_plc.service_provider_id
+        INNER JOIN eligible_cases
+          ON mis_plc.person_id_mis = eligible_cases.PERSON_ID_MIS
+      ) unique_contracts
+      GROUP BY CONTACT_ROW_ID
     ),
 
     mis_placements_agg AS (

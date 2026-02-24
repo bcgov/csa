@@ -1,7 +1,0 @@
-id,last_updated_date,payment_number,payment_type,payment_status,payment_amount,payment_effective_start_date,payment_effective_end_date,product,contract_number,payment_updated,person_id_mis
-PM001,2026-01-15,PAY-1001,Variable,Paid,1850.00,2026-01-01,2026-01-31,Family Care,CN-5001,2026-01-15,01078531
-PM002,2026-01-15,PAY-1002,Monthly Family Care Rate,Paid,2200.00,2025-12-01,2025-12-31,Family Care,CN-5001,2026-01-15,01078531
-PM003,2026-01-12,PAY-2001,Variable,Pending,1650.00,2026-01-01,2026-01-31,Family Care,CN-5003,2026-01-12,01080563
-PM004,2026-01-12,PAY-2002,ADJ-Variable,Paid,350.00,2025-12-01,2025-12-31,Family Care,CN-5003,2026-01-12,01080563
-PM005,2026-01-10,PAY-3001,Monthly Family Care Rate,Paid,1900.00,2026-01-01,2026-01-31,Family Care,CN-5005,2026-01-10,01080565
-PM006,2026-01-08,PAY-4001,Variable,Pending,2100.00,2026-01-01,2026-01-31,Family Care,CN-5006,2026-01-08,01080953

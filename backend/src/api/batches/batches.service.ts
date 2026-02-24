@@ -1,9 +1,17 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { BATCH_STATUS } from 'src/common/state-machine/constants'
+import {
+  BATCH_DETAIL_STATUS,
+  BATCH_EVENT,
+  BATCH_STATUS,
+  CSA_EVENT,
+  CSA_STATUS,
+} from 'src/common/state-machine/constants'
 import type { TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
+import { enrichLabels } from 'src/common/utils'
 import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
+import { ContactsService } from '../contacts/contacts.service'
 import { BulkOperationResponse } from '../contacts/interfaces'
 
 export interface AddContactsResult extends BulkOperationResponse {
@@ -28,6 +36,7 @@ export class BatchesService {
   constructor(
     private prisma: PrismaService,
     private stateMachine: StateMachineService,
+    private contactsService: ContactsService,
   ) {}
 
   async findAll() {
@@ -66,17 +75,19 @@ export class BatchesService {
       return result
     }
 
+    const nextState = result.to!
+
     await this.prisma.batch.update({
       where: { id: batchId },
       data: {
-        status: result.to,
+        status: nextState,
         ...options?.additionalData,
       },
     })
 
-    this.logger.log(`Batch ${batchId}: ${currentState} → ${result.to} [${event}]`)
+    this.logger.log(`Batch ${batchId}: ${currentState}->${nextState} [${event}]`)
 
-    return result
+    return { success: true, from: currentState, to: nextState }
   }
 
   // Update a batch detail's status using the state machine.
@@ -99,19 +110,21 @@ export class BatchesService {
       return result
     }
 
+    const nextState = result.to!
+
     await this.prisma.contactBatchDetail.update({
       where: { id: detailId },
       data: {
-        status: result.to,
+        status: nextState,
         lastUpdatedAt: new Date(),
         lastUpdatedBy: 'SYSTEM',
         ...options?.additionalData,
       },
     })
 
-    this.logger.log(`BatchDetail ${detailId}: ${currentState} → ${result.to} [${event}]`)
+    this.logger.log(`BatchDetail ${detailId}: ${currentState}->${nextState} [${event}]`)
 
-    return result
+    return { success: true, from: currentState, to: nextState }
   }
 
   async findBatchContacts(batchId: number) {
@@ -122,7 +135,7 @@ export class BatchesService {
       throw new NotFoundException(`Batch ${batchId} not found`)
     }
 
-    return this.prisma.contactBatchDetail.findMany({
+    const details = await this.prisma.contactBatchDetail.findMany({
       where: { batchId },
       include: {
         contact: {
@@ -137,6 +150,11 @@ export class BatchesService {
       },
       orderBy: { createdAt: 'desc' },
     })
+
+    return details.map((detail) => ({
+      ...detail,
+      contact: enrichLabels(detail.contact),
+    }))
   }
 
   async findOrCreatePendingBatch() {
@@ -172,9 +190,9 @@ export class BatchesService {
 
     const existingContacts = await this.prisma.contact.findMany({
       where: { id: { in: contactIds } },
-      select: { id: true },
+      select: { id: true, caseNumber: true, csaStatus: true },
     })
-    const existingContactIds = new Set(existingContacts.map((c) => c.id))
+    const existingContactMap = new Map(existingContacts.map((c) => [c.id, c]))
 
     const alreadyInBatch = await this.prisma.contactBatchDetail.findMany({
       where: {
@@ -187,24 +205,63 @@ export class BatchesService {
 
     const now = new Date()
     for (const contactId of contactIds) {
-      if (!existingContactIds.has(contactId)) {
+      const contact = existingContactMap.get(contactId)
+      if (!contact) {
         result.skipped.push({ id: contactId, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
-      } else if (alreadyInBatchIds.has(contactId)) {
+        continue
+      }
+      if (alreadyInBatchIds.has(contactId)) {
         result.skipped.push({ id: contactId, reason: BULK_OPERATION_SKIP_REASONS.ALREADY_IN_BATCH })
-      } else {
-        await this.prisma.contactBatchDetail.create({
-          data: {
-            contactId,
-            batchId: pendingBatch.id,
-            transactionType: TRANSACTION_TYPES.APPLICATION,
-            status: BATCH_STATUS.PENDING,
-            createdAt: now,
-            createdBy: userId,
-            lastUpdatedAt: now,
-            lastUpdatedBy: userId,
-          },
+        continue
+      }
+
+      try {
+        const transition = await this.contactsService.updateCsaStatus(
+          contactId,
+          CSA_EVENT.ADD_TO_BATCH,
+          'USER',
+          { userId },
+        )
+
+        if (!transition.success) {
+          result.skipped.push({
+            id: contactId,
+            reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION,
+          })
+          continue
+        }
+
+        // Derive transaction type from the target state
+        const transactionType =
+          transition.to === CSA_STATUS.IN_BATCH_CANCELLATION
+            ? TRANSACTION_TYPES.CANCELLATION
+            : TRANSACTION_TYPES.APPLICATION
+
+        const caseNumber = contact.caseNumber ?? ''
+        await this.prisma.$transaction(async (tx) => {
+          const batchDetail = await tx.contactBatchDetail.create({
+            data: {
+              contactId,
+              batchId: pendingBatch.id,
+              transactionType,
+              status: BATCH_STATUS.PENDING,
+              createdAt: now,
+              createdBy: userId,
+              lastUpdatedAt: now,
+              lastUpdatedBy: userId,
+            },
+          })
+          await tx.contactBatchDetail.update({
+            where: { id: batchDetail.id },
+            data: { referenceNumber: `${caseNumber}-${batchDetail.id}` },
+          })
         })
         result.success.push(contactId)
+      } catch (error) {
+        this.logger.error(
+          `Failed to add contact ${contactId} to batch: ${(error as Error).message}`,
+        )
+        result.skipped.push({ id: contactId, reason: 'error' })
       }
     }
 
@@ -218,6 +275,56 @@ export class BatchesService {
     })
 
     return result
+  }
+
+  async aggregateBatchStatus(batchId: number): Promise<void> {
+    const allDetails = await this.prisma.contactBatchDetail.findMany({
+      where: { batchId },
+      select: { status: true },
+    })
+
+    const statuses = allDetails.map((d) => d.status)
+    const hasProcessed = statuses.includes(BATCH_DETAIL_STATUS.PROCESSED)
+    const hasError = statuses.includes(BATCH_DETAIL_STATUS.ERROR)
+    const hasInProgress = statuses.includes(BATCH_DETAIL_STATUS.IN_PROGRESS)
+
+    if (hasInProgress) {
+      this.logger.log(`Batch ${batchId}: some details still in_progress, batch stays in_progress`)
+      return
+    }
+
+    let batchEvent: string
+    let batchMessage: string | null = null
+    if (hasProcessed && hasError) {
+      batchEvent = BATCH_EVENT.CRA_PARTIAL_REJECTED
+      batchMessage = 'At least one of the child record(s) in the Batch Details is in Error.'
+    } else if (hasProcessed && !hasError) {
+      batchEvent = BATCH_EVENT.CRA_ACCEPTED
+    } else {
+      batchEvent = BATCH_EVENT.CRA_ALL_REJECTED
+      batchMessage = 'All child(ren) in the Batch Details are in Error.'
+    }
+
+    const batch = await this.prisma.batch.findUnique({
+      where: { id: batchId },
+      select: { systemComments: true },
+    })
+
+    const systemComments = this.buildSystemComment(batchMessage, batch?.systemComments ?? null)
+
+    await this.updateBatchStatus(batchId, batchEvent, {
+      additionalData: systemComments != null ? { systemComments } : {},
+    })
+  }
+
+  private buildSystemComment(
+    newMessage: string | null,
+    existingComments: string | null,
+  ): string | null {
+    if (!newMessage) return existingComments
+    const date = new Date().toISOString().split('T')[0]
+    const dated = `[${date}] ${newMessage}`
+    return existingComments ? `${dated}\n${existingComments}` : dated
   }
 
   async removeContactFromPendingBatch(contactId: number): Promise<void> {
@@ -254,5 +361,7 @@ export class BatchesService {
         },
       }),
     ])
+
+    await this.contactsService.updateCsaStatus(contactId, CSA_EVENT.REMOVE_FROM_BATCH, 'USER')
   }
 }

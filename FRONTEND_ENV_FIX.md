@@ -186,9 +186,9 @@ exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
 
 ### Request Flow
 ```
-Browser → GET /config.json → Caddy serves /runtime-config/config.json
+Browser->GET /config.json->Caddy serves /runtime-config/config.json
                            ↓
-Frontend reads config → Validates structure → Initializes Keycloak
+Frontend reads config->Validates structure->Initializes Keycloak
 ```
 
 ---
@@ -336,7 +336,7 @@ fetch('/config.json').then(r => r.json()).then(console.log)
 | Aspect | Benefits |
 |--------|----------|
 | **Security** | No secrets in source code or Docker image |
-| **Simplicity** | ConfigMap → Mount → Serve → Load |
+| **Simplicity** | ConfigMap->Mount->Serve->Load |
 | **Debugging** | Direct access to `/config.json` in pod and browser |
 | **Configuration** | Single source of truth (ConfigMap) |
 | **Deployment** | Same image works across all environments |
@@ -350,7 +350,7 @@ fetch('/config.json').then(r => r.json()).then(console.log)
 **Original approach (env vars):**
 - ❌ Required generating config.json from env vars
 - ❌ Extra shell script logic
-- ❌ Two sources of truth (ConfigMap → env → config.json)
+- ❌ Two sources of truth (ConfigMap->env->config.json)
 
 **Current approach (direct mount):**
 - ✅ ConfigMap is directly served as-is
@@ -364,7 +364,7 @@ fetch('/config.json').then(r => r.json()).then(console.log)
 
 ✅ **Zero Hardcoded Values** - Configuration from ConfigMap only
 ✅ **Fail-Fast** - Application errors immediately if config missing
-✅ **Simple Architecture** - ConfigMap → Mount → Serve → Load
+✅ **Simple Architecture** - ConfigMap->Mount->Serve->Load
 ✅ **Easy Debugging** - Inspect `/config.json` directly
 ✅ **Kubernetes Native** - Uses standard ConfigMap mounting
 ✅ **Production Ready** - Same image across all environments

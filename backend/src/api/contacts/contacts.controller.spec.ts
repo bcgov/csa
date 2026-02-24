@@ -3,8 +3,14 @@ import { NotFoundException } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
+import { CSAGuard } from '../common/guards/csa.guard'
 import { ContactsController } from './contacts.controller'
 import { ContactsService } from './contacts.service'
+
+// Mock guard that always allows access
+const mockCSAGuard = {
+  canActivate: () => true,
+}
 
 describe('ContactsController', () => {
   let controller: ContactsController
@@ -31,6 +37,9 @@ describe('ContactsController', () => {
     resumeContacts: vi.fn(),
     holdContacts: vi.fn(),
     findContactBatches: vi.fn(),
+    updateEligibilityStatus: vi.fn(),
+    updateNotEligibleStatus: vi.fn(),
+    updateChildOver18: vi.fn(),
   }
 
   beforeEach(async () => {
@@ -42,7 +51,10 @@ describe('ContactsController', () => {
           useValue: mockContactsService,
         },
       ],
-    }).compile()
+    })
+      .overrideGuard(CSAGuard)
+      .useValue(mockCSAGuard)
+      .compile()
 
     controller = module.get<ContactsController>(ContactsController)
     service = module.get<ContactsService>(ContactsService)
@@ -146,7 +158,7 @@ describe('ContactsController', () => {
       const result = {
         success: [1, 2],
         skipped: [
-          { id: 3, reason: 'already_on_hold' },
+          { id: 3, reason: 'invalid_transition' },
           { id: 999, reason: 'not_found' },
         ],
       }
@@ -177,7 +189,7 @@ describe('ContactsController', () => {
       const result = {
         success: [1, 2],
         skipped: [
-          { id: 3, reason: 'not_on_hold' },
+          { id: 3, reason: 'invalid_transition' },
           { id: 999, reason: 'not_found' },
         ],
       }
@@ -200,6 +212,99 @@ describe('ContactsController', () => {
         .expect(201)
 
       expect(spy).toHaveBeenCalledWith([1, 2, 3], 'system')
+    })
+  })
+
+  describe('POST /contacts/set-eligible', () => {
+    it('should return bulk eligibility status update result', async () => {
+      const result = {
+        success: [1, 2],
+        skipped: [
+          { id: 3, reason: 'invalid_transition' },
+          { id: 999, reason: 'not_found' },
+        ],
+      }
+      vi.spyOn(service, 'updateEligibilityStatus').mockResolvedValue(result)
+
+      return request(app.getHttpServer())
+        .post('/contacts/set-eligible')
+        .send({ contactIds: [1, 2, 3, 999], action: 'ELIGIBLE' })
+        .expect(201)
+        .expect(result)
+    })
+
+    it('should call service with correct parameters', async () => {
+      const result = { success: [1], skipped: [] }
+      const spy = vi.spyOn(service, 'updateEligibilityStatus').mockResolvedValue(result)
+
+      await request(app.getHttpServer())
+        .post('/contacts/set-eligible')
+        .send({ contactIds: [1, 2, 3], action: 'ELIGIBLE' })
+        .expect(201)
+
+      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'ELIGIBLE', 'system')
+    })
+  })
+
+  describe('POST /contacts/set-not-eligible', () => {
+    it('should return bulk not eligible status update result', async () => {
+      const result = {
+        success: [1, 2],
+        skipped: [
+          { id: 3, reason: 'invalid_transition' },
+          { id: 999, reason: 'not_found' },
+        ],
+      }
+      vi.spyOn(service, 'updateNotEligibleStatus').mockResolvedValue(result)
+
+      return request(app.getHttpServer())
+        .post('/contacts/set-not-eligible')
+        .send({ contactIds: [1, 2, 3, 999], action: 'SET_NOT_ELIGIBLE' })
+        .expect(201)
+        .expect(result)
+    })
+
+    it('should call service with correct parameters', async () => {
+      const result = { success: [1], skipped: [] }
+      const spy = vi.spyOn(service, 'updateNotEligibleStatus').mockResolvedValue(result)
+
+      await request(app.getHttpServer())
+        .post('/contacts/set-not-eligible')
+        .send({ contactIds: [1, 2, 3], action: 'SET_NOT_ELIGIBLE' })
+        .expect(201)
+
+      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'SET_NOT_ELIGIBLE', 'system')
+    })
+  })
+
+  describe('POST /contacts/age-out', () => {
+    it('should return bulk child over 18 status update result', async () => {
+      const result = {
+        success: [1, 2],
+        skipped: [
+          { id: 3, reason: 'invalid_transition' },
+          { id: 999, reason: 'not_found' },
+        ],
+      }
+      vi.spyOn(service, 'updateChildOver18').mockResolvedValue(result)
+
+      return request(app.getHttpServer())
+        .post('/contacts/age-out')
+        .send({ contactIds: [1, 2, 3, 999], action: 'AGE_OUT' })
+        .expect(201)
+        .expect(result)
+    })
+
+    it('should call service with correct parameters', async () => {
+      const result = { success: [1], skipped: [] }
+      const spy = vi.spyOn(service, 'updateChildOver18').mockResolvedValue(result)
+
+      await request(app.getHttpServer())
+        .post('/contacts/age-out')
+        .send({ contactIds: [1, 2, 3], action: 'AGE_OUT' })
+        .expect(201)
+
+      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'AGE_OUT', 'system')
     })
   })
 

@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Patch, Post } from '@nestjs/common'
+import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common'
 import { ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { CSAGuard } from '../common/guards/csa.guard'
 import {
   UpdateBatchStatusDto,
   UpdateContactStatusDto,
@@ -9,6 +10,7 @@ import { StatusUpdateService } from './status-update.service'
 
 @ApiTags('status-update')
 @Controller('status-update')
+@UseGuards(CSAGuard)
 export class StatusUpdateController {
   constructor(private readonly statusUpdateService: StatusUpdateService) {}
 
@@ -45,7 +47,7 @@ export class StatusUpdateController {
   @ApiResponse({
     status: 200,
     description:
-      'Bulk eligibility status update result with success and failed arrays. Updates: "not_eligible_out_of_pay" → "eligible_tbd" and "not_eligible_ip_tbd" → "in_pay"',
+      'Bulk eligibility status update result with success and failed arrays. Updates: "not_eligible_out_of_pay"->"eligible_tbd" and "not_eligible_ip_tbd"->"in_pay"',
   })
   async updateEligibilityStatus(@Body() dto: UpdateEligibilityStatusDto) {
     return this.statusUpdateService.updateEligibilityStatus(dto)
@@ -56,7 +58,7 @@ export class StatusUpdateController {
   @ApiResponse({
     status: 200,
     description:
-      'Bulk not eligible status update result with success and failed arrays. Updates: "eligible_tbd", "in_pay", or "on_hold" → "not_eligible_ip_tbd"',
+      'Bulk not eligible status update result with success and failed arrays. Updates: "eligible_tbd", "in_pay", or "on_hold"->"not_eligible_ip_tbd"',
   })
   async updateNotEligibleStatus(@Body() dto: UpdateEligibilityStatusDto) {
     return this.statusUpdateService.updateNotEligibleStatus(dto)
@@ -67,7 +69,7 @@ export class StatusUpdateController {
   @ApiResponse({
     status: 200,
     description:
-      'Bulk not eligible status update with alternative transitions. Updates: "eligible_tbd" or "on_hold" → "not_eligible_out_of_pay", "in_pay" → "not_eligible_ip_tbd"',
+      'Bulk not eligible status update with alternative transitions. Updates: "eligible_tbd" or "on_hold"->"not_eligible_out_of_pay", "in_pay"->"not_eligible_ip_tbd"',
   })
   async updateNotEligibleStatusAlt(@Body() dto: UpdateEligibilityStatusDto) {
     return this.statusUpdateService.updateNotEligibleStatusAlt(dto)
@@ -78,7 +80,7 @@ export class StatusUpdateController {
   @ApiResponse({
     status: 200,
     description:
-      'Bulk status update to Over 18. Updates: "eligible_tbd" or "not_eligible_ip_tbd" → "Over 18"',
+      'Bulk status update to Over 18. Updates: "eligible_tbd" or "not_eligible_ip_tbd"->"Over 18"',
   })
   async updateOver18Status(@Body() dto: UpdateEligibilityStatusDto) {
     return this.statusUpdateService.updateOver18Status(dto)

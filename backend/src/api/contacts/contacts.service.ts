@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { BATCH_STATUS, CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
+import { CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
+import { enrichLabels } from 'src/common/utils'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
+import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { ALLOWED_FILTER_SORT_FIELDS, BULK_OPERATION_SKIP_REASONS } from './constants'
 import { ContactDto } from './dto/contact.dto'
 import type {
@@ -20,6 +22,7 @@ export class ContactsService {
   constructor(
     private prisma: PrismaService,
     private stateMachine: StateMachineService,
+    private icmSyncBackService: IcmSyncBackService,
   ) {}
 
   async findAll(
@@ -93,7 +96,7 @@ export class ContactsService {
     ])
 
     return {
-      data,
+      data: data.map(enrichLabels),
       page,
       limit,
       total,
@@ -184,7 +187,7 @@ export class ContactsService {
       throw new NotFoundException(`Contact ${id} not found`)
     }
 
-    return contact
+    return enrichLabels(contact)
   }
 
   // Update a contact's CSA status using the state machine.
@@ -202,37 +205,68 @@ export class ContactsService {
 
     const currentState = contact.csaStatus ?? ''
 
+    // For RESUME, pass the stored resumeStatus as the target state
+    // For CRA_FILE_REJECTED, pass the stored preBatchStatus as the target state
+    const targetState =
+      event === CSA_EVENT.RESUME
+        ? (contact.resumeStatus ?? undefined)
+        : event === CSA_EVENT.CRA_FILE_REJECTED
+          ? (contact.preBatchStatus ?? undefined)
+          : undefined
+
     // Use state machine to validate and get next state
-    const result = this.stateMachine.transitionContact(
-      currentState,
-      event,
-      actor,
-      contact.resumeStatus,
-    )
+    const result = this.stateMachine.transitionContact(currentState, event, actor, targetState)
 
     if (!result.success) {
       return result
     }
 
+    const nextState = result.to!
+
     // Build update data
     const updateData: Record<string, unknown> = {
-      csaStatus: result.to,
+      csaStatus: nextState,
       csaStatusEffectiveDate: new Date(),
+      icmIntegrationStatus: true,
       lastUpdatedBy: options?.userId ?? 'SYSTEM',
       lastUpdatedAt: new Date(),
       ...options?.additionalData,
     }
 
-    // Handle HOLD - save current state to resumeStatus
+    // save current state to resumeStatus
     if (event === CSA_EVENT.HOLD) {
       updateData.resumeStatus = currentState
       updateData.holdBy = options?.userId
     }
 
-    // Handle RESUME - clear resume fields
+    // clear resume fields
     if (event === CSA_EVENT.RESUME) {
       updateData.resumeStatus = null
       updateData.holdBy = null
+    }
+
+    // save current state to preBatchStatus (only if not already set)
+    if (event === CSA_EVENT.ADD_TO_BATCH && !contact.preBatchStatus) {
+      updateData.preBatchStatus = currentState
+    }
+
+    // clear preBatchStatus (batch flow succeeded)
+    if (event === CSA_EVENT.CRA_ACCEPTED) {
+      updateData.preBatchStatus = null
+    }
+
+    // clear preBatchStatus (rolled back)
+    if (event === CSA_EVENT.CRA_FILE_REJECTED) {
+      updateData.preBatchStatus = null
+    }
+
+    // default cancel reason code when user sets not eligible from in-pay
+    if (
+      event === CSA_EVENT.SET_NOT_ELIGIBLE &&
+      currentState === CSA_STATUS.IN_PAY &&
+      !contact.cancelReasonCode
+    ) {
+      updateData.cancelReasonCode = '21'
     }
 
     await this.prisma.contact.update({
@@ -240,9 +274,17 @@ export class ContactsService {
       data: updateData,
     })
 
-    this.logger.log(`Contact ${contactId}: ${currentState} → ${result.to} [${event}] by ${actor}`)
+    this.logger.log(`Contact ${contactId}: ${currentState}->${nextState} [${event}] by ${actor}`)
 
-    return result
+    if (actor === 'USER') {
+      this.icmSyncBackService.syncSingleContact(contactId).catch((err) => {
+        this.logger.warn(
+          `Immediate ICM sync failed for contact ${contactId}: ${(err as Error).message}`,
+        )
+      })
+    }
+
+    return { success: true, from: currentState, to: nextState }
   }
 
   async fullTextSearch(
@@ -274,7 +316,7 @@ export class ContactsService {
     ])
 
     return {
-      data,
+      data: data.map(enrichLabels),
       page,
       limit,
       total,
@@ -288,51 +330,17 @@ export class ContactsService {
       skipped: [],
     }
 
-    // Get all contacts
-    const contacts = await this.prisma.contact.findMany({
-      where: { id: { in: contactIds } },
-    })
-    const contactMap = new Map(contacts.map((c) => [c.id, c]))
-
-    // Find contacts in pending batch
-    const inPendingBatch = await this.prisma.contactBatchDetail.findMany({
-      where: {
-        contactId: { in: contactIds },
-        batch: { status: BATCH_STATUS.PENDING },
-      },
-      select: { contactId: true },
-    })
-    const inPendingBatchIds = new Set(inPendingBatch.map((c) => c.contactId))
-
-    // Categorize contacts
-    const toHold: number[] = []
     for (const id of contactIds) {
-      const contact = contactMap.get(id)
-      if (!contact) {
-        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
-      } else if (contact.csaStatus === CSA_STATUS.ON_HOLD) {
-        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.ALREADY_ON_HOLD })
-      } else if (inPendingBatchIds.has(id)) {
-        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.IN_PENDING_BATCH })
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.HOLD, 'USER', { userId })
+      if (transitionResult.success) {
+        result.success.push(id)
       } else {
-        toHold.push(id)
+        const reason =
+          transitionResult.reason === 'Contact not found'
+            ? BULK_OPERATION_SKIP_REASONS.NOT_FOUND
+            : BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION
+        result.skipped.push({ id, reason })
       }
-    }
-
-    // Update valid contacts and preserve original csa_status in resumeStatus
-    for (const id of toHold) {
-      const contact = contactMap.get(id)!
-      await this.prisma.contact.update({
-        where: { id },
-        data: {
-          resumeStatus: contact.csaStatus,
-          csaStatus: CSA_STATUS.ON_HOLD,
-          holdBy: userId,
-          lastUpdatedAt: new Date(),
-          lastUpdatedBy: userId,
-        },
-      })
-      result.success.push(id)
     }
 
     return result
@@ -344,38 +352,173 @@ export class ContactsService {
       skipped: [],
     }
 
-    // Get all contacts
-    const contacts = await this.prisma.contact.findMany({
-      where: { id: { in: contactIds } },
-    })
-    const contactMap = new Map(contacts.map((c) => [c.id, c]))
-
-    // Categorize contacts
-    const toResume: Array<{ id: number; resumeStatus: string }> = []
     for (const id of contactIds) {
-      const contact = contactMap.get(id)
-      if (!contact) {
-        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
-      } else if (contact.csaStatus !== CSA_STATUS.ON_HOLD) {
-        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_ON_HOLD })
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.RESUME, 'USER', { userId })
+      if (transitionResult.success) {
+        result.success.push(id)
       } else {
-        toResume.push({ id, resumeStatus: contact.resumeStatus! })
+        const reason =
+          transitionResult.reason === 'Contact not found'
+            ? BULK_OPERATION_SKIP_REASONS.NOT_FOUND
+            : BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION
+        result.skipped.push({ id, reason })
       }
     }
 
-    // Update valid contacts
-    for (const { id, resumeStatus } of toResume) {
-      await this.prisma.contact.update({
+    return result
+  }
+
+  async updateEligibilityStatus(
+    contactIds: number[],
+    action: string,
+    userId: string,
+  ): Promise<BulkOperationResponse> {
+    if (action !== 'ELIGIBLE') {
+      throw new BadRequestException(`Invalid action: ${action}. Only 'ELIGIBLE' is supported.`)
+    }
+
+    const result: BulkOperationResponse = {
+      success: [],
+      skipped: [],
+    }
+
+    for (const id of contactIds) {
+      // Fetch the contact to determine current CSA status
+      const contact = await this.prisma.contact.findUnique({
         where: { id },
-        data: {
-          csaStatus: resumeStatus,
-          resumeStatus: null,
-          holdBy: null,
-          lastUpdatedAt: new Date(),
-          lastUpdatedBy: userId,
-        },
+        select: { csaStatus: true },
       })
-      result.success.push(id)
+
+      if (!contact) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
+        continue
+      }
+
+      // Determine the appropriate event based on current status
+      let event: string
+      let actor: Actor
+
+      if (contact.csaStatus === CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY) {
+        // not_eligible_out_of_pay -> eligible_tbd using SET_ELIGIBLE_TBD
+        event = CSA_EVENT.SET_ELIGIBLE_TBD
+        actor = 'USER'
+      } else if (contact.csaStatus === CSA_STATUS.NOT_ELIGIBLE_IP_TBD) {
+        // not_eligible_ip_tbd -> in_pay using BECOME_ELIGIBLE
+        event = CSA_EVENT.BECOME_ELIGIBLE
+        actor = 'USER'
+      } else {
+        // Current status is not eligible for this operation
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION })
+        continue
+      }
+
+      const transitionResult = await this.updateCsaStatus(id, event, actor, { userId })
+      if (transitionResult.success) {
+        result.success.push(id)
+      } else {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION })
+      }
+    }
+
+    return result
+  }
+
+  async updateNotEligibleStatus(
+    contactIds: number[],
+    action: string,
+    userId: string,
+  ): Promise<BulkOperationResponse> {
+    if (action !== 'SET_NOT_ELIGIBLE') {
+      throw new BadRequestException(
+        `Invalid action: ${action}. Only 'SET_NOT_ELIGIBLE' is supported.`,
+      )
+    }
+
+    const result: BulkOperationResponse = {
+      success: [],
+      skipped: [],
+    }
+
+    for (const id of contactIds) {
+      // Fetch the contact to determine current CSA status
+      const contact = await this.prisma.contact.findUnique({
+        where: { id },
+        select: { csaStatus: true },
+      })
+
+      if (!contact) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
+        continue
+      }
+
+      // Determine if the current status supports SET_NOT_ELIGIBLE transition
+      // eligible_tbd -> not_eligible_out_of_pay
+      // on_hold -> not_eligible_out_of_pay
+      // in_pay -> not_eligible_ip_tbd
+      const validStatuses = [CSA_STATUS.ELIGIBLE_TBD, CSA_STATUS.ON_HOLD, CSA_STATUS.IN_PAY]
+
+      if (!validStatuses.includes(contact.csaStatus as any)) {
+        // Current status is not eligible for this operation
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION })
+        continue
+      }
+
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.SET_NOT_ELIGIBLE, 'USER', {
+        userId,
+      })
+      if (transitionResult.success) {
+        result.success.push(id)
+      } else {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION })
+      }
+    }
+
+    return result
+  }
+
+  async updateChildOver18(
+    contactIds: number[],
+    action: string,
+    userId: string,
+  ): Promise<BulkOperationResponse> {
+    if (action !== 'AGE_OUT') {
+      throw new BadRequestException(`Invalid action: ${action}. Only 'AGE_OUT' is supported.`)
+    }
+
+    const result: BulkOperationResponse = {
+      success: [],
+      skipped: [],
+    }
+
+    for (const id of contactIds) {
+      // Fetch the contact to determine current CSA status
+      const contact = await this.prisma.contact.findUnique({
+        where: { id },
+        select: { csaStatus: true },
+      })
+
+      if (!contact) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
+        continue
+      }
+
+      // Determine if the current status supports AGE_OUT transition
+      // eligible_tbd -> over_18
+      // not_eligible_ip_tbd -> over_18
+      const validStatuses = [CSA_STATUS.ELIGIBLE_TBD, CSA_STATUS.NOT_ELIGIBLE_IP_TBD]
+
+      if (!validStatuses.includes(contact.csaStatus as any)) {
+        // Current status is not eligible for this operation
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION })
+        continue
+      }
+
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.AGE_OUT, 'USER', { userId })
+      if (transitionResult.success) {
+        result.success.push(id)
+      } else {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION })
+      }
     }
 
     return result

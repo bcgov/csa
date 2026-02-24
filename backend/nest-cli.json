@@ -10,6 +10,14 @@
       {
         "include": "api/mock/data/**/*.json",
         "watchAssets": true
+      },
+      {
+        "include": "sync/mock-data/**/*.json",
+        "watchAssets": true
+      },
+      {
+        "include": "sync/mock-data/**/*.csv",
+        "watchAssets": true
       }
     ]
   }

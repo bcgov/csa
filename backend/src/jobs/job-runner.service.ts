@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { JobRun, Prisma } from '@prisma/client'
 import { JobTrigger } from './enums/job-trigger.enum'
 import { JobType } from './enums/job-type.enum'
 import { JobResult } from './interfaces/job-result.interface'
@@ -39,7 +40,14 @@ export class JobRunner {
       metadata: job.metadata as Record<string, unknown> | undefined,
     }
 
-    await handler.onStart?.(context)
+    try {
+      await handler.onStart?.(context)
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error))
+      this.logger.error(`Job ${jobId} onStart hook failed: ${err.message}`, err.stack)
+      await this.safeMarkFailed(jobId, err)
+      return { success: false, message: `onStart failed: ${err.message}` }
+    }
 
     // Inline retry loop
     let lastError: Error | null = null
@@ -47,9 +55,8 @@ export class JobRunner {
       try {
         if (attempt > 0) {
           this.logger.log(`Inline retry attempt ${attempt} for job ${jobId}`)
-          // Short delay between inline retries (exponential: 1s, 2s, 4s)
-          // TODO: to increase ?
-          await this.sleep(1000 * Math.pow(2, attempt - 1))
+          // Exponential backoff: 2s, 4s, 8s
+          await this.sleep(2000 * Math.pow(2, attempt - 1))
         }
 
         const result = await handler.execute(context)
@@ -63,13 +70,21 @@ export class JobRunner {
         }
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error))
-        this.logger.warn(`Job ${jobId} inline attempt ${attempt + 1} failed: ${lastError.message}`)
+        this.logger.error(
+          `Job ${jobId} attempt ${attempt + 1}/${handler.inlineRetryAttempts + 1} failed: ${lastError.message}`,
+          lastError.stack,
+        )
       }
     }
 
     // All inline retries exhausted - mark as failed
-    await this.jobsService.markFailed(jobId, lastError!.message)
-    await handler.onFailure?.(context, lastError!)
+    await this.safeMarkFailed(jobId, lastError!)
+
+    try {
+      await handler.onFailure?.(context, lastError!)
+    } catch (hookError) {
+      this.logger.error(`Job ${jobId} onFailure hook threw: ${hookError}`)
+    }
 
     return {
       success: false,
@@ -91,12 +106,21 @@ export class JobRunner {
     }
 
     // Create a new job run record (starts as RUNNING)
-    const jobRun = await this.jobsService.createJob({
-      jobType,
-      jobTrigger,
-      parentJobId: options?.parentJobId,
-      metadata: options?.metadata,
-    })
+    let jobRun: JobRun
+    try {
+      jobRun = await this.jobsService.createJob({
+        jobType,
+        jobTrigger,
+        parentJobId: options?.parentJobId,
+        metadata: options?.metadata,
+      })
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        this.logger.warn(`Job ${jobType} is already running, skipping`)
+        return { success: false, message: `Job ${jobType} is already running` }
+      }
+      throw error
+    }
 
     this.logger.log(`Created job run ${jobRun.id} for ${jobType}`)
 
@@ -128,6 +152,17 @@ export class JobRunner {
       } catch (error) {
         this.logger.error(`Error retrying job ${job.id}: ${error}`)
       }
+    }
+  }
+
+  private async safeMarkFailed(jobId: number, error: Error): Promise<void> {
+    const errorDetail = error.stack || error.message
+    try {
+      await this.jobsService.markFailed(jobId, errorDetail)
+    } catch (dbError) {
+      this.logger.error(
+        `Failed to mark job ${jobId} as FAILED in DB: ${dbError}. Original error: ${errorDetail}`,
+      )
     }
   }
 

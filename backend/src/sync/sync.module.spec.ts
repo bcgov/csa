@@ -15,6 +15,14 @@ describe('SyncModule', () => {
   let registry: JobRegistry
 
   beforeEach(async () => {
+    process.env.USE_MOCK_DATA = 'true'
+    process.env.ICM_API_URL = 'http://test-icm'
+    process.env.ICM_TRUSTED_USERNAME = 'test-user'
+    process.env.ICM_API_USERNAME = 'test-user'
+    process.env.ICM_TOKEN_URL = 'http://test-keycloak/token'
+    process.env.ICM_CLIENT_ID = 'test-client'
+    process.env.ICM_CLIENT_SECRET = 'test-secret'
+
     module = await Test.createTestingModule({
       imports: [JobsModule, SyncModule],
     }).compile()

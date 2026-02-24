@@ -1,7 +1,7 @@
 generator client {
   provider      = "prisma-client-js"
-  moduleFormat  = "cjs"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
+  moduleFormat  = "cjs"
 }
 
 datasource db {
@@ -75,91 +75,95 @@ model Contact {
   orderStatus                String?   @map("order_status")
   orderAmount                String?   @map("order_amount")
   orderEffectiveStartDate    DateTime? @db.Date @map("order_effective_start_date")
+  orderEffectiveEndDate      DateTime? @db.Date @map("order_effective_end_date")
   product                    String?   @map("product")
   holdBy                     String?   @map("hold_by")
-  resumeStatus  String?      @map("resume_status")
+  resumeStatus               String?   @map("resume_status")
+  preBatchStatus               String?   @map("pre_batch_status")
+  prevRecipientFirstName     String?   @map("prev_recipient_first_name")
+  prevRecipientLastName      String?   @map("prev_recipient_last_name")
+  cancelReasonCode           String?   @map("cancel_reason_code")
+  careEndDate                DateTime? @db.Date @map("care_end_date")
 
   // Relations
   contactBatchDetails        ContactBatchDetail[]
 
-  @@schema("csa")
   @@map("contacts")
+  @@schema("csa")
 }
 
 model Batch {
-  id                    Int                    @id @default(autoincrement())
-  batchDate             DateTime               @db.Date @map("batch_date")
-  status                String
-  recordCount           Int                    @map("record_count")
-  createdAt             DateTime               @map("created_at")
-  systemComments        String?                @map("system_comments")
+  id                  Int                  @id @default(autoincrement())
+  batchDate           DateTime             @map("batch_date") @db.Date
+  status              String
+  recordCount         Int                  @map("record_count")
+  createdAt           DateTime             @map("created_at")
+  updatedAt           DateTime             @map("updated_at")  @updatedAt
+  systemComments      String?              @map("system_comments")
+  contactBatchDetails ContactBatchDetail[]
+  transferFiles       TransferFile[]
 
-  // Relations
-  contactBatchDetails   ContactBatchDetail[]
-  transferFiles         TransferFile[]
-
-  @@schema("csa")
   @@map("batches")
+  @@schema("csa")
 }
 
 model ContactBatchDetail {
-  id              Int       @id @default(autoincrement())
-  contactId       Int       @map("contact_id")
-  batchId         Int       @map("batch_id")
-  transactionType String    @map("transaction_type")
-  systemComments  String?   @map("system_comments")
-  createdAt       DateTime  @map("created_at")
-  createdBy       String    @map("created_by")
-  lastUpdatedAt   DateTime  @map("last_updated_at")
-  lastUpdatedBy   String    @map("last_updated_by")
+  id              Int      @id @default(autoincrement())
+  contactId       Int      @map("contact_id")
+  batchId         Int      @map("batch_id")
+  transactionType String   @map("transaction_type")
+  referenceNumber String?  @unique @map("reference_number")
+  systemComments  String?  @map("system_comments")
+  createdAt       DateTime @map("created_at")
+  createdBy       String   @map("created_by")
+  lastUpdatedAt   DateTime @map("last_updated_at") @updatedAt
+  lastUpdatedBy   String   @map("last_updated_by")
   status          String?
-
-  // Relations
-  contact         Contact   @relation(fields: [contactId], references: [id])
-  batch           Batch     @relation(fields: [batchId], references: [id])
+  batch           Batch    @relation(fields: [batchId], references: [id])
+  contact         Contact  @relation(fields: [contactId], references: [id])
 
   @@unique([contactId, batchId], name: "contact_batch_unique")
-  @@schema("csa")
   @@map("contact_batch_details")
+  @@schema("csa")
 }
 
 model TransferFile {
-  id                Int       @id @default(autoincrement())
-  batchId           Int?      @map("batch_id")
-  destinationId     String    @map("destination_id")
-  direction         String
-  fileName          String    @map("file_name")
-  fileSize          String?   @map("file_size")
-  deliveredAt       DateTime? @map("delivered_at")
-  downloadedAt      DateTime? @map("downloaded_at")
-  referenceNumbers  Int[]     @map("reference_numbers")
+  id               Int       @id @default(autoincrement())
+  batchId          Int?      @map("batch_id")
+  destinationId    String    @map("destination_id")
+  direction        String
+  fileName         String    @map("file_name")
+  deliveredAt      DateTime? @map("delivered_at")
+  downloadedAt     DateTime? @map("downloaded_at")
+  referenceNumbers String[]  @map("reference_numbers")
+  fileSize         String?   @map("file_size")
+  isDetailsProcessed Boolean  @default(false) @map("is_processed")
+  isValid          Boolean   @default(true) @map("is_valid")
+  sequenceNumber   Int?      @map("sequence_number")
+  batch            Batch?    @relation(fields: [batchId], references: [id])
 
-  // Relations
-  batch             Batch?    @relation(fields: [batchId], references: [id])
-
-  @@schema("csa")
   @@map("transfer_files")
+  @@schema("csa")
 }
 
 model JobRun {
-  id            Int       @id @default(autoincrement())
-  jobType       String    @map("job_type")
-  status        String
-  parentJobId   Int?      @map("parent_job_id")
-  jobTrigger    String    @map("job_trigger")
-  retryCount    Int       @default(0) @map("retry_count")
-  error         String?
-  metadata      Json      @default("{}") @db.JsonB
-  createdAt     DateTime  @default(now()) @map("created_at")
-  startedAt     DateTime  @map("started_at")
-  completedAt   DateTime? @map("completed_at")
-
-  parentJob     JobRun?   @relation("ChildJobs", fields: [parentJobId], references: [id])
-  childJobs     JobRun[]  @relation("ChildJobs")
+  id          Int       @id @default(autoincrement())
+  jobType     String    @map("job_type")
+  status      String
+  parentJobId Int?      @map("parent_job_id")
+  jobTrigger  String    @map("job_trigger")
+  retryCount  Int       @default(0) @map("retry_count")
+  error       String?
+  metadata    Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  startedAt   DateTime  @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  parentJob   JobRun?   @relation("ChildJobs", fields: [parentJobId], references: [id])
+  childJobs   JobRun[]  @relation("ChildJobs")
 
   @@index([status])
   @@index([parentJobId])
   @@index([jobType, status])
-  @@schema("csa")
   @@map("job_runs")
+  @@schema("csa")
 }

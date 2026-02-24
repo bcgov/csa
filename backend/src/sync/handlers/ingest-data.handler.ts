@@ -15,6 +15,7 @@ import { JobRunner } from 'src/jobs/job-runner.service'
 @Injectable()
 export class IngestDataHandler extends BaseJob {
   readonly jobType = JobType.INGEST_DATA
+  readonly inlineRetryAttempts = 0 // Orchestrator: children handle their own retries
 
   constructor(private readonly jobRunner: JobRunner) {
     super()
@@ -55,23 +56,22 @@ export class IngestDataHandler extends BaseJob {
         }
       }
 
-      // Step 3: Sync back to ICM
-      this.logger.log('Syncing back to ICM...')
-      const syncResult = await this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.CRON, {
+      // Step 3: Sync back to ICM (awaited so pod stays alive, but sync failure doesn't fail ingestion)
+      this.logger.log('Syncing flagged contacts back to ICM...')
+      const syncResult = await this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM, {
         parentJobId,
       })
 
       if (!syncResult.success) {
-        return {
-          success: false,
-          message: 'ICM sync failed',
-          metadata: { syncResult },
-        }
+        this.logger.warn(
+          `ICM sync-back failed: ${syncResult.message}. Retry will pick up flagged contacts.`,
+        )
       }
 
       return {
         success: true,
-        message: 'Data ingestion and sync completed successfully',
+        message: 'Data ingestion and eligibility completed successfully',
+        metadata: { syncResult },
       }
     } catch (error) {
       this.logger.error(`Unexpected error in INGEST_DATA: ${error.message}`, error.stack)

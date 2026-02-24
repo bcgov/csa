@@ -3,24 +3,23 @@ import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
+import { EligibilityService } from '../eligibility/eligibility.service'
 
-// Runs after INGEST_ICM and INGEST_MIS complete
 @Injectable()
 export class RunEligibilityHandler extends BaseJob {
   readonly jobType = JobType.RUN_ELIGIBILITY
 
-  async execute(_context: JobContext): Promise<JobResult> {
-    // TODO: Implement eligibility logic
+  constructor(private readonly eligibilityService: EligibilityService) {
+    super()
+  }
 
-    this.logger.log('RUN_ELIGIBILITY stub - not yet implemented')
+  async execute(_context: JobContext): Promise<JobResult> {
+    const result = await this.eligibilityService.run()
 
     return {
       success: true,
-      message: 'Eligibility processing stub',
-      metadata: {
-        contacts_eligible: 0,
-        contacts_excluded: 0,
-      },
+      message: `Eligibility complete: ${result.processed} processed, ${result.statusChanges} updated, ${result.autoBatched.application} batched (application), ${result.autoBatched.cancellation} batched (cancellation)`,
+      metadata: result as unknown as Record<string, unknown>,
     }
   }
 }

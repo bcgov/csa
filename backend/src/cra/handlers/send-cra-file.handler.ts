@@ -1,64 +1,189 @@
 import { Injectable } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import type { Batch, Contact, ContactBatchDetail } from '@prisma/client'
+import { BatchesService } from 'src/api/batches/batches.service'
+import { ContactsService } from 'src/api/contacts/contacts.service'
+import { PrismaService } from 'src/common/database/prisma.service'
+import {
+  BATCH_DETAIL_STATUS,
+  BATCH_EVENT,
+  BATCH_STATUS,
+  CSA_EVENT,
+} from 'src/common/state-machine/constants'
 import { BaseJob } from 'src/jobs/base-job'
+import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
+import { JobRunner } from 'src/jobs/job-runner.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
-import { CraDataService } from '../outbound-file/cra-data.service'
-import { FileCreateService } from '../outbound-file/file-create.service'
-import { FileTransferClientService } from '../outbound-file/file-transfer.service'
+import { OutboundDataService } from '../outbound/outbound-data.service'
+import { OutboundFileService } from '../outbound/outbound-file.service'
+import { OutboundTransferService } from '../outbound/outbound-transfer.service'
 
-const { FILE_TRANSFER_STATUS, DESTINATION_ID } = CRA_DATA_HANDLING_CONSTANT
+const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
-/*
- * Triggered by CronJob SEND_CRA_FILE
- * Creates a CRA-formatted file with eligible contacts and send it for tranfer
- */
 @Injectable()
 export class SendCraFileHandler extends BaseJob {
   readonly jobType = JobType.SEND_CRA_FILE
+
+  private batch: Batch | null = null
+  private batchDetails: (ContactBatchDetail & { contact: Contact })[] = []
+  private readonly lastSequenceNumber: number
+  private readonly craEnabled: boolean
+
   constructor(
-    private readonly craDataService: CraDataService,
-    private readonly fileCreateService: FileCreateService,
-    private readonly fileTransferClientService: FileTransferClientService,
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+    private readonly batchesService: BatchesService,
+    private readonly contactsService: ContactsService,
+    private readonly outboundDataService: OutboundDataService,
+    private readonly outboundFileService: OutboundFileService,
+    private readonly outboundTransferService: OutboundTransferService,
+    private readonly jobRunner: JobRunner,
   ) {
     super()
+    this.lastSequenceNumber = this.configService.get<number>('cra.lastSequenceNumber')!
+    this.craEnabled = this.configService.get<boolean>('cra.enabled')!
+  }
+
+  async onStart(context: JobContext): Promise<void> {
+    await super.onStart(context)
+
+    // Find actionable batch (system_error prioritized for retry, then pending)
+    this.batch = await this.prisma.batch.findFirst({
+      where: { status: { in: [BATCH_STATUS.SYSTEM_ERROR, BATCH_STATUS.PENDING] } },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    if (!this.batch) {
+      this.logger.log('No actionable batch found')
+      return
+    }
+
+    // Get batch details with contacts
+    this.batchDetails = await this.prisma.contactBatchDetail.findMany({
+      where: { batchId: this.batch.id },
+      include: { contact: true },
+    })
+
+    if (this.batchDetails.length === 0) {
+      this.logger.log(`Batch ${this.batch.id} has no contacts`)
+      return
+    }
+
+    // Transition batch->in_progress
+    await this.batchesService.updateBatchStatus(this.batch.id, BATCH_EVENT.SEND_TO_CRA)
+
+    // Transition batch details->in_progress (skip if already in_progress on retry)
+    for (const detail of this.batchDetails) {
+      if (detail.status !== BATCH_DETAIL_STATUS.IN_PROGRESS) {
+        await this.batchesService.updateBatchDetailStatus(detail.id, BATCH_EVENT.SEND_TO_CRA)
+      }
+    }
   }
 
   async execute(_context: JobContext): Promise<JobResult> {
-    // 1. Query pending batch contacts
-    // 2. Format data according to CRA specifications
-    // 3. Write to file storage
-    // 4. Transfer file to CRA destination
-    // 5. Return metadata: { file_path, record_count, transfer_status }
-    const { header, details, trailer } = await this.craDataService.buildCraFileData()
+    if (!this.craEnabled) {
+      return { success: true, message: 'CRA sending is disabled (CRA_INTEGRATION_ENABLED=false)' }
+    }
 
-    const { filePath, fileName, recordCount } = this.fileCreateService.createFile(
+    if (!this.batch || this.batchDetails.length === 0) {
+      return { success: true, message: 'No batch to process' }
+    }
+
+    // Build CRA file data
+    const { header, details, trailer } = this.outboundDataService.buildCraFileData(
+      this.batchDetails,
+    )
+
+    // Get next sequence number (wraps 9999->1)
+    const lastSequence = await this.prisma.transferFile.aggregate({
+      _max: { sequenceNumber: true },
+      where: { direction: FILE_DIRECTION.OUTBOUND },
+    })
+    const nextSequence = ((lastSequence._max.sequenceNumber ?? this.lastSequenceNumber) % 9999) + 1
+
+    // Create file on local storage
+    const { filePath, fileName, recordCount } = this.outboundFileService.createFile(
       header,
       details,
       trailer,
-    )
-    const fileTransferResponse = await this.fileTransferClientService.sendFileToTransferService(
-      filePath,
-      fileName,
       DESTINATION_ID,
+      nextSequence,
     )
-    if (fileTransferResponse.statusCode === 226) {
-      // TODO: update batch/contact status on success
-    } else {
-      // TODO: handle failure - update status or retry
-    }
 
-    this.logger.log('CRA FILE TRANSFER RESPONSE', fileTransferResponse)
+    // Transfer file
+    await this.outboundTransferService.sendFileToTransferService(filePath, fileName, DESTINATION_ID)
+
+    // Create TransferFile record
+    await this.prisma.transferFile.create({
+      data: {
+        batchId: this.batch.id,
+        destinationId: DESTINATION_ID,
+        direction: FILE_DIRECTION.OUTBOUND,
+        fileName,
+        deliveredAt: new Date(),
+        referenceNumbers: this.batchDetails
+          .map((d) => d.referenceNumber)
+          .filter(Boolean) as string[],
+        sequenceNumber: nextSequence,
+      },
+    })
+
+    this.logger.log(
+      `Batch ${this.batch.id}: file ${fileName} sent, ${this.batchDetails.length} contacts updated`,
+    )
 
     return {
       success: true,
-      message: 'CRA file send stub',
+      message: `Batch ${this.batch.id} sent to CRA`,
       metadata: {
+        batch_id: this.batch.id,
         file_path: filePath,
         record_count: recordCount,
-        transfer_status: FILE_TRANSFER_STATUS.COMPLETED,
+        contacts_count: this.batchDetails.length,
       },
+    }
+  }
+
+  async onSuccess(context: JobContext, result: JobResult): Promise<void> {
+    await super.onSuccess(context, result)
+
+    if (!this.batch) return
+
+    const now = new Date()
+
+    // Update contact CSA statuses and set csaSentDate
+    for (const detail of this.batchDetails) {
+      await this.contactsService.updateCsaStatus(
+        detail.contactId,
+        CSA_EVENT.SEND_TO_CRA,
+        UPDATED_BY.SYSTEM,
+        { additionalData: { csaSentDate: now } },
+      )
+    }
+
+    // Set batchDate
+    await this.prisma.batch.update({
+      where: { id: this.batch.id },
+      data: { batchDate: now },
+    })
+
+    // Fire sync flagged contacts to ICM Job
+    this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM).catch((err) => {
+      this.logger.warn(`Post-CRA ICM sync failed: ${(err as Error).message}`)
+    })
+  }
+
+  async onFailure(context: JobContext, error: Error): Promise<void> {
+    await super.onFailure(context, error)
+
+    if (this.batch) {
+      this.logger.error(`File transfer failed for batch ${this.batch.id}`, error)
+      await this.batchesService.updateBatchStatus(this.batch.id, BATCH_EVENT.SEND_FAILED)
+      // TODO: Revert each contact's CSA status via CRA_FILE_REJECTED
+      // State transition to confirm
     }
   }
 }

@@ -17,7 +17,14 @@ class PrismaService
     if (PrismaService.instance) {
       return PrismaService.instance
     }
-    const pool = new Pool({ connectionString: databaseConfig.url })
+    const pool = new Pool({
+      connectionString: databaseConfig.url,
+    })
+    // Set search_path on each new connection (compatible with Openshift Crunchy DB that
+    // block startup parameters like `-c search_path=` in the options field)
+    pool.on('connect', (client) => {
+      client.query(`SET search_path TO ${databaseConfig.schema}`)
+    })
     const adapter = new PrismaPg(pool)
     super({
       adapter,
@@ -44,6 +51,11 @@ class PrismaService
       }
       this.logger.log(`Query: ${e.query} - Params: ${e.params} - Duration: ${e.duration}ms`)
     })
+  }
+
+  /** Expose the underlying pg Pool for raw operations (e.g. COPY FROM STDIN). */
+  getPool(): Pool {
+    return this.pool
   }
 
   async onModuleDestroy() {

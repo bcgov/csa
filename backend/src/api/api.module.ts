@@ -6,6 +6,7 @@ import { PrismaService } from 'src/common/database/prisma.service'
 import { StateMachineModule } from 'src/common/state-machine/state-machine.module'
 import { appConfig } from 'src/config/app.config'
 import { HTTPLoggerMiddleware } from '../common/middleware/req.res.logger'
+import { AdminModule } from './admin/admin.module'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { BatchesModule } from './batches/batches.module'
@@ -15,7 +16,7 @@ import { MetricsController } from './metrics/metrics.controller'
 import { MockModule } from './mock/mock.module'
 import { StatusUpdateModule } from './status_update/status-update.module'
 
-const enableMockApi = process.env.NODE_ENV !== 'production'
+const enableMockApi = process.env.USE_MOCK_DATA === 'true'
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -27,6 +28,7 @@ const enableMockApi = process.env.NODE_ENV !== 'production'
     StatusUpdateModule,
     BatchesModule,
     StateMachineModule,
+    AdminModule,
     ...(enableMockApi ? [MockModule] : []),
   ],
   controllers: [AppController, MetricsController, HealthController],

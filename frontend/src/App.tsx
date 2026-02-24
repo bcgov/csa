@@ -182,7 +182,7 @@ function App() {
   const [selectedBatch, setSelectedBatch] = useState<number>(1) // Default to first batch
 
   // Pre-defined filter state
-  const [preDefinedFilter, setPreDefinedFilter] = useState('All Records')
+  const [preDefinedFilter, setPreDefinedFilter] = useState('Pending User review/action')
 
   // Contacts API state
   const [contacts, setContacts] = useState<Contact[]>([])
@@ -2084,8 +2084,6 @@ function App() {
                         displayEmpty
                       >
                         <MenuItem value="All Records">All Records</MenuItem>
-                        <MenuItem value="All eligible records">All eligible records</MenuItem>
-                        <MenuItem value="All records in progress">All records in progress</MenuItem>
                         <MenuItem value="Pending User review/action">
                           Pending User review/action
                         </MenuItem>

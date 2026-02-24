@@ -85,31 +85,30 @@ describe('MisService', () => {
     it('should skip files that do not exist', async () => {
       mockFileStorage.exists.mockResolvedValue(false)
 
-      const results = await service.ingestAll()
+      const files = await service.ingestAll()
 
-      expect(results).toHaveLength(3)
-      expect(results.every((r) => r.skipped === true)).toBe(true)
-      expect(results.every((r) => r.rows === 0)).toBe(true)
-      expect(mockFileStorage.download).not.toHaveBeenCalled()
+      expect(files).toHaveLength(3)
+      expect(files.every((r) => r.skipped === true)).toBe(true)
+      expect(files.every((r) => r.rows === 0)).toBe(true)
     })
 
     // TODO: re-enable when DB load is restored in mis.service.ts
     it.skip('should ingest all 3 MIS files when they exist', async () => {
-      const results = await service.ingestAll()
+      const files = await service.ingestAll()
 
-      expect(results).toHaveLength(3)
+      expect(files).toHaveLength(3)
       expect(mockFileStorage.download).toHaveBeenCalledTimes(3)
-      expect(results.every((r) => r.rows === 2)).toBe(true)
-      expect(results.every((r) => r.skipped === undefined)).toBe(true)
+      expect(files.every((r) => r.rows === 2)).toBe(true)
+      expect(files.every((r) => r.skipped === undefined)).toBe(true)
     })
 
     it('should prepend S3 prefix to file keys', async () => {
       await service.ingestAll()
 
-      const keys = mockFileStorage.download.mock.calls.map((call: unknown[]) => call[0])
-      expect(keys).toContain('csas3/CSAS3_Payments.csv')
-      expect(keys).toContain('csas3/CSAS3_Contract.csv')
-      expect(keys).toContain('csas3/CSAS3_Placement.csv')
+      const existsKeys = mockFileStorage.exists.mock.calls.map((call: unknown[]) => call[0])
+      expect(existsKeys).toContain('csas3/rap_payments.csv')
+      expect(existsKeys).toContain('csas3/rap_contracts.csv')
+      expect(existsKeys).toContain('csas3/rap_placements.csv')
     })
 
     // TODO: re-enable when DB load is restored in mis.service.ts
@@ -118,8 +117,8 @@ describe('MisService', () => {
 
       expect(mockFileStorage.move).toHaveBeenCalledTimes(3)
       const moveCalls = mockFileStorage.move.mock.calls
-      expect(moveCalls[0][0]).toBe('csas3/CSAS3_Payments.csv')
-      expect(moveCalls[0][1]).toMatch(/^csas3\/PROCESSED\/\d{4}-\d{2}-\d{2}\/CSAS3_Payments\.csv$/)
+      expect(moveCalls[0][0]).toBe('csas3/rap_payments.csv')
+      expect(moveCalls[0][1]).toMatch(/^csas3\/PROCESSED\/\d{4}-\d{2}-\d{2}\/rap_payments\.csv$/)
     })
 
     it('should not move files when they are skipped', async () => {
@@ -163,10 +162,43 @@ describe('MisService', () => {
     it.skip('should continue if move fails (non-fatal)', async () => {
       mockFileStorage.move.mockRejectedValue(new Error('Access Denied'))
 
-      const results = await service.ingestAll()
+      const files = await service.ingestAll()
 
-      expect(results).toHaveLength(3)
-      expect(results.every((r) => r.rows === 2)).toBe(true)
+      expect(files).toHaveLength(3)
+      expect(files.every((r) => r.rows === 2)).toBe(true)
+    })
+  })
+
+  describe('readLastUpdated', () => {
+    it('should read last_updated value from CSV', async () => {
+      mockFileStorage.download.mockImplementation((key: string) => {
+        if (key.includes('last_updated')) {
+          return Promise.resolve(Readable.from(['LAST_UPDATED\n20260221\n']))
+        }
+        return Promise.resolve(Readable.from(['HEADER\nrow1\nrow2']))
+      })
+
+      const lastUpdated = await service.readLastUpdated()
+
+      expect(lastUpdated).toBe('20260221')
+    })
+
+    it('should return null when file is missing', async () => {
+      mockFileStorage.exists.mockImplementation((key: string) => {
+        if (key.includes('last_updated')) return Promise.resolve(false)
+        return Promise.resolve(true)
+      })
+
+      const lastUpdated = await service.readLastUpdated()
+
+      expect(lastUpdated).toBeNull()
+    })
+
+    it('should prepend S3 prefix to file key', async () => {
+      await service.readLastUpdated()
+
+      const existsKeys = mockFileStorage.exists.mock.calls.map((call: unknown[]) => call[0])
+      expect(existsKeys).toContain('csas3/last_updated.csv')
     })
   })
 })

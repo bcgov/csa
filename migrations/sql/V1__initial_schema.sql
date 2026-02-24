@@ -137,6 +137,7 @@ CREATE TABLE IF NOT EXISTS csa.job_runs (
 CREATE INDEX idx_job_runs_status ON csa.job_runs (status);
 CREATE INDEX idx_job_runs_parent ON csa.job_runs (parent_job_id);
 CREATE INDEX idx_job_runs_type_status ON csa.job_runs (job_type, status);
+CREATE UNIQUE INDEX idx_job_runs_one_running_per_type ON csa.job_runs (job_type) WHERE status = 'RUNNING';
 
 CREATE TABLE IF NOT EXISTS csa.transfer_files (
   id                SERIAL      PRIMARY KEY,
@@ -219,7 +220,7 @@ CREATE TABLE IF NOT EXISTS csa.stg_icm_legal_authority_admin (
   INGESTED_AT     TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS csa.stg_legal_authority (
+CREATE TABLE IF NOT EXISTS csa.stg_icm_legal_authority (
   ROW_ID         TEXT      PRIMARY KEY,
   LAST_UPD       TEXT,
   LGL_AUTH_CD    TEXT,
@@ -251,6 +252,7 @@ CREATE TABLE IF NOT EXISTS csa.stg_icm_orders (
   STATUS_CD           TEXT,
   TOTAL_AMT           TEXT,
   X_EFF_START_DT      TEXT,
+  X_EFF_END_DT        TEXT,
   PRODUCT_NAME        TEXT,
   X_PCMS_CONTRACT_NUM TEXT,
   AGREEMENT_ROW_ID    TEXT,
@@ -267,10 +269,8 @@ CREATE TABLE IF NOT EXISTS csa.stg_mis_payments (
   payment_amount              TEXT,
   payment_effective_start_date TEXT,
   payment_effective_end_date  TEXT,
-  product                     TEXT,
   contract_number             TEXT,
   payment_updated             TEXT,
-  person_id_mis               TEXT,
   ingested_at                 TIMESTAMP DEFAULT NOW()
 );
 
@@ -283,9 +283,8 @@ CREATE TABLE IF NOT EXISTS csa.stg_mis_contracts (
   status                    TEXT,
   contract_start_date       TEXT,
   contract_end_date         TEXT,
-  type                      TEXT,
-  contract_termination_date TEXT,
-  person_id_mis             TEXT,
+  contract_type             TEXT,
+  termination_date          TEXT,
   ingested_at               TIMESTAMP DEFAULT NOW()
 );
 
@@ -310,19 +309,21 @@ CREATE TABLE IF NOT EXISTS csa.stg_mis_placements (
 -- staging table indexes
 
 -- ICM staging indexes (eligibility query joins)
+CREATE INDEX idx_stg_icm_cases_contact ON csa.stg_icm_cases (CONTACT_ROW_ID);
+CREATE INDEX idx_stg_icm_cases_person_mis ON csa.stg_icm_cases (PERSON_ID_MIS);
 CREATE INDEX idx_stg_icm_placements_case ON csa.stg_icm_placements (CASE_ROW_ID);
 CREATE INDEX idx_stg_icm_placements_agreement ON csa.stg_icm_placements (AGREEMENT_ROW_ID);
 CREATE INDEX idx_stg_icm_orders_agreement ON csa.stg_icm_orders (AGREEMENT_ROW_ID);
-CREATE INDEX idx_stg_legal_authority_parent ON csa.stg_legal_authority (PAR_ROW_ID);
+CREATE INDEX idx_stg_icm_legal_authority_parent ON csa.stg_icm_legal_authority (PAR_ROW_ID);
 
 -- MIS staging indexes (eligibility query joins)
-CREATE INDEX idx_stg_mis_payments_person ON csa.stg_mis_payments (person_id_mis);
 CREATE INDEX idx_stg_mis_payments_contract ON csa.stg_mis_payments (contract_number);
 CREATE INDEX idx_stg_mis_placements_person ON csa.stg_mis_placements (person_id_mis);
 CREATE INDEX idx_stg_mis_placements_contract ON csa.stg_mis_placements (contract_number);
 CREATE INDEX idx_stg_mis_placements_legacy ON csa.stg_mis_placements (legacy_file_number);
 CREATE INDEX idx_stg_mis_contracts_number ON csa.stg_mis_contracts (contract_number);
-CREATE INDEX idx_stg_mis_contracts_person ON csa.stg_mis_contracts (person_id_mis);
+CREATE INDEX idx_stg_mis_contracts_provider ON csa.stg_mis_contracts (service_provider_id);
+CREATE INDEX idx_stg_mis_placements_provider ON csa.stg_mis_placements (service_provider_id);
 
 -- db users permissions
 GRANT USAGE ON SCHEMA csa TO "csa-app";

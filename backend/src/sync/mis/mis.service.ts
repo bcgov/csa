@@ -25,7 +25,7 @@ export class MisService {
 
   async ingestAll(): Promise<MisResult[]> {
     // TODO mock to remove
-    if (this.configService.get<string>('MIS_INGESTION_ENABLED') === 'false') {
+    if (this.configService.get<string>('MIS_INGESTION_ENABLED') === 'true') {
       this.logger.log('MIS ingestion disabled, skipping')
       return []
     }

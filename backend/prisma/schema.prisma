@@ -94,7 +94,7 @@ model Contact {
 
 model Batch {
   id                  Int                  @id @default(autoincrement())
-  batchDate           DateTime             @map("batch_date") @db.Date
+  batchDate           DateTime?            @map("batch_date") @db.Date
   status              String
   recordCount         Int                  @map("record_count")
   createdAt           DateTime             @map("created_at")

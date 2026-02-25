@@ -1198,6 +1198,28 @@ function App() {
 
       // Clear selection after successful operation
       setSelected([])
+
+      // Reload contacts to reflect the updated CSA status
+      if (successCount > 0) {
+        const apiFilters = [
+          'All Records',
+          'Pending User review/action',
+          'All children On Hold from CSA',
+          'Children In Pay',
+          'Children Out of Pay',
+          'CRA Refused CSA List',
+          'Children within a batch',
+          'Children over 18 years (never eligible)',
+        ]
+
+        if (apiFilters.includes(preDefinedFilter)) {
+          if (isSearchActive && searchTerm.trim().length >= 3) {
+            await performFullTextSearch(searchTerm.trim(), currentPage)
+          } else {
+            await fetchContacts(currentPage)
+          }
+        }
+      }
     } catch (error) {
       console.error('Add to batch error:', error)
       setSnackbar({
@@ -1412,10 +1434,10 @@ function App() {
         case 'batchDate':
           return batch.batchDate
             ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: '2-digit',
-              })
+              year: 'numeric',
+              month: 'short',
+              day: '2-digit',
+            })
             : ''
         case 'status':
           return batch.status
@@ -1631,10 +1653,10 @@ function App() {
       batchId: `1-${batch.id}`, // Format as "1-{id}"
       batchDate: batch.batchDate
         ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: '2-digit',
-          })
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+        })
         : '',
       status: batch.status,
       recordCount: batch.recordCount,
@@ -2535,30 +2557,30 @@ function App() {
                   'Children within a batch',
                   'Children over 18 years (never eligible)',
                 ].includes(preDefinedFilter) && (
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      mt: 2,
-                      px: 2,
-                    }}
-                  >
-                    <Typography variant="body2" color="text.secondary">
-                      {loadingContacts
-                        ? 'Loading...'
-                        : `Showing ${contacts.length} of ${totalRecords} records`}
-                    </Typography>
-                    <Pagination
-                      count={totalPages}
-                      page={currentPage}
-                      onChange={handlePageChange}
-                      color="primary"
-                      showFirstButton
-                      showLastButton
-                    />
-                  </Box>
-                )}
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mt: 2,
+                        px: 2,
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        {loadingContacts
+                          ? 'Loading...'
+                          : `Showing ${contacts.length} of ${totalRecords} records`}
+                      </Typography>
+                      <Pagination
+                        count={totalPages}
+                        page={currentPage}
+                        onChange={handlePageChange}
+                        color="primary"
+                        showFirstButton
+                        showLastButton
+                      />
+                    </Box>
+                  )}
 
                 {/* Error message */}
                 {contactsError && preDefinedFilter === 'All Records' && (

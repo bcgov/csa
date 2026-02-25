@@ -409,30 +409,28 @@ function App() {
   })
 
   // Helper function to get pre-defined filter configuration
+  // Note: csaStatus values must match database format (snake_case)
   const getPreDefinedFilterConfig = useCallback((filterName: string): any => {
     if (filterName === 'Pending User review/action') {
       return [
         {
           OR: [
-            { key: 'csaStatus', op: 'eq', value: 'On Hold' },
-            { key: 'csaStatus', op: 'eq', value: 'Eligible - TBD' },
-            { key: 'csaStatus', op: 'eq', value: 'Not Eligible - IP - TBD' },
-            { key: 'csaStatus', op: 'eq', value: 'Eligible' },
-            { key: 'csaStatus', op: 'eq', value: 'Not Eligible - In Pay' },
+            { key: 'csaStatus', op: 'eq', value: 'on_hold' },
+            { key: 'csaStatus', op: 'eq', value: 'eligible_tbd' },
+            { key: 'csaStatus', op: 'eq', value: 'not_eligible_ip_tbd' },
+            { key: 'csaStatus', op: 'eq', value: 'eligible' },
+            { key: 'csaStatus', op: 'eq', value: 'not_eligible_in_pay' },
           ],
         },
       ]
     } else if (filterName === 'All children On Hold from CSA') {
-      return [{ key: 'csaStatus', op: 'eq', value: 'on hold' }]
+      return [{ key: 'csaStatus', op: 'eq', value: 'on_hold' }]
     } else if (filterName === 'Children In Pay') {
-      return [{ key: 'csaStatus', op: 'eq', value: 'In Pay' }]
+      return [{ key: 'csaStatus', op: 'eq', value: 'in_pay' }]
     } else if (filterName === 'Children Out of Pay') {
       return [
         {
-          OR: [
-            { key: 'csaStatus', op: 'eq', value: 'Not Eligible' },
-            { key: 'csaStatus', op: 'eq', value: 'Out of Pay' },
-          ],
+          OR: [{ key: 'csaStatus', op: 'eq', value: 'not_eligible_out_of_pay' }],
         },
         { key: 'din', op: 'notblank', value: '' },
       ]
@@ -440,8 +438,8 @@ function App() {
       return [
         {
           OR: [
-            { key: 'csaStatus', op: 'eq', value: 'Application Refused - CRA' },
-            { key: 'csaStatus', op: 'eq', value: 'Cancellation Refused - CRA' },
+            { key: 'csaStatus', op: 'eq', value: 'application_refused_cra' },
+            { key: 'csaStatus', op: 'eq', value: 'cancellation_refused_cra' },
           ],
         },
       ]
@@ -449,15 +447,15 @@ function App() {
       return [
         {
           OR: [
-            { key: 'csaStatus', op: 'eq', value: 'In Batch - Application' },
-            { key: 'csaStatus', op: 'eq', value: 'Batch Sent - Application' },
-            { key: 'csaStatus', op: 'eq', value: 'In Batch - Cancellation' },
-            { key: 'csaStatus', op: 'eq', value: 'Batch Sent - Cancellation' },
+            { key: 'csaStatus', op: 'eq', value: 'in_batch_application' },
+            { key: 'csaStatus', op: 'eq', value: 'batch_sent_application' },
+            { key: 'csaStatus', op: 'eq', value: 'in_batch_cancellation' },
+            { key: 'csaStatus', op: 'eq', value: 'batch_sent_cancellation' },
           ],
         },
       ]
     } else if (filterName === 'Children over 18 years (never eligible)') {
-      return [{ key: 'csaStatus', op: 'eq', value: 'Over 18' }]
+      return [{ key: 'csaStatus', op: 'eq', value: 'over_18' }]
     }
     return undefined
   }, [])
@@ -472,68 +470,76 @@ function App() {
         let filter: any = undefined
 
         // Apply filter based on selected pre-defined filter
+        // Note: csaStatus values must match database format (snake_case)
         if (preDefinedFilter === 'Pending User review/action') {
-          // csaStatus = 'On Hold' OR 'Eligible - TBD' OR 'Not Eligible - IP - TBD' OR 'Eligible' OR 'Not Eligible - In Pay'
+          // csaStatus = 'on_hold' OR 'eligible_tbd' OR 'not_eligible_ip_tbd' OR 'eligible' OR 'not_eligible_in_pay'
           filter = [
             {
               OR: [
-                { key: 'csaStatus', op: 'eq', value: 'On Hold' },
-                { key: 'csaStatus', op: 'eq', value: 'Eligible - TBD' },
-                { key: 'csaStatus', op: 'eq', value: 'Not Eligible - IP - TBD' },
-                { key: 'csaStatus', op: 'eq', value: 'Eligible' },
-                { key: 'csaStatus', op: 'eq', value: 'Not Eligible - In Pay' },
+                { key: 'csaStatus', op: 'eq', value: 'on_hold' },
+                { key: 'csaStatus', op: 'eq', value: 'eligible_tbd' },
+                { key: 'csaStatus', op: 'eq', value: 'not_eligible_ip_tbd' },
+                { key: 'csaStatus', op: 'eq', value: 'eligible' },
+                { key: 'csaStatus', op: 'eq', value: 'not_eligible_in_pay' },
               ],
             },
           ]
         } else if (preDefinedFilter === 'All children On Hold from CSA') {
-          filter = [{ key: 'csaStatus', op: 'eq', value: 'on hold' }]
+          filter = [{ key: 'csaStatus', op: 'eq', value: 'on_hold' }]
         } else if (preDefinedFilter === 'Children In Pay') {
-          filter = [{ key: 'csaStatus', op: 'eq', value: 'In Pay' }]
+          filter = [{ key: 'csaStatus', op: 'eq', value: 'in_pay' }]
         } else if (preDefinedFilter === 'Children Out of Pay') {
-          // (csaStatus = 'Not Eligible' OR csaStatus = 'Out of Pay') AND din is not blank
+          // csaStatus = 'not_eligible_out_of_pay' AND din is not blank
           filter = [
             {
-              OR: [
-                { key: 'csaStatus', op: 'eq', value: 'Not Eligible' },
-                { key: 'csaStatus', op: 'eq', value: 'Out of Pay' },
-              ],
+              OR: [{ key: 'csaStatus', op: 'eq', value: 'not_eligible_out_of_pay' }],
             },
             { key: 'din', op: 'notblank', value: '' },
           ]
         } else if (preDefinedFilter === 'CRA Refused CSA List') {
-          // csaStatus = 'Application Refused - CRA' OR csaStatus = 'Cancellation Refused - CRA'
+          // csaStatus = 'application_refused_cra' OR 'cancellation_refused_cra'
           filter = [
             {
               OR: [
-                { key: 'csaStatus', op: 'eq', value: 'Application Refused - CRA' },
-                { key: 'csaStatus', op: 'eq', value: 'Cancellation Refused - CRA' },
+                { key: 'csaStatus', op: 'eq', value: 'application_refused_cra' },
+                { key: 'csaStatus', op: 'eq', value: 'cancellation_refused_cra' },
               ],
             },
           ]
         } else if (preDefinedFilter === 'Children within a batch') {
-          // csaStatus = 'In Batch - Application' OR 'Batch Sent - Application' OR 'In Batch - Cancellation' OR 'Batch Sent - Cancellation'
+          // csaStatus = 'in_batch_application' OR 'batch_sent_application' OR 'in_batch_cancellation' OR 'batch_sent_cancellation'
           filter = [
             {
               OR: [
-                { key: 'csaStatus', op: 'eq', value: 'In Batch - Application' },
-                { key: 'csaStatus', op: 'eq', value: 'Batch Sent - Application' },
-                { key: 'csaStatus', op: 'eq', value: 'In Batch - Cancellation' },
-                { key: 'csaStatus', op: 'eq', value: 'Batch Sent - Cancellation' },
+                { key: 'csaStatus', op: 'eq', value: 'in_batch_application' },
+                { key: 'csaStatus', op: 'eq', value: 'batch_sent_application' },
+                { key: 'csaStatus', op: 'eq', value: 'in_batch_cancellation' },
+                { key: 'csaStatus', op: 'eq', value: 'batch_sent_cancellation' },
               ],
             },
           ]
         } else if (preDefinedFilter === 'Children over 18 years (never eligible)') {
-          // csaStatus = 'Over 18'
-          filter = [{ key: 'csaStatus', op: 'eq', value: 'Over 18' }]
+          // csaStatus = 'over_18'
+          filter = [{ key: 'csaStatus', op: 'eq', value: 'over_18' }]
         }
 
-        const response = await getAllContacts(page, recordsPerPage, filter)
+        // Build sort parameter if sortConfig is set
+        let sort: Array<{ [key: string]: 'asc' | 'desc' }> | undefined
+        if (sortConfig) {
+          const backendField = columnToFieldMapping[sortConfig.column]
+          if (backendField) {
+            sort = [{ [backendField]: sortConfig.direction }]
+          }
+        }
+
+        const response = await getAllContacts(page, recordsPerPage, filter, sort)
         setContacts(response.data)
         setTotalPages(response.totalPages)
         setTotalRecords(response.total)
         console.log('Fetched contacts:', response.data)
         console.log('Total records:', response.total)
         console.log('Applied filter:', filter)
+        console.log('Applied sort:', sort)
       } catch (error) {
         console.error('Failed to fetch contacts:', error)
         setContactsError('Failed to load contacts. Please try again.')
@@ -542,7 +548,7 @@ function App() {
         setLoadingContacts(false)
       }
     },
-    [preDefinedFilter, recordsPerPage],
+    [preDefinedFilter, recordsPerPage, sortConfig, columnToFieldMapping],
   )
 
   // Function to perform column-specific filter search
@@ -1336,6 +1342,10 @@ function App() {
 
   const clearColumnFilter = (column: string) => {
     setColumnFilters((prev) => ({ ...prev, [column]: [] }))
+    // Reset column filter active state and refetch data
+    setIsColumnFilterActive(false)
+    setFilterSearchTerm('')
+    fetchContacts(currentPage)
   }
 
   // Batch History filter handling functions
@@ -1466,8 +1476,9 @@ function App() {
   }
 
   // Apply filters and sorting to data - always use API data
+  // Note: Sorting is now handled by the backend API, so we just transform the data here
   const filteredData = useMemo(() => {
-    let data = contacts.map((contact) => ({
+    const data = contacts.map((contact) => ({
       id: contact.id,
       firstName: contact.firstName || '',
       middleName: contact.middleName || '',
@@ -1476,7 +1487,8 @@ function App() {
       dob: contact.dateOfBirth ? new Date(contact.dateOfBirth).toLocaleDateString() : '',
       age: contact.age || 0,
       din: contact.din || '',
-      csaStatus: contact.csaStatus || '',
+      csaStatus: contact.csaStatusLabel || contact.csaStatus || '', // Display label
+      csaStatusRaw: contact.csaStatus || '', // Raw value for validation logic
       statusEffective: contact.csaStatusEffectiveDate
         ? new Date(contact.csaStatusEffectiveDate).toLocaleDateString()
         : '',
@@ -1488,35 +1500,8 @@ function App() {
       lastUpdatedBy: contact.lastUpdatedBy || '',
     }))
 
-    // Apply sorting
-    if (sortConfig) {
-      data = [...data].sort((a, b) => {
-        const aValue = a[sortConfig.column as keyof typeof a]
-        const bValue = b[sortConfig.column as keyof typeof b]
-
-        // Handle different data types
-        if (aValue === undefined || aValue === '') return 1
-        if (bValue === undefined || bValue === '') return -1
-
-        // Numeric comparison
-        if (typeof aValue === 'number' && typeof bValue === 'number') {
-          return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue
-        }
-
-        // String comparison
-        const aString = String(aValue).toLowerCase()
-        const bString = String(bValue).toLowerCase()
-
-        if (sortConfig.direction === 'asc') {
-          return aString.localeCompare(bString)
-        } else {
-          return bString.localeCompare(aString)
-        }
-      })
-    }
-
     return data
-  }, [sortConfig, contacts])
+  }, [contacts])
 
   // Check if all selected records have valid CSA status for Hold/Resume
   const canHoldResume = useMemo(() => {
@@ -1524,7 +1509,7 @@ function App() {
 
     return selected.every((id) => {
       const record = filteredData.find((row) => row.id === id)
-      return record && VALID_CSA_STATUSES.includes(record.csaStatus)
+      return record && VALID_CSA_STATUSES.includes(record.csaStatusRaw)
     })
   }, [selected, filteredData])
 
@@ -1534,7 +1519,7 @@ function App() {
 
     return selected.every((id) => {
       const record = filteredData.find((row) => row.id === id)
-      return record && VALID_BATCH_STATUSES.includes(record.csaStatus)
+      return record && VALID_BATCH_STATUSES.includes(record.csaStatusRaw)
     })
   }, [selected, filteredData])
 
@@ -1563,8 +1548,8 @@ function App() {
       const record = filteredData.find((row) => row.id === id)
       return (
         record &&
-        (record.csaStatus === 'not_eligible_out_of_pay' ||
-          record.csaStatus === 'not_eligible_ip_tbd')
+        (record.csaStatusRaw === 'not_eligible_out_of_pay' ||
+          record.csaStatusRaw === 'not_eligible_ip_tbd')
       )
     })
   }, [selected, filteredData])
@@ -1578,9 +1563,9 @@ function App() {
       const record = filteredData.find((row) => row.id === id)
       return (
         record &&
-        (record.csaStatus === 'eligible_tbd' ||
-          record.csaStatus === 'in_pay' ||
-          record.csaStatus === 'on_hold')
+        (record.csaStatusRaw === 'eligible_tbd' ||
+          record.csaStatusRaw === 'in_pay' ||
+          record.csaStatusRaw === 'on_hold')
       )
     })
   }, [selected, filteredData])
@@ -1594,7 +1579,7 @@ function App() {
       const record = filteredData.find((row) => row.id === id)
       return (
         record &&
-        (record.csaStatus === 'eligible_tbd' || record.csaStatus === 'not_eligible_ip_tbd')
+        (record.csaStatusRaw === 'eligible_tbd' || record.csaStatusRaw === 'not_eligible_ip_tbd')
       )
     })
   }, [selected, filteredData])

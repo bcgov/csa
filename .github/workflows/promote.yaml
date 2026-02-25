@@ -75,12 +75,14 @@ jobs:
       build_images: ${{ steps.vars.outputs.build_images }}
     steps:
       - uses: actions/checkout@v4
-        with :
+        with:
           fetch-depth: 0
 
       - id: filter
         uses: dorny/paths-filter@v3
         with:
+          base: ${{ github.event.before }}
+          ref: ${{ github.sha }}
           filters: |
             frontend:
               - 'frontend/**'

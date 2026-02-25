@@ -26,6 +26,7 @@ export interface Contact {
   serviceOffice?: string
   assignedTo?: string
   csaStatus?: string
+  csaStatusLabel?: string
   csaStatusEffectiveDate?: string
   csaSentDate?: string
   din?: string

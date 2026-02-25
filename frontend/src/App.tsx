@@ -1487,7 +1487,8 @@ function App() {
       dob: contact.dateOfBirth ? new Date(contact.dateOfBirth).toLocaleDateString() : '',
       age: contact.age || 0,
       din: contact.din || '',
-      csaStatus: contact.csaStatus || '',
+      csaStatus: contact.csaStatusLabel || contact.csaStatus || '', // Display label
+      csaStatusRaw: contact.csaStatus || '', // Raw value for validation logic
       statusEffective: contact.csaStatusEffectiveDate
         ? new Date(contact.csaStatusEffectiveDate).toLocaleDateString()
         : '',
@@ -1508,7 +1509,7 @@ function App() {
 
     return selected.every((id) => {
       const record = filteredData.find((row) => row.id === id)
-      return record && VALID_CSA_STATUSES.includes(record.csaStatus)
+      return record && VALID_CSA_STATUSES.includes(record.csaStatusRaw)
     })
   }, [selected, filteredData])
 
@@ -1518,7 +1519,7 @@ function App() {
 
     return selected.every((id) => {
       const record = filteredData.find((row) => row.id === id)
-      return record && VALID_BATCH_STATUSES.includes(record.csaStatus)
+      return record && VALID_BATCH_STATUSES.includes(record.csaStatusRaw)
     })
   }, [selected, filteredData])
 
@@ -1547,8 +1548,8 @@ function App() {
       const record = filteredData.find((row) => row.id === id)
       return (
         record &&
-        (record.csaStatus === 'not_eligible_out_of_pay' ||
-          record.csaStatus === 'not_eligible_ip_tbd')
+        (record.csaStatusRaw === 'not_eligible_out_of_pay' ||
+          record.csaStatusRaw === 'not_eligible_ip_tbd')
       )
     })
   }, [selected, filteredData])
@@ -1562,9 +1563,9 @@ function App() {
       const record = filteredData.find((row) => row.id === id)
       return (
         record &&
-        (record.csaStatus === 'eligible_tbd' ||
-          record.csaStatus === 'in_pay' ||
-          record.csaStatus === 'on_hold')
+        (record.csaStatusRaw === 'eligible_tbd' ||
+          record.csaStatusRaw === 'in_pay' ||
+          record.csaStatusRaw === 'on_hold')
       )
     })
   }, [selected, filteredData])
@@ -1578,7 +1579,7 @@ function App() {
       const record = filteredData.find((row) => row.id === id)
       return (
         record &&
-        (record.csaStatus === 'eligible_tbd' || record.csaStatus === 'not_eligible_ip_tbd')
+        (record.csaStatusRaw === 'eligible_tbd' || record.csaStatusRaw === 'not_eligible_ip_tbd')
       )
     })
   }, [selected, filteredData])

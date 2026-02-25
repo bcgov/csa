@@ -36,6 +36,38 @@ export interface Contact {
   enrollForCsa?: string
   misLegalAuthorityCode?: string
   legalAuthorityCode?: string
+  // Birth location fields
+  birthCity?: string
+  birthProvince?: string
+  birthCountry?: string
+  // Placement fields
+  placementLocation?: string
+  locationType?: string
+  locationSubType?: string
+  placementStatus?: string
+  actualStartDate?: string
+  actualEndDate?: string
+  paidUnpaid?: string
+  interruptedPlacement?: string
+  sourcePlacement?: string
+  // Service provider and agreement fields
+  serviceProviderName?: string
+  providerId?: string
+  placeOfServiceName?: string
+  agreementType?: string
+  agreementStatus?: string
+  agreementStartDate?: string
+  agreementEndDate?: string
+  terminationDate?: string
+  mcfdContract?: string
+  // Order fields
+  orderNumber?: string
+  orderType?: string
+  orderStatus?: string
+  orderAmount?: string
+  orderEffectiveStartDate?: string
+  orderEffectiveEndDate?: string
+  product?: string
 }
 
 export interface PaginatedContactsResponse {

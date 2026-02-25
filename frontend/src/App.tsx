@@ -75,42 +75,6 @@ const VALID_BATCH_STATUSES = [
   'cancellation_refused_cra', // Cancellation Refused - CRA
 ]
 
-// Sample data for batch history (child-specific)
-const childBatchHistory = [
-  {
-    id: 1,
-    batchId: '1-567',
-    createdDate: '2025-Nov-18',
-    batchDate: '',
-    status: 'Pending',
-    transactionType: 'Cancellation',
-  },
-  {
-    id: 2,
-    batchId: '1-134',
-    createdDate: '2025-Sept-17',
-    batchDate: '2025-Sep-30',
-    status: 'CRA Processed',
-    transactionType: 'Application',
-  },
-  {
-    id: 3,
-    batchId: '1-156',
-    createdDate: '2025-Mar-15',
-    batchDate: '2025-Mar-16',
-    status: 'CRA Processed',
-    transactionType: 'Cancellation',
-  },
-  {
-    id: 4,
-    batchId: '1-165',
-    createdDate: '2024-Apr-15',
-    batchDate: '2024-Apr-21',
-    status: 'Placeholder for text',
-    transactionType: 'Application',
-  },
-]
-
 function App() {
   // Use Keycloak authentication
   const {
@@ -1395,8 +1359,16 @@ function App() {
     setBatchHistoryColumnFilters((prev) => ({ ...prev, [column]: [] }))
   }
 
-  const getBatchHistoryUniqueValues = (column: keyof (typeof childBatchHistory)[0]) => {
-    const values = childBatchHistory.map((row) => row[column])
+  const getBatchHistoryUniqueValues = (column: string) => {
+    // Transform API data to match the table structure, then get unique values
+    const transformedData = contactBatchHistory.map((item) => ({
+      batchId: String(item.batch.id),
+      createdDate: new Date(item.createdAt).toLocaleDateString(),
+      batchDate: item.batch.batchDate ? new Date(item.batch.batchDate).toLocaleDateString() : '',
+      status: item.batch.status || '',
+      transactionType: item.transactionType || '',
+    }))
+    const values = transformedData.map((row) => row[column as keyof typeof row])
     return Array.from(new Set(values)).filter((v) => v !== undefined && v !== '')
   }
 
@@ -1505,6 +1477,8 @@ function App() {
       firstName: contact.firstName || '',
       middleName: contact.middleName || '',
       lastName: contact.lastName || '',
+      akaLastName: contact.akaLastName || '',
+      akaFirstName: contact.akaFirstName || '',
       gender: contact.gender || '',
       dob: contact.dateOfBirth ? new Date(contact.dateOfBirth).toLocaleDateString() : '',
       age: contact.age || 0,
@@ -1515,8 +1489,50 @@ function App() {
         ? new Date(contact.csaStatusEffectiveDate).toLocaleDateString()
         : '',
       caseNumber: contact.caseNumber || '',
+      caseType: contact.caseType || '',
       caseStatus: contact.caseStatus || '',
       legacyFile: contact.legacyFileNumber || '',
+      serviceOffice: contact.serviceOffice || '',
+      assignedTo: contact.assignedTo || '',
+      effectiveLegalStatus: contact.effectiveLegalStatus || '',
+      effectiveDate: contact.effectiveDate
+        ? new Date(contact.effectiveDate).toLocaleDateString()
+        : '',
+      expiryDate: contact.expiryDate ? new Date(contact.expiryDate).toLocaleDateString() : '',
+      // Birth location
+      birthCity: contact.birthCity || '',
+      birthProvince: contact.birthProvince || '',
+      birthCountry: contact.birthCountry || '',
+      // Placement fields
+      placementLocation: contact.placementLocation || '',
+      locationType: contact.locationType || '',
+      locationSubType: contact.locationSubType || '',
+      placementStatus: contact.placementStatus || '',
+      actualStartDate: contact.actualStartDate
+        ? new Date(contact.actualStartDate).toLocaleDateString()
+        : '',
+      actualEndDate: contact.actualEndDate
+        ? new Date(contact.actualEndDate).toLocaleDateString()
+        : '',
+      paidUnpaid: contact.paidUnpaid || '',
+      sourcePlacement: contact.sourcePlacement || '',
+      // Service provider and agreement fields
+      serviceProviderName: contact.serviceProviderName || '',
+      providerId: contact.providerId || '',
+      placeOfServiceName: contact.placeOfServiceName || '',
+      agreementType: contact.agreementType || '',
+      agreementStatus: contact.agreementStatus || '',
+      agreementStartDate: contact.agreementStartDate
+        ? new Date(contact.agreementStartDate).toLocaleDateString()
+        : '',
+      agreementEndDate: contact.agreementEndDate
+        ? new Date(contact.agreementEndDate).toLocaleDateString()
+        : '',
+      terminationDate: contact.terminationDate
+        ? new Date(contact.terminationDate).toLocaleDateString()
+        : '',
+      mcfdContract: contact.mcfdContract || '',
+      product: contact.product || '',
       cgwrks3: '',
       lastUpdated: contact.lastUpdatedAt ? new Date(contact.lastUpdatedAt).toLocaleString() : '',
       lastUpdatedBy: contact.lastUpdatedBy || '',
@@ -2723,9 +2739,7 @@ function App() {
                     />
                     <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
                       {batchHistoryFilterAnchor.column &&
-                        getBatchHistoryUniqueValues(
-                          batchHistoryFilterAnchor.column as keyof (typeof childBatchHistory)[0],
-                        )
+                        getBatchHistoryUniqueValues(batchHistoryFilterAnchor.column)
                           .sort()
                           .filter((value) =>
                             String(value)
@@ -2844,14 +2858,20 @@ function App() {
                                   AKA Last Name
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  John
+                                  {childData.akaLastName || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Birth Place
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  Victoria, BC, CA
+                                  {[
+                                    childData.birthCity,
+                                    childData.birthProvince,
+                                    childData.birthCountry,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(', ') || '-'}{' '}
                                 </Typography>
                               </Box>
                             </Box>
@@ -2882,7 +2902,7 @@ function App() {
                                   variant="body2"
                                   sx={{ fontWeight: 500, color: '#1976d2', cursor: 'pointer' }}
                                 >
-                                  Open Case
+                                  {childData.serviceOffice || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
@@ -2899,14 +2919,14 @@ function App() {
                                   Assigned to
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  IEIC: CONNECT
+                                  {childData.assignedTo || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Case Type
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  Child Services
+                                  {childData.caseType || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
@@ -2920,7 +2940,7 @@ function App() {
                                   Legal Status Code
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  C88: GCD
+                                  {childData.effectiveLegalStatus || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
@@ -2934,14 +2954,14 @@ function App() {
                                   Effective Date
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  2025-03-12
+                                  {childData.effectiveDate || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Expiry Date
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  2025-11-16
+                                  {childData.expiryDate || '-'}
                                 </Typography>
                               </Box>
                             </Box>
@@ -2972,68 +2992,72 @@ function App() {
                                   variant="body2"
                                   sx={{ fontWeight: 500, color: '#1976d2', cursor: 'pointer' }}
                                 >
-                                  Actual Placement
+                                  {childData.placementStatus || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Placement/Location No.
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  1-14732
+                                  {childData.placementLocation || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Actual Start Date
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  2025-11-16
+                                  {childData.actualStartDate || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Type
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  Placement
+                                  {childData.locationType || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Actual End Date
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  NA
+                                  {childData.actualEndDate || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Sub-type
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  Emergency
+                                  {childData.locationSubType || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Paid/Unpaid
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  NA
+                                  {childData.paidUnpaid || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Source
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  <Typography
-                                    component="span"
-                                    sx={{
-                                      backgroundColor: '#e3f2fd',
-                                      color: '#1976d2',
-                                      px: 1,
-                                      py: 0.5,
-                                      borderRadius: 1,
-                                      fontSize: '0.75rem',
-                                    }}
-                                  >
-                                    ICM
-                                  </Typography>
+                                  {childData.sourcePlacement ? (
+                                    <Typography
+                                      component="span"
+                                      sx={{
+                                        backgroundColor: '#e3f2fd',
+                                        color: '#1976d2',
+                                        px: 1,
+                                        py: 0.5,
+                                        borderRadius: 1,
+                                        fontSize: '0.75rem',
+                                      }}
+                                    >
+                                      {childData.sourcePlacement}
+                                    </Typography>
+                                  ) : (
+                                    '-'
+                                  )}
                                 </Typography>
                               </Box>
                             </Box>
@@ -3064,70 +3088,70 @@ function App() {
                                   variant="body2"
                                   sx={{ fontWeight: 500, color: '#1976d2', cursor: 'pointer' }}
                                 >
-                                  Actual Agreement
+                                  {childData.agreementStatus || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Start Date
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  2025-07-01
+                                  {childData.agreementStartDate || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Provider
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  2925 POP 1 SP-1
+                                  {childData.serviceProviderName || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   End Date
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  2026-08-30
+                                  {childData.agreementEndDate || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Provider ID
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  1-17284
+                                  {childData.providerId || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Termination Date
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  NA
+                                  {childData.terminationDate || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Place of Service
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  NA
+                                  {childData.placeOfServiceName || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Agreement Type
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  2925 PDS
+                                  {childData.agreementType || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
-                                  SIEMS PDS 1
+                                  MCFD Contract
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  01040334SP
+                                  {childData.mcfdContract || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
                                   Product Type
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  Variable
+                                  {childData.product || '-'}
                                 </Typography>
                               </Box>
                             </Box>
@@ -3898,9 +3922,7 @@ function App() {
               />
               <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
                 {batchHistoryFilterAnchor.column &&
-                  getBatchHistoryUniqueValues(
-                    batchHistoryFilterAnchor.column as keyof (typeof childBatchHistory)[0],
-                  )
+                  getBatchHistoryUniqueValues(batchHistoryFilterAnchor.column)
                     .sort()
                     .filter((value) =>
                       String(value)

@@ -409,29 +409,29 @@ function App() {
   })
 
   // Helper function to get pre-defined filter configuration
+  // Note: csaStatus values must match database format (snake_case)
   const getPreDefinedFilterConfig = useCallback((filterName: string): any => {
     if (filterName === 'Pending User review/action') {
       return [
         {
           OR: [
-            { key: 'csaStatus', op: 'eq', value: 'On Hold' },
-            { key: 'csaStatus', op: 'eq', value: 'Eligible - TBD' },
-            { key: 'csaStatus', op: 'eq', value: 'Not Eligible - IP - TBD' },
-            { key: 'csaStatus', op: 'eq', value: 'Eligible' },
-            { key: 'csaStatus', op: 'eq', value: 'Not Eligible - In Pay' },
+            { key: 'csaStatus', op: 'eq', value: 'on_hold' },
+            { key: 'csaStatus', op: 'eq', value: 'eligible_tbd' },
+            { key: 'csaStatus', op: 'eq', value: 'not_eligible_ip_tbd' },
+            { key: 'csaStatus', op: 'eq', value: 'eligible' },
+            { key: 'csaStatus', op: 'eq', value: 'not_eligible_in_pay' },
           ],
         },
       ]
     } else if (filterName === 'All children On Hold from CSA') {
-      return [{ key: 'csaStatus', op: 'eq', value: 'on hold' }]
+      return [{ key: 'csaStatus', op: 'eq', value: 'on_hold' }]
     } else if (filterName === 'Children In Pay') {
-      return [{ key: 'csaStatus', op: 'eq', value: 'In Pay' }]
+      return [{ key: 'csaStatus', op: 'eq', value: 'in_pay' }]
     } else if (filterName === 'Children Out of Pay') {
       return [
         {
           OR: [
-            { key: 'csaStatus', op: 'eq', value: 'Not Eligible' },
-            { key: 'csaStatus', op: 'eq', value: 'Out of Pay' },
+            { key: 'csaStatus', op: 'eq', value: 'not_eligible_out_of_pay' },
           ],
         },
         { key: 'din', op: 'notblank', value: '' },
@@ -440,8 +440,8 @@ function App() {
       return [
         {
           OR: [
-            { key: 'csaStatus', op: 'eq', value: 'Application Refused - CRA' },
-            { key: 'csaStatus', op: 'eq', value: 'Cancellation Refused - CRA' },
+            { key: 'csaStatus', op: 'eq', value: 'application_refused_cra' },
+            { key: 'csaStatus', op: 'eq', value: 'cancellation_refused_cra' },
           ],
         },
       ]
@@ -449,15 +449,15 @@ function App() {
       return [
         {
           OR: [
-            { key: 'csaStatus', op: 'eq', value: 'In Batch - Application' },
-            { key: 'csaStatus', op: 'eq', value: 'Batch Sent - Application' },
-            { key: 'csaStatus', op: 'eq', value: 'In Batch - Cancellation' },
-            { key: 'csaStatus', op: 'eq', value: 'Batch Sent - Cancellation' },
+            { key: 'csaStatus', op: 'eq', value: 'in_batch_application' },
+            { key: 'csaStatus', op: 'eq', value: 'batch_sent_application' },
+            { key: 'csaStatus', op: 'eq', value: 'in_batch_cancellation' },
+            { key: 'csaStatus', op: 'eq', value: 'batch_sent_cancellation' },
           ],
         },
       ]
     } else if (filterName === 'Children over 18 years (never eligible)') {
-      return [{ key: 'csaStatus', op: 'eq', value: 'Over 18' }]
+      return [{ key: 'csaStatus', op: 'eq', value: 'over_18' }]
     }
     return undefined
   }, [])
@@ -472,59 +472,59 @@ function App() {
         let filter: any = undefined
 
         // Apply filter based on selected pre-defined filter
+        // Note: csaStatus values must match database format (snake_case)
         if (preDefinedFilter === 'Pending User review/action') {
-          // csaStatus = 'On Hold' OR 'Eligible - TBD' OR 'Not Eligible - IP - TBD' OR 'Eligible' OR 'Not Eligible - In Pay'
+          // csaStatus = 'on_hold' OR 'eligible_tbd' OR 'not_eligible_ip_tbd' OR 'eligible' OR 'not_eligible_in_pay'
           filter = [
             {
               OR: [
-                { key: 'csaStatus', op: 'eq', value: 'On Hold' },
-                { key: 'csaStatus', op: 'eq', value: 'Eligible - TBD' },
-                { key: 'csaStatus', op: 'eq', value: 'Not Eligible - IP - TBD' },
-                { key: 'csaStatus', op: 'eq', value: 'Eligible' },
-                { key: 'csaStatus', op: 'eq', value: 'Not Eligible - In Pay' },
+                { key: 'csaStatus', op: 'eq', value: 'on_hold' },
+                { key: 'csaStatus', op: 'eq', value: 'eligible_tbd' },
+                { key: 'csaStatus', op: 'eq', value: 'not_eligible_ip_tbd' },
+                { key: 'csaStatus', op: 'eq', value: 'eligible' },
+                { key: 'csaStatus', op: 'eq', value: 'not_eligible_in_pay' },
               ],
             },
           ]
         } else if (preDefinedFilter === 'All children On Hold from CSA') {
-          filter = [{ key: 'csaStatus', op: 'eq', value: 'on hold' }]
+          filter = [{ key: 'csaStatus', op: 'eq', value: 'on_hold' }]
         } else if (preDefinedFilter === 'Children In Pay') {
-          filter = [{ key: 'csaStatus', op: 'eq', value: 'In Pay' }]
+          filter = [{ key: 'csaStatus', op: 'eq', value: 'in_pay' }]
         } else if (preDefinedFilter === 'Children Out of Pay') {
-          // (csaStatus = 'Not Eligible' OR csaStatus = 'Out of Pay') AND din is not blank
+          // csaStatus = 'not_eligible_out_of_pay' AND din is not blank
           filter = [
             {
               OR: [
-                { key: 'csaStatus', op: 'eq', value: 'Not Eligible' },
-                { key: 'csaStatus', op: 'eq', value: 'Out of Pay' },
+                { key: 'csaStatus', op: 'eq', value: 'not_eligible_out_of_pay' },
               ],
             },
             { key: 'din', op: 'notblank', value: '' },
           ]
         } else if (preDefinedFilter === 'CRA Refused CSA List') {
-          // csaStatus = 'Application Refused - CRA' OR csaStatus = 'Cancellation Refused - CRA'
+          // csaStatus = 'application_refused_cra' OR 'cancellation_refused_cra'
           filter = [
             {
               OR: [
-                { key: 'csaStatus', op: 'eq', value: 'Application Refused - CRA' },
-                { key: 'csaStatus', op: 'eq', value: 'Cancellation Refused - CRA' },
+                { key: 'csaStatus', op: 'eq', value: 'application_refused_cra' },
+                { key: 'csaStatus', op: 'eq', value: 'cancellation_refused_cra' },
               ],
             },
           ]
         } else if (preDefinedFilter === 'Children within a batch') {
-          // csaStatus = 'In Batch - Application' OR 'Batch Sent - Application' OR 'In Batch - Cancellation' OR 'Batch Sent - Cancellation'
+          // csaStatus = 'in_batch_application' OR 'batch_sent_application' OR 'in_batch_cancellation' OR 'batch_sent_cancellation'
           filter = [
             {
               OR: [
-                { key: 'csaStatus', op: 'eq', value: 'In Batch - Application' },
-                { key: 'csaStatus', op: 'eq', value: 'Batch Sent - Application' },
-                { key: 'csaStatus', op: 'eq', value: 'In Batch - Cancellation' },
-                { key: 'csaStatus', op: 'eq', value: 'Batch Sent - Cancellation' },
+                { key: 'csaStatus', op: 'eq', value: 'in_batch_application' },
+                { key: 'csaStatus', op: 'eq', value: 'batch_sent_application' },
+                { key: 'csaStatus', op: 'eq', value: 'in_batch_cancellation' },
+                { key: 'csaStatus', op: 'eq', value: 'batch_sent_cancellation' },
               ],
             },
           ]
         } else if (preDefinedFilter === 'Children over 18 years (never eligible)') {
-          // csaStatus = 'Over 18'
-          filter = [{ key: 'csaStatus', op: 'eq', value: 'Over 18' }]
+          // csaStatus = 'over_18'
+          filter = [{ key: 'csaStatus', op: 'eq', value: 'over_18' }]
         }
 
         // Build sort parameter if sortConfig is set

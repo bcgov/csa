@@ -12,6 +12,12 @@ export function formatDateTime(date: Date): string {
   return `${formatDate(date)} 00:00:00`
 }
 
+export function daysAgo(days: number, referenceDate: Date = new Date()): Date {
+  const d = new Date(referenceDate)
+  d.setDate(d.getDate() - days)
+  return d
+}
+
 export function firstDayOfPreviousMonth(referenceDate: Date = new Date()): Date {
   const d = new Date(referenceDate)
   d.setDate(1)

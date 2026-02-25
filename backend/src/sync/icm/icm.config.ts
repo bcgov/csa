@@ -1,4 +1,5 @@
 import {
+  daysAgo,
   firstDayOfPreviousMonth,
   formatDate,
   formatDateTime,
@@ -44,7 +45,7 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     primaryKey: 'ROW_ID',
     cursorLabel: 'Updated',
     searchSpec: () =>
-      `([Status] = "Active" OR [Status] = "Interrupted" OR [Status] = "Ended") AND [End Date] >= "${formatDate(new Date())}"`,
+      `[Status] = "Active" OR [Status] = "Interrupted" OR ([Status] = "Ended" AND [End Date] >= "${formatDate(daysAgo(30))}")`,
     fieldMap: STG_ICM_PLACEMENTS_MAP,
   },
   {

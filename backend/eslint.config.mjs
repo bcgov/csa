@@ -1,7 +1,7 @@
 import eslint from '@eslint/js';
-import tseslint from 'typescript-eslint';
-import prettier from 'eslint-plugin-prettier';
 import prettierConfig from 'eslint-config-prettier';
+import prettier from 'eslint-plugin-prettier';
+import tseslint from 'typescript-eslint';
 
 /**
  * Shared ignore patterns (inlined from eslint-base.config.mjs)
@@ -43,12 +43,12 @@ const baseRules = {
 };
 
 export default tseslint.config(
+  {ignores: [...baseIgnores]},
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   prettierConfig,
   {
     files: ['**/*.ts'],
-    ignores: [...baseIgnores],
     plugins: {
       prettier,
     },

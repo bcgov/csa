@@ -40,6 +40,20 @@ class APIService {
       },
       (error) => {
         console.error(error)
+
+        // Handle token expiration - clear auth and redirect to login
+        if (
+          error?.response?.status === 401 &&
+          error?.response?.data?.message === 'Token has expired. Please login again.'
+        ) {
+          console.warn('Token expired, clearing auth and redirecting to login...')
+          localStorage.removeItem('authToken')
+          localStorage.removeItem('isLoggedIn')
+          // Redirect to landing page
+          window.location.href = '/'
+        }
+
+        return Promise.reject(error)
       },
     )
   }

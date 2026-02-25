@@ -1,5 +1,5 @@
 # Build - compile TypeScript
-FROM node:24-slim AS build
+FROM node:24.13-slim AS build
 WORKDIR /app
 ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
 COPY package*.json ./
@@ -8,7 +8,7 @@ COPY . .
 RUN npm run build
 
 # Production Dependencies
-FROM node:24-slim AS dependencies
+FROM node:24.13-slim AS dependencies
 WORKDIR /app
 ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
 COPY package*.json ./
@@ -16,7 +16,7 @@ RUN echo "Production Dependencies"
 RUN npm ci --omit=dev
 
 # Production Stage - Copy app and dependencies
-FROM node:24-slim
+FROM node:24.13-slim
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules

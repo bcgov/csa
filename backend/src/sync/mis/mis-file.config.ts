@@ -28,6 +28,7 @@ export const MIS_FILE_CONFIGS: MisFileConfig[] = [
       'payment_effective_end_date',
       'contract_number',
       'payment_updated',
+      'person_id_mis',
     ],
   },
   {

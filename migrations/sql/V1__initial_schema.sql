@@ -92,7 +92,7 @@ CREATE INDEX idx_contacts_search_text_trgm ON csa.contacts USING GIN (search_tex
 
 CREATE TABLE IF NOT EXISTS csa.batches (
   id              SERIAL      PRIMARY KEY,
-  batch_date      DATE        NOT NULL,
+  batch_date      DATE,
   status          TEXT        NOT NULL,
   record_count    INTEGER     NOT NULL,
   system_comments TEXT,
@@ -271,6 +271,7 @@ CREATE TABLE IF NOT EXISTS csa.stg_mis_payments (
   payment_effective_end_date  TEXT,
   contract_number             TEXT,
   payment_updated             TEXT,
+  person_id_mis               TEXT,
   ingested_at                 TIMESTAMP DEFAULT NOW()
 );
 

@@ -163,6 +163,6 @@ export class OutboundFileService {
   createFileName(sequenceNumber: number): string {
     const paddedSequence = String(sequenceNumber).padStart(4, '0')
 
-    return `${this.fileNamePrefix}.${this.environmentCode}.${this.craUserId}.${this.fileTypeCode}${paddedSequence}.txt`
+    return `${this.fileNamePrefix}.${this.environmentCode}.${this.craUserId}.${this.fileTypeCode}${paddedSequence}`
   }
 }

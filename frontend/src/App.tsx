@@ -1198,6 +1198,28 @@ function App() {
 
       // Clear selection after successful operation
       setSelected([])
+
+      // Reload contacts to reflect the updated CSA status
+      if (successCount > 0) {
+        const apiFilters = [
+          'All Records',
+          'Pending User review/action',
+          'All children On Hold from CSA',
+          'Children In Pay',
+          'Children Out of Pay',
+          'CRA Refused CSA List',
+          'Children within a batch',
+          'Children over 18 years (never eligible)',
+        ]
+
+        if (apiFilters.includes(preDefinedFilter)) {
+          if (isSearchActive && searchTerm.trim().length >= 3) {
+            await performFullTextSearch(searchTerm.trim(), currentPage)
+          } else {
+            await fetchContacts(currentPage)
+          }
+        }
+      }
     } catch (error) {
       console.error('Add to batch error:', error)
       setSnackbar({

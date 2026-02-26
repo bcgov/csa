@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
-import { enrichLabels, isEligibleAge } from 'src/common/utils'
+import { CSA_EVENT, CSA_STATUS, CSA_STATUS_LABELS } from 'src/common/state-machine/constants'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
+import { enrichLabels, isEligibleAge } from 'src/common/utils'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { ALLOWED_FILTER_SORT_FIELDS, BULK_OPERATION_SKIP_REASONS } from './constants'
 import { ContactDto } from './dto/contact.dto'
@@ -136,12 +136,43 @@ export class ContactsService {
   }
 
   private convertSingleFilterToPrisma(filter: FilterItem): Record<string, unknown> {
-    const { key, op, value } = filter
+    const { key: filterKey, op, value: filterValue } = filter
+    let key = filterKey
+    let value: unknown = filterValue
 
     if (!ALLOWED_FILTER_SORT_FIELDS.includes(key as (typeof ALLOWED_FILTER_SORT_FIELDS)[number])) {
       throw new BadRequestException(
         `Invalid filter field: ${key}. Allowed fields: ${ALLOWED_FILTER_SORT_FIELDS.join(', ')}`,
       )
+    }
+
+    // Convert csaStatusLabel filter to csaStatus by looking up the reverse mapping
+    if (key === 'csaStatusLabel' && typeof value === 'string') {
+      // Create reverse mapping from label to status code
+      const labelToStatus: Record<string, string> = {}
+      for (const [statusCode, label] of Object.entries(CSA_STATUS_LABELS)) {
+        labelToStatus[label.toLowerCase()] = statusCode
+      }
+
+      // Check for exact match first
+      const lowerValue = value.toLowerCase()
+      if (labelToStatus[lowerValue]) {
+        value = labelToStatus[lowerValue]
+      } else {
+        // For partial matching with 'like', find any status codes whose labels contain the search term
+        if (op === 'like') {
+          const matchingStatuses = Object.entries(CSA_STATUS_LABELS)
+            .filter(([, label]) => label.toLowerCase().includes(lowerValue))
+            .map(([statusCode]) => statusCode)
+
+          if (matchingStatuses.length > 0) {
+            // Return OR condition for all matching statuses
+            return { csaStatus: { in: matchingStatuses } }
+          }
+        }
+      }
+      // Use csaStatus as the actual database field
+      key = 'csaStatus'
     }
 
     switch (op) {

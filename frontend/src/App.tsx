@@ -618,17 +618,17 @@ function App() {
       'Children within a batch',
       'Children over 18 years (never eligible)',
     ]
-    if (
-      apiFilters.includes(preDefinedFilter) &&
-      isAuthenticated &&
-      !isSearchActive &&
-      !isColumnFilterActive
-    ) {
-      fetchContacts(currentPage)
+
+    if (!apiFilters.includes(preDefinedFilter) || !isAuthenticated) {
+      return
     }
-    // If column filter is active and page changes, re-apply the column filter
-    if (isColumnFilterActive && activeColumnFilter && isAuthenticated) {
+
+    // If column filter is active, re-apply the column filter on page change
+    if (isColumnFilterActive && activeColumnFilter) {
       performColumnFilterSearch(activeColumnFilter.column, activeColumnFilter.query, currentPage)
+    } else if (!isSearchActive) {
+      // Only fetch regular contacts when no column filter or search is active
+      fetchContacts(currentPage)
     }
   }, [
     preDefinedFilter,
@@ -663,8 +663,8 @@ function App() {
     const searchTimer = setTimeout(() => {
       if (searchTerm.trim().length >= 3) {
         performFullTextSearch(searchTerm.trim(), currentPage)
-      } else if (searchTerm.trim().length === 0) {
-        // If search is cleared, go back to regular filter
+      } else if (searchTerm.trim().length === 0 && !isColumnFilterActive) {
+        // If search is cleared and no column filter is active, go back to regular filter
         setIsSearchActive(false)
         fetchContacts(currentPage)
       }
@@ -676,6 +676,7 @@ function App() {
     currentPage,
     preDefinedFilter,
     isAuthenticated,
+    isColumnFilterActive,
     fetchContacts,
     performFullTextSearch,
   ])

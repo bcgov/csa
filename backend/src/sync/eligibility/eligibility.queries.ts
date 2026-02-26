@@ -1,3 +1,11 @@
+import { CSA_STATUS_LABELS } from 'src/common/state-machine/constants/csa-status.constants'
+
+const ICM_STATUS_CASE = `CASE UPPER(TRIM(cases.X_CSA_PAY_STATUS))\n${Object.entries(
+  CSA_STATUS_LABELS,
+)
+  .map(([code, label]) => `      WHEN '${label.toUpperCase()}' THEN '${code}'`)
+  .join('\n')}\n      ELSE NULL\n    END`
+
 const CHANGED_CONTACTS_CTE = `
     changed_contacts AS (
       -- ICM: cases with recent ingested_at
@@ -170,7 +178,7 @@ export function buildLoadContactProfilesSql(threshold: Date | null): {
         )) AS data
       FROM stg_icm_placements icm_plc
       INNER JOIN eligible_cases ON eligible_cases.ROW_ID = icm_plc.CASE_ROW_ID
-      WHERE icm_plc.X_STATUS IN ('Active', 'Interrupted')
+      WHERE UPPER(TRIM(icm_plc.X_STATUS)) IN ('ACTIVE', 'INTERRUPTED')
       GROUP BY eligible_cases.CONTACT_ROW_ID
     ),
 
@@ -319,7 +327,7 @@ export function buildLoadContactProfilesSql(threshold: Date | null): {
       FROM stg_mis_placements mis_plc
       INNER JOIN eligible_cases
         ON mis_plc.person_id_mis = eligible_cases.PERSON_ID_MIS
-      WHERE mis_plc.status IN ('Active', 'Interrupted', 'Ended')
+      WHERE UPPER(TRIM(mis_plc.status)) IN ('ACTIVE', 'INTERRUPTED', 'ENDED')
       GROUP BY eligible_cases.CONTACT_ROW_ID
     )
 
@@ -353,7 +361,7 @@ export function buildLoadContactProfilesSql(threshold: Date | null): {
     legal_auth.EXPIRY_DT         AS "legalExpiryDate",
     legal_auth.START_DT          AS "effectiveDate",
     master_contacts.id               AS "existingContactId",
-    master_contacts.csa_status       AS "csaStatus",
+    COALESCE(master_contacts.csa_status, ${ICM_STATUS_CASE}) AS "csaStatus",
     cases.PERSON_ID_MIS              AS "personIdMis",
     master_contacts.is_in_eligible   AS "isInEligible",
     cases.X_DECEASED                 AS "deceased",

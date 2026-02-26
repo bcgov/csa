@@ -140,6 +140,15 @@ describe('step3_PlacementCheck', () => {
     expect(ctx.eligiblePlacements![0].type).toBe('Placement')
   })
 
+  it('should handle variant casing and whitespace in type and status', () => {
+    const ctx = makeCtx({
+      placements: [makePlacement({ type: ' placement ', status: ' active ' })],
+    })
+    const result = step3_PlacementCheck.evaluate(ctx)
+    expect(result).toBeNull()
+    expect(ctx.hasPlacement).toBe(true)
+  })
+
   it('should only consider Active/Interrupted placements, ignoring other statuses', () => {
     const ctx = makeCtx({
       placements: [makePlacement({ type: 'Placement', status: 'Ended' })],

@@ -271,7 +271,7 @@ function App() {
       dob: 'dateOfBirth',
       age: 'age',
       din: 'din',
-      csaStatus: 'csaStatus',
+      csaStatus: 'csaStatusLabel',
       statusEffective: 'csaStatusEffectiveDate',
       caseNumber: 'caseNumber',
       caseStatus: 'caseStatus',
@@ -529,8 +529,23 @@ function App() {
         }
 
         // Build filter for column-specific search
-        // Use like operator for text search (Prisma 'contains' doesn't need % wildcards)
-        const columnFilter = [{ key: backendField, op: 'like', value: query }]
+        // Use 'eq' for numeric fields, 'like' for text fields
+        const numericColumns = ['age']
+        const isNumericColumn = numericColumns.includes(column)
+        const op = isNumericColumn ? 'eq' : 'like'
+
+        // For numeric columns, parse as integer and validate
+        let value: string | number = query
+        if (isNumericColumn) {
+          const parsedValue = parseInt(query, 10)
+          if (isNaN(parsedValue)) {
+            setLoadingContacts(false)
+            return // Don't make API call for invalid numeric input
+          }
+          value = parsedValue
+        }
+
+        const columnFilter = [{ key: backendField, op, value }]
 
         // Combine with existing pre-defined filter if needed
         let combinedFilter = columnFilter
@@ -643,7 +658,7 @@ function App() {
     performFullTextSearch,
   ])
 
-  // Column filter search effect - triggers when filterSearchTerm has 3+ characters
+  // Column filter search effect - triggers when filterSearchTerm has enough characters
   useEffect(() => {
     const apiFilters = [
       'All Records',
@@ -661,9 +676,13 @@ function App() {
       return
     }
 
+    // Numeric columns only need 1 character, text columns need 3
+    const numericColumns = ['age']
+    const minChars = numericColumns.includes(filterAnchor.column) ? 1 : 3
+
     // Debounce column search - wait 500ms after user stops typing
     const columnSearchTimer = setTimeout(() => {
-      if (filterSearchTerm.trim().length >= 3) {
+      if (filterSearchTerm.trim().length >= minChars) {
         performColumnFilterSearch(filterAnchor.column, filterSearchTerm.trim(), currentPage)
       } else if (filterSearchTerm.trim().length === 0 && isColumnFilterActive) {
         // If column search is cleared, go back to regular filter
@@ -1406,10 +1425,10 @@ function App() {
         case 'batchDate':
           return batch.batchDate
             ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: '2-digit',
-              })
+              year: 'numeric',
+              month: 'short',
+              day: '2-digit',
+            })
             : ''
         case 'status':
           return batch.status
@@ -1669,10 +1688,10 @@ function App() {
       batchId: `1-${batch.id}`, // Format as "1-{id}"
       batchDate: batch.batchDate
         ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: '2-digit',
-          })
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+        })
         : '',
       status: batch.status,
       recordCount: batch.recordCount,
@@ -2573,30 +2592,30 @@ function App() {
                   'Children within a batch',
                   'Children over 18 years (never eligible)',
                 ].includes(preDefinedFilter) && (
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      mt: 2,
-                      px: 2,
-                    }}
-                  >
-                    <Typography variant="body2" color="text.secondary">
-                      {loadingContacts
-                        ? 'Loading...'
-                        : `Showing ${contacts.length} of ${totalRecords} records`}
-                    </Typography>
-                    <Pagination
-                      count={totalPages}
-                      page={currentPage}
-                      onChange={handlePageChange}
-                      color="primary"
-                      showFirstButton
-                      showLastButton
-                    />
-                  </Box>
-                )}
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mt: 2,
+                        px: 2,
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        {loadingContacts
+                          ? 'Loading...'
+                          : `Showing ${contacts.length} of ${totalRecords} records`}
+                      </Typography>
+                      <Pagination
+                        count={totalPages}
+                        page={currentPage}
+                        onChange={handlePageChange}
+                        color="primary"
+                        showFirstButton
+                        showLastButton
+                      />
+                    </Box>
+                  )}
 
                 {/* Error message */}
                 {contactsError && preDefinedFilter === 'All Records' && (

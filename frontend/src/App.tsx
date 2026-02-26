@@ -1582,6 +1582,7 @@ function App() {
         : '',
       mcfdContract: contact.mcfdContract || '',
       product: contact.product || '',
+      isOver18: contact.isOver18 || false,
       cgwrks3: '',
       lastUpdated: contact.lastUpdatedAt ? new Date(contact.lastUpdatedAt).toLocaleString() : '',
       lastUpdatedBy: contact.lastUpdatedBy || '',
@@ -1661,11 +1662,13 @@ function App() {
   const canUpdateOver18 = useMemo(() => {
     if (selected.length === 0) return false
 
-    // Only enable if all selected records have eligible_tbd or not_eligible_ip_tbd status
+    // Only enable if all selected records have isOver18 flag set to true
+    // AND have eligible_tbd or not_eligible_ip_tbd status
     return selected.every((id) => {
       const record = filteredData.find((row) => row.id === id)
       return (
         record &&
+        record.isOver18 === true &&
         (record.csaStatusRaw === 'eligible_tbd' || record.csaStatusRaw === 'not_eligible_ip_tbd')
       )
     })

@@ -23,7 +23,7 @@ export class ContactsService {
     private prisma: PrismaService,
     private stateMachine: StateMachineService,
     private icmSyncBackService: IcmSyncBackService,
-  ) { }
+  ) {}
 
   async findAll(
     page: number = 1,
@@ -136,7 +136,9 @@ export class ContactsService {
   }
 
   private convertSingleFilterToPrisma(filter: FilterItem): Record<string, unknown> {
-    let { key, op, value } = filter
+    const { key: filterKey, op, value: filterValue } = filter
+    let key = filterKey
+    let value: unknown = filterValue
 
     if (!ALLOWED_FILTER_SORT_FIELDS.includes(key as (typeof ALLOWED_FILTER_SORT_FIELDS)[number])) {
       throw new BadRequestException(

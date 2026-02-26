@@ -142,6 +142,10 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterSearchTerm, setFilterSearchTerm] = useState('')
   const [isColumnFilterActive, setIsColumnFilterActive] = useState(false)
+  const [activeColumnFilter, setActiveColumnFilter] = useState<{
+    column: string
+    query: string
+  } | null>(null)
   const [selectedChild, setSelectedChild] = useState<number | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<number>(1) // Default to first batch
 
@@ -271,7 +275,7 @@ function App() {
       dob: 'dateOfBirth',
       age: 'age',
       din: 'din',
-      csaStatus: 'csaStatus',
+      csaStatus: 'csaStatusLabel',
       statusEffective: 'csaStatusEffectiveDate',
       caseNumber: 'caseNumber',
       caseStatus: 'caseStatus',
@@ -529,8 +533,23 @@ function App() {
         }
 
         // Build filter for column-specific search
-        // Use like operator for text search (Prisma 'contains' doesn't need % wildcards)
-        const columnFilter = [{ key: backendField, op: 'like', value: query }]
+        // Use 'eq' for numeric fields, 'like' for text fields
+        const numericColumns = ['age']
+        const isNumericColumn = numericColumns.includes(column)
+        const op = isNumericColumn ? 'eq' : 'like'
+
+        // For numeric columns, parse as integer and validate
+        let value: string | number = query
+        if (isNumericColumn) {
+          const parsedValue = parseInt(query, 10)
+          if (isNaN(parsedValue)) {
+            setLoadingContacts(false)
+            return // Don't make API call for invalid numeric input
+          }
+          value = parsedValue
+        }
+
+        const columnFilter = [{ key: backendField, op, value }]
 
         // Combine with existing pre-defined filter if needed
         let combinedFilter = columnFilter
@@ -599,10 +618,28 @@ function App() {
       'Children within a batch',
       'Children over 18 years (never eligible)',
     ]
-    if (apiFilters.includes(preDefinedFilter) && isAuthenticated && !isSearchActive) {
+    if (
+      apiFilters.includes(preDefinedFilter) &&
+      isAuthenticated &&
+      !isSearchActive &&
+      !isColumnFilterActive
+    ) {
       fetchContacts(currentPage)
     }
-  }, [preDefinedFilter, currentPage, isAuthenticated, isSearchActive, fetchContacts])
+    // If column filter is active and page changes, re-apply the column filter
+    if (isColumnFilterActive && activeColumnFilter && isAuthenticated) {
+      performColumnFilterSearch(activeColumnFilter.column, activeColumnFilter.query, currentPage)
+    }
+  }, [
+    preDefinedFilter,
+    currentPage,
+    isAuthenticated,
+    isSearchActive,
+    isColumnFilterActive,
+    activeColumnFilter,
+    fetchContacts,
+    performColumnFilterSearch,
+  ])
 
   // Full-text search effect - triggers when searchTerm has 3+ characters
   useEffect(() => {
@@ -643,7 +680,7 @@ function App() {
     performFullTextSearch,
   ])
 
-  // Column filter search effect - triggers when filterSearchTerm has 3+ characters
+  // Column filter search effect - triggers when filterSearchTerm has enough characters
   useEffect(() => {
     const apiFilters = [
       'All Records',
@@ -661,22 +698,29 @@ function App() {
       return
     }
 
+    // Numeric columns only need 1 character, text columns need 3
+    const numericColumns = ['age']
+    const minChars = numericColumns.includes(filterAnchor.column) ? 1 : 3
+
     // Debounce column search - wait 500ms after user stops typing
     const columnSearchTimer = setTimeout(() => {
-      if (filterSearchTerm.trim().length >= 3) {
+      if (filterSearchTerm.trim().length >= minChars) {
+        // Store the active column filter for pagination
+        setActiveColumnFilter({ column: filterAnchor.column, query: filterSearchTerm.trim() })
         performColumnFilterSearch(filterAnchor.column, filterSearchTerm.trim(), currentPage)
       } else if (filterSearchTerm.trim().length === 0 && isColumnFilterActive) {
         // If column search is cleared, go back to regular filter
         setIsColumnFilterActive(false)
+        setActiveColumnFilter(null)
         fetchContacts(currentPage)
       }
     }, 500)
 
     return () => clearTimeout(columnSearchTimer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     filterSearchTerm,
     filterAnchor.column,
-    currentPage,
     preDefinedFilter,
     isAuthenticated,
     isColumnFilterActive,
@@ -737,6 +781,10 @@ function App() {
     setCurrentPage(1) // Reset to first page when filter changes
     setSearchTerm('') // Clear search when changing filters
     setIsSearchActive(false) // Deactivate search mode
+    // Clear column filter when changing PDQ filter
+    setIsColumnFilterActive(false)
+    setActiveColumnFilter(null)
+    setFilterSearchTerm('')
   }
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -1330,6 +1378,7 @@ function App() {
     setColumnFilters((prev) => ({ ...prev, [column]: [] }))
     // Reset column filter active state and refetch data
     setIsColumnFilterActive(false)
+    setActiveColumnFilter(null)
     setFilterSearchTerm('')
     fetchContacts(currentPage)
   }

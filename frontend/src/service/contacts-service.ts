@@ -68,6 +68,8 @@ export interface Contact {
   orderEffectiveStartDate?: string
   orderEffectiveEndDate?: string
   product?: string
+  // Over 18 flag
+  isOver18?: boolean
 }
 
 export interface PaginatedContactsResponse {

@@ -568,6 +568,7 @@ function App() {
             'cancellation refused cra': 'cancellation_refused_cra',
             'cancellation refused - cra': 'cancellation_refused_cra',
             'in pay': 'in_pay',
+            'not eligible out of pay': 'not_eligible_out_of_pay'
           }
           const lowerQuery = value.toLowerCase()
           // Check if there's a direct mapping

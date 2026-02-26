@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config'
 import * as jwt from 'jsonwebtoken'
 import { firstValueFrom } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
+import { normalize } from 'src/common/utils'
 import { UserInfoDto } from './dto/user-info.dto'
 import { PermissionDto, UserPermissionsDto } from './dto/user-permissions.dto'
 import { ICMEmployeeResponse } from './interfaces/icm-api.interface'
@@ -161,8 +162,12 @@ export class AdminService {
         const responsibilities = Array.isArray(icmData.items.Responsibility)
           ? icmData.items.Responsibility
           : [icmData.items.Responsibility]
-        const rwResponsibility = responsibilities.find((r) => r.Name === 'ICM CSA Application - RW')
-        const roResponsibility = responsibilities.find((r) => r.Name === 'ICM CSA Application - RO')
+        const rwResponsibility = responsibilities.find(
+          (r) => normalize(r.Name) === 'ICM CSA APPLICATION - RW',
+        )
+        const roResponsibility = responsibilities.find(
+          (r) => normalize(r.Name) === 'ICM CSA APPLICATION - RO',
+        )
 
         if (rwResponsibility || roResponsibility) {
           hasCSAResponsibility = true
@@ -439,8 +444,12 @@ export class AdminService {
       const responsibilities = Array.isArray(icmData.items.Responsibility)
         ? icmData.items.Responsibility
         : [icmData.items.Responsibility]
-      const hasRWAccess = responsibilities.some((r) => r.Name === 'ICM CSA Application - RW')
-      const hasROAccess = responsibilities.some((r) => r.Name === 'ICM CSA Application - RO')
+      const hasRWAccess = responsibilities.some(
+        (r) => normalize(r.Name) === 'ICM CSA APPLICATION - RW',
+      )
+      const hasROAccess = responsibilities.some(
+        (r) => normalize(r.Name) === 'ICM CSA APPLICATION - RO',
+      )
 
       if (hasRWAccess) {
         basePermissions.push(
@@ -487,8 +496,12 @@ export class AdminService {
       const icmResponsibilities = Array.isArray(icmData.items.Responsibility)
         ? icmData.items.Responsibility
         : [icmData.items.Responsibility]
-      const hasRWAccess = icmResponsibilities.some((r) => r.Name === 'ICM CSA Application - RW')
-      const hasROAccess = icmResponsibilities.some((r) => r.Name === 'ICM CSA Application - RO')
+      const hasRWAccess = icmResponsibilities.some(
+        (r) => normalize(r.Name) === 'ICM CSA APPLICATION - RW',
+      )
+      const hasROAccess = icmResponsibilities.some(
+        (r) => normalize(r.Name) === 'ICM CSA APPLICATION - RO',
+      )
 
       if (hasRWAccess) {
         responsibilities.push('csa_user', 'admin')

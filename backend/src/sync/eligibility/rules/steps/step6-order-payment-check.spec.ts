@@ -127,6 +127,14 @@ describe('step6_OrderPaymentCheck', () => {
     expect(result!.step).toBe(7)
   })
 
+  it('should handle variant casing and whitespace in order type and status', () => {
+    const ctx = makeCtx({
+      orders: [makeOrder({ orderType: ' monthly family care rate ', orderStatus: ' closed ' })],
+    })
+    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    expect(result!.step).toBe(7)
+  })
+
   it('should accept Processed status (MIS)', () => {
     const ctx = makeCtx({
       orders: [makeOrder({ orderStatus: 'Processed', source: 'MIS' })],

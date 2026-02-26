@@ -87,7 +87,7 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
   { sourceField: 'X_CASELOAD', sourceLabel: 'Caseload', masterField: 'case_load' },
 
   { sourceField: 'NAME', sourceLabel: 'Office Name', masterField: 'service_office' },
-  { sourceField: 'LOGIN', sourceLabel: 'Sales Rep', masterField: 'assigned_to' },
+  { sourceField: 'LOGIN', sourceLabel: 'Assigned To', masterField: 'assigned_to' },
 
   {
     sourceField: 'SUBJECT_LAST_NAME',
@@ -107,7 +107,11 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
     masterField: 'adm_first_name',
   },
   { sourceField: 'X_ADM_LAST_NAME', sourceLabel: 'Admn Last Name', masterField: 'adm_last_name' },
-  { sourceField: 'X_DECEASED', sourceLabel: 'Deceased', masterField: 'is_deceased' },
+  {
+    sourceField: 'X_DECEASED',
+    sourceLabel: 'Key Player Deceased Flag',
+    masterField: 'is_deceased',
+  },
   {
     sourceField: 'PERSON_ID_MIS',
     sourceLabel: 'Key Player Integration Id',

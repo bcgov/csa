@@ -26,11 +26,17 @@ export class MockIcmDataSource extends IcmDataSource {
       return items
     }
 
+    const labels = Array.isArray(config.cursorLabel) ? config.cursorLabel : [config.cursorLabel]
+
     const filtered = items.filter((record) => {
-      const dateStr = record[config.cursorLabel]
-      if (typeof dateStr !== 'string') return true
-      const parsed = this.parseIcmDate(dateStr)
-      return !parsed || parsed > lastUpdated
+      const cursorDates = labels
+        .map((label) => record[label])
+        .filter((v): v is string => typeof v === 'string')
+        .map((dateStr) => this.parseIcmDate(dateStr))
+        .filter((d): d is Date => d !== null)
+
+      if (cursorDates.length === 0) return true
+      return cursorDates.some((d) => d > lastUpdated)
     })
 
     this.logger.log(

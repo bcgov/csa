@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { normalize } from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { CraDetail, CraHeader, CraTrailer } from './outbound.interface'
 
@@ -109,7 +110,10 @@ export class OutboundDataService {
   }
 
   private mapGender(gender: string | null): string {
-    if (gender === 'M' || gender === 'F') return gender
+    const g = normalize(gender)
+    if (g === 'M' || g === 'F') return g
+    if (g?.startsWith('MAN')) return 'M'
+    if (g?.startsWith('WOMAN')) return 'F'
     return 'X'
   }
 

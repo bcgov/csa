@@ -1,8 +1,9 @@
+import { normalize } from 'src/common/utils'
 import { EligibilityResult } from '../../eligibility.types'
 import { EligibilityContext, EligibilityRule } from '../rule.interface'
 import { step8_UpdateEligibleTbd } from './step8-update-eligible-tbd'
 
-const ACTIVE_STATUSES = ['Active', 'Interrupted']
+const ACTIVE_STATUSES = ['ACTIVE', 'INTERRUPTED']
 
 /**
  * STEP 3: Check Placement / Non-Placement Location
@@ -19,10 +20,12 @@ export const step3_PlacementCheck: EligibilityRule = {
   evaluate(ctx: EligibilityContext): EligibilityResult | null {
     const { placements } = ctx.contact
 
-    const activePlacements = placements.filter((p) => ACTIVE_STATUSES.includes(p.status))
+    const activePlacements = placements.filter((p) => ACTIVE_STATUSES.includes(normalize(p.status)))
 
-    const placementRecords = activePlacements.filter((p) => p.type === 'Placement')
-    const nonPlacementRecords = activePlacements.filter((p) => p.type === 'Non-Placement Location')
+    const placementRecords = activePlacements.filter((p) => normalize(p.type) === 'PLACEMENT')
+    const nonPlacementRecords = activePlacements.filter(
+      (p) => normalize(p.type) === 'NON-PLACEMENT LOCATION',
+    )
 
     const hasPlacement = placementRecords.length > 0
     const hasNonPlacement = nonPlacementRecords.length > 0

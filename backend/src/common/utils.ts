@@ -34,7 +34,18 @@ export function enrichLabels<T extends Record<string, any>>(record: T): T {
     labels.csaStatusLabel = ''
   }
 
-  return { ...record, ...labels }
+  const flags: Record<string, boolean> = {}
+
+  if ('dateOfBirth' in record && record.dateOfBirth) {
+    flags.isOver18 = !isEligibleAge(record.dateOfBirth)
+  }
+
+  return { ...record, ...labels, ...flags }
+}
+
+// String normalization for comparison
+export function normalize(value: string | null | undefined): string | undefined {
+  return value?.trim().toUpperCase()
 }
 
 // Eligibility helpers

@@ -67,6 +67,18 @@ describe('step2_LegalStatusCheck', () => {
     expect(result!.step).toBe(8)
   })
 
+  it('should handle variant casing and whitespace in legal auth code', () => {
+    const ctx = makeCtx({ misLegalAuthCode: ' opc ' })
+    const result = step2_LegalStatusCheck.evaluate(ctx, REF_DATE)
+    expect(result!.step).toBe(8)
+  })
+
+  it('should handle variant casing and whitespace in enrollForCsa', () => {
+    const ctx = makeCtx({ enrollForCsa: ' yes ', legalExpiryDate: null })
+    const result = step2_LegalStatusCheck.evaluate(ctx, REF_DATE)
+    expect(result).toBeNull()
+  })
+
   describe('when legal authority not expired (expiry >= today or null)', () => {
     it('should return null (continue to step 3) when enrollForCsa is Yes', () => {
       const ctx = makeCtx({ enrollForCsa: 'Yes', legalExpiryDate: null })

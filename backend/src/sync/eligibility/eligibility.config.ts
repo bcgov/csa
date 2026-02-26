@@ -23,15 +23,15 @@ export const ELIGIBILITY_CONFIG = {
 
   // Step 6: Order/Payment criteria
   ELIGIBLE_ORDER_TYPES: [
-    'Monthly Family Care Rate',
-    'ADJ-Monthly Family Care Rate',
-    'Variable',
-    'ADJ-Variable',
-    'Maintenance Payment',
-    'Fixed Rate',
-    'Variable Rate',
+    'MONTHLY FAMILY CARE RATE',
+    'ADJ-MONTHLY FAMILY CARE RATE',
+    'VARIABLE',
+    'ADJ-VARIABLE',
+    'MAINTENANCE PAYMENT',
+    'FIXED RATE',
+    'VARIABLE RATE',
   ] as readonly string[],
-  ELIGIBLE_ORDER_STATUSES: ['Closed', 'Processed'] as readonly string[],
+  ELIGIBLE_ORDER_STATUSES: ['CLOSED', 'PROCESSED'] as readonly string[],
   MIN_ORDER_AMOUNT: 1549.2,
 
   // Step 9: Default values when cancellation fields are blank

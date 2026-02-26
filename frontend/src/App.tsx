@@ -1281,6 +1281,43 @@ function App() {
       // Refresh batch history for the selected contact
       await handleContactClick(selectedChild)
 
+      // Refresh the eligibility list to reflect updated CSA status
+      const apiFilters = [
+        'All Records',
+        'Pending User review/action',
+        'All children On Hold from CSA',
+        'Children In Pay',
+        'Children Out of Pay',
+        'CRA Refused CSA List',
+        'Children within a batch',
+        'Children over 18 years (never eligible)',
+      ]
+
+      if (apiFilters.includes(preDefinedFilter)) {
+        // Reload based on active filter/search
+        if (isColumnFilterActive && activeColumnFilter) {
+          await performColumnFilterSearch(
+            activeColumnFilter.column,
+            activeColumnFilter.query,
+            currentPage,
+          )
+        } else if (isSearchActive && searchTerm.trim().length >= 3) {
+          await performFullTextSearch(searchTerm.trim(), currentPage)
+        } else {
+          await fetchContacts(currentPage)
+        }
+      }
+
+      // Refresh Batch Requests table
+      const updatedBatches = await getAllBatches()
+      setBatches(updatedBatches)
+
+      // Refresh Batch Details table for the currently selected batch
+      if (selectedBatch) {
+        const updatedDetails = await getBatchContacts(selectedBatch)
+        setBatchDetails(updatedDetails)
+      }
+
       // Clear selection
       setSelectedBatchHistoryId(null)
     } catch (error: any) {
@@ -1456,10 +1493,10 @@ function App() {
         case 'batchDate':
           return batch.batchDate
             ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: '2-digit',
-              })
+              year: 'numeric',
+              month: 'short',
+              day: '2-digit',
+            })
             : ''
         case 'status':
           return batch.status
@@ -1722,10 +1759,10 @@ function App() {
       batchId: `1-${batch.id}`, // Format as "1-{id}"
       batchDate: batch.batchDate
         ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: '2-digit',
-          })
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+        })
         : '',
       status: batch.status,
       recordCount: batch.recordCount,
@@ -2626,30 +2663,30 @@ function App() {
                   'Children within a batch',
                   'Children over 18 years (never eligible)',
                 ].includes(preDefinedFilter) && (
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      mt: 2,
-                      px: 2,
-                    }}
-                  >
-                    <Typography variant="body2" color="text.secondary">
-                      {loadingContacts
-                        ? 'Loading...'
-                        : `Showing ${contacts.length} of ${totalRecords} records`}
-                    </Typography>
-                    <Pagination
-                      count={totalPages}
-                      page={currentPage}
-                      onChange={handlePageChange}
-                      color="primary"
-                      showFirstButton
-                      showLastButton
-                    />
-                  </Box>
-                )}
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mt: 2,
+                        px: 2,
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        {loadingContacts
+                          ? 'Loading...'
+                          : `Showing ${contacts.length} of ${totalRecords} records`}
+                      </Typography>
+                      <Pagination
+                        count={totalPages}
+                        page={currentPage}
+                        onChange={handlePageChange}
+                        color="primary"
+                        showFirstButton
+                        showLastButton
+                      />
+                    </Box>
+                  )}
 
                 {/* Error message */}
                 {contactsError && preDefinedFilter === 'All Records' && (

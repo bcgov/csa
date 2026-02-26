@@ -663,8 +663,8 @@ function App() {
     const searchTimer = setTimeout(() => {
       if (searchTerm.trim().length >= 3) {
         performFullTextSearch(searchTerm.trim(), currentPage)
-      } else if (searchTerm.trim().length === 0) {
-        // If search is cleared, go back to regular filter
+      } else if (searchTerm.trim().length === 0 && !isColumnFilterActive) {
+        // If search is cleared and no column filter is active, go back to regular filter
         setIsSearchActive(false)
         fetchContacts(currentPage)
       }
@@ -676,6 +676,7 @@ function App() {
     currentPage,
     preDefinedFilter,
     isAuthenticated,
+    isColumnFilterActive,
     fetchContacts,
     performFullTextSearch,
   ])

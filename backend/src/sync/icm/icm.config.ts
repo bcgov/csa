@@ -33,7 +33,7 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     endpoint: '/Cases/Case',
     stagingTable: 'stg_icm_cases',
     primaryKey: 'ROW_ID',
-    cursorLabel: ['Key Player Last Updated Date', 'Updated Date'],
+    cursorLabel: ['Key Player Last Updated Date', 'Last Updated Date'],
     searchSpec: () =>
       `[Type] = "Child Services" AND [Key Player Birth Date] >= "${formatDate(getAgeCutoffDate())}"`,
     fieldMap: STG_ICM_CASES_MAP,

@@ -155,7 +155,7 @@ describe('IcmApiDataSource', () => {
     it('should build OR cursor filter when cursorLabel is an array', async () => {
       const multiCursorConfig: IcmApiConfig = {
         ...mockConfig,
-        cursorLabel: ['Key Player Last Updated Date', 'Updated Date'],
+        cursorLabel: ['Key Player Last Updated Date', 'Last Updated Date'],
       }
 
       httpService.get.mockReturnValue(of({ status: 200, headers: {}, data: { items: [] } }))
@@ -166,14 +166,14 @@ describe('IcmApiDataSource', () => {
       const callUrl = httpService.get.mock.calls[0][0]
       const decoded = decodeURIComponent(callUrl).replace(/\+/g, ' ')
       expect(decoded).toContain(
-        '([Key Player Last Updated Date] > "01/15/2026" OR [Updated Date] > "01/15/2026")',
+        '([Key Player Last Updated Date] > "01/15/2026" OR [Last Updated Date] > "01/15/2026")',
       )
     })
 
     it('should combine static searchSpec with multi-cursor using AND', async () => {
       const multiCursorConfig: IcmApiConfig = {
         ...mockConfig,
-        cursorLabel: ['Key Player Last Updated Date', 'Updated Date'],
+        cursorLabel: ['Key Player Last Updated Date', 'Last Updated Date'],
         searchSpec: () => '[Type] = "Child Services"',
       }
 
@@ -185,7 +185,7 @@ describe('IcmApiDataSource', () => {
       const callUrl = httpService.get.mock.calls[0][0]
       const decoded = decodeURIComponent(callUrl).replace(/\+/g, ' ')
       expect(decoded).toContain(
-        '([Type] = "Child Services") AND ([Key Player Last Updated Date] > "01/10/2026" OR [Updated Date] > "01/10/2026")',
+        '([Type] = "Child Services") AND ([Key Player Last Updated Date] > "01/10/2026" OR [Last Updated Date] > "01/10/2026")',
       )
     })
 

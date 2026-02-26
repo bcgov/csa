@@ -6,6 +6,7 @@ import { BATCH_STATUS } from 'src/common/state-machine/constants/batch-status.co
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobsService } from 'src/jobs/jobs.service'
+import { normalize } from 'src/common/utils'
 import { ELIGIBILITY_CONFIG, PROTECTED_STATUSES } from './eligibility.config'
 import { buildLoadContactProfilesSql } from './eligibility.queries'
 import {
@@ -395,7 +396,7 @@ export class EligibilityService {
       // Parse MIS placements from pre-aggregated JSON
       const misPlacements: PlacementRecord[] = (raw.misPlacements ?? []).map(
         (placement: any): PlacementRecord => ({
-          type: placement.type ?? 'Placement',
+          type: placement.type ?? 'PLACEMENT', // TODO: list MIS placement types
           status: placement.status,
           startDate: placement.startDate ? new Date(placement.startDate) : null,
           endDate: placement.endDate ? new Date(placement.endDate) : null,
@@ -531,7 +532,8 @@ export class EligibilityService {
     // Primary Placement: first active Placement-type record, preferring ICM source
     const activePlacements = profile.placements.filter(
       (placement) =>
-        placement.type === 'Placement' && ['Active', 'Interrupted'].includes(placement.status),
+        normalize(placement.type) === 'PLACEMENT' &&
+        ['ACTIVE', 'INTERRUPTED'].includes(normalize(placement.status)),
     )
     const icmPlacements = activePlacements.filter((placement) => placement.source === 'ICM')
     const primaryPlacement = icmPlacements[0] ?? activePlacements[0] ?? null

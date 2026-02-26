@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
-import { enrichLabels } from 'src/common/utils'
+import { enrichLabels, isEligibleAge } from 'src/common/utils'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
@@ -491,14 +491,19 @@ export class ContactsService {
     }
 
     for (const id of contactIds) {
-      // Fetch the contact to determine current CSA status
       const contact = await this.prisma.contact.findUnique({
         where: { id },
-        select: { csaStatus: true },
+        select: { csaStatus: true, dateOfBirth: true },
       })
 
       if (!contact) {
         result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.NOT_FOUND })
+        continue
+      }
+
+      // Skip if contact is still eligible age (under 18 through end of birth month)
+      if (!contact.dateOfBirth || isEligibleAge(contact.dateOfBirth)) {
+        result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION })
         continue
       }
 

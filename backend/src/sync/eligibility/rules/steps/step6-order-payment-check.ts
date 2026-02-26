@@ -1,3 +1,4 @@
+import { normalize } from 'src/common/utils'
 import { ELIGIBILITY_CONFIG } from '../../eligibility.config'
 import { EligibilityResult } from '../../eligibility.types'
 import { EligibilityContext, EligibilityRule } from '../rule.interface'
@@ -54,9 +55,11 @@ export const step6_OrderPaymentCheck: EligibilityRule & {
     )
 
     // Check type and status on the selected order
-    const typeMatch = ELIGIBILITY_CONFIG.ELIGIBLE_ORDER_TYPES.includes(selectedOrder.orderType)
+    const typeMatch = ELIGIBILITY_CONFIG.ELIGIBLE_ORDER_TYPES.includes(
+      normalize(selectedOrder.orderType),
+    )
     const statusMatch = ELIGIBILITY_CONFIG.ELIGIBLE_ORDER_STATUSES.includes(
-      selectedOrder.orderStatus,
+      normalize(selectedOrder.orderStatus),
     )
     const amountMatch = selectedOrder.amount >= ELIGIBILITY_CONFIG.MIN_ORDER_AMOUNT
 

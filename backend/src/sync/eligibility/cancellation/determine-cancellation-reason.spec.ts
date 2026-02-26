@@ -63,6 +63,24 @@ describe('determineCancellationReason', () => {
       })
     })
 
+    it('should handle variant casing and whitespace in placement fields', () => {
+      const result = determineCancellationReason(
+        makeInput({
+          icmPlacements: [
+            {
+              type: ' non-placement location ',
+              serviceType: ' absent/unknown location ',
+              status: ' active ',
+            },
+          ],
+        }),
+      )
+      expect(result).toEqual({
+        isInEligible: true,
+        cancelReasonCode: CANCEL_REASON.CHILD_MISSING_AWOL,
+      })
+    })
+
     it('should NOT return code 22 when ICM placement sub-type matches but status is not Active', () => {
       const result = determineCancellationReason(
         makeInput({

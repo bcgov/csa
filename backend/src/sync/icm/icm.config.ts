@@ -21,7 +21,7 @@ export interface IcmApiConfig {
   endpoint: string
   stagingTable: string
   primaryKey: string
-  cursorLabel: string
+  cursorLabel: string | string[]
   searchSpec?: () => string
   fieldMap: FieldMapEntry[]
 }
@@ -33,7 +33,7 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     endpoint: '/Cases/Case',
     stagingTable: 'stg_icm_cases',
     primaryKey: 'ROW_ID',
-    cursorLabel: 'Key Player Last Updated Date',
+    cursorLabel: ['Key Player Last Updated Date', 'Updated Date'],
     searchSpec: () =>
       `[Type] = "Child Services" AND [Key Player Birth Date] >= "${formatDate(getAgeCutoffDate())}"`,
     fieldMap: STG_ICM_CASES_MAP,
@@ -95,7 +95,7 @@ export const ICM_SYNC_CONFIGS: IcmApiConfig[] = [
     name: 'contacts',
     endpoint: '/ICMContact/ICMContact',
     stagingTable: 'stg_icm_contacts',
-    primaryKey: 'id',
+    primaryKey: 'Id',
     cursorLabel: 'Updated',
     fieldMap: STG_ICM_CONTACTS_MAP,
   },

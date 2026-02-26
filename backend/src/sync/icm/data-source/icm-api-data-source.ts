@@ -139,7 +139,13 @@ export class IcmApiDataSource extends IcmDataSource {
     }
 
     if (lastUpdated) {
-      specParts.push(`[${config.cursorLabel}] > "${formatDate(lastUpdated)}"`)
+      const dateStr = formatDate(lastUpdated)
+      const labels = Array.isArray(config.cursorLabel) ? config.cursorLabel : [config.cursorLabel]
+      const cursorFilter =
+        labels.length === 1
+          ? `[${labels[0]}] > "${dateStr}"`
+          : `(${labels.map((l) => `[${l}] > "${dateStr}"`).join(' OR ')})`
+      specParts.push(cursorFilter)
     }
 
     if (specParts.length > 0) {

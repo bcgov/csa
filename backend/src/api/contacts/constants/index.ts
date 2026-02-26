@@ -7,6 +7,7 @@ export const ALLOWED_FILTER_SORT_FIELDS = [
   'age',
   'din',
   'csaStatus',
+  'csaStatusLabel',
   'csaStatusEffectiveDate',
   'legacyFileNumber',
   'lastUpdatedAt',

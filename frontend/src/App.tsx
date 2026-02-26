@@ -142,6 +142,7 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterSearchTerm, setFilterSearchTerm] = useState('')
   const [isColumnFilterActive, setIsColumnFilterActive] = useState(false)
+  const [activeColumnFilter, setActiveColumnFilter] = useState<{ column: string; query: string } | null>(null)
   const [selectedChild, setSelectedChild] = useState<number | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<number>(1) // Default to first batch
 
@@ -614,10 +615,14 @@ function App() {
       'Children within a batch',
       'Children over 18 years (never eligible)',
     ]
-    if (apiFilters.includes(preDefinedFilter) && isAuthenticated && !isSearchActive) {
+    if (apiFilters.includes(preDefinedFilter) && isAuthenticated && !isSearchActive && !isColumnFilterActive) {
       fetchContacts(currentPage)
     }
-  }, [preDefinedFilter, currentPage, isAuthenticated, isSearchActive, fetchContacts])
+    // If column filter is active and page changes, re-apply the column filter
+    if (isColumnFilterActive && activeColumnFilter && isAuthenticated) {
+      performColumnFilterSearch(activeColumnFilter.column, activeColumnFilter.query, currentPage)
+    }
+  }, [preDefinedFilter, currentPage, isAuthenticated, isSearchActive, isColumnFilterActive, activeColumnFilter, fetchContacts, performColumnFilterSearch])
 
   // Full-text search effect - triggers when searchTerm has 3+ characters
   useEffect(() => {
@@ -683,10 +688,13 @@ function App() {
     // Debounce column search - wait 500ms after user stops typing
     const columnSearchTimer = setTimeout(() => {
       if (filterSearchTerm.trim().length >= minChars) {
+        // Store the active column filter for pagination
+        setActiveColumnFilter({ column: filterAnchor.column, query: filterSearchTerm.trim() })
         performColumnFilterSearch(filterAnchor.column, filterSearchTerm.trim(), currentPage)
       } else if (filterSearchTerm.trim().length === 0 && isColumnFilterActive) {
         // If column search is cleared, go back to regular filter
         setIsColumnFilterActive(false)
+        setActiveColumnFilter(null)
         fetchContacts(currentPage)
       }
     }, 500)
@@ -695,7 +703,6 @@ function App() {
   }, [
     filterSearchTerm,
     filterAnchor.column,
-    currentPage,
     preDefinedFilter,
     isAuthenticated,
     isColumnFilterActive,
@@ -756,6 +763,10 @@ function App() {
     setCurrentPage(1) // Reset to first page when filter changes
     setSearchTerm('') // Clear search when changing filters
     setIsSearchActive(false) // Deactivate search mode
+    // Clear column filter when changing PDQ filter
+    setIsColumnFilterActive(false)
+    setActiveColumnFilter(null)
+    setFilterSearchTerm('')
   }
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -1349,6 +1360,7 @@ function App() {
     setColumnFilters((prev) => ({ ...prev, [column]: [] }))
     // Reset column filter active state and refetch data
     setIsColumnFilterActive(false)
+    setActiveColumnFilter(null)
     setFilterSearchTerm('')
     fetchContacts(currentPage)
   }

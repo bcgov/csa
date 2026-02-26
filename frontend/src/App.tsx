@@ -142,7 +142,10 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterSearchTerm, setFilterSearchTerm] = useState('')
   const [isColumnFilterActive, setIsColumnFilterActive] = useState(false)
-  const [activeColumnFilter, setActiveColumnFilter] = useState<{ column: string; query: string } | null>(null)
+  const [activeColumnFilter, setActiveColumnFilter] = useState<{
+    column: string
+    query: string
+  } | null>(null)
   const [selectedChild, setSelectedChild] = useState<number | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<number>(1) // Default to first batch
 
@@ -615,14 +618,28 @@ function App() {
       'Children within a batch',
       'Children over 18 years (never eligible)',
     ]
-    if (apiFilters.includes(preDefinedFilter) && isAuthenticated && !isSearchActive && !isColumnFilterActive) {
+    if (
+      apiFilters.includes(preDefinedFilter) &&
+      isAuthenticated &&
+      !isSearchActive &&
+      !isColumnFilterActive
+    ) {
       fetchContacts(currentPage)
     }
     // If column filter is active and page changes, re-apply the column filter
     if (isColumnFilterActive && activeColumnFilter && isAuthenticated) {
       performColumnFilterSearch(activeColumnFilter.column, activeColumnFilter.query, currentPage)
     }
-  }, [preDefinedFilter, currentPage, isAuthenticated, isSearchActive, isColumnFilterActive, activeColumnFilter, fetchContacts, performColumnFilterSearch])
+  }, [
+    preDefinedFilter,
+    currentPage,
+    isAuthenticated,
+    isSearchActive,
+    isColumnFilterActive,
+    activeColumnFilter,
+    fetchContacts,
+    performColumnFilterSearch,
+  ])
 
   // Full-text search effect - triggers when searchTerm has 3+ characters
   useEffect(() => {
@@ -700,6 +717,7 @@ function App() {
     }, 500)
 
     return () => clearTimeout(columnSearchTimer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     filterSearchTerm,
     filterAnchor.column,
@@ -1437,10 +1455,10 @@ function App() {
         case 'batchDate':
           return batch.batchDate
             ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: '2-digit',
-            })
+                year: 'numeric',
+                month: 'short',
+                day: '2-digit',
+              })
             : ''
         case 'status':
           return batch.status
@@ -1700,10 +1718,10 @@ function App() {
       batchId: `1-${batch.id}`, // Format as "1-{id}"
       batchDate: batch.batchDate
         ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: '2-digit',
-        })
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit',
+          })
         : '',
       status: batch.status,
       recordCount: batch.recordCount,
@@ -2604,30 +2622,30 @@ function App() {
                   'Children within a batch',
                   'Children over 18 years (never eligible)',
                 ].includes(preDefinedFilter) && (
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        mt: 2,
-                        px: 2,
-                      }}
-                    >
-                      <Typography variant="body2" color="text.secondary">
-                        {loadingContacts
-                          ? 'Loading...'
-                          : `Showing ${contacts.length} of ${totalRecords} records`}
-                      </Typography>
-                      <Pagination
-                        count={totalPages}
-                        page={currentPage}
-                        onChange={handlePageChange}
-                        color="primary"
-                        showFirstButton
-                        showLastButton
-                      />
-                    </Box>
-                  )}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      mt: 2,
+                      px: 2,
+                    }}
+                  >
+                    <Typography variant="body2" color="text.secondary">
+                      {loadingContacts
+                        ? 'Loading...'
+                        : `Showing ${contacts.length} of ${totalRecords} records`}
+                    </Typography>
+                    <Pagination
+                      count={totalPages}
+                      page={currentPage}
+                      onChange={handlePageChange}
+                      color="primary"
+                      showFirstButton
+                      showLastButton
+                    />
+                  </Box>
+                )}
 
                 {/* Error message */}
                 {contactsError && preDefinedFilter === 'All Records' && (

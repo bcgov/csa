@@ -275,7 +275,7 @@ function App() {
       dob: 'dateOfBirth',
       age: 'age',
       din: 'din',
-      csaStatus: 'csaStatusLabel',
+      csaStatus: 'csaStatus',
       statusEffective: 'csaStatusEffectiveDate',
       caseNumber: 'caseNumber',
       caseStatus: 'caseStatus',
@@ -547,6 +547,33 @@ function App() {
             return // Don't make API call for invalid numeric input
           }
           value = parsedValue
+        }
+
+        // For csaStatus column, convert user-friendly labels to database values
+        if (column === 'csaStatus' && typeof value === 'string') {
+          const csaStatusLabelToValue: Record<string, string> = {
+            'over 18': 'over_18',
+            'on hold': 'on_hold',
+            'eligible': 'eligible',
+            'eligible tbd': 'eligible_tbd',
+            'eligible - tbd': 'eligible_tbd',
+            'not eligible in pay': 'not_eligible_in_pay',
+            'not eligible - in pay': 'not_eligible_in_pay',
+            'not eligible ip tbd': 'not_eligible_ip_tbd',
+            'not eligible - ip - tbd': 'not_eligible_ip_tbd',
+            'application refused': 'application_refused_cra',
+            'application refused cra': 'application_refused_cra',
+            'application refused - cra': 'application_refused_cra',
+            'cancellation refused': 'cancellation_refused_cra',
+            'cancellation refused cra': 'cancellation_refused_cra',
+            'cancellation refused - cra': 'cancellation_refused_cra',
+            'in pay': 'in_pay',
+          }
+          const lowerQuery = value.toLowerCase()
+          // Check if there's a direct mapping
+          if (csaStatusLabelToValue[lowerQuery]) {
+            value = csaStatusLabelToValue[lowerQuery]
+          }
         }
 
         const columnFilter = [{ key: backendField, op, value }]
@@ -1455,10 +1482,10 @@ function App() {
         case 'batchDate':
           return batch.batchDate
             ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: '2-digit',
-              })
+              year: 'numeric',
+              month: 'short',
+              day: '2-digit',
+            })
             : ''
         case 'status':
           return batch.status
@@ -1721,10 +1748,10 @@ function App() {
       batchId: `1-${batch.id}`, // Format as "1-{id}"
       batchDate: batch.batchDate
         ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: '2-digit',
-          })
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+        })
         : '',
       status: batch.status,
       recordCount: batch.recordCount,
@@ -2625,30 +2652,30 @@ function App() {
                   'Children within a batch',
                   'Children over 18 years (never eligible)',
                 ].includes(preDefinedFilter) && (
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      mt: 2,
-                      px: 2,
-                    }}
-                  >
-                    <Typography variant="body2" color="text.secondary">
-                      {loadingContacts
-                        ? 'Loading...'
-                        : `Showing ${contacts.length} of ${totalRecords} records`}
-                    </Typography>
-                    <Pagination
-                      count={totalPages}
-                      page={currentPage}
-                      onChange={handlePageChange}
-                      color="primary"
-                      showFirstButton
-                      showLastButton
-                    />
-                  </Box>
-                )}
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mt: 2,
+                        px: 2,
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        {loadingContacts
+                          ? 'Loading...'
+                          : `Showing ${contacts.length} of ${totalRecords} records`}
+                      </Typography>
+                      <Pagination
+                        count={totalPages}
+                        page={currentPage}
+                        onChange={handlePageChange}
+                        color="primary"
+                        showFirstButton
+                        showLastButton
+                      />
+                    </Box>
+                  )}
 
                 {/* Error message */}
                 {contactsError && preDefinedFilter === 'All Records' && (

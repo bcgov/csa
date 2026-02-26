@@ -275,7 +275,7 @@ function App() {
       dob: 'dateOfBirth',
       age: 'age',
       din: 'din',
-      csaStatus: 'csaStatus',
+      csaStatus: 'csaStatusLabel',
       statusEffective: 'csaStatusEffectiveDate',
       caseNumber: 'caseNumber',
       caseStatus: 'caseStatus',
@@ -549,34 +549,6 @@ function App() {
           value = parsedValue
         }
 
-        // For csaStatus column, convert user-friendly labels to database values
-        if (column === 'csaStatus' && typeof value === 'string') {
-          const csaStatusLabelToValue: Record<string, string> = {
-            'over 18': 'over_18',
-            'on hold': 'on_hold',
-            'eligible': 'eligible',
-            'eligible tbd': 'eligible_tbd',
-            'eligible - tbd': 'eligible_tbd',
-            'not eligible in pay': 'not_eligible_in_pay',
-            'not eligible - in pay': 'not_eligible_in_pay',
-            'not eligible ip tbd': 'not_eligible_ip_tbd',
-            'not eligible - ip - tbd': 'not_eligible_ip_tbd',
-            'application refused': 'application_refused_cra',
-            'application refused cra': 'application_refused_cra',
-            'application refused - cra': 'application_refused_cra',
-            'cancellation refused': 'cancellation_refused_cra',
-            'cancellation refused cra': 'cancellation_refused_cra',
-            'cancellation refused - cra': 'cancellation_refused_cra',
-            'in pay': 'in_pay',
-            'not eligible - out of pay': 'not_eligible_out_of_pay'
-          }
-          const lowerQuery = value.toLowerCase()
-          // Check if there's a direct mapping
-          if (csaStatusLabelToValue[lowerQuery]) {
-            value = csaStatusLabelToValue[lowerQuery]
-          }
-        }
-
         const columnFilter = [{ key: backendField, op, value }]
 
         // Combine with existing pre-defined filter if needed
@@ -646,17 +618,17 @@ function App() {
       'Children within a batch',
       'Children over 18 years (never eligible)',
     ]
-    if (
-      apiFilters.includes(preDefinedFilter) &&
-      isAuthenticated &&
-      !isSearchActive &&
-      !isColumnFilterActive
-    ) {
-      fetchContacts(currentPage)
+
+    if (!apiFilters.includes(preDefinedFilter) || !isAuthenticated) {
+      return
     }
-    // If column filter is active and page changes, re-apply the column filter
-    if (isColumnFilterActive && activeColumnFilter && isAuthenticated) {
+
+    // If column filter is active, re-apply the column filter on page change
+    if (isColumnFilterActive && activeColumnFilter) {
       performColumnFilterSearch(activeColumnFilter.column, activeColumnFilter.query, currentPage)
+    } else if (!isSearchActive) {
+      // Only fetch regular contacts when no column filter or search is active
+      fetchContacts(currentPage)
     }
   }, [
     preDefinedFilter,

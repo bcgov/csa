@@ -1,3 +1,4 @@
+import { normalize } from 'src/common/utils'
 import {
   CANCEL_REASON,
   CancelReasonCode,
@@ -40,19 +41,21 @@ export interface CancellationResult {
  */
 export function determineCancellationReason(input: CancellationInput): CancellationResult {
   // Code 14: Child Died
-  if (input.deceased?.toUpperCase() === 'Y') {
+  if (normalize(input.deceased) === 'Y') {
     return { isInEligible: true, cancelReasonCode: CANCEL_REASON.CHILD_DIED }
   }
 
   // Code 22: Child Missing / AWOL
   const hasIcmAwol = input.icmPlacements.some(
     (p) =>
-      p.type === ICM_PLACEMENT.TYPE_NON_PLACEMENT &&
-      p.serviceType === ICM_PLACEMENT.SUBTYPE_AWOL &&
-      p.status === ICM_PLACEMENT.STATUS_ACTIVE,
+      normalize(p.type) === ICM_PLACEMENT.TYPE_NON_PLACEMENT &&
+      normalize(p.serviceType) === ICM_PLACEMENT.SUBTYPE_AWOL &&
+      normalize(p.status) === ICM_PLACEMENT.STATUS_ACTIVE,
   )
   const hasMisAwol = input.misPlacements.some(
-    (p) => p.type === MIS_PLACEMENT.TYPE_AWOL && p.status === MIS_PLACEMENT.STATUS_ACTIVE,
+    (p) =>
+      normalize(p.type) === MIS_PLACEMENT.TYPE_AWOL &&
+      normalize(p.status) === MIS_PLACEMENT.STATUS_ACTIVE,
   )
   if (hasIcmAwol || hasMisAwol) {
     return { isInEligible: true, cancelReasonCode: CANCEL_REASON.CHILD_MISSING_AWOL }
@@ -61,12 +64,14 @@ export function determineCancellationReason(input: CancellationInput): Cancellat
   // Code 29: Adoption
   const hasIcmAdoption = input.icmPlacements.some(
     (p) =>
-      p.type === ICM_PLACEMENT.TYPE_NON_PLACEMENT &&
-      p.serviceType === ICM_PLACEMENT.SUBTYPE_ADOPTION &&
-      p.status === ICM_PLACEMENT.STATUS_ACTIVE,
+      normalize(p.type) === ICM_PLACEMENT.TYPE_NON_PLACEMENT &&
+      normalize(p.serviceType) === ICM_PLACEMENT.SUBTYPE_ADOPTION &&
+      normalize(p.status) === ICM_PLACEMENT.STATUS_ACTIVE,
   )
   const hasMisAdoption = input.misPlacements.some(
-    (p) => p.type === MIS_PLACEMENT.TYPE_ADOPTION && p.status === MIS_PLACEMENT.STATUS_ACTIVE,
+    (p) =>
+      normalize(p.type) === MIS_PLACEMENT.TYPE_ADOPTION &&
+      normalize(p.status) === MIS_PLACEMENT.STATUS_ACTIVE,
   )
   if (hasIcmAdoption || hasMisAdoption) {
     return { isInEligible: true, cancelReasonCode: CANCEL_REASON.ADOPTION }

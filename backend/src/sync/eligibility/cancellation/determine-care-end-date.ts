@@ -1,3 +1,4 @@
+import { normalize } from 'src/common/utils'
 import type { OrderRecord, PlacementRecord } from '../eligibility.types'
 
 /**
@@ -22,8 +23,8 @@ export function determineCareEndDate(
     .filter(
       (o) =>
         o.effectiveEndDate != null &&
-        ((o.source === 'ICM' && o.orderStatus === 'Closed') ||
-          (o.source === 'MIS' && o.orderStatus === 'Processed')),
+        ((o.source === 'ICM' && normalize(o.orderStatus) === 'CLOSED') ||
+          (o.source === 'MIS' && normalize(o.orderStatus) === 'PROCESSED')),
     )
     .map((o) => o.effectiveEndDate!.getTime())
 

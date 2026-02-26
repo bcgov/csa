@@ -1,3 +1,4 @@
+import { normalize } from 'src/common/utils'
 import { ELIGIBILITY_CONFIG } from '../../eligibility.config'
 import { EligibilityResult } from '../../eligibility.types'
 import { EligibilityContext, EligibilityRule } from '../rule.interface'
@@ -21,16 +22,20 @@ export const step2_LegalStatusCheck: EligibilityRule & {
   evaluate(ctx: EligibilityContext, referenceDate: Date = new Date()): EligibilityResult | null {
     const { csaStatus, misLegalAuthCode, legalExpiryDate, enrollForCsa } = ctx.contact
 
-    if (misLegalAuthCode && ELIGIBILITY_CONFIG.STEP8_LEGAL_AUTH_CODES.includes(misLegalAuthCode)) {
+    if (
+      misLegalAuthCode &&
+      ELIGIBILITY_CONFIG.STEP8_LEGAL_AUTH_CODES.includes(normalize(misLegalAuthCode)!)
+    ) {
       return step8_UpdateEligibleTbd(csaStatus)
     }
 
     const isNotExpired = legalExpiryDate === null || legalExpiryDate >= referenceDate
 
     if (isNotExpired) {
-      if (enrollForCsa === 'Yes') return null
-      if (enrollForCsa === 'TBD') return step8_UpdateEligibleTbd(csaStatus)
-      if (enrollForCsa === 'No') return step9_UpdateNotEligible(csaStatus)
+      const normalizedEnroll = normalize(enrollForCsa)
+      if (normalizedEnroll === 'YES') return null
+      if (normalizedEnroll === 'TBD') return step8_UpdateEligibleTbd(csaStatus)
+      if (normalizedEnroll === 'NO') return step9_UpdateNotEligible(csaStatus)
 
       return step8_UpdateEligibleTbd(csaStatus)
     }

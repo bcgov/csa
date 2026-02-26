@@ -15,14 +15,14 @@ export const CANCEL_REASON_LABELS: Record<CancelReasonCode, string> = {
 }
 
 export const ICM_PLACEMENT = {
-  TYPE_NON_PLACEMENT: 'Non-Placement Location',
-  SUBTYPE_AWOL: 'Absent/Unknown Location',
-  SUBTYPE_ADOPTION: 'Adoption Home',
-  STATUS_ACTIVE: 'Active',
+  TYPE_NON_PLACEMENT: 'NON-PLACEMENT LOCATION',
+  SUBTYPE_AWOL: 'ABSENT/UNKNOWN LOCATION',
+  SUBTYPE_ADOPTION: 'ADOPTION HOME',
+  STATUS_ACTIVE: 'ACTIVE',
 } as const
 
 export const MIS_PLACEMENT = {
   TYPE_AWOL: 'AW',
   TYPE_ADOPTION: 'AD',
-  STATUS_ACTIVE: 'Active',
+  STATUS_ACTIVE: 'ACTIVE',
 } as const

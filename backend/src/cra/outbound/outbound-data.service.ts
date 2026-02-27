@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { normalize } from 'src/common/utils'
+import { normalize, formatDatePstCompact } from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { CraDetail, CraHeader, CraTrailer } from './outbound.interface'
 
@@ -45,7 +45,7 @@ export interface BatchDetailWithContact {
 @Injectable()
 export class OutboundDataService {
   buildCraFileData(batchDetails: BatchDetailWithContact[]): CraFileData {
-    const processDate = this.formatDate(new Date())
+    const processDate = formatDatePstCompact(new Date())
     const details = batchDetails.map((bd) => this.mapToDetail(bd))
 
     return {

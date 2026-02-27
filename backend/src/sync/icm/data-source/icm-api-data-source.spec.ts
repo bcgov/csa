@@ -143,7 +143,8 @@ describe('IcmApiDataSource', () => {
     it('should include SearchSpec with cursor when lastUpdated is provided', async () => {
       httpService.get.mockReturnValue(of({ status: 200, headers: {}, data: { items: [] } }))
 
-      const lastUpdated = new Date(2026, 0, 15) // Jan 15, 2026
+      // Jan 15 20:00 UTC = Jan 15 12:00 PST
+      const lastUpdated = new Date('2026-01-15T20:00:00Z')
       await service.fetchAll(mockConfig, lastUpdated)
 
       const callUrl = httpService.get.mock.calls[0][0]
@@ -160,7 +161,7 @@ describe('IcmApiDataSource', () => {
 
       httpService.get.mockReturnValue(of({ status: 200, headers: {}, data: { items: [] } }))
 
-      const lastUpdated = new Date(2026, 0, 15)
+      const lastUpdated = new Date('2026-01-15T20:00:00Z')
       await service.fetchAll(multiCursorConfig, lastUpdated)
 
       const callUrl = httpService.get.mock.calls[0][0]
@@ -179,7 +180,7 @@ describe('IcmApiDataSource', () => {
 
       httpService.get.mockReturnValue(of({ status: 200, headers: {}, data: { items: [] } }))
 
-      const lastUpdated = new Date(2026, 0, 10)
+      const lastUpdated = new Date('2026-01-10T20:00:00Z')
       await service.fetchAll(multiCursorConfig, lastUpdated)
 
       const callUrl = httpService.get.mock.calls[0][0]
@@ -197,7 +198,7 @@ describe('IcmApiDataSource', () => {
 
       httpService.get.mockReturnValue(of({ status: 200, headers: {}, data: { items: [] } }))
 
-      const lastUpdated = new Date(2026, 0, 10)
+      const lastUpdated = new Date('2026-01-10T20:00:00Z')
       await service.fetchAll(configWithSpec, lastUpdated)
 
       const callUrl = httpService.get.mock.calls[0][0]
@@ -219,7 +220,8 @@ describe('IcmApiDataSource', () => {
     it('should use date-only format for cursor (no time)', async () => {
       httpService.get.mockReturnValue(of({ status: 200, headers: {}, data: { items: [] } }))
 
-      const lastUpdated = new Date(2026, 0, 15, 14, 30, 45)
+      // Jan 15 22:30:45 UTC = Jan 15 14:30:45 PST
+      const lastUpdated = new Date('2026-01-15T22:30:45Z')
       await service.fetchAll(mockConfig, lastUpdated)
 
       const callUrl = httpService.get.mock.calls[0][0]

@@ -132,6 +132,66 @@ describe('IcmService', () => {
       expect(result.upserted).toBe(BATCH_SIZE + 1)
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(2)
     })
+
+    it('should convert PST date fields to UTC ISO strings', async () => {
+      const dateFieldMap: FieldMapEntry[] = [
+        { sourceField: 'ROW_ID', sourceLabel: 'Row Id', masterField: 'case_row_id' },
+        {
+          sourceField: 'LAST_UPD',
+          sourceLabel: 'Last Updated Date',
+          masterField: 'last_upd',
+          dbType: 'timestamp',
+        },
+        {
+          sourceField: 'BIRTH_DT',
+          sourceLabel: 'Birth Date',
+          masterField: 'date_of_birth',
+          dbType: 'date',
+        },
+      ]
+      const dateConfig: IcmApiConfig = {
+        ...testConfig,
+        fieldMap: dateFieldMap,
+      }
+
+      mockIcmDataSource.fetchAll.mockResolvedValue([
+        {
+          'Row Id': '1-ABC',
+          'Last Updated Date': '01/13/2026 10:51:03',
+          'Birth Date': '01/01/2012',
+        },
+      ])
+
+      await service.ingestResource(dateConfig)
+
+      const args = mockPrisma.$executeRawUnsafe.mock.calls[0]
+      // args[0] = SQL, args[1] = ROW_ID array, args[2] = LAST_UPD array, args[3] = BIRTH_DT array
+      expect(args[1]).toEqual(['1-ABC'])
+      // 01/13/2026 10:51:03 PST = 2026-01-13T18:51:03.000Z
+      expect(args[2]).toEqual(['2026-01-13T18:51:03.000Z'])
+      // 01/01/2012 midnight PST = 2012-01-01T08:00:00.000Z
+      expect(args[3]).toEqual(['2012-01-01T08:00:00.000Z'])
+    })
+
+    it('should pass null for empty date fields', async () => {
+      const dateFieldMap: FieldMapEntry[] = [
+        { sourceField: 'ROW_ID', sourceLabel: 'Row Id', masterField: 'case_row_id' },
+        {
+          sourceField: 'LAST_UPD',
+          sourceLabel: 'Last Updated Date',
+          masterField: 'last_upd',
+          dbType: 'timestamp',
+        },
+      ]
+      const dateConfig: IcmApiConfig = { ...testConfig, fieldMap: dateFieldMap }
+
+      mockIcmDataSource.fetchAll.mockResolvedValue([{ 'Row Id': '1-ABC', 'Last Updated Date': '' }])
+
+      await service.ingestResource(dateConfig)
+
+      const args = mockPrisma.$executeRawUnsafe.mock.calls[0]
+      expect(args[2]).toEqual([null])
+    })
   })
 
   describe('ingestAll', () => {

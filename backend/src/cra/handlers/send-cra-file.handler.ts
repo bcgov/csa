@@ -30,7 +30,6 @@ export class SendCraFileHandler extends BaseJob {
   private batch: Batch | null = null
   private batchDetails: (ContactBatchDetail & { contact: Contact })[] = []
   private readonly lastSequenceNumber: number
-  private readonly craEnabled: boolean
 
   constructor(
     private readonly prisma: PrismaService,
@@ -44,7 +43,6 @@ export class SendCraFileHandler extends BaseJob {
   ) {
     super()
     this.lastSequenceNumber = this.configService.get<number>('cra.lastSequenceNumber')!
-    this.craEnabled = this.configService.get<boolean>('cra.enabled')!
   }
 
   async onStart(context: JobContext): Promise<void> {
@@ -84,10 +82,6 @@ export class SendCraFileHandler extends BaseJob {
   }
 
   async execute(_context: JobContext): Promise<JobResult> {
-    if (!this.craEnabled) {
-      return { success: true, message: 'CRA sending is disabled (CRA_INTEGRATION_ENABLED=false)' }
-    }
-
     if (!this.batch || this.batchDetails.length === 0) {
       return { success: true, message: 'No batch to process' }
     }

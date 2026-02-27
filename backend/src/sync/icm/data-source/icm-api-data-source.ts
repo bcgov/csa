@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { firstValueFrom } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
-import { formatDate } from 'src/common/utils'
+import { formatDatePst } from 'src/common/utils'
 import { IcmApiConfig, ICM_UPDATE_BATCH_LIMIT } from '../icm.config'
 import { IcmApiRecord, IcmContactUpdatePayload, IcmDataSource } from './icm-data-source'
 
@@ -139,7 +139,7 @@ export class IcmApiDataSource extends IcmDataSource {
     }
 
     if (lastUpdated) {
-      const dateStr = formatDate(lastUpdated)
+      const dateStr = formatDatePst(lastUpdated)
       const labels = Array.isArray(config.cursorLabel) ? config.cursorLabel : [config.cursorLabel]
       const cursorFilter =
         labels.length === 1

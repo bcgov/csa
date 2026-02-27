@@ -1,7 +1,13 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { CSA_EVENT, CSA_STATUS, CSA_STATUS_LABELS } from 'src/common/state-machine/constants'
+import {
+  CRA_FILE_REJECTED_TARGET,
+  CSA_EVENT,
+  CSA_STATUS,
+  CSA_STATUS_LABELS,
+  REMOVE_FROM_BATCH_TARGET,
+} from 'src/common/state-machine/constants'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { enrichLabels, isEligibleAge } from 'src/common/utils'
@@ -237,13 +243,16 @@ export class ContactsService {
     const currentState = contact.csaStatus ?? ''
 
     // For RESUME, pass the stored resumeStatus as the target state
-    // For CRA_FILE_REJECTED, pass the stored preBatchStatus as the target state
+    // For CRA_FILE_REJECTED, map preBatchStatus to correct revert state (refused -> TBD)
+    // For REMOVE_FROM_BATCH, map preBatchStatus to the correct return state
     const targetState =
       event === CSA_EVENT.RESUME
         ? (contact.resumeStatus ?? undefined)
         : event === CSA_EVENT.CRA_FILE_REJECTED
-          ? (contact.preBatchStatus ?? undefined)
-          : undefined
+          ? (CRA_FILE_REJECTED_TARGET[contact.preBatchStatus ?? ''] ?? undefined)
+          : event === CSA_EVENT.REMOVE_FROM_BATCH
+            ? (REMOVE_FROM_BATCH_TARGET[contact.preBatchStatus ?? ''] ?? undefined)
+            : undefined
 
     // Use state machine to validate and get next state
     const result = this.stateMachine.transitionContact(currentState, event, actor, targetState)
@@ -276,18 +285,18 @@ export class ContactsService {
       updateData.holdBy = null
     }
 
-    // save current state to preBatchStatus (only if not already set)
-    if (event === CSA_EVENT.ADD_TO_BATCH && !contact.preBatchStatus) {
+    // save current state to preBatchStatus (fresh each batch cycle)
+    if (event === CSA_EVENT.ADD_TO_BATCH) {
       updateData.preBatchStatus = currentState
     }
 
-    // clear preBatchStatus (batch flow succeeded)
-    if (event === CSA_EVENT.CRA_ACCEPTED) {
-      updateData.preBatchStatus = null
-    }
-
-    // clear preBatchStatus (rolled back)
-    if (event === CSA_EVENT.CRA_FILE_REJECTED) {
+    // clear preBatchStatus on all batch cycle exits
+    if (
+      event === CSA_EVENT.REMOVE_FROM_BATCH ||
+      event === CSA_EVENT.CRA_ACCEPTED ||
+      event === CSA_EVENT.CRA_FILE_REJECTED ||
+      event === CSA_EVENT.CRA_RECORD_REJECTED
+    ) {
       updateData.preBatchStatus = null
     }
 

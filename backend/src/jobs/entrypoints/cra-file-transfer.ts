@@ -2,8 +2,9 @@
 import { Logger } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { CraModule } from 'src/cra/cra.module'
-// import { JobTrigger } from '../enums/job-trigger.enum'
-// import { JobType } from '../enums/job-type.enum'
+import { JobTrigger } from '../enums/job-trigger.enum'
+import { JobType } from '../enums/job-type.enum'
+import { JobRunner } from '../job-runner.service'
 
 // Generates and sends CRA file
 async function bootstrap() {
@@ -18,11 +19,10 @@ async function bootstrap() {
     })
 
     // Get JobRunner from DI container
-    // const jobRunner = app.get(JobRunner)
+    const jobRunner = app.get(JobRunner)
 
-    // TODO: re-enable when CRA file transfer handler is ready
-    // const result = await jobRunner.runJobType(JobType.SEND_CRA_FILE, JobTrigger.CRON)
-    const result = { success: true, message: 'CRA file transfer bypassed (not yet ready)' }
+    // Run SEND_CRA_FILE job
+    const result = await jobRunner.runJobType(JobType.SEND_CRA_FILE, JobTrigger.CRON)
 
     await app.close()
 

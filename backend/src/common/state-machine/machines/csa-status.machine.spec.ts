@@ -136,14 +136,18 @@ describe('csaStatusMachine', () => {
   })
 
   describe('remove from batch', () => {
-    it('should remove from application batch to eligible_tbd', () => {
-      const state = getNextCsaState(CSA_STATUS.IN_BATCH_APPLICATION, CSA_EVENT.REMOVE_FROM_BATCH)
-      expect(state).toBe(CSA_STATUS.ELIGIBLE_TBD)
+    it('should return array of valid targets for REMOVE_FROM_BATCH from in_batch_application', () => {
+      const targets = getNextCsaState(CSA_STATUS.IN_BATCH_APPLICATION, CSA_EVENT.REMOVE_FROM_BATCH)
+      expect(Array.isArray(targets)).toBe(true)
+      expect(targets).toContain(CSA_STATUS.ELIGIBLE_TBD)
+      expect(targets).toContain(CSA_STATUS.APPLICATION_REFUSED_CRA)
     })
 
-    it('should remove from cancellation batch to not_eligible_ip_tbd', () => {
-      const state = getNextCsaState(CSA_STATUS.IN_BATCH_CANCELLATION, CSA_EVENT.REMOVE_FROM_BATCH)
-      expect(state).toBe(CSA_STATUS.NOT_ELIGIBLE_IP_TBD)
+    it('should return array of valid targets for REMOVE_FROM_BATCH from in_batch_cancellation', () => {
+      const targets = getNextCsaState(CSA_STATUS.IN_BATCH_CANCELLATION, CSA_EVENT.REMOVE_FROM_BATCH)
+      expect(Array.isArray(targets)).toBe(true)
+      expect(targets).toContain(CSA_STATUS.NOT_ELIGIBLE_IP_TBD)
+      expect(targets).toContain(CSA_STATUS.CANCELLATION_REFUSED_CRA)
     })
   })
 })

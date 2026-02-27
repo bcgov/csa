@@ -1,8 +1,8 @@
 import {
   daysAgo,
   firstDayOfPreviousMonth,
-  formatDate,
-  formatDateTime,
+  formatDatePst,
+  formatDateTimePst,
   getAgeCutoffDate,
 } from 'src/common/utils'
 import {
@@ -35,7 +35,7 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     primaryKey: 'ROW_ID',
     cursorLabel: ['Key Player Last Updated Date', 'Last Updated Date'],
     searchSpec: () =>
-      `[Type] = "Child Services" AND [Key Player Birth Date] >= "${formatDate(getAgeCutoffDate())}"`,
+      `[Type] = "Child Services" AND [Key Player Birth Date] >= "${formatDatePst(getAgeCutoffDate())}"`,
     fieldMap: STG_ICM_CASES_MAP,
   },
   {
@@ -45,7 +45,7 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     primaryKey: 'ROW_ID',
     cursorLabel: 'Updated',
     searchSpec: () =>
-      `[Status] = "Active" OR [Status] = "Interrupted" OR ([Status] = "Ended" AND [End Date] >= "${formatDate(daysAgo(30))}")`,
+      `[Status] = "Active" OR [Status] = "Interrupted" OR ([Status] = "Ended" AND [End Date] >= "${formatDatePst(daysAgo(30))}")`,
     fieldMap: STG_ICM_PLACEMENTS_MAP,
   },
   {
@@ -63,7 +63,7 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     primaryKey: 'ROW_ID',
     cursorLabel: 'Updated',
     searchSpec: () =>
-      `([Legal Authority Code] = 'OPC-Perm Cust Trans-Cons-54.01' OR [Legal Authority Code] = 'OPO-Perm Custody Trans-54.01' OR [Legal Authority Code] = 'OPT-Perm Custody Trans-54.1') OR ([Expiry Date] IS NULL OR [Expiry Date] >= "${formatDate(new Date())}")`,
+      `([Legal Authority Code] = 'OPC-Perm Cust Trans-Cons-54.01' OR [Legal Authority Code] = 'OPO-Perm Custody Trans-54.01' OR [Legal Authority Code] = 'OPT-Perm Custody Trans-54.1') OR ([Expiry Date] IS NULL OR [Expiry Date] >= "${formatDatePst(new Date())}")`,
     fieldMap: STG_LEGAL_AUTHORITY_MAP,
   },
   {
@@ -83,7 +83,7 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     primaryKey: 'ROW_ID',
     cursorLabel: 'Order Updated',
     searchSpec: () =>
-      `[Product] <> "Recovered Funds" AND [Order Status] = "Closed" AND ([Order Type] = "Variable" OR [Order Type] = "ADJ-Variable" OR [Order Type] = "Monthly Family Care Rate" OR [Order Type] = "Adj-Monthly Family Care Rate" OR [Order Type] = "Maintenance Payment") AND [Order Effective Start Date] >= "${formatDateTime(firstDayOfPreviousMonth())}"`,
+      `[Product] <> "Recovered Funds" AND [Order Status] = "Closed" AND ([Order Type] = "Variable" OR [Order Type] = "ADJ-Variable" OR [Order Type] = "Monthly Family Care Rate" OR [Order Type] = "Adj-Monthly Family Care Rate" OR [Order Type] = "Maintenance Payment") AND [Order Effective Start Date] >= "${formatDateTimePst(firstDayOfPreviousMonth())}"`,
     fieldMap: STG_ORDER_MAP,
   },
 ]

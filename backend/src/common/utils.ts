@@ -1,3 +1,4 @@
+import { DateTime } from 'luxon'
 import { CSA_STATUS_LABELS } from './state-machine/constants'
 
 // Date Helpers
@@ -23,6 +24,50 @@ export function firstDayOfPreviousMonth(referenceDate: Date = new Date()): Date 
   d.setDate(1)
   d.setMonth(d.getMonth() - 1)
   return d
+}
+
+// PST/PDT Date Helpers (using Luxon)
+// ICM and CRA operate in Pacific time (America/Los_Angeles).
+// These functions handle formatting UTC Dates as PST strings and parsing PST strings to UTC Dates.
+
+const PST_ZONE = 'America/Los_Angeles'
+
+// Format a Date as MM/DD/YYYY in PST/PDT.
+// Used for ICM search spec cursor dates and date filters.
+export function formatDatePst(date: Date): string {
+  return DateTime.fromJSDate(date).setZone(PST_ZONE).toFormat('MM/dd/yyyy')
+}
+
+// Format a Date as YYYYMMDD in PST/PDT.
+// Used for CRA file date fields.
+export function formatDatePstCompact(date: Date): string {
+  return DateTime.fromJSDate(date).setZone(PST_ZONE).toFormat('yyyyMMdd')
+}
+
+// Format a Date as MM/DD/YYYY HH:MM:SS in PST/PDT.
+// Used for ICM sync-back payloads and datetime filters.
+export function formatDateTimePst(date: Date): string {
+  return DateTime.fromJSDate(date).setZone(PST_ZONE).toFormat('MM/dd/yyyy HH:mm:ss')
+}
+
+/**
+ * Parse a date string (MM/DD/YYYY or MM/DD/YYYY HH:MM:SS) as PST/PDT
+ * and return a UTC Date. Returns null for empty/null input.
+ *
+ * ICM sends dates in Pacific time. This function interprets the text
+ * as PST and converts to a proper UTC Date.
+ */
+export function parseDateAsPst(dateStr: string | null | undefined): Date | null {
+  if (!dateStr || dateStr.trim() === '') return null
+
+  const trimmed = dateStr.trim()
+  const hasTime = trimmed.includes(':')
+  const fmt = hasTime ? 'MM/dd/yyyy HH:mm:ss' : 'MM/dd/yyyy'
+
+  const dt = DateTime.fromFormat(trimmed, fmt, { zone: PST_ZONE })
+  if (!dt.isValid) return null
+
+  return dt.toJSDate()
 }
 
 export function enrichLabels<T extends Record<string, any>>(record: T): T {

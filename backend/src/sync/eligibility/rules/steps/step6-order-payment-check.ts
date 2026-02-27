@@ -78,13 +78,13 @@ export const step6_OrderPaymentCheck: EligibilityRule & {
 
 function isInMonth(date: Date | null, month: { year: number; month: number }): boolean {
   if (!date) return false
-  return date.getFullYear() === month.year && date.getMonth() === month.month
+  return date.getUTCFullYear() === month.year && date.getUTCMonth() === month.month
 }
 
 function getPreviousMonth(date: Date): { year: number; month: number } {
-  const month = date.getMonth() - 1
+  const month = date.getUTCMonth() - 1
   if (month < 0) {
-    return { year: date.getFullYear() - 1, month: 11 }
+    return { year: date.getUTCFullYear() - 1, month: 11 }
   }
-  return { year: date.getFullYear(), month }
+  return { year: date.getUTCFullYear(), month }
 }

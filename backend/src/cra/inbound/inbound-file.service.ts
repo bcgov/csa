@@ -22,6 +22,8 @@ export class InboundFileService {
   private readonly fileTransferServiceUrl: string
   private readonly responseEnvFlag: string
 
+  private readonly craEnabled: boolean
+
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
@@ -30,9 +32,15 @@ export class InboundFileService {
     this.fileStoragePath = this.configService.get<string>('app.fileStoragePath')!
     this.fileTransferServiceUrl = this.configService.get<string>('app.fileTransferServiceUrl')!
     this.responseEnvFlag = this.configService.get<string>('cra.responseEnvFlag')!
+    this.craEnabled = this.configService.get<boolean>('cra.enabled')!
   }
 
   async downloadNewResponseFiles(destinationId: string): Promise<DownloadedFile[]> {
+    if (!this.craEnabled) {
+      this.logger.log('[CRA Disabled] Response file download skipped — no remote files to poll')
+      return []
+    }
+
     const existingFiles = await this.prisma.transferFile.findMany({
       where: { direction: FILE_DIRECTION.INBOUND },
       select: { fileName: true },

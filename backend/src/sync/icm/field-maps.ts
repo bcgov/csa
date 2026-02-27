@@ -9,7 +9,7 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
   { sourceField: 'ROW_ID', sourceLabel: 'Id', masterField: 'case_row_id_icm' },
   {
     sourceField: 'LAST_UPD',
-    sourceLabel: 'Updated Date',
+    sourceLabel: 'Last Updated Date',
     masterField: 'last_upd_case_icm',
     dbType: 'timestamp',
   },
@@ -300,13 +300,13 @@ export const STG_ORDER_MAP: FieldMapEntry[] = [
     sourceField: 'X_EFF_START_DT',
     sourceLabel: 'Order Effective Start Date',
     masterField: 'order_effective_start_date',
-    dbType: 'timestamp',
+    dbType: 'date',
   },
   {
     sourceField: 'X_EFF_END_DT',
     sourceLabel: 'Order Effective End Date',
     masterField: 'order_effective_end_date',
-    dbType: 'timestamp',
+    dbType: 'date',
   },
   { sourceField: 'PRODUCT_NAME', sourceLabel: 'Product', masterField: 'product' },
   {

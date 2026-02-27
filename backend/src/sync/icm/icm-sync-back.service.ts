@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { CSA_STATUS_LABELS } from 'src/common/state-machine/constants/csa-status.constants'
 import { IcmContactUpdatePayload, IcmDataSource } from './data-source/icm-data-source'
+import { formatDateTimePst } from 'src/common/utils'
 
 const ICM_BATCH_SIZE = 100
 
@@ -122,19 +123,10 @@ export class IcmSyncBackService {
         ? (CSA_STATUS_LABELS[contact.csaStatus] ?? contact.csaStatus)
         : '',
       'CSA Status Effective Date': contact.csaStatusEffectiveDate
-        ? this.formatIcmDateTime(contact.csaStatusEffectiveDate)
+        ? formatDateTimePst(contact.csaStatusEffectiveDate)
         : '',
       'CSA DIN': contact.din ?? null,
-      'CSA Sent Date': contact.csaSentDate ? this.formatIcmDateTime(contact.csaSentDate) : null,
+      'CSA Sent Date': contact.csaSentDate ? formatDateTimePst(contact.csaSentDate) : null,
     }
-  }
-
-  private formatIcmDateTime(date: Date): string {
-    const mm = String(date.getMonth() + 1).padStart(2, '0')
-    const dd = String(date.getDate()).padStart(2, '0')
-    const hh = String(date.getHours()).padStart(2, '0')
-    const min = String(date.getMinutes()).padStart(2, '0')
-    const ss = String(date.getSeconds()).padStart(2, '0')
-    return `${mm}/${dd}/${date.getFullYear()} ${hh}:${min}:${ss}`
   }
 }

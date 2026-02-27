@@ -270,7 +270,10 @@ const UPSERT_SQL = `
       WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN NOW()
       ELSE contacts.csa_status_effective_date
     END,
-    icm_integration_status = true,
+    icm_integration_status = CASE
+      WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN true
+      ELSE contacts.icm_integration_status
+    END,
     last_updated_at = NOW(),
     last_updated_by = 'SYSTEM'
 `

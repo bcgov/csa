@@ -7,7 +7,7 @@ const makeContact = (id: number, overrides = {}) => ({
   id,
   personIdIcm: `ICM-${id}`,
   csaStatus: 'eligible',
-  csaStatusEffectiveDate: new Date(2026, 0, 15),
+  csaStatusEffectiveDate: new Date('2026-01-15T20:00:00Z'), // Jan 15 12:00 PST
   din: `DIN-${id}`,
   csaSentDate: null,
   ...overrides,
@@ -116,11 +116,13 @@ describe('IcmSyncBackService', () => {
       expect(prisma.contact.updateMany).toHaveBeenCalledTimes(1)
     })
 
-    it('should format dates as MM/DD/YYYY HH:MM:SS in payload', async () => {
+    it('should format dates as MM/DD/YYYY HH:MM:SS in PST in payload', async () => {
       const contacts = [
         makeContact(1, {
-          csaStatusEffectiveDate: new Date(2026, 5, 20, 10, 30, 45),
-          csaSentDate: new Date(2026, 2, 10, 14, 15, 0),
+          // Jun 20 17:30:45 UTC = Jun 20 10:30:45 PDT (UTC-7 in summer)
+          csaStatusEffectiveDate: new Date('2026-06-20T17:30:45Z'),
+          // Mar 10 21:15:00 UTC = Mar 10 14:15:00 PDT (UTC-7 after spring-forward)
+          csaSentDate: new Date('2026-03-10T21:15:00Z'),
         }),
       ]
       prisma.contact.findMany.mockResolvedValue(contacts)

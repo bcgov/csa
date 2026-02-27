@@ -76,6 +76,29 @@ export const SYSTEM_CSA_EVENTS = new Set<string>([
   CSA_EVENT.LOSE_PAY_ELIGIBILITY,
 ])
 
+// Maps preBatchStatus to target state when removing from batch.
+// Keys must cover all states that can reach in_batch_application/in_batch_cancellation via ADD_TO_BATCH.
+// See CSA_TRANSITIONS in csa-status.machine.ts for the full list.
+export const REMOVE_FROM_BATCH_TARGET: Record<string, string> = {
+  [CSA_STATUS.ELIGIBLE]: CSA_STATUS.ELIGIBLE_TBD,
+  [CSA_STATUS.ELIGIBLE_TBD]: CSA_STATUS.ELIGIBLE_TBD,
+  [CSA_STATUS.APPLICATION_REFUSED_CRA]: CSA_STATUS.APPLICATION_REFUSED_CRA,
+  [CSA_STATUS.NOT_ELIGIBLE_IN_PAY]: CSA_STATUS.NOT_ELIGIBLE_IP_TBD,
+  [CSA_STATUS.NOT_ELIGIBLE_IP_TBD]: CSA_STATUS.NOT_ELIGIBLE_IP_TBD,
+  [CSA_STATUS.CANCELLATION_REFUSED_CRA]: CSA_STATUS.CANCELLATION_REFUSED_CRA,
+}
+
+// Maps preBatchStatus to target state when file is rejected by CRA.
+// Keys must match REMOVE_FROM_BATCH_TARGET. Refused states revert to TBD (file rejection != CRA record-level decision).
+export const CRA_FILE_REJECTED_TARGET: Record<string, string> = {
+  [CSA_STATUS.ELIGIBLE]: CSA_STATUS.ELIGIBLE,
+  [CSA_STATUS.ELIGIBLE_TBD]: CSA_STATUS.ELIGIBLE_TBD,
+  [CSA_STATUS.APPLICATION_REFUSED_CRA]: CSA_STATUS.ELIGIBLE_TBD,
+  [CSA_STATUS.NOT_ELIGIBLE_IN_PAY]: CSA_STATUS.NOT_ELIGIBLE_IN_PAY,
+  [CSA_STATUS.NOT_ELIGIBLE_IP_TBD]: CSA_STATUS.NOT_ELIGIBLE_IP_TBD,
+  [CSA_STATUS.CANCELLATION_REFUSED_CRA]: CSA_STATUS.NOT_ELIGIBLE_IP_TBD,
+}
+
 // State-based actor permissions
 // { [state]: { [event]: allowedActors[] } }
 export const STATE_ACTOR_PERMISSIONS: Record<string, Record<string, ('USER' | 'SYSTEM')[]>> = {

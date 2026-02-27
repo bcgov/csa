@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import { BatchesService } from 'src/api/batches/batches.service'
 import { ContactsService } from 'src/api/contacts/contacts.service'
 import { PrismaService } from 'src/common/database/prisma.service'
@@ -30,10 +29,8 @@ export class PollCraResponseHandler extends BaseJob {
   private recordsAccepted!: number
   private recordsRejected!: number
   private recordsRecycled!: number
-  private readonly craEnabled: boolean
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly inboundFileService: InboundFileService,
     private readonly inboundResponseService: InboundResponseService,
     private readonly prisma: PrismaService,
@@ -42,14 +39,9 @@ export class PollCraResponseHandler extends BaseJob {
     private readonly jobRunner: JobRunner,
   ) {
     super()
-    this.craEnabled = this.configService.get<boolean>('cra.enabled')!
   }
 
   async execute(_context: JobContext): Promise<JobResult> {
-    if (!this.craEnabled) {
-      return { success: true, message: 'CRA polling is disabled (CRA_INTEGRATION_ENABLED=false)' }
-    }
-
     // shares across all the retries
     this.processedBatchIds = new Set<number>()
     this.recordsAccepted = 0

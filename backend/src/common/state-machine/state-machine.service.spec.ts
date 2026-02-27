@@ -234,6 +234,42 @@ describe('StateMachineService', () => {
       expect(result.success).toBe(false)
       expect(result.reason).toBe('Invalid target state for this transition')
     })
+
+    it('should require targetState for REMOVE_FROM_BATCH (dynamic transition)', () => {
+      const result = service.transitionContact(
+        CSA_STATUS.IN_BATCH_APPLICATION,
+        CSA_EVENT.REMOVE_FROM_BATCH,
+        'USER',
+      )
+
+      expect(result.success).toBe(false)
+      expect(result.reason).toBe('Target state required for dynamic transition')
+    })
+
+    it('should succeed for REMOVE_FROM_BATCH with valid targetState', () => {
+      const result = service.transitionContact(
+        CSA_STATUS.IN_BATCH_APPLICATION,
+        CSA_EVENT.REMOVE_FROM_BATCH,
+        'USER',
+        CSA_STATUS.ELIGIBLE_TBD,
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.from).toBe(CSA_STATUS.IN_BATCH_APPLICATION)
+      expect(result.to).toBe(CSA_STATUS.ELIGIBLE_TBD)
+    })
+
+    it('should reject REMOVE_FROM_BATCH with invalid targetState', () => {
+      const result = service.transitionContact(
+        CSA_STATUS.IN_BATCH_APPLICATION,
+        CSA_EVENT.REMOVE_FROM_BATCH,
+        'USER',
+        CSA_STATUS.IN_PAY,
+      )
+
+      expect(result.success).toBe(false)
+      expect(result.reason).toBe('Invalid target state for this transition')
+    })
   })
 
   describe('transitionBatch (pure)', () => {

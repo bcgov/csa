@@ -92,8 +92,7 @@ describe('MisService', () => {
       expect(files.every((r) => r.rows === 0)).toBe(true)
     })
 
-    // TODO: re-enable when DB load is restored in mis.service.ts
-    it.skip('should ingest all 3 MIS files when they exist', async () => {
+    it('should ingest all 3 MIS files when they exist', async () => {
       const files = await service.ingestAll()
 
       expect(files).toHaveLength(3)
@@ -111,8 +110,7 @@ describe('MisService', () => {
       expect(existsKeys).toContain('csas3/rap_placements.csv')
     })
 
-    // TODO: re-enable when DB load is restored in mis.service.ts
-    it.skip('should move files to processed after successful ingestion', async () => {
+    it('should move files to processed after successful ingestion', async () => {
       await service.ingestAll()
 
       expect(mockFileStorage.move).toHaveBeenCalledTimes(3)
@@ -129,8 +127,7 @@ describe('MisService', () => {
       expect(mockFileStorage.move).not.toHaveBeenCalled()
     })
 
-    // TODO: re-enable when DB load is restored in mis.service.ts
-    it.skip('should throw when CSV has no data rows', async () => {
+    it('should throw when CSV has no data rows', async () => {
       copyRowCount = 0
       mockFileStorage.download.mockImplementation(() =>
         Promise.resolve(Readable.from(['HEADER\n'])),
@@ -139,8 +136,7 @@ describe('MisService', () => {
       await expect(service.ingestAll()).rejects.toThrow('CSV has no data rows')
     })
 
-    // TODO: re-enable when DB load is restored in mis.service.ts
-    it.skip('should rollback on empty CSV (preserving existing data)', async () => {
+    it('should rollback on empty CSV (preserving existing data)', async () => {
       copyRowCount = 0
       mockFileStorage.download.mockImplementation(() =>
         Promise.resolve(Readable.from(['HEADER\n'])),
@@ -158,8 +154,7 @@ describe('MisService', () => {
       expect(rollbackCalls.length).toBeGreaterThan(0)
     })
 
-    // TODO: re-enable when DB load is restored in mis.service.ts
-    it.skip('should continue if move fails (non-fatal)', async () => {
+    it('should continue if move fails (non-fatal)', async () => {
       mockFileStorage.move.mockRejectedValue(new Error('Access Denied'))
 
       const files = await service.ingestAll()

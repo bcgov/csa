@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { IcmApiRecord, IcmDataSource } from './data-source/icm-data-source'
+import { parseDateAsPst } from 'src/common/utils'
 import { IcmApiConfig } from './icm.config'
 
 export const BATCH_SIZE = 1000
@@ -51,7 +52,12 @@ export class IcmService {
     const arrays = fieldMap.map((entry) =>
       records.map((record) => {
         const raw = record[entry.sourceLabel]
-        return raw === '' || raw == null ? null : raw
+        if (raw === '' || raw == null) return null
+        // Convert ICM PST date strings to UTC ISO format before PostgreSQL casts them
+        if (entry.dbType === 'timestamp' || entry.dbType === 'date') {
+          return parseDateAsPst(raw)?.toISOString() ?? null
+        }
+        return raw
       }),
     )
 

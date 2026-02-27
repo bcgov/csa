@@ -42,7 +42,7 @@ const VALID_FILE_NAME = 'craUserId.VRSP0001.txt'
 
 describe('PollCraResponseHandler', () => {
   let handler: PollCraResponseHandler
-  let mockConfigService: any
+
   let mockInboundFileService: any
   let mockInboundResponseService: any
   let mockPrisma: any
@@ -51,13 +51,6 @@ describe('PollCraResponseHandler', () => {
   let mockJobRunner: any
 
   beforeEach(() => {
-    mockConfigService = {
-      get: vi.fn((key: string) => {
-        const config: Record<string, any> = { 'cra.enabled': true }
-        return config[key]
-      }),
-    }
-
     mockInboundFileService = {
       downloadNewResponseFiles: vi.fn().mockResolvedValue([]),
       getLocalFilePath: vi.fn().mockReturnValue('/tmp/cra-ftp/inbound/default.txt'),
@@ -122,7 +115,6 @@ describe('PollCraResponseHandler', () => {
     }
 
     handler = new PollCraResponseHandler(
-      mockConfigService,
       mockInboundFileService,
       mockInboundResponseService,
       mockPrisma,
@@ -134,33 +126,6 @@ describe('PollCraResponseHandler', () => {
 
   it('should have jobType POLL_CRA_RESPONSE', () => {
     expect(handler.jobType).toBe(JobType.POLL_CRA_RESPONSE)
-  })
-
-  describe('CRA disabled', () => {
-    it('should return early when CRA_INTEGRATION_ENABLED is false', async () => {
-      const disabledConfigService = {
-        get: vi.fn((key: string) => {
-          const config: Record<string, any> = { 'cra.enabled': false }
-          return config[key]
-        }),
-      }
-
-      const disabledHandler = new PollCraResponseHandler(
-        disabledConfigService as any,
-        mockInboundFileService,
-        mockInboundResponseService,
-        mockPrisma,
-        mockBatchesService,
-        mockContactsService,
-        mockJobRunner,
-      )
-
-      const result = await disabledHandler.execute(mockContext)
-
-      expect(result.success).toBe(true)
-      expect(result.message).toContain('CRA polling is disabled')
-      expect(mockInboundFileService.downloadNewResponseFiles).not.toHaveBeenCalled()
-    })
   })
 
   // Helpers

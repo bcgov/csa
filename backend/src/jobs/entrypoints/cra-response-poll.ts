@@ -2,8 +2,9 @@
 import { Logger } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { CraModule } from 'src/cra/cra.module'
-// import { JobTrigger } from '../enums/job-trigger.enum'
-// import { JobType } from '../enums/job-type.enum'
+import { JobTrigger } from '../enums/job-trigger.enum'
+import { JobType } from '../enums/job-type.enum'
+import { JobRunner } from '../job-runner.service'
 
 // Polls for and processes CRA response files
 async function bootstrap() {
@@ -18,11 +19,10 @@ async function bootstrap() {
     })
 
     // Get JobRunner from DI container
-    // const jobRunner = app.get(JobRunner)
+    const jobRunner = app.get(JobRunner)
 
-    // TODO: re-enable when CRA response poll handler is ready
-    // const result = await jobRunner.runJobType(JobType.POLL_CRA_RESPONSE, JobTrigger.CRON)
-    const result = { success: true, message: 'CRA response poll bypassed (not yet ready)' }
+    // Run POLL_CRA_RESPONSE job
+    const result = await jobRunner.runJobType(JobType.POLL_CRA_RESPONSE, JobTrigger.CRON)
 
     await app.close()
 

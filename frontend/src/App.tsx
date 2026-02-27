@@ -1361,10 +1361,16 @@ function App() {
     if (selectedBatchDetails.length === 0) return
 
     try {
+      // Map selected batch_contact IDs to their corresponding contact IDs
+      const contactIds = selectedBatchDetails
+        .map((batchContactId) => {
+          const detail = batchDetails.find((d) => d.id === batchContactId)
+          return detail?.contactId
+        })
+        .filter((id): id is number => id !== undefined)
+
       // Remove each selected contact from the batch
-      const removePromises = selectedBatchDetails.map((contactId) =>
-        removeContactFromBatch(contactId),
-      )
+      const removePromises = contactIds.map((contactId) => removeContactFromBatch(contactId))
 
       const results = await Promise.all(removePromises)
 
@@ -1493,10 +1499,10 @@ function App() {
         case 'batchDate':
           return batch.batchDate
             ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: '2-digit',
-              })
+              year: 'numeric',
+              month: 'short',
+              day: '2-digit',
+            })
             : ''
         case 'status':
           return batch.status
@@ -1759,10 +1765,10 @@ function App() {
       batchId: `1-${batch.id}`, // Format as "1-{id}"
       batchDate: batch.batchDate
         ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: '2-digit',
-          })
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+        })
         : '',
       status: batch.status,
       recordCount: batch.recordCount,
@@ -1807,6 +1813,7 @@ function App() {
     // Transform API data to match table structure
     return batchDetails.map((detail) => ({
       id: detail.id,
+      contactId: detail.contactId,
       lastName: detail.contact.lastName,
       middleName: '', // API doesn't return middleName from contact
       givenName: detail.contact.firstName,
@@ -2663,30 +2670,30 @@ function App() {
                   'Children within a batch',
                   'Children over 18 years (never eligible)',
                 ].includes(preDefinedFilter) && (
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      mt: 2,
-                      px: 2,
-                    }}
-                  >
-                    <Typography variant="body2" color="text.secondary">
-                      {loadingContacts
-                        ? 'Loading...'
-                        : `Showing ${contacts.length} of ${totalRecords} records`}
-                    </Typography>
-                    <Pagination
-                      count={totalPages}
-                      page={currentPage}
-                      onChange={handlePageChange}
-                      color="primary"
-                      showFirstButton
-                      showLastButton
-                    />
-                  </Box>
-                )}
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mt: 2,
+                        px: 2,
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        {loadingContacts
+                          ? 'Loading...'
+                          : `Showing ${contacts.length} of ${totalRecords} records`}
+                      </Typography>
+                      <Pagination
+                        count={totalPages}
+                        page={currentPage}
+                        onChange={handlePageChange}
+                        color="primary"
+                        showFirstButton
+                        showLastButton
+                      />
+                    </Box>
+                  )}
 
                 {/* Error message */}
                 {contactsError && preDefinedFilter === 'All Records' && (

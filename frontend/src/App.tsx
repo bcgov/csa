@@ -75,6 +75,26 @@ const VALID_BATCH_STATUSES = [
   'cancellation_refused_cra', // Cancellation Refused - CRA
 ]
 
+// Date formatting helpers
+const formatDateYMD = (dateString: string): string => {
+  const date = new Date(dateString)
+  const year = date.getFullYear()
+  const month = date.toLocaleString('en-US', { month: 'short' })
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const formatDateTimeYMDHMS = (dateString: string): string => {
+  const date = new Date(dateString)
+  const year = date.getFullYear()
+  const month = date.toLocaleString('en-US', { month: 'short' })
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
 function App() {
   // Use Keycloak authentication
   const {
@@ -1573,13 +1593,13 @@ function App() {
       akaLastName: contact.akaLastName || '',
       akaFirstName: contact.akaFirstName || '',
       gender: contact.gender || '',
-      dob: contact.dateOfBirth ? new Date(contact.dateOfBirth).toLocaleDateString() : '',
+      dob: contact.dateOfBirth ? formatDateYMD(contact.dateOfBirth) : '',
       age: contact.age || 0,
       din: contact.din || '',
       csaStatus: contact.csaStatusLabel || contact.csaStatus || '', // Display label
       csaStatusRaw: contact.csaStatus || '', // Raw value for validation logic
       statusEffective: contact.csaStatusEffectiveDate
-        ? new Date(contact.csaStatusEffectiveDate).toLocaleDateString()
+        ? formatDateTimeYMDHMS(contact.csaStatusEffectiveDate)
         : '',
       caseNumber: contact.caseNumber || '',
       caseType: contact.caseType || '',
@@ -2371,26 +2391,6 @@ function App() {
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
-                              onClick={(e) => handleSortClick(e, 'gender')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Gender
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'gender')}
-                              sx={{
-                                padding: 0.5,
-                                color: columnFilters.gender?.length > 0 ? '#1976d2' : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
                               onClick={(e) => handleSortClick(e, 'dob')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
@@ -2402,26 +2402,6 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color: columnFilters.dob?.length > 0 ? '#1976d2' : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'age')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Age
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'age')}
-                              sx={{
-                                padding: 0.5,
-                                color: columnFilters.age?.length > 0 ? '#1976d2' : 'inherit',
                               }}
                             >
                               <FilterListIcon fontSize="small" />
@@ -2641,9 +2621,7 @@ function App() {
                           <TableCell>{row.lastName}</TableCell>
                           <TableCell>{row.firstName}</TableCell>
                           <TableCell>{row.middleName}</TableCell>
-                          <TableCell>{row.gender}</TableCell>
                           <TableCell>{row.dob}</TableCell>
-                          <TableCell>{row.age}</TableCell>
                           <TableCell>{row.din}</TableCell>
                           <TableCell>{row.csaStatus}</TableCell>
                           <TableCell>{row.statusEffective}</TableCell>
@@ -2969,6 +2947,20 @@ function App() {
                                   ]
                                     .filter(Boolean)
                                     .join(', ') || '-'}{' '}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Gender
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.gender || '-'}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Age
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.age || '-'}
                                 </Typography>
                               </Box>
                             </Box>

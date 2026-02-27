@@ -1281,6 +1281,43 @@ function App() {
       // Refresh batch history for the selected contact
       await handleContactClick(selectedChild)
 
+      // Refresh the eligibility list to reflect updated CSA status
+      const apiFilters = [
+        'All Records',
+        'Pending User review/action',
+        'All children On Hold from CSA',
+        'Children In Pay',
+        'Children Out of Pay',
+        'CRA Refused CSA List',
+        'Children within a batch',
+        'Children over 18 years (never eligible)',
+      ]
+
+      if (apiFilters.includes(preDefinedFilter)) {
+        // Reload based on active filter/search
+        if (isColumnFilterActive && activeColumnFilter) {
+          await performColumnFilterSearch(
+            activeColumnFilter.column,
+            activeColumnFilter.query,
+            currentPage,
+          )
+        } else if (isSearchActive && searchTerm.trim().length >= 3) {
+          await performFullTextSearch(searchTerm.trim(), currentPage)
+        } else {
+          await fetchContacts(currentPage)
+        }
+      }
+
+      // Refresh Batch Requests table
+      const updatedBatches = await getAllBatches()
+      setBatches(updatedBatches)
+
+      // Refresh Batch Details table for the currently selected batch
+      if (selectedBatch) {
+        const updatedDetails = await getBatchContacts(selectedBatch)
+        setBatchDetails(updatedDetails)
+      }
+
       // Clear selection
       setSelectedBatchHistoryId(null)
     } catch (error: any) {
@@ -1324,10 +1361,16 @@ function App() {
     if (selectedBatchDetails.length === 0) return
 
     try {
+      // Map selected batch_contact IDs to their corresponding contact IDs
+      const contactIds = selectedBatchDetails
+        .map((batchContactId) => {
+          const detail = batchDetails.find((d) => d.id === batchContactId)
+          return detail?.contactId
+        })
+        .filter((id): id is number => id !== undefined)
+
       // Remove each selected contact from the batch
-      const removePromises = selectedBatchDetails.map((contactId) =>
-        removeContactFromBatch(contactId),
-      )
+      const removePromises = contactIds.map((contactId) => removeContactFromBatch(contactId))
 
       const results = await Promise.all(removePromises)
 
@@ -1770,6 +1813,7 @@ function App() {
     // Transform API data to match table structure
     return batchDetails.map((detail) => ({
       id: detail.id,
+      contactId: detail.contactId,
       lastName: detail.contact.lastName,
       middleName: '', // API doesn't return middleName from contact
       givenName: detail.contact.firstName,

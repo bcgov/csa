@@ -227,6 +227,7 @@ export interface BatchContactDetail {
     id: number
     lastName: string
     firstName: string
+    middleName: string | null
     din: string
     csaStatus: string
   }

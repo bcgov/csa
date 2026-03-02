@@ -13,22 +13,22 @@ describe('determineCancellationReason', () => {
   describe('Code 14 - Child Died', () => {
     it('should return code 14 when deceased flag is Y', () => {
       const result = determineCancellationReason(makeInput({ deceased: 'Y' }))
-      expect(result).toEqual({ isInEligible: true, cancelReasonCode: CANCEL_REASON.CHILD_DIED })
+      expect(result).toEqual({ isIneligible: true, cancelReasonCode: CANCEL_REASON.CHILD_DIED })
     })
 
     it('should return code 14 when deceased flag is y (case-insensitive)', () => {
       const result = determineCancellationReason(makeInput({ deceased: 'y' }))
-      expect(result).toEqual({ isInEligible: true, cancelReasonCode: CANCEL_REASON.CHILD_DIED })
+      expect(result).toEqual({ isIneligible: true, cancelReasonCode: CANCEL_REASON.CHILD_DIED })
     })
 
     it('should not return code 14 when deceased flag is N', () => {
       const result = determineCancellationReason(makeInput({ deceased: 'N' }))
-      expect(result).toEqual({ isInEligible: false, cancelReasonCode: null })
+      expect(result).toEqual({ isIneligible: false, cancelReasonCode: null })
     })
 
     it('should not return code 14 when deceased flag is null', () => {
       const result = determineCancellationReason(makeInput({ deceased: null }))
-      expect(result).toEqual({ isInEligible: false, cancelReasonCode: null })
+      expect(result).toEqual({ isIneligible: false, cancelReasonCode: null })
     })
   })
 
@@ -46,7 +46,7 @@ describe('determineCancellationReason', () => {
         }),
       )
       expect(result).toEqual({
-        isInEligible: true,
+        isIneligible: true,
         cancelReasonCode: CANCEL_REASON.CHILD_MISSING_AWOL,
       })
     })
@@ -58,7 +58,7 @@ describe('determineCancellationReason', () => {
         }),
       )
       expect(result).toEqual({
-        isInEligible: true,
+        isIneligible: true,
         cancelReasonCode: CANCEL_REASON.CHILD_MISSING_AWOL,
       })
     })
@@ -76,7 +76,7 @@ describe('determineCancellationReason', () => {
         }),
       )
       expect(result).toEqual({
-        isInEligible: true,
+        isIneligible: true,
         cancelReasonCode: CANCEL_REASON.CHILD_MISSING_AWOL,
       })
     })
@@ -93,7 +93,7 @@ describe('determineCancellationReason', () => {
           ],
         }),
       )
-      expect(result).toEqual({ isInEligible: false, cancelReasonCode: null })
+      expect(result).toEqual({ isIneligible: false, cancelReasonCode: null })
     })
 
     it('should NOT return code 22 when MIS type is AW but status is not Active', () => {
@@ -102,7 +102,7 @@ describe('determineCancellationReason', () => {
           misPlacements: [{ type: 'AW', status: 'Ended' }],
         }),
       )
-      expect(result).toEqual({ isInEligible: false, cancelReasonCode: null })
+      expect(result).toEqual({ isIneligible: false, cancelReasonCode: null })
     })
   })
 
@@ -119,7 +119,7 @@ describe('determineCancellationReason', () => {
           ],
         }),
       )
-      expect(result).toEqual({ isInEligible: true, cancelReasonCode: CANCEL_REASON.ADOPTION })
+      expect(result).toEqual({ isIneligible: true, cancelReasonCode: CANCEL_REASON.ADOPTION })
     })
 
     it('should return code 29 when MIS placement type is AD and Active', () => {
@@ -128,7 +128,7 @@ describe('determineCancellationReason', () => {
           misPlacements: [{ type: 'AD', status: 'Active' }],
         }),
       )
-      expect(result).toEqual({ isInEligible: true, cancelReasonCode: CANCEL_REASON.ADOPTION })
+      expect(result).toEqual({ isIneligible: true, cancelReasonCode: CANCEL_REASON.ADOPTION })
     })
 
     it('should NOT return code 29 when ICM placement sub-type matches but status is not Active', () => {
@@ -143,7 +143,7 @@ describe('determineCancellationReason', () => {
           ],
         }),
       )
-      expect(result).toEqual({ isInEligible: false, cancelReasonCode: null })
+      expect(result).toEqual({ isIneligible: false, cancelReasonCode: null })
     })
   })
 
@@ -182,7 +182,7 @@ describe('determineCancellationReason', () => {
   })
 
   describe('Default - no match', () => {
-    it('should return isInEligible false and null code when no conditions match', () => {
+    it('should return isIneligible false and null code when no conditions match', () => {
       const result = determineCancellationReason(
         makeInput({
           deceased: 'N',
@@ -190,12 +190,12 @@ describe('determineCancellationReason', () => {
           misPlacements: [{ type: 'Consulting', status: 'Active' }],
         }),
       )
-      expect(result).toEqual({ isInEligible: false, cancelReasonCode: null })
+      expect(result).toEqual({ isIneligible: false, cancelReasonCode: null })
     })
 
-    it('should return isInEligible false when inputs are all empty/null', () => {
+    it('should return isIneligible false when inputs are all empty/null', () => {
       const result = determineCancellationReason(makeInput())
-      expect(result).toEqual({ isInEligible: false, cancelReasonCode: null })
+      expect(result).toEqual({ isIneligible: false, cancelReasonCode: null })
     })
   })
 })

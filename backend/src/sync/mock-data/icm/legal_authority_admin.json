@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "Id": "LA-000002",
+      "Updated": "02/09/2026 10:00:00",
+      "Legal Auth Code": "ADO-Adoption Act-24",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-000003",
+      "Updated": "02/09/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-000004",
+      "Updated": "02/09/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    }
+  ]
+}

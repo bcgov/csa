@@ -4,9 +4,10 @@ import { TRANSACTION_TYPES } from 'src/api/contacts/constants'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_STATUS } from 'src/common/state-machine/constants/batch-status.constants'
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
+import { normalize } from 'src/common/utils'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobsService } from 'src/jobs/jobs.service'
-import { normalize } from 'src/common/utils'
+import { CANCEL_REASON } from './cancellation/cancellation-reason.constants'
 import { ELIGIBILITY_CONFIG, PROTECTED_STATUSES } from './eligibility.config'
 import { buildLoadContactProfilesSql } from './eligibility.queries'
 import {
@@ -26,6 +27,12 @@ import { step3_PlacementCheck } from './rules/steps/step3-placement-check'
 import { step4_FetchAgreementContract } from './rules/steps/step4-fetch-agreement-contract'
 import { step6_OrderPaymentCheck } from './rules/steps/step6-order-payment-check'
 
+const INELIGIBLE_CANCEL_CODES = new Set<string>([
+  CANCEL_REASON.CHILD_DIED,
+  CANCEL_REASON.CHILD_MISSING_AWOL,
+  CANCEL_REASON.ADOPTION,
+])
+
 const RULES: EligibilityRule[] = [
   step1A_AgeCheck,
   step1B_CancellationCheck,
@@ -34,9 +41,6 @@ const RULES: EligibilityRule[] = [
   step4_FetchAgreementContract,
   step6_OrderPaymentCheck,
 ]
-
-// -- Column definitions for the contacts upsert --
-
 interface UpsertContext {
   profile: ContactProfile
   result: EligibilityResult
@@ -81,8 +85,19 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
   { dbColumn: 'service_office', pgType: 'text', extract: (c) => c.profile.serviceOffice },
   { dbColumn: 'assigned_to', pgType: 'text', extract: (c) => c.profile.assignedTo },
   { dbColumn: 'csa_status', pgType: 'text', extract: (c) => c.result.newStatus },
-  { dbColumn: 'din', pgType: 'text', extract: (c) => c.profile.din },
-  { dbColumn: 'csa_sent_date', pgType: 'timestamp', extract: (c) => c.profile.csaSentDate },
+  {
+    dbColumn: 'csa_status_effective_date',
+    pgType: 'timestamptz',
+    extract: (c) => c.profile.csaStatusEffectiveDate ?? new Date(),
+    conflictMode: 'skip',
+  },
+  { dbColumn: 'din', pgType: 'text', extract: (c) => c.profile.din, conflictMode: 'skip' },
+  {
+    dbColumn: 'csa_sent_date',
+    pgType: 'timestamptz',
+    extract: (c) => c.profile.csaSentDate,
+    conflictMode: 'skip',
+  },
   { dbColumn: 'enroll_for_csa', pgType: 'text', extract: (c) => c.profile.enrollForCsa },
   {
     dbColumn: 'mis_legal_authority_code',
@@ -99,7 +114,7 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
     pgType: 'text',
     extract: (c) => c.profile.effectiveLegalStatus,
   },
-  { dbColumn: 'effective_date', pgType: 'timestamp', extract: (c) => c.profile.effectiveDate },
+  { dbColumn: 'effective_date', pgType: 'date', extract: (c) => c.profile.effectiveDate },
   { dbColumn: 'expiry_date', pgType: 'date', extract: (c) => c.profile.legalExpiryDate },
   { dbColumn: 'birth_city', pgType: 'text', extract: (c) => c.profile.birthCity },
   { dbColumn: 'birth_province', pgType: 'text', extract: (c) => c.profile.birthProvince },
@@ -122,12 +137,12 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
   },
   {
     dbColumn: 'actual_start_date',
-    pgType: 'timestamp',
+    pgType: 'timestamptz',
     extract: (c) => c.primaryPlacement?.startDate ?? null,
   },
   {
     dbColumn: 'actual_end_date',
-    pgType: 'timestamp',
+    pgType: 'timestamptz',
     extract: (c) => c.primaryPlacement?.endDate ?? null,
   },
   {
@@ -173,17 +188,17 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
   },
   {
     dbColumn: 'agreement_start_date',
-    pgType: 'timestamp',
+    pgType: 'timestamptz',
     extract: (c) => c.primaryAgreement?.agreementStartDate ?? null,
   },
   {
     dbColumn: 'agreement_end_date',
-    pgType: 'timestamp',
+    pgType: 'timestamptz',
     extract: (c) => c.primaryAgreement?.agreementEndDate ?? null,
   },
   {
     dbColumn: 'termination_date',
-    pgType: 'timestamp',
+    pgType: 'timestamptz',
     extract: (c) => c.primaryAgreement?.terminationDate ?? null,
   },
   {
@@ -211,19 +226,13 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
   },
   { dbColumn: 'product', pgType: 'text', extract: (c) => c.primaryOrder?.product ?? null },
   { dbColumn: 'source_order', pgType: 'text', extract: (c) => c.primaryOrder?.source ?? 'ICM' },
+  { dbColumn: 'cancel_reason_code', pgType: 'text', extract: (c) => c.result.cancelReasonCode },
+  { dbColumn: 'care_end_date', pgType: 'date', extract: (c) => c.result.careEndDate },
   {
-    dbColumn: 'cancel_reason_code',
-    pgType: 'text',
-    extract: (c) => c.result.cancelReasonCode,
-    conflictMode: 'coalesce',
+    dbColumn: 'is_ineligible',
+    pgType: 'boolean',
+    extract: (c) => INELIGIBLE_CANCEL_CODES.has(c.result.cancelReasonCode ?? ''),
   },
-  {
-    dbColumn: 'care_end_date',
-    pgType: 'date',
-    extract: (c) => c.result.careEndDate,
-    conflictMode: 'coalesce',
-  },
-  { dbColumn: 'is_in_eligible', pgType: 'boolean', extract: (c) => c.profile.isInEligible },
   { dbColumn: 'is_deceased', pgType: 'text', extract: (c) => c.profile.deceased },
 ]
 
@@ -256,12 +265,12 @@ const UPDATE_SET = CONTACT_COLUMNS.filter((c) => c.conflictMode !== 'skip')
 const UPSERT_SQL = `
   INSERT INTO contacts (
     ${COL_LIST},
-    csa_status_effective_date, icm_integration_status,
+    icm_integration_status,
     created_at, created_by, last_updated_at, last_updated_by
   )
   SELECT
     ${SELECT_LIST},
-    NOW(), true, NOW(), 'SYSTEM', NOW(), 'SYSTEM'
+    true, NOW(), 'SYSTEM', NOW(), 'SYSTEM'
   FROM unnest(${UNNEST_PARAMS})
   AS t(${COL_LIST})
   ON CONFLICT (person_id_icm) DO UPDATE SET
@@ -274,8 +283,14 @@ const UPSERT_SQL = `
       WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN true
       ELSE contacts.icm_integration_status
     END,
-    last_updated_at = NOW(),
-    last_updated_by = 'SYSTEM'
+    last_updated_at = CASE
+      WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN NOW()
+      ELSE contacts.last_updated_at
+    END,
+    last_updated_by = CASE
+      WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN 'SYSTEM'
+      ELSE contacts.last_updated_by
+    END
 `
 
 @Injectable()
@@ -319,7 +334,11 @@ export class EligibilityService {
       ) {
         updates.push({
           profile,
-          result: { newStatus: profile.csaStatus, cancelReasonCode: null, careEndDate: null },
+          result: {
+            newStatus: profile.csaStatus,
+            cancelReasonCode: profile.cancelReasonCode,
+            careEndDate: profile.careEndDate,
+          },
         })
         continue
       }
@@ -399,7 +418,7 @@ export class EligibilityService {
       // Parse MIS placements from pre-aggregated JSON
       const misPlacements: PlacementRecord[] = (raw.misPlacements ?? []).map(
         (placement: any): PlacementRecord => ({
-          type: placement.type ?? 'PLACEMENT', // TODO: list MIS placement types
+          type: placement.type?.startsWith('PL ') ? 'Placement' : 'Non-Placement Location',
           status: placement.status,
           startDate: placement.startDate ? new Date(placement.startDate) : null,
           endDate: placement.endDate ? new Date(placement.endDate) : null,
@@ -504,6 +523,9 @@ export class EligibilityService {
         serviceOffice: raw.serviceOffice ?? null,
         assignedTo: raw.assignedTo ?? null,
         csaStatus: raw.csaStatus ?? null,
+        csaStatusEffectiveDate: raw.csaStatusEffectiveDate
+          ? new Date(raw.csaStatusEffectiveDate)
+          : null,
         existingContactId: raw.existingContactId,
         din: raw.din ?? null,
         csaSentDate: raw.csaSentDate ? new Date(raw.csaSentDate) : null,
@@ -516,8 +538,10 @@ export class EligibilityService {
         birthCity: raw.birthCity ?? null,
         birthProvince: raw.birthProvince ?? null,
         birthCountry: raw.birthCountry ?? null,
-        isInEligible: raw.isInEligible ?? false,
+        isIneligible: raw.isIneligible ?? false,
         deceased: raw.deceased ?? null,
+        cancelReasonCode: raw.cancelReasonCode ?? null,
+        careEndDate: raw.careEndDate ? new Date(raw.careEndDate) : null,
         placements: [...icmPlacements, ...misPlacements],
         orders: [...icmOrders, ...misPayments],
         agreements: [...icmAgreements, ...misContracts],
@@ -708,7 +732,7 @@ export class EligibilityService {
             created_at, created_by, last_updated_at, last_updated_by)
          SELECT * FROM unnest(
            $1::int[], $2::int[], $3::text[], $4::text[], $5::text[],
-           $6::timestamp[], $7::text[], $8::timestamp[], $9::text[]
+           $6::timestamptz[], $7::text[], $8::timestamptz[], $9::text[]
          )
          RETURNING id, contact_id
        )

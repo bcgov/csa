@@ -141,8 +141,6 @@ function generateContact(csaStatus: string) {
     middleName: middle,
     akaLastName: faker.person.lastName(),
     akaFirstName: faker.person.firstName(),
-    searchText: `${firstName} ${middle} ${faker.person.lastName()} ${faker.string.alphanumeric(5).toUpperCase()}`,
-
     personIdIcm: faker.string.alphanumeric(10).toUpperCase(),
     personIdMis: faker.string.alphanumeric(10).toUpperCase(),
 

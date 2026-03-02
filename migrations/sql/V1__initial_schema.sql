@@ -25,11 +25,11 @@ CREATE TABLE IF NOT EXISTS csa.contacts (
   service_office             TEXT,
   assigned_to                TEXT,
   csa_status                 TEXT,
-  csa_status_effective_date  TIMESTAMP,
-  csa_sent_date              TIMESTAMP,
+  csa_status_effective_date  DATE,
+  csa_sent_date              TIMESTAMPTZ,
   din                        TEXT,
   effective_legal_status     TEXT,
-  effective_date             TIMESTAMP,
+  effective_date             DATE,
   expiry_date                DATE,
   enroll_for_csa             TEXT,
   mis_legal_authority_code   TEXT,
@@ -41,8 +41,8 @@ CREATE TABLE IF NOT EXISTS csa.contacts (
   location_type              TEXT,
   location_sub_type          TEXT,
   placement_status           TEXT,
-  actual_start_date          TIMESTAMP,
-  actual_end_date            TIMESTAMP,
+  actual_start_date          TIMESTAMPTZ,
+  actual_end_date            TIMESTAMPTZ,
   paid_unpaid                TEXT,
   interrupted_placement      TEXT,
   source_placement           TEXT,
@@ -51,9 +51,9 @@ CREATE TABLE IF NOT EXISTS csa.contacts (
   place_of_service_name      TEXT,
   agreement_type             TEXT,
   agreement_status           TEXT,
-  agreement_start_date       TIMESTAMP,
-  agreement_end_date         TIMESTAMP,
-  termination_date           TIMESTAMP,
+  agreement_start_date       TIMESTAMPTZ,
+  agreement_end_date         TIMESTAMPTZ,
+  termination_date           TIMESTAMPTZ,
   mcfd_contract              TEXT,
   order_number               TEXT,
   order_type                 TEXT,
@@ -70,12 +70,12 @@ CREATE TABLE IF NOT EXISTS csa.contacts (
   prev_recipient_last_name   TEXT,
   cancel_reason_code         TEXT,
   care_end_date              DATE,
-  is_in_eligible             BOOLEAN      DEFAULT FALSE,
+  is_ineligible              BOOLEAN      DEFAULT FALSE,
   is_deceased                TEXT,
   icm_integration_status     BOOLEAN      NOT NULL,
-  created_at                 TIMESTAMP    NOT NULL,
+  created_at                 TIMESTAMPTZ  NOT NULL,
   created_by                 TEXT         NOT NULL,
-  last_updated_at            TIMESTAMP    NOT NULL,
+  last_updated_at            TIMESTAMPTZ  NOT NULL,
   last_updated_by            TEXT         NOT NULL
 );
 
@@ -96,8 +96,8 @@ CREATE TABLE IF NOT EXISTS csa.batches (
   status          TEXT        NOT NULL,
   record_count    INTEGER     NOT NULL,
   system_comments TEXT,
-  updated_at      TIMESTAMP   NOT NULL,
-  created_at      TIMESTAMP   NOT NULL
+  updated_at      TIMESTAMPTZ NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL
 );
 
 CREATE UNIQUE INDEX batches_pending_unique ON csa.batches (status)
@@ -110,9 +110,9 @@ CREATE TABLE IF NOT EXISTS csa.contact_batch_details (
   transaction_type    TEXT        NOT NULL,
   reference_number    TEXT        UNIQUE,
   system_comments     TEXT,
-  created_at          TIMESTAMP   NOT NULL,
+  created_at          TIMESTAMPTZ NOT NULL,
   created_by          TEXT        NOT NULL,
-  last_updated_at     TIMESTAMP   NOT NULL,
+  last_updated_at     TIMESTAMPTZ NOT NULL,
   last_updated_by     TEXT        NOT NULL,
   status              TEXT,
   CONSTRAINT contact_batch_unique UNIQUE (contact_id, batch_id),
@@ -129,9 +129,9 @@ CREATE TABLE IF NOT EXISTS csa.job_runs (
   retry_count    INTEGER     DEFAULT 0,
   error          TEXT,
   metadata       JSONB       DEFAULT '{}'::jsonb,
-  created_at     TIMESTAMP   NOT NULL DEFAULT NOW(),
-  started_at     TIMESTAMP   NOT NULL,
-  completed_at   TIMESTAMP
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  started_at     TIMESTAMPTZ NOT NULL,
+  completed_at   TIMESTAMPTZ
 );
 
 CREATE INDEX idx_job_runs_status ON csa.job_runs (status);
@@ -146,8 +146,8 @@ CREATE TABLE IF NOT EXISTS csa.transfer_files (
   direction         TEXT        NOT NULL,
   file_name         TEXT        NOT NULL,
   file_size         TEXT,
-  delivered_at      TIMESTAMP,
-  downloaded_at     TIMESTAMP,
+  delivered_at      TIMESTAMPTZ,
+  downloaded_at     TIMESTAMPTZ,
   reference_numbers INTEGER[],
   is_processed      BOOLEAN     DEFAULT FALSE,
   is_valid          BOOLEAN     DEFAULT TRUE,

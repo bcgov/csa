@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "Id": "AG-000002",
+      "Updated": "02/09/2026 10:00:00",
+      "Service Provider": "Ward - Keebler",
+      "Service Provider Id": "SP-000002",
+      "ICM PCMS Contract Number": "FCH-000002",
+      "Agreement Status": "Active",
+      "Agreement Start Date": "01/09/2026 17:12:42",
+      "Agreement End Date": "06/24/2026 22:35:25",
+      "Agreement Type": "Out of Care",
+      "ICM Termination Date": ""
+    },
+    {
+      "Id": "AG-000003",
+      "Updated": "02/09/2026 10:00:00",
+      "Service Provider": "Hilpert and Sons",
+      "Service Provider Id": "SP-000003",
+      "ICM PCMS Contract Number": "FCH-000003",
+      "Agreement Status": "Active",
+      "Agreement Start Date": "12/01/2025 06:52:19",
+      "Agreement End Date": "02/06/2027 07:49:30",
+      "Agreement Type": "FCH",
+      "ICM Termination Date": ""
+    },
+    {
+      "Id": "AG-000004",
+      "Updated": "02/09/2026 10:00:00",
+      "Service Provider": "Moen, Fay and Osinski",
+      "Service Provider Id": "SP-000004",
+      "ICM PCMS Contract Number": "FCH-000004",
+      "Agreement Status": "Active",
+      "Agreement Start Date": "07/24/2025 06:45:59",
+      "Agreement End Date": "03/28/2026 23:26:12",
+      "Agreement Type": "FCH",
+      "ICM Termination Date": ""
+    }
+  ]
+}

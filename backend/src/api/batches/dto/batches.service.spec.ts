@@ -340,12 +340,13 @@ describe('BatchesService', () => {
         to: CSA_STATUS.ELIGIBLE_TBD,
       })
 
-      await expect(service.removeContactFromPendingBatch(100)).resolves.toBeUndefined()
+      await expect(service.removeContactFromPendingBatch(100, 'user1')).resolves.toBeUndefined()
 
       expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
         100,
         CSA_EVENT.REMOVE_FROM_BATCH,
         'USER',
+        { userId: 'user1' },
       )
     })
 

@@ -26,9 +26,9 @@ model Contact {
   caseLoad                   String    @map("case_load")
   sourceOrder                String    @map("source_order")
   icmIntegrationStatus       Boolean   @map("icm_integration_status")
-  createdAt                  DateTime  @map("created_at")
+  createdAt                  DateTime  @map("created_at") @db.Timestamptz()
   createdBy                  String    @map("created_by")
-  lastUpdatedAt              DateTime  @map("last_updated_at")
+  lastUpdatedAt              DateTime  @map("last_updated_at") @db.Timestamptz()
   lastUpdatedBy              String    @map("last_updated_by")
   searchText                 String    @default(dbgenerated()) @map("search_text")
 
@@ -40,11 +40,11 @@ model Contact {
   serviceOffice              String?   @map("service_office")
   assignedTo                 String?   @map("assigned_to")
   csaStatus                  String?   @map("csa_status")
-  csaStatusEffectiveDate     DateTime? @map("csa_status_effective_date")
-  csaSentDate                DateTime? @map("csa_sent_date")
+  csaStatusEffectiveDate     DateTime? @map("csa_status_effective_date") @db.Date
+  csaSentDate                DateTime? @map("csa_sent_date") @db.Timestamptz()
   din                        String?   @map("din")
   effectiveLegalStatus       String?   @map("effective_legal_status")
-  effectiveDate              DateTime? @map("effective_date")
+  effectiveDate              DateTime? @map("effective_date") @db.Date
   expiryDate                 DateTime? @db.Date @map("expiry_date")
   enrollForCsa               String?   @map("enroll_for_csa")
   misLegalAuthorityCode      String?   @map("mis_legal_authority_code")
@@ -56,8 +56,8 @@ model Contact {
   locationType               String?   @map("location_type")
   locationSubType            String?   @map("location_sub_type")
   placementStatus            String?   @map("placement_status")
-  actualStartDate            DateTime? @map("actual_start_date")
-  actualEndDate              DateTime? @map("actual_end_date")
+  actualStartDate            DateTime? @map("actual_start_date") @db.Timestamptz()
+  actualEndDate              DateTime? @map("actual_end_date") @db.Timestamptz()
   paidUnpaid                 String?   @map("paid_unpaid")
   interruptedPlacement       String?   @map("interrupted_placement")
   sourcePlacement            String?   @map("source_placement")
@@ -66,9 +66,9 @@ model Contact {
   placeOfServiceName         String?   @map("place_of_service_name")
   agreementType              String?   @map("agreement_type")
   agreementStatus            String?   @map("agreement_status")
-  agreementStartDate         DateTime? @map("agreement_start_date")
-  agreementEndDate           DateTime? @map("agreement_end_date")
-  terminationDate            DateTime? @map("termination_date")
+  agreementStartDate         DateTime? @map("agreement_start_date") @db.Timestamptz()
+  agreementEndDate           DateTime? @map("agreement_end_date") @db.Timestamptz()
+  terminationDate            DateTime? @map("termination_date") @db.Timestamptz()
   mcfdContract               String?   @map("mcfd_contract")
   orderNumber                String?   @map("order_number")
   orderType                  String?   @map("order_type")
@@ -97,8 +97,8 @@ model Batch {
   batchDate           DateTime?            @map("batch_date") @db.Date
   status              String
   recordCount         Int                  @map("record_count")
-  createdAt           DateTime             @map("created_at")
-  updatedAt           DateTime             @map("updated_at")  @updatedAt
+  createdAt           DateTime             @map("created_at") @db.Timestamptz()
+  updatedAt           DateTime             @map("updated_at") @db.Timestamptz() @updatedAt
   systemComments      String?              @map("system_comments")
   contactBatchDetails ContactBatchDetail[]
   transferFiles       TransferFile[]
@@ -114,9 +114,9 @@ model ContactBatchDetail {
   transactionType String   @map("transaction_type")
   referenceNumber String?  @unique @map("reference_number")
   systemComments  String?  @map("system_comments")
-  createdAt       DateTime @map("created_at")
+  createdAt       DateTime @map("created_at") @db.Timestamptz()
   createdBy       String   @map("created_by")
-  lastUpdatedAt   DateTime @map("last_updated_at") @updatedAt
+  lastUpdatedAt   DateTime @map("last_updated_at") @db.Timestamptz() @updatedAt
   lastUpdatedBy   String   @map("last_updated_by")
   status          String?
   batch           Batch    @relation(fields: [batchId], references: [id])
@@ -133,8 +133,8 @@ model TransferFile {
   destinationId    String    @map("destination_id")
   direction        String
   fileName         String    @map("file_name")
-  deliveredAt      DateTime? @map("delivered_at")
-  downloadedAt     DateTime? @map("downloaded_at")
+  deliveredAt      DateTime? @map("delivered_at") @db.Timestamptz()
+  downloadedAt     DateTime? @map("downloaded_at") @db.Timestamptz()
   referenceNumbers String[]  @map("reference_numbers")
   fileSize         String?   @map("file_size")
   isDetailsProcessed Boolean  @default(false) @map("is_processed")
@@ -155,9 +155,9 @@ model JobRun {
   retryCount  Int       @default(0) @map("retry_count")
   error       String?
   metadata    Json      @default("{}")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  startedAt   DateTime  @map("started_at")
-  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  startedAt   DateTime  @map("started_at") @db.Timestamptz()
+  completedAt DateTime? @map("completed_at") @db.Timestamptz()
   parentJob   JobRun?   @relation("ChildJobs", fields: [parentJobId], references: [id])
   childJobs   JobRun[]  @relation("ChildJobs")
 

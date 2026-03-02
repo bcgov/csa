@@ -24,6 +24,7 @@ export interface ContactProfile {
   assignedTo: string | null
 
   csaStatus: CsaStatus | null
+  csaStatusEffectiveDate: Date | null
   existingContactId: number | null
   din: string | null
   csaSentDate: Date | null
@@ -39,9 +40,10 @@ export interface ContactProfile {
   birthProvince: string | null
   birthCountry: string | null
 
-  isInEligible: boolean
+  isIneligible: boolean
   deceased: string | null
-  cancelReasonCode?: string | null
+  cancelReasonCode: string | null
+  careEndDate: Date | null
 
   placements: PlacementRecord[]
   orders: OrderRecord[]

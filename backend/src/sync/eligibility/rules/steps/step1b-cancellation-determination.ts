@@ -34,7 +34,7 @@ export const step1B_CancellationCheck: EligibilityRule = {
         .map((p) => ({ type: p.type, status: p.status })),
     })
 
-    if (result.isInEligible) {
+    if (result.isIneligible) {
       const careEndDate = determineCareEndDate(contact.orders, contact.placements)
       return step9_UpdateNotEligible(contact.csaStatus, result.cancelReasonCode, careEndDate)
     }

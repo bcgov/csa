@@ -24,7 +24,7 @@ export interface CancellationInput {
 }
 
 export interface CancellationResult {
-  isInEligible: boolean
+  isIneligible: boolean
   cancelReasonCode: CancelReasonCode | null
 }
 
@@ -37,12 +37,12 @@ export interface CancellationResult {
  *   3. Code 29 - Adoption (ICM sub-type 'Adoption Home' Active, OR MIS type 'AD' Active)
  *
  * Code 21 (default) is NOT set here. It's applied by Step 9 when no specific code is present.
- * Returns isInEligible=false when no cancellation conditions are met.
+ * Returns isIneligible=false when no cancellation conditions are met.
  */
 export function determineCancellationReason(input: CancellationInput): CancellationResult {
   // Code 14: Child Died
   if (normalize(input.deceased) === 'Y') {
-    return { isInEligible: true, cancelReasonCode: CANCEL_REASON.CHILD_DIED }
+    return { isIneligible: true, cancelReasonCode: CANCEL_REASON.CHILD_DIED }
   }
 
   // Code 22: Child Missing / AWOL
@@ -58,7 +58,7 @@ export function determineCancellationReason(input: CancellationInput): Cancellat
       normalize(p.status) === MIS_PLACEMENT.STATUS_ACTIVE,
   )
   if (hasIcmAwol || hasMisAwol) {
-    return { isInEligible: true, cancelReasonCode: CANCEL_REASON.CHILD_MISSING_AWOL }
+    return { isIneligible: true, cancelReasonCode: CANCEL_REASON.CHILD_MISSING_AWOL }
   }
 
   // Code 29: Adoption
@@ -74,9 +74,9 @@ export function determineCancellationReason(input: CancellationInput): Cancellat
       normalize(p.status) === MIS_PLACEMENT.STATUS_ACTIVE,
   )
   if (hasIcmAdoption || hasMisAdoption) {
-    return { isInEligible: true, cancelReasonCode: CANCEL_REASON.ADOPTION }
+    return { isIneligible: true, cancelReasonCode: CANCEL_REASON.ADOPTION }
   }
 
   // No cancellation condition met
-  return { isInEligible: false, cancelReasonCode: null }
+  return { isIneligible: false, cancelReasonCode: null }
 }

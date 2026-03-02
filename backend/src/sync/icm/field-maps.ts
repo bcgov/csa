@@ -54,7 +54,7 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
     sourceField: 'X_CSA_EFF_DATE',
     sourceLabel: 'Key Player CSA Status Effective Date',
     masterField: 'csa_status_effective_date',
-    dbType: 'timestamp',
+    dbType: 'date',
   },
   { sourceField: 'X_CSA_DIN', sourceLabel: 'Key Player DIN', masterField: 'din' },
 
@@ -133,7 +133,7 @@ export const STG_ICM_CONTACTS_MAP: FieldMapEntry[] = [
     sourceField: 'X_CSA_EFF_DATE',
     sourceLabel: 'CSA Status Effective Date',
     masterField: 'csa_status_effective_date',
-    dbType: 'timestamp',
+    dbType: 'date',
   },
 ]
 
@@ -238,13 +238,13 @@ export const STG_LEGAL_AUTHORITY_MAP: FieldMapEntry[] = [
     sourceField: 'START_DT',
     sourceLabel: 'Effective Date',
     masterField: 'effective_date',
-    dbType: 'timestamp',
+    dbType: 'date',
   },
   {
     sourceField: 'EXPIRY_DT',
     sourceLabel: 'Expiry Date',
     masterField: 'expiry_date',
-    dbType: 'timestamp',
+    dbType: 'date',
   },
   { sourceField: 'PAR_ROW_ID', sourceLabel: 'Parent Contact Id', masterField: 'parent_contact_id' },
 ]

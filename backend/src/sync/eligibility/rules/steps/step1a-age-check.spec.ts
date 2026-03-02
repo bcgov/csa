@@ -35,7 +35,7 @@ const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile =>
   birthCity: null,
   birthProvince: null,
   birthCountry: null,
-  isInEligible: false,
+  isIneligible: false,
   deceased: null,
   placements: [],
   orders: [],

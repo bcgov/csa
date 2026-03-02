@@ -39,7 +39,7 @@ export interface ContactProfile {
   birthProvince: string | null
   birthCountry: string | null
 
-  isInEligible: boolean
+  isIneligible: boolean
   deceased: string | null
   cancelReasonCode?: string | null
 

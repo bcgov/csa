@@ -82,7 +82,7 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
   { dbColumn: 'assigned_to', pgType: 'text', extract: (c) => c.profile.assignedTo },
   { dbColumn: 'csa_status', pgType: 'text', extract: (c) => c.result.newStatus },
   { dbColumn: 'din', pgType: 'text', extract: (c) => c.profile.din },
-  { dbColumn: 'csa_sent_date', pgType: 'timestamp', extract: (c) => c.profile.csaSentDate },
+  { dbColumn: 'csa_sent_date', pgType: 'timestamptz', extract: (c) => c.profile.csaSentDate },
   { dbColumn: 'enroll_for_csa', pgType: 'text', extract: (c) => c.profile.enrollForCsa },
   {
     dbColumn: 'mis_legal_authority_code',
@@ -99,7 +99,7 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
     pgType: 'text',
     extract: (c) => c.profile.effectiveLegalStatus,
   },
-  { dbColumn: 'effective_date', pgType: 'timestamp', extract: (c) => c.profile.effectiveDate },
+  { dbColumn: 'effective_date', pgType: 'date', extract: (c) => c.profile.effectiveDate },
   { dbColumn: 'expiry_date', pgType: 'date', extract: (c) => c.profile.legalExpiryDate },
   { dbColumn: 'birth_city', pgType: 'text', extract: (c) => c.profile.birthCity },
   { dbColumn: 'birth_province', pgType: 'text', extract: (c) => c.profile.birthProvince },
@@ -122,12 +122,12 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
   },
   {
     dbColumn: 'actual_start_date',
-    pgType: 'timestamp',
+    pgType: 'timestamptz',
     extract: (c) => c.primaryPlacement?.startDate ?? null,
   },
   {
     dbColumn: 'actual_end_date',
-    pgType: 'timestamp',
+    pgType: 'timestamptz',
     extract: (c) => c.primaryPlacement?.endDate ?? null,
   },
   {
@@ -173,17 +173,17 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
   },
   {
     dbColumn: 'agreement_start_date',
-    pgType: 'timestamp',
+    pgType: 'timestamptz',
     extract: (c) => c.primaryAgreement?.agreementStartDate ?? null,
   },
   {
     dbColumn: 'agreement_end_date',
-    pgType: 'timestamp',
+    pgType: 'timestamptz',
     extract: (c) => c.primaryAgreement?.agreementEndDate ?? null,
   },
   {
     dbColumn: 'termination_date',
-    pgType: 'timestamp',
+    pgType: 'timestamptz',
     extract: (c) => c.primaryAgreement?.terminationDate ?? null,
   },
   {
@@ -223,7 +223,7 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
     extract: (c) => c.result.careEndDate,
     conflictMode: 'coalesce',
   },
-  { dbColumn: 'is_in_eligible', pgType: 'boolean', extract: (c) => c.profile.isInEligible },
+  { dbColumn: 'is_ineligible', pgType: 'boolean', extract: (c) => c.profile.isIneligible },
   { dbColumn: 'is_deceased', pgType: 'text', extract: (c) => c.profile.deceased },
 ]
 
@@ -516,7 +516,7 @@ export class EligibilityService {
         birthCity: raw.birthCity ?? null,
         birthProvince: raw.birthProvince ?? null,
         birthCountry: raw.birthCountry ?? null,
-        isInEligible: raw.isInEligible ?? false,
+        isIneligible: raw.isIneligible ?? false,
         deceased: raw.deceased ?? null,
         placements: [...icmPlacements, ...misPlacements],
         orders: [...icmOrders, ...misPayments],
@@ -708,7 +708,7 @@ export class EligibilityService {
             created_at, created_by, last_updated_at, last_updated_by)
          SELECT * FROM unnest(
            $1::int[], $2::int[], $3::text[], $4::text[], $5::text[],
-           $6::timestamp[], $7::text[], $8::timestamp[], $9::text[]
+           $6::timestamptz[], $7::text[], $8::timestamptz[], $9::text[]
          )
          RETURNING id, contact_id
        )

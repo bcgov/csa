@@ -363,7 +363,7 @@ export function buildLoadContactProfilesSql(threshold: Date | null): {
     master_contacts.id               AS "existingContactId",
     COALESCE(master_contacts.csa_status, ${ICM_STATUS_CASE}) AS "csaStatus",
     cases.PERSON_ID_MIS              AS "personIdMis",
-    master_contacts.is_in_eligible   AS "isInEligible",
+    master_contacts.is_ineligible    AS "isIneligible",
     cases.X_DECEASED                 AS "deceased",
     COALESCE(icm_plc.data, '[]'::json)  AS "icmPlacements",
     COALESCE(icm_ord.data, '[]'::json)  AS "icmOrders",

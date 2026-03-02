@@ -64,16 +64,15 @@ export class CSAGuard implements CanActivate {
     const token = authHeader.slice(7)
     const decoded = this.decodeAndValidateToken(token)
 
-    // Attach decoded token to request for use in route handlers
+    // Attach decoded token and extracted username to request for use in route handlers
+    const username = this.extractUsername(decoded)
     ;(request as any).user = decoded
+    ;(request as any).username = username
 
     // If skipCSACheck is set, only validate token (don't check ICM)
     if (skipCSACheck) {
       return true
     }
-
-    // Get username from token
-    const username = this.extractUsername(decoded)
 
     // Check cache first
     const cached = csaAccessCache.get(username)

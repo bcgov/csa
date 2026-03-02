@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpException, Param, Post, Query, UseGuards } from '@nestjs/common'
 import { ApiBody, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
+import { CurrentUser } from '../common/decorators'
 import { CSAGuard } from '../common/guards/csa.guard'
 import { ContactsService } from './contacts.service'
 import { ContactDto } from './dto/contact.dto'
@@ -105,9 +106,10 @@ export class ContactsController {
     },
   })
   @ApiResponse({ status: 200, description: 'Bulk hold result with success and failed arrays' })
-  async holdContacts(@Body() body: { contactIds: number[] }): Promise<BulkOperationResponse> {
-    // TODO: Get userId from auth context when authentication is implemented
-    const userId = 'system'
+  async holdContacts(
+    @Body() body: { contactIds: number[] },
+    @CurrentUser() userId: string,
+  ): Promise<BulkOperationResponse> {
     return this.contactsService.holdContacts(body.contactIds, userId)
   }
 
@@ -119,9 +121,10 @@ export class ContactsController {
     },
   })
   @ApiResponse({ status: 200, description: 'Bulk resume result with success and failed arrays' })
-  async resumeContacts(@Body() body: { contactIds: number[] }): Promise<BulkOperationResponse> {
-    // TODO: Get userId from auth context when authentication is implemented
-    const userId = 'system'
+  async resumeContacts(
+    @Body() body: { contactIds: number[] },
+    @CurrentUser() userId: string,
+  ): Promise<BulkOperationResponse> {
     return this.contactsService.resumeContacts(body.contactIds, userId)
   }
 
@@ -142,9 +145,8 @@ export class ContactsController {
   })
   async updateEligibilityStatus(
     @Body() body: { contactIds: number[]; action: string },
+    @CurrentUser() userId: string,
   ): Promise<BulkOperationResponse> {
-    // TODO: Get userId from auth context when authentication is implemented
-    const userId = 'system'
     return this.contactsService.updateEligibilityStatus(body.contactIds, body.action, userId)
   }
 
@@ -165,9 +167,8 @@ export class ContactsController {
   })
   async updateNotEligibleStatus(
     @Body() body: { contactIds: number[]; action: string },
+    @CurrentUser() userId: string,
   ): Promise<BulkOperationResponse> {
-    // TODO: Get userId from auth context when authentication is implemented
-    const userId = 'system'
     return this.contactsService.updateNotEligibleStatus(body.contactIds, body.action, userId)
   }
 
@@ -188,9 +189,8 @@ export class ContactsController {
   })
   async updateChildOver18(
     @Body() body: { contactIds: number[]; action: string },
+    @CurrentUser() userId: string,
   ): Promise<BulkOperationResponse> {
-    // TODO: Get userId from auth context when authentication is implemented
-    const userId = 'system'
     return this.contactsService.updateChildOver18(body.contactIds, body.action, userId)
   }
 

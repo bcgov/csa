@@ -1,0 +1,58 @@
+{
+  "items": [
+    {
+      "Id": "PL-000002",
+      "Updated": "02/09/2026 10:00:00",
+      "Placement Number": "1-50322938675",
+      "Type": "Placement",
+      "Service Type": "FCH Level 3",
+      "Status": "Active",
+      "Start Date": "04/22/2025 02:19:42",
+      "End Date": "",
+      "Place of Service": "Goyette, Bailey and O'Connell",
+      "Paid/Unpaid?": "Paid",
+      "Service Provider": "Weimann - Wilkinson",
+      "Service Provider Id": "SP-000002",
+      "MCFD Contract Number": "FCH-000002",
+      "Interrupted Placement #": "",
+      "Case Id": "P-000002",
+      "Agreement Id": "AG-000002"
+    },
+    {
+      "Id": "PL-000003",
+      "Updated": "02/09/2026 10:00:00",
+      "Placement Number": "1-10100603808",
+      "Type": "Placement",
+      "Service Type": "FCH Level 2",
+      "Status": "Active",
+      "Start Date": "10/22/2025 03:25:02",
+      "End Date": "",
+      "Place of Service": "Thiel LLC",
+      "Paid/Unpaid?": "Paid",
+      "Service Provider": "Grady, Dare and Rolfson",
+      "Service Provider Id": "SP-000003",
+      "MCFD Contract Number": "FCH-000003",
+      "Interrupted Placement #": "",
+      "Case Id": "P-000003",
+      "Agreement Id": "AG-000003"
+    },
+    {
+      "Id": "PL-000004",
+      "Updated": "02/09/2026 10:00:00",
+      "Placement Number": "1-38915398844",
+      "Type": "Placement",
+      "Service Type": "FCH Level 2",
+      "Status": "Active",
+      "Start Date": "12/22/2025 09:58:03",
+      "End Date": "",
+      "Place of Service": "Zulauf, Zieme and Luettgen",
+      "Paid/Unpaid?": "Paid",
+      "Service Provider": "Welch, Stanton and Franecki",
+      "Service Provider Id": "SP-000004",
+      "MCFD Contract Number": "FCH-000004",
+      "Interrupted Placement #": "",
+      "Case Id": "P-000004",
+      "Agreement Id": "AG-000004"
+    }
+  ]
+}

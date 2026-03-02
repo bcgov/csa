@@ -10,7 +10,7 @@ export class MockFileStorageService extends FileStorageService {
 
   private getMockPath(key: string): string {
     const filename = path.basename(key)
-    return path.join(__dirname, '..', '..', 'mock-data', 'mis', 'mock', filename)
+    return path.join(__dirname, '..', '..', 'mock-data', 'mis', filename)
   }
 
   async download(key: string): Promise<Readable> {

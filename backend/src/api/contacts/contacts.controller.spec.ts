@@ -7,9 +7,13 @@ import { CSAGuard } from '../common/guards/csa.guard'
 import { ContactsController } from './contacts.controller'
 import { ContactsService } from './contacts.service'
 
-// Mock guard that always allows access
 const mockCSAGuard = {
-  canActivate: () => true,
+  canActivate: (context: { switchToHttp: () => { getRequest: () => any } }) => {
+    const req = context.switchToHttp().getRequest()
+    const testUsername = req.headers['x-test-username']
+    if (testUsername) req.username = testUsername
+    return true
+  },
 }
 
 describe('ContactsController', () => {
@@ -180,7 +184,20 @@ describe('ContactsController', () => {
         .send({ contactIds: [1, 2, 3] })
         .expect(201)
 
-      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'system')
+      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'SYSTEM')
+    })
+
+    it('should pass username from @CurrentUser when guard sets it', async () => {
+      const result = { success: [1], skipped: [] }
+      const spy = vi.spyOn(service, 'holdContacts').mockResolvedValue(result)
+
+      await request(app.getHttpServer())
+        .post('/contacts/hold')
+        .set('X-Test-Username', 'JDOE')
+        .send({ contactIds: [1] })
+        .expect(201)
+
+      expect(spy).toHaveBeenCalledWith([1], 'JDOE')
     })
   })
 
@@ -211,7 +228,7 @@ describe('ContactsController', () => {
         .send({ contactIds: [1, 2, 3] })
         .expect(201)
 
-      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'system')
+      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'SYSTEM')
     })
   })
 
@@ -242,7 +259,7 @@ describe('ContactsController', () => {
         .send({ contactIds: [1, 2, 3], action: 'ELIGIBLE' })
         .expect(201)
 
-      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'ELIGIBLE', 'system')
+      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'ELIGIBLE', 'SYSTEM')
     })
   })
 
@@ -273,7 +290,7 @@ describe('ContactsController', () => {
         .send({ contactIds: [1, 2, 3], action: 'SET_NOT_ELIGIBLE' })
         .expect(201)
 
-      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'SET_NOT_ELIGIBLE', 'system')
+      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'SET_NOT_ELIGIBLE', 'SYSTEM')
     })
   })
 
@@ -304,7 +321,7 @@ describe('ContactsController', () => {
         .send({ contactIds: [1, 2, 3], action: 'AGE_OUT' })
         .expect(201)
 
-      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'AGE_OUT', 'system')
+      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'AGE_OUT', 'SYSTEM')
     })
   })
 

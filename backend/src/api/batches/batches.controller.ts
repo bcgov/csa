@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common'
 import { ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { AddContactsDto } from '../batches/dto/add-contact.dto'
+import { CurrentUser } from '../common/decorators'
 import { CSAGuard } from '../common/guards/csa.guard'
 import { BatchesService } from './batches.service'
 
@@ -26,9 +27,7 @@ export class BatchesController {
   @Post('pending/contacts')
   @ApiBody({ type: AddContactsDto })
   @ApiResponse({ status: 201, description: 'Contacts added to pending batch' })
-  async addContactsToPending(@Body() dto: AddContactsDto) {
-    // TODO: Get userId from auth context when authentication is implemented
-    const userId = 'system'
+  async addContactsToPending(@Body() dto: AddContactsDto, @CurrentUser() userId: string) {
     return this.batchesService.addContactsToPendingBatch(dto.contactIds, userId)
   }
 
@@ -36,8 +35,11 @@ export class BatchesController {
   @HttpCode(204)
   @ApiResponse({ status: 204, description: 'Contact removed from pending batch' })
   @ApiResponse({ status: 404, description: 'Contact not found in pending batch' })
-  async removeContactFromPending(@Param('contactId') contactId: string) {
-    await this.batchesService.removeContactFromPendingBatch(+contactId)
+  async removeContactFromPending(
+    @Param('contactId') contactId: string,
+    @CurrentUser() userId: string,
+  ) {
+    await this.batchesService.removeContactFromPendingBatch(+contactId, userId)
   }
 
   @Get(':id')

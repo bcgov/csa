@@ -1,0 +1,31 @@
+{
+  "items": [
+    {
+      "Id": "LEG-000002",
+      "Updated": "02/09/2026 10:00:00",
+      "Legal Authority Code": "ADO-Adoption Act-24",
+      "Effective Legal Status": "ICD-Interim Order-35(2)(a)",
+      "Effective Date": "06/04/2025",
+      "Expiry Date": "05/30/2027",
+      "Parent Contact Id": "P-000002"
+    },
+    {
+      "Id": "LEG-000003",
+      "Updated": "02/09/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "12/02/2025",
+      "Expiry Date": "11/18/2026",
+      "Parent Contact Id": "P-000003"
+    },
+    {
+      "Id": "LEG-000004",
+      "Updated": "02/09/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "SNP-SNA-Protection 7(1)",
+      "Effective Date": "03/01/2024",
+      "Expiry Date": "11/04/2027",
+      "Parent Contact Id": "P-000004"
+    }
+  ]
+}

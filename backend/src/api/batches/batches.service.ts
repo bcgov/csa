@@ -327,7 +327,7 @@ export class BatchesService {
     return existingComments ? `${dated}\n${existingComments}` : dated
   }
 
-  async removeContactFromPendingBatch(contactId: number): Promise<void> {
+  async removeContactFromPendingBatch(contactId: number, userId?: string): Promise<void> {
     const pendingBatch = await this.prisma.batch.findFirst({
       where: { status: BATCH_STATUS.PENDING },
     })
@@ -362,6 +362,8 @@ export class BatchesService {
       }),
     ])
 
-    await this.contactsService.updateCsaStatus(contactId, CSA_EVENT.REMOVE_FROM_BATCH, 'USER')
+    await this.contactsService.updateCsaStatus(contactId, CSA_EVENT.REMOVE_FROM_BATCH, 'USER', {
+      userId,
+    })
   }
 }

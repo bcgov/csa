@@ -21,6 +21,7 @@ const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile =>
   serviceOffice: null,
   assignedTo: null,
   csaStatus: null,
+  csaStatusEffectiveDate: null,
   existingContactId: null,
   din: null,
   csaSentDate: null,
@@ -37,6 +38,8 @@ const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile =>
   akaLastName: null,
   isIneligible: false,
   deceased: null,
+  cancelReasonCode: null,
+  careEndDate: null,
   placements: [],
   orders: [],
   agreements: [],
@@ -61,6 +64,7 @@ const makeCtx = (
   ctxOverrides: Partial<EligibilityContext> = {},
 ): EligibilityContext => ({
   contact: makeContact(contactOverrides),
+  referenceDate: REF_DATE,
   hasPlacement: true,
   hasNonPlacement: false,
   contractNumbers: ['C-100'],
@@ -72,7 +76,7 @@ describe('step6_OrderPaymentCheck', () => {
     const ctx = makeCtx({
       orders: [makeOrder()],
     })
-    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(7)
   })
 
@@ -80,13 +84,13 @@ describe('step6_OrderPaymentCheck', () => {
     const ctx = makeCtx({
       orders: [makeOrder({ amount: 1000.0 })],
     })
-    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(8)
   })
 
   it('should route to step 8 when no orders found at all', () => {
     const ctx = makeCtx({ orders: [] })
-    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(8)
   })
 
@@ -95,7 +99,7 @@ describe('step6_OrderPaymentCheck', () => {
       { orders: [makeOrder({ amount: 1000.0, orderType: 'Invalid Type' })] },
       { hasNonPlacement: false },
     )
-    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(9)
   })
 
@@ -104,7 +108,7 @@ describe('step6_OrderPaymentCheck', () => {
       { orders: [makeOrder({ amount: 1000.0, orderType: 'Invalid Type' })] },
       { hasNonPlacement: true },
     )
-    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(8)
   })
 
@@ -115,15 +119,26 @@ describe('step6_OrderPaymentCheck', () => {
         makeOrder({ contractNumber: 'C-100', amount: 500 }),
       ],
     })
-    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(8)
+  })
+
+  it('should match ICM orders by agreementRowId when contractNumber is null', () => {
+    const ctx = makeCtx(
+      {
+        orders: [makeOrder({ contractNumber: null, agreementRowId: 'A-1' })],
+      },
+      { contractNumbers: [], agreementRowIds: ['A-1'] },
+    )
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
+    expect(result!.step).toBe(7)
   })
 
   it('should accept MIS order types (Fixed Rate, Variable Rate)', () => {
     const ctx = makeCtx({
       orders: [makeOrder({ orderType: 'Fixed Rate', source: 'MIS' })],
     })
-    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(7)
   })
 
@@ -131,7 +146,7 @@ describe('step6_OrderPaymentCheck', () => {
     const ctx = makeCtx({
       orders: [makeOrder({ orderType: ' monthly family care rate ', orderStatus: ' closed ' })],
     })
-    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(7)
   })
 
@@ -139,7 +154,7 @@ describe('step6_OrderPaymentCheck', () => {
     const ctx = makeCtx({
       orders: [makeOrder({ orderStatus: 'Processed', source: 'MIS' })],
     })
-    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(7)
   })
 
@@ -148,7 +163,7 @@ describe('step6_OrderPaymentCheck', () => {
     const ctx = makeCtx({
       orders: [makeOrder({ effectiveStartDate: new Date('2025-12-15') })],
     })
-    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(9)
   })
 
@@ -156,15 +171,26 @@ describe('step6_OrderPaymentCheck', () => {
     const ctx = makeCtx({
       orders: [makeOrder({ amount: 1549.2 })],
     })
-    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(7)
   })
 
-  it('should pick highest amount order from previous month', () => {
+  it('should route to step 7 if any previous-month order matches all 4 criteria', () => {
     const ctx = makeCtx({
       orders: [makeOrder({ amount: 500 }), makeOrder({ amount: 1600 })],
     })
-    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
+    expect(result!.step).toBe(7)
+  })
+
+  it('should route to step 7 even if highest-amount order fails type but another passes all 4', () => {
+    const ctx = makeCtx({
+      orders: [
+        makeOrder({ amount: 2000, orderType: 'Invalid Type' }),
+        makeOrder({ amount: 1600, orderType: 'Monthly Family Care Rate' }),
+      ],
+    })
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(7)
   })
 
@@ -175,7 +201,7 @@ describe('step6_OrderPaymentCheck', () => {
         makeOrder({ amount: 1000 }),
       ],
     })
-    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(8)
   })
 
@@ -184,7 +210,7 @@ describe('step6_OrderPaymentCheck', () => {
       { orders: [makeOrder({ effectiveStartDate: new Date('2025-12-15') })] },
       { hasNonPlacement: true },
     )
-    const result = step6_OrderPaymentCheck.evaluate(ctx, REF_DATE)
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(8)
   })
 })

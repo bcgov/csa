@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS csa.contacts (
   service_office             TEXT,
   assigned_to                TEXT,
   csa_status                 TEXT,
-  csa_status_effective_date  DATE,
+  csa_status_effective_date  TIMESTAMPTZ,
   csa_sent_date              TIMESTAMPTZ,
   din                        TEXT,
   effective_legal_status     TEXT,

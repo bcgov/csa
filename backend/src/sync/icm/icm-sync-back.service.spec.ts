@@ -7,7 +7,7 @@ const makeContact = (id: number, overrides = {}) => ({
   id,
   personIdIcm: `ICM-${id}`,
   csaStatus: 'eligible',
-  csaStatusEffectiveDate: new Date('2026-01-15T20:00:00Z'), // Jan 15 12:00 PST
+  csaStatusEffectiveDate: new Date('2026-01-15T20:00:00Z'),
   din: `DIN-${id}`,
   csaSentDate: null,
   ...overrides,
@@ -116,12 +116,10 @@ describe('IcmSyncBackService', () => {
       expect(prisma.contact.updateMany).toHaveBeenCalledTimes(1)
     })
 
-    it('should format dates as MM/DD/YYYY HH:MM:SS in PST in payload', async () => {
+    it('should format effective date and sent date as MM/DD/YYYY HH:MM:SS Pacific', async () => {
       const contacts = [
         makeContact(1, {
-          // Jun 20 17:30:45 UTC = Jun 20 10:30:45 PDT (UTC-7 in summer)
-          csaStatusEffectiveDate: new Date('2026-06-20T17:30:45Z'),
-          // Mar 10 21:15:00 UTC = Mar 10 14:15:00 PDT (UTC-7 after spring-forward)
+          csaStatusEffectiveDate: new Date('2026-06-20T07:00:00Z'),
           csaSentDate: new Date('2026-03-10T21:15:00Z'),
         }),
       ]
@@ -131,7 +129,7 @@ describe('IcmSyncBackService', () => {
 
       expect(icmDataSource.updateContacts).toHaveBeenCalledWith([
         expect.objectContaining({
-          'CSA Status Effective Date': '06/20/2026 10:30:45',
+          'CSA Status Effective Date': '06/20/2026 00:00:00',
           'CSA Sent Date': '03/10/2026 14:15:00',
         }),
       ])

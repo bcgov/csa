@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { pacificToday } from 'src/common/utils'
 import type { Batch, Contact, ContactBatchDetail } from '@prisma/client'
 import { BatchesService } from 'src/api/batches/batches.service'
 import { ContactsService } from 'src/api/contacts/contacts.service'
@@ -158,10 +159,9 @@ export class SendCraFileHandler extends BaseJob {
       )
     }
 
-    // Set batchDate
     await this.prisma.batch.update({
       where: { id: this.batch.id },
-      data: { batchDate: now },
+      data: { batchDate: pacificToday() },
     })
 
     // Fire sync flagged contacts to ICM Job

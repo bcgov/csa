@@ -4,6 +4,7 @@ import { EligibilityContext } from '../rule.interface'
 import { step4_FetchAgreementContract } from './step4-fetch-agreement-contract'
 
 const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile => ({
+  caseRowId: 'CASE-1',
   personIdIcm: 'ICM-1',
   personIdMis: 'MIS-1',
   firstName: 'John',
@@ -20,6 +21,7 @@ const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile =>
   serviceOffice: null,
   assignedTo: null,
   csaStatus: null,
+  csaStatusEffectiveDate: null,
   existingContactId: null,
   din: null,
   csaSentDate: null,
@@ -36,6 +38,8 @@ const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile =>
   akaLastName: null,
   isIneligible: false,
   deceased: null,
+  cancelReasonCode: null,
+  careEndDate: null,
   placements: [],
   orders: [],
   agreements: [],
@@ -46,6 +50,7 @@ describe('step4_FetchAgreementContract', () => {
   it('should extract contract numbers from eligible placements and continue chain', () => {
     const ctx: EligibilityContext = {
       contact: makeContact(),
+      referenceDate: new Date('2026-02-10'),
       eligiblePlacements: [
         {
           type: 'Placement',
@@ -54,11 +59,13 @@ describe('step4_FetchAgreementContract', () => {
           endDate: null,
           contractNumber: 'C-100',
           agreementRowId: 'A-1',
+          rawType: null,
           paidUnpaid: null,
           source: 'ICM',
         },
         {
           type: 'Placement',
+          rawType: null,
           status: 'Interrupted',
           startDate: null,
           endDate: null,
@@ -74,14 +81,17 @@ describe('step4_FetchAgreementContract', () => {
 
     expect(result).toBeNull() // always continues to Step 6
     expect(ctx.contractNumbers).toEqual(['C-100', 'C-200'])
+    expect(ctx.agreementRowIds).toEqual(['A-1', 'A-2'])
   })
 
   it('should filter out null contract numbers', () => {
     const ctx: EligibilityContext = {
       contact: makeContact(),
+      referenceDate: new Date('2026-02-10'),
       eligiblePlacements: [
         {
           type: 'Placement',
+          rawType: null,
           status: 'Active',
           startDate: null,
           endDate: null,
@@ -92,6 +102,7 @@ describe('step4_FetchAgreementContract', () => {
         },
         {
           type: 'Placement',
+          rawType: null,
           status: 'Active',
           startDate: null,
           endDate: null,
@@ -111,6 +122,7 @@ describe('step4_FetchAgreementContract', () => {
   it('should set empty array when no eligible placements in context', () => {
     const ctx: EligibilityContext = {
       contact: makeContact(),
+      referenceDate: new Date('2026-02-10'),
     }
 
     step4_FetchAgreementContract.evaluate(ctx)
@@ -120,9 +132,11 @@ describe('step4_FetchAgreementContract', () => {
   it('should deduplicate contract numbers', () => {
     const ctx: EligibilityContext = {
       contact: makeContact(),
+      referenceDate: new Date('2026-02-10'),
       eligiblePlacements: [
         {
           type: 'Placement',
+          rawType: null,
           status: 'Active',
           startDate: null,
           endDate: null,
@@ -133,6 +147,7 @@ describe('step4_FetchAgreementContract', () => {
         },
         {
           type: 'Placement',
+          rawType: null,
           status: 'Interrupted',
           startDate: null,
           endDate: null,

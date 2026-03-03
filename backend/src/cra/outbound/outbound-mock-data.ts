@@ -1,15 +1,10 @@
+import { formatDatePacificCompact } from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 
 const { HEADER_TRAN_CODE, DETAIL_TRAN_CODE, TRAILER_TRAN_CODE } =
   CRA_DATA_HANDLING_CONSTANT.REQUEST_FILE
 
-const currentDate = (): string => {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}${month}${day}`
-}
+const currentDate = (): string => formatDatePacificCompact(new Date())
 
 const details = [
   {

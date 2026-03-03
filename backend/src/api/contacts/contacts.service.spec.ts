@@ -1289,7 +1289,13 @@ describe('ContactsService', () => {
 
       const result = await service.findContactBatches(1)
 
-      expect(result).toEqual(batchDetails)
+      expect(result).toEqual([
+        {
+          ...batchDetails[0],
+          statusLabel: 'Processed',
+          batch: { ...batchDetails[0].batch, statusLabel: 'Processed' },
+        },
+      ])
       expect(prisma.contactBatchDetail.findMany).toHaveBeenCalledWith({
         where: { contactId: 1 },
         include: {

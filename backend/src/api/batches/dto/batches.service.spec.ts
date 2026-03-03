@@ -62,7 +62,10 @@ describe('BatchesService', () => {
 
       const result = await service.findAll()
 
-      expect(result).toEqual(batches)
+      expect(result).toEqual([
+        { id: 2, status: 'pending', createdAt: new Date('2026-01-29'), statusLabel: 'Pending' },
+        { id: 1, status: 'processed', createdAt: new Date('2026-01-28'), statusLabel: 'Processed' },
+      ])
       expect(mockPrismaService.batch.findMany).toHaveBeenCalledWith({
         orderBy: { createdAt: 'desc' },
       })
@@ -76,7 +79,7 @@ describe('BatchesService', () => {
 
       const result = await service.findOne(1)
 
-      expect(result).toEqual(batch)
+      expect(result).toEqual({ ...batch, statusLabel: 'Pending' })
       expect(mockPrismaService.batch.findUnique).toHaveBeenCalledWith({
         where: { id: 1 },
       })
@@ -98,6 +101,8 @@ describe('BatchesService', () => {
           id: 1,
           contactId: 100,
           batchId: 1,
+          transactionType: 'application',
+          status: 'pending',
           contact: {
             id: 100,
             lastName: 'Doe',
@@ -115,6 +120,7 @@ describe('BatchesService', () => {
       expect(result).toEqual(
         details.map((d) => ({
           ...d,
+          statusLabel: 'Pending',
           contact: {
             ...d.contact,
             csaStatusLabel: 'Eligible',
@@ -152,7 +158,7 @@ describe('BatchesService', () => {
 
       const result = await service.findOrCreatePendingBatch()
 
-      expect(result).toEqual(pendingBatch)
+      expect(result).toEqual({ ...pendingBatch, statusLabel: 'Pending' })
       expect(mockPrismaService.batch.findFirst).toHaveBeenCalledWith({
         where: { status: BATCH_STATUS.PENDING },
       })
@@ -166,7 +172,7 @@ describe('BatchesService', () => {
 
       const result = await service.findOrCreatePendingBatch()
 
-      expect(result).toEqual(newBatch)
+      expect(result).toEqual({ ...newBatch, statusLabel: 'Pending' })
       expect(mockPrismaService.batch.create).toHaveBeenCalledWith({
         data: {
           batchDate: null,

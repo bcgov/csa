@@ -89,6 +89,7 @@ ALTER TABLE csa.contacts ALTER COLUMN search_text SET NOT NULL;
 
 -- Full-text search index (trigram for ILIKE '%term%' queries)
 CREATE INDEX idx_contacts_search_text_trgm ON csa.contacts USING GIN (search_text gin_trgm_ops);
+CREATE INDEX idx_contacts_status_dob ON csa.contacts (csa_status, date_of_birth);
 
 CREATE TABLE IF NOT EXISTS csa.batches (
   id              SERIAL      PRIMARY KEY,
@@ -102,6 +103,7 @@ CREATE TABLE IF NOT EXISTS csa.batches (
 
 CREATE UNIQUE INDEX batches_pending_unique ON csa.batches (status)
   WHERE status = 'pending';
+CREATE INDEX idx_batches_status_created_at ON csa.batches (status, created_at);
 
 CREATE TABLE IF NOT EXISTS csa.contact_batch_details (
   id                  SERIAL      PRIMARY KEY,
@@ -120,6 +122,8 @@ CREATE TABLE IF NOT EXISTS csa.contact_batch_details (
   CONSTRAINT fk_cbd_batch FOREIGN KEY (batch_id) REFERENCES csa.batches (id)
 );
 
+CREATE INDEX idx_contact_batch_details_batch_id ON csa.contact_batch_details (batch_id);
+
 CREATE TABLE IF NOT EXISTS csa.job_runs (
   id             SERIAL      PRIMARY KEY,
   job_type       TEXT        NOT NULL,
@@ -137,6 +141,7 @@ CREATE TABLE IF NOT EXISTS csa.job_runs (
 CREATE INDEX idx_job_runs_status ON csa.job_runs (status);
 CREATE INDEX idx_job_runs_parent ON csa.job_runs (parent_job_id);
 CREATE INDEX idx_job_runs_type_status ON csa.job_runs (job_type, status);
+CREATE INDEX idx_job_runs_type_status_completed ON csa.job_runs (job_type, status, completed_at DESC);
 CREATE UNIQUE INDEX idx_job_runs_one_running_per_type ON csa.job_runs (job_type) WHERE status = 'RUNNING';
 
 CREATE TABLE IF NOT EXISTS csa.transfer_files (
@@ -154,6 +159,11 @@ CREATE TABLE IF NOT EXISTS csa.transfer_files (
   sequence_number   INTEGER,
   CONSTRAINT fk_transfer_files_batch FOREIGN KEY (batch_id) REFERENCES csa.batches (id)
 );
+
+CREATE INDEX idx_transfer_files_direction ON csa.transfer_files (direction);
+
+CREATE INDEX idx_contacts_icm_sync ON csa.contacts (icm_integration_status)
+  WHERE icm_integration_status = true;
 
 -- staging tables
 
@@ -316,6 +326,7 @@ CREATE INDEX idx_stg_icm_placements_case ON csa.stg_icm_placements (CASE_ROW_ID)
 CREATE INDEX idx_stg_icm_placements_agreement ON csa.stg_icm_placements (AGREEMENT_ROW_ID);
 CREATE INDEX idx_stg_icm_orders_agreement ON csa.stg_icm_orders (AGREEMENT_ROW_ID);
 CREATE INDEX idx_stg_icm_legal_authority_parent ON csa.stg_icm_legal_authority (PAR_ROW_ID);
+CREATE INDEX idx_stg_icm_legal_authority_admin_code ON csa.stg_icm_legal_authority_admin (LGL_AUTH_CD);
 
 -- MIS staging indexes (eligibility query joins)
 CREATE INDEX idx_stg_mis_payments_contract ON csa.stg_mis_payments (contract_number);

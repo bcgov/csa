@@ -577,7 +577,7 @@ export class ContactsService {
       throw new NotFoundException(`Contact ${contactId} not found`)
     }
 
-    return this.prisma.contactBatchDetail.findMany({
+    const details = await this.prisma.contactBatchDetail.findMany({
       where: { contactId },
       include: {
         batch: {
@@ -590,6 +590,11 @@ export class ContactsService {
       },
       orderBy: { createdAt: 'desc' },
     })
+
+    return details.map((detail) => enrichLabels({
+      ...detail,
+      batch: enrichLabels(detail.batch),
+    }))
   }
 
   // Escape ILIKE special characters to prevent wildcard injection

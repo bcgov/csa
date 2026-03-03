@@ -40,9 +40,10 @@ export class BatchesService {
   ) {}
 
   async findAll() {
-    return this.prisma.batch.findMany({
+    const batches = await this.prisma.batch.findMany({
       orderBy: { createdAt: 'desc' },
     })
+    return batches.map(enrichLabels)
   }
 
   async findOne(id: number) {
@@ -52,7 +53,7 @@ export class BatchesService {
     if (!batch) {
       throw new NotFoundException(`Batch ${id} not found`)
     }
-    return batch
+    return enrichLabels(batch)
   }
 
   // Update a batch's status using the state machine.
@@ -151,7 +152,7 @@ export class BatchesService {
       orderBy: { createdAt: 'desc' },
     })
 
-    return details.map((detail) => ({
+    return details.map((detail) => enrichLabels({
       ...detail,
       contact: enrichLabels(detail.contact),
     }))
@@ -173,7 +174,7 @@ export class BatchesService {
       })
     }
 
-    return pendingBatch
+    return enrichLabels(pendingBatch)
   }
 
   async addContactsToPendingBatch(

@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { JobsService } from 'src/jobs/jobs.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildLoadContactProfilesSql } from './eligibility.queries'
+import { buildFindAgedOutContactIdsSql, buildLoadContactProfilesSql } from './eligibility.queries'
 import { EligibilityService } from './eligibility.service'
 
 describe('EligibilityService', () => {
@@ -225,6 +225,47 @@ describe('EligibilityService', () => {
 
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
       expect.not.stringContaining('changed_contacts'),
+    )
+  })
+
+  it('should query for aged-out contacts in incremental mode', async () => {
+    const lastSuccess = new Date('2026-02-14T10:00:00Z')
+    mockJobsService.getLastSuccessTimestamp.mockResolvedValue(lastSuccess)
+
+    await service.run()
+
+    expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
+      expect.stringContaining('csa_status IN'),
+      expect.any(Date),
+    )
+  })
+
+  it('should not query for aged-out contacts in full load mode', async () => {
+    mockJobsService.getLastSuccessTimestamp.mockResolvedValue(null)
+
+    await service.run()
+
+    expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalledWith(
+      expect.stringContaining('csa_status IN'),
+      expect.any(Date),
+    )
+  })
+
+  it('should include aged-out IDs in profile query when found', async () => {
+    const lastSuccess = new Date('2026-02-14T10:00:00Z')
+    mockJobsService.getLastSuccessTimestamp.mockResolvedValue(lastSuccess)
+
+    mockPrisma.$queryRawUnsafe
+      .mockResolvedValueOnce([{ person_id_icm: 'AGED-1' }, { person_id_icm: 'AGED-2' }]) // aged-out query
+      .mockResolvedValueOnce([]) // loadContactProfiles
+
+    await service.run()
+
+    const expectedThreshold = new Date(lastSuccess.getTime() - 2 * 24 * 60 * 60 * 1000)
+    expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
+      expect.stringContaining('ANY($2::TEXT[])'),
+      expectedThreshold,
+      ['AGED-1', 'AGED-2'],
     )
   })
 
@@ -539,5 +580,41 @@ describe('buildLoadContactProfilesSql', () => {
 
     expect(sql).toContain('legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID')
     expect(sql).not.toContain('legal_auth.PAR_ROW_ID = cases.ROW_ID')
+  })
+
+  it('should include ANY clause when agedOutContactIds provided in incremental mode', () => {
+    const { sql, params } = buildLoadContactProfilesSql(new Date('2026-02-12'), ['ICM-1', 'ICM-2'])
+    expect(sql).toContain('ANY($2::TEXT[])')
+    expect(sql).toContain('changed_contacts')
+    expect(params).toEqual([new Date('2026-02-12'), ['ICM-1', 'ICM-2']])
+  })
+
+  it('should not include ANY clause when agedOutContactIds is empty', () => {
+    const { sql, params } = buildLoadContactProfilesSql(new Date('2026-02-12'), [])
+    expect(sql).not.toContain('ANY($2::TEXT[])')
+    expect(sql).toContain('changed_contacts')
+    expect(params).toEqual([new Date('2026-02-12')])
+  })
+
+  it('should ignore agedOutContactIds in full load mode', () => {
+    const { sql, params } = buildLoadContactProfilesSql(null, ['ICM-1'])
+    expect(sql).not.toContain('ANY')
+    expect(sql).not.toContain('changed_contacts')
+    expect(params).toEqual([])
+  })
+})
+
+describe('buildFindAgedOutContactIdsSql', () => {
+  it('should query contacts with transitionable statuses and DOB before cutoff', () => {
+    const cutoff = new Date('2008-03-01')
+    const { sql, params } = buildFindAgedOutContactIdsSql(cutoff)
+
+    expect(sql).toContain('csa_status IN')
+    expect(sql).toContain("'eligible'")
+    expect(sql).toContain("'in_pay'")
+    expect(sql).toContain("'not_eligible_out_of_pay'")
+    expect(sql).toContain('date_of_birth < $1')
+    expect(sql).toContain('date_of_birth IS NOT NULL')
+    expect(params).toEqual([cutoff])
   })
 })

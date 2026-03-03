@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   firstDayOfPreviousMonth,
   formatDate,
-  formatDatePst,
-  formatDatePstCompact,
+  formatDatePacific,
+  formatDatePacificCompact,
   formatDateTime,
-  formatDateTimePst,
+  formatDateTimePacific,
   getAgeCutoffDate,
   isEligibleAge,
-  parseDateAsPst,
+  parseCalendarDate,
+  parseDateAsPacific,
 } from './utils'
 
 describe('formatDate', () => {
@@ -57,156 +58,182 @@ describe('firstDayOfPreviousMonth', () => {
   })
 })
 
-describe('formatDatePst', () => {
+describe('formatDatePacific', () => {
   it('should format UTC noon as same-day PST', () => {
-    expect(formatDatePst(new Date('2026-01-15T12:00:00Z'))).toBe('01/15/2026')
+    expect(formatDatePacific(new Date('2026-01-15T12:00:00Z'))).toBe('01/15/2026')
   })
 
   it('should format UTC midnight as previous day in PST (winter)', () => {
-    expect(formatDatePst(new Date('2026-01-15T00:00:00Z'))).toBe('01/14/2026')
+    expect(formatDatePacific(new Date('2026-01-15T00:00:00Z'))).toBe('01/14/2026')
   })
 
   it('should format UTC midnight as previous day in PDT (summer)', () => {
-    expect(formatDatePst(new Date('2026-07-15T00:00:00Z'))).toBe('07/14/2026')
+    expect(formatDatePacific(new Date('2026-07-15T00:00:00Z'))).toBe('07/14/2026')
   })
 
   it('should handle UTC 08:00 as same day midnight PST (winter)', () => {
-    expect(formatDatePst(new Date('2026-01-15T08:00:00Z'))).toBe('01/15/2026')
+    expect(formatDatePacific(new Date('2026-01-15T08:00:00Z'))).toBe('01/15/2026')
   })
 
   it('should handle UTC 07:00 as same day midnight PDT (summer)', () => {
-    expect(formatDatePst(new Date('2026-07-15T07:00:00Z'))).toBe('07/15/2026')
+    expect(formatDatePacific(new Date('2026-07-15T07:00:00Z'))).toBe('07/15/2026')
   })
 
   it('should zero-pad month and day', () => {
-    expect(formatDatePst(new Date('2026-03-05T20:00:00Z'))).toBe('03/05/2026')
+    expect(formatDatePacific(new Date('2026-03-05T20:00:00Z'))).toBe('03/05/2026')
   })
 })
 
-describe('formatDatePstCompact', () => {
+describe('formatDatePacificCompact', () => {
   it('should format as YYYYMMDD in PST (winter)', () => {
-    expect(formatDatePstCompact(new Date('2026-01-15T12:00:00Z'))).toBe('20260115')
+    expect(formatDatePacificCompact(new Date('2026-01-15T12:00:00Z'))).toBe('20260115')
   })
 
   it('should format UTC midnight as previous day in PST', () => {
-    expect(formatDatePstCompact(new Date('2026-01-15T00:00:00Z'))).toBe('20260114')
+    expect(formatDatePacificCompact(new Date('2026-01-15T00:00:00Z'))).toBe('20260114')
   })
 
   it('should format as YYYYMMDD in PDT (summer)', () => {
-    expect(formatDatePstCompact(new Date('2026-07-15T12:00:00Z'))).toBe('20260715')
+    expect(formatDatePacificCompact(new Date('2026-07-15T12:00:00Z'))).toBe('20260715')
   })
 
   it('should zero-pad month and day', () => {
-    expect(formatDatePstCompact(new Date('2026-03-05T20:00:00Z'))).toBe('20260305')
+    expect(formatDatePacificCompact(new Date('2026-03-05T20:00:00Z'))).toBe('20260305')
   })
 })
 
-describe('formatDateTimePst', () => {
+describe('formatDateTimePacific', () => {
   it('should format with time in PST (winter)', () => {
-    expect(formatDateTimePst(new Date('2026-01-15T18:30:45Z'))).toBe('01/15/2026 10:30:45')
+    expect(formatDateTimePacific(new Date('2026-01-15T18:30:45Z'))).toBe('01/15/2026 10:30:45')
   })
 
   it('should format with time in PDT (summer)', () => {
-    expect(formatDateTimePst(new Date('2026-07-15T17:30:00Z'))).toBe('07/15/2026 10:30:00')
+    expect(formatDateTimePacific(new Date('2026-07-15T17:30:00Z'))).toBe('07/15/2026 10:30:00')
   })
 
   it('should handle midnight PST', () => {
-    expect(formatDateTimePst(new Date('2026-01-15T08:00:00Z'))).toBe('01/15/2026 00:00:00')
+    expect(formatDateTimePacific(new Date('2026-01-15T08:00:00Z'))).toBe('01/15/2026 00:00:00')
   })
 
   it('should handle 23:59:59 PST', () => {
-    expect(formatDateTimePst(new Date('2026-01-16T07:59:59Z'))).toBe('01/15/2026 23:59:59')
+    expect(formatDateTimePacific(new Date('2026-01-16T07:59:59Z'))).toBe('01/15/2026 23:59:59')
   })
 
   it('should zero-pad hours, minutes, seconds', () => {
-    expect(formatDateTimePst(new Date('2026-01-15T08:05:03Z'))).toBe('01/15/2026 00:05:03')
+    expect(formatDateTimePacific(new Date('2026-01-15T08:05:03Z'))).toBe('01/15/2026 00:05:03')
   })
 })
 
-describe('parseDateAsPst', () => {
+describe('parseDateAsPacific', () => {
   it('should parse MM/DD/YYYY HH:MM:SS as PST (winter)', () => {
-    const result = parseDateAsPst('01/13/2026 10:51:03')
+    const result = parseDateAsPacific('01/13/2026 10:51:03')
     expect(result!.toISOString()).toBe('2026-01-13T18:51:03.000Z')
   })
 
   it('should parse MM/DD/YYYY HH:MM:SS as PDT (summer)', () => {
-    const result = parseDateAsPst('07/15/2026 10:00:00')
+    const result = parseDateAsPacific('07/15/2026 10:00:00')
     expect(result!.toISOString()).toBe('2026-07-15T17:00:00.000Z')
   })
 
   it('should parse date-only as PST midnight (winter)', () => {
-    const result = parseDateAsPst('01/13/2026')
+    const result = parseDateAsPacific('01/13/2026')
     expect(result!.toISOString()).toBe('2026-01-13T08:00:00.000Z')
   })
 
   it('should parse date-only as PDT midnight (summer)', () => {
-    const result = parseDateAsPst('07/15/2026')
+    const result = parseDateAsPacific('07/15/2026')
     expect(result!.toISOString()).toBe('2026-07-15T07:00:00.000Z')
   })
 
   it('should handle midnight timestamp', () => {
-    const result = parseDateAsPst('01/13/2026 00:00:00')
+    const result = parseDateAsPacific('01/13/2026 00:00:00')
     expect(result!.toISOString()).toBe('2026-01-13T08:00:00.000Z')
   })
 
   it('should handle 23:59:59 PST', () => {
-    const result = parseDateAsPst('01/13/2026 23:59:59')
+    const result = parseDateAsPacific('01/13/2026 23:59:59')
     expect(result!.toISOString()).toBe('2026-01-14T07:59:59.000Z')
   })
 
   it('should return null for empty string', () => {
-    expect(parseDateAsPst('')).toBeNull()
+    expect(parseDateAsPacific('')).toBeNull()
   })
 
   it('should return null for null', () => {
-    expect(parseDateAsPst(null)).toBeNull()
+    expect(parseDateAsPacific(null)).toBeNull()
   })
 
   it('should return null for undefined', () => {
-    expect(parseDateAsPst(undefined)).toBeNull()
+    expect(parseDateAsPacific(undefined)).toBeNull()
   })
 
   it('should return null for whitespace-only', () => {
-    expect(parseDateAsPst('   ')).toBeNull()
+    expect(parseDateAsPacific('   ')).toBeNull()
   })
 
   it('should handle DST spring-forward boundary (March)', () => {
-    const beforeSpring = parseDateAsPst('03/08/2026 01:30:00')
+    const beforeSpring = parseDateAsPacific('03/08/2026 01:30:00')
     expect(beforeSpring!.toISOString()).toBe('2026-03-08T09:30:00.000Z')
 
-    const afterSpring = parseDateAsPst('03/08/2026 03:30:00')
+    const afterSpring = parseDateAsPacific('03/08/2026 03:30:00')
     expect(afterSpring!.toISOString()).toBe('2026-03-08T10:30:00.000Z')
   })
 
   it('should handle DST fall-back boundary (November)', () => {
-    const afterFall = parseDateAsPst('11/01/2026 03:00:00')
+    const afterFall = parseDateAsPacific('11/01/2026 03:00:00')
     expect(afterFall!.toISOString()).toBe('2026-11-01T11:00:00.000Z')
   })
 
   it('should handle ambiguous 1:30 AM during fall-back (favors standard time)', () => {
     // 1:30 AM occurs twice during fall-back. Luxon resolves to standard time (PST, UTC-8).
-    const result = parseDateAsPst('11/01/2026 01:30:00')
+    const result = parseDateAsPacific('11/01/2026 01:30:00')
     expect(result!.toISOString()).toBe('2026-11-01T09:30:00.000Z')
   })
 })
 
-describe('round-trip: parse then format (PST)', () => {
+describe('parseCalendarDate', () => {
+  it('should parse MM/DD/YYYY to ISO date string', () => {
+    expect(parseCalendarDate('01/15/2026')).toBe('2026-01-15')
+  })
+
+  it('should not shift date regardless of season', () => {
+    expect(parseCalendarDate('07/15/2026')).toBe('2026-07-15')
+  })
+
+  it('should return null for empty string', () => {
+    expect(parseCalendarDate('')).toBeNull()
+  })
+
+  it('should return null for null', () => {
+    expect(parseCalendarDate(null)).toBeNull()
+  })
+
+  it('should return null for undefined', () => {
+    expect(parseCalendarDate(undefined)).toBeNull()
+  })
+
+  it('should return null for whitespace-only', () => {
+    expect(parseCalendarDate('   ')).toBeNull()
+  })
+})
+
+describe('round-trip: parse then format (Pacific)', () => {
   it('should round-trip a winter datetime', () => {
     const original = '01/13/2026 10:51:03'
-    const parsed = parseDateAsPst(original)!
-    expect(formatDateTimePst(parsed)).toBe(original)
+    const parsed = parseDateAsPacific(original)!
+    expect(formatDateTimePacific(parsed)).toBe(original)
   })
 
   it('should round-trip a summer datetime', () => {
     const original = '07/15/2026 14:30:00'
-    const parsed = parseDateAsPst(original)!
-    expect(formatDateTimePst(parsed)).toBe(original)
+    const parsed = parseDateAsPacific(original)!
+    expect(formatDateTimePacific(parsed)).toBe(original)
   })
 
   it('should round-trip a date-only value', () => {
     const original = '01/13/2026'
-    const parsed = parseDateAsPst(original)!
-    expect(formatDatePst(parsed)).toBe(original)
+    const parsed = parseDateAsPacific(original)!
+    expect(formatDatePacific(parsed)).toBe(original)
   })
 })
 

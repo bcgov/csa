@@ -14,12 +14,10 @@ import { step9_UpdateNotEligible } from './step9-update-not-eligible'
  *   - Enroll for CSA = No->Step 9
  * - Expired->Step 9
  */
-export const step2_LegalStatusCheck: EligibilityRule & {
-  evaluate(ctx: EligibilityContext, referenceDate?: Date): EligibilityResult | null
-} = {
+export const step2_LegalStatusCheck: EligibilityRule = {
   name: 'step2_LegalStatusCheck',
 
-  evaluate(ctx: EligibilityContext, referenceDate: Date = new Date()): EligibilityResult | null {
+  evaluate(ctx: EligibilityContext): EligibilityResult | null {
     const { csaStatus, misLegalAuthCode, legalExpiryDate, enrollForCsa } = ctx.contact
 
     if (
@@ -29,17 +27,16 @@ export const step2_LegalStatusCheck: EligibilityRule & {
       return step8_UpdateEligibleTbd(csaStatus)
     }
 
-    const isNotExpired = legalExpiryDate === null || legalExpiryDate >= referenceDate
+    const isNotExpired = legalExpiryDate === null || legalExpiryDate >= ctx.referenceDate
 
     if (isNotExpired) {
       const normalizedEnroll = normalize(enrollForCsa)
       if (normalizedEnroll === 'YES') return null
       if (normalizedEnroll === 'TBD') return step8_UpdateEligibleTbd(csaStatus)
-      if (normalizedEnroll === 'NO') return step9_UpdateNotEligible(csaStatus)
-
-      return step8_UpdateEligibleTbd(csaStatus)
+      if (normalizedEnroll === 'NO')
+        return step9_UpdateNotEligible(csaStatus, null, null, ctx.referenceDate)
     }
 
-    return step9_UpdateNotEligible(csaStatus)
+    return step9_UpdateNotEligible(csaStatus, null, null, ctx.referenceDate)
   },
 }

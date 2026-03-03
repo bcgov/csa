@@ -53,6 +53,7 @@ export interface ContactProfile {
 /** Placement from ICM or MIS staging */
 export interface PlacementRecord {
   type: string // 'Placement' | 'Non-Placement Location'
+  rawType: string | null // original MIS type code ('AW', 'AD', 'PL ...') before remapping
   status: string // 'Active' | 'Interrupted' | ...
   startDate: Date | null
   endDate: Date | null

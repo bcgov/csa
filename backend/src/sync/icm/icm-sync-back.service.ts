@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { CSA_STATUS_LABELS } from 'src/common/state-machine/constants/csa-status.constants'
 import { IcmContactUpdatePayload, IcmDataSource } from './data-source/icm-data-source'
-import { formatDateTimePst } from 'src/common/utils'
+import { formatDateTimePacific } from 'src/common/utils'
 
 const ICM_BATCH_SIZE = 100
 
@@ -123,10 +123,10 @@ export class IcmSyncBackService {
         ? (CSA_STATUS_LABELS[contact.csaStatus] ?? contact.csaStatus)
         : '',
       'CSA Status Effective Date': contact.csaStatusEffectiveDate
-        ? formatDateTimePst(contact.csaStatusEffectiveDate)
+        ? formatDateTimePacific(contact.csaStatusEffectiveDate)
         : '',
       'CSA DIN': contact.din ?? null,
-      'CSA Sent Date': contact.csaSentDate ? formatDateTimePst(contact.csaSentDate) : null,
+      'CSA Sent Date': contact.csaSentDate ? formatDateTimePacific(contact.csaSentDate) : null,
     }
   }
 }

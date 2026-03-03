@@ -9,6 +9,9 @@ export class BatchSummaryDto {
 
   @ApiProperty()
   status: string
+
+  @ApiProperty({ description: 'Display label for batch status' })
+  statusLabel: string
 }
 
 export class ContactSummaryDto {
@@ -61,6 +64,9 @@ export class ContactBatchDetailDto {
 
   @ApiProperty({ nullable: true })
   status: string | null
+
+  @ApiProperty({ description: 'Display label for batch detail status' })
+  statusLabel: string
 }
 
 export class ContactBatchDetailWithContactDto extends ContactBatchDetailDto {

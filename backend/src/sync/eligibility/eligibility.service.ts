@@ -4,7 +4,7 @@ import { TRANSACTION_TYPES } from 'src/api/contacts/constants'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_STATUS } from 'src/common/state-machine/constants/batch-status.constants'
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
-import { normalize } from 'src/common/utils'
+import { normalize, pacificToday } from 'src/common/utils'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobsService } from 'src/jobs/jobs.service'
 import { CANCEL_REASON } from './cancellation/cancellation-reason.constants'
@@ -304,6 +304,7 @@ export class EligibilityService {
   ) {}
 
   async run(): Promise<EligibilityRunResult> {
+    const referenceDate = pacificToday()
     const threshold = await this.computeThreshold()
     this.logger.log(
       threshold
@@ -327,6 +328,12 @@ export class EligibilityService {
     const updates: Array<{ profile: ContactProfile; result: EligibilityResult }> = []
 
     for (const profile of profiles) {
+      if (!profile.dateOfBirth) {
+        this.logger.warn(`Skipping contact ${profile.personIdIcm}: missing date of birth`)
+        stats.skipped++
+        continue
+      }
+
       // Protected statuses: preserve existing csa_status, still upsert data
       if (
         profile.csaStatus &&
@@ -343,7 +350,7 @@ export class EligibilityService {
         continue
       }
 
-      const result = runEligibility(profile, RULES)
+      const result = runEligibility(profile, RULES, referenceDate)
       if (!result) continue
 
       if (result.newStatus) {
@@ -399,6 +406,7 @@ export class EligibilityService {
       const icmPlacements: PlacementRecord[] = (raw.icmPlacements ?? []).map(
         (placement: any): PlacementRecord => ({
           type: placement.type,
+          rawType: null,
           status: placement.status,
           startDate: placement.startDate ? new Date(placement.startDate) : null,
           endDate: placement.endDate ? new Date(placement.endDate) : null,
@@ -419,6 +427,7 @@ export class EligibilityService {
       const misPlacements: PlacementRecord[] = (raw.misPlacements ?? []).map(
         (placement: any): PlacementRecord => ({
           type: placement.type?.startsWith('PL ') ? 'Placement' : 'Non-Placement Location',
+          rawType: placement.type ?? null,
           status: placement.status,
           startDate: placement.startDate ? new Date(placement.startDate) : null,
           endDate: placement.endDate ? new Date(placement.endDate) : null,

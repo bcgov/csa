@@ -20,7 +20,16 @@ export const step4_FetchAgreementContract: EligibilityRule = {
       ),
     ]
 
+    const agreementRowIds = [
+      ...new Set(
+        placements
+          .map((p) => p.agreementRowId)
+          .filter((a): a is string => a !== null && a !== undefined),
+      ),
+    ]
+
     ctx.contractNumbers = contractNumbers
+    ctx.agreementRowIds = agreementRowIds
 
     return null
   },

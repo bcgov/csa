@@ -54,7 +54,7 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
     sourceField: 'X_CSA_EFF_DATE',
     sourceLabel: 'Key Player CSA Status Effective Date',
     masterField: 'csa_status_effective_date',
-    dbType: 'date',
+    dbType: 'timestamp',
   },
   { sourceField: 'X_CSA_DIN', sourceLabel: 'Key Player DIN', masterField: 'din' },
 
@@ -133,7 +133,7 @@ export const STG_ICM_CONTACTS_MAP: FieldMapEntry[] = [
     sourceField: 'X_CSA_EFF_DATE',
     sourceLabel: 'CSA Status Effective Date',
     masterField: 'csa_status_effective_date',
-    dbType: 'date',
+    dbType: 'timestamp',
   },
 ]
 

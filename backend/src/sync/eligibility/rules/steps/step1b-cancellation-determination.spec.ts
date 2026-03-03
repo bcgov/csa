@@ -6,6 +6,7 @@ import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.consta
 import { CANCEL_REASON } from '../../cancellation/cancellation-reason.constants'
 
 const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile => ({
+  caseRowId: 'CASE-1',
   personIdIcm: 'ICM-1',
   personIdMis: 'MIS-1',
   firstName: 'John',
@@ -24,6 +25,7 @@ const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile =>
   serviceOffice: null,
   assignedTo: null,
   csaStatus: CSA_STATUS.IN_PAY,
+  csaStatusEffectiveDate: null,
   existingContactId: 1,
   din: null,
   csaSentDate: null,
@@ -38,6 +40,8 @@ const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile =>
   birthCountry: null,
   isIneligible: false,
   deceased: null,
+  cancelReasonCode: null,
+  careEndDate: null,
   placements: [],
   orders: [],
   agreements: [],
@@ -46,6 +50,7 @@ const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile =>
 
 const makeCtx = (overrides: Partial<ContactProfile> = {}): EligibilityContext => ({
   contact: makeContact(overrides),
+  referenceDate: new Date('2026-02-10'),
 })
 
 describe('step1B_CancellationCheck', () => {
@@ -83,7 +88,8 @@ describe('step1B_CancellationCheck', () => {
       const ctx = makeCtx({
         placements: [
           {
-            type: 'AW',
+            type: 'Non-Placement Location',
+            rawType: 'AW',
             status: 'Active',
             startDate: null,
             endDate: null,
@@ -124,7 +130,8 @@ describe('step1B_CancellationCheck', () => {
       const ctx = makeCtx({
         placements: [
           {
-            type: 'AD',
+            type: 'Non-Placement Location',
+            rawType: 'AD',
             status: 'Active',
             startDate: null,
             endDate: null,

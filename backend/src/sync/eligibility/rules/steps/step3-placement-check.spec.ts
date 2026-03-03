@@ -56,6 +56,7 @@ const makePlacement = (overrides: Partial<PlacementRecord> = {}): PlacementRecor
 
 const makeCtx = (overrides: Partial<ContactProfile> = {}): EligibilityContext => ({
   contact: makeContact(overrides),
+  referenceDate: new Date('2026-02-10'),
 })
 
 describe('step3_PlacementCheck', () => {

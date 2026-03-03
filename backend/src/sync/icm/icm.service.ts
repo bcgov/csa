@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { parseDateAsPst } from 'src/common/utils'
+import { parseCalendarDate, parseDateAsPacific } from 'src/common/utils'
 import { IcmApiRecord, IcmDataSource } from './data-source/icm-data-source'
 import { IcmApiConfig } from './icm.config'
 
@@ -53,9 +53,11 @@ export class IcmService {
       records.map((record) => {
         const raw = record[entry.sourceLabel]
         if (raw === '' || raw == null) return null
-        // Convert ICM PST date strings to UTC ISO format before PostgreSQL casts them
-        if (entry.dbType === 'timestamp' || entry.dbType === 'date') {
-          return parseDateAsPst(String(raw))?.toISOString() ?? null
+        if (entry.dbType === 'date') {
+          return parseCalendarDate(String(raw))
+        }
+        if (entry.dbType === 'timestamp') {
+          return parseDateAsPacific(String(raw))?.toISOString() ?? null
         }
         return raw
       }),

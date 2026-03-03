@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
 import { existsSync, writeFileSync } from 'fs'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { formatDatePacificCompact } from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { OutboundDataService } from './outbound-data.service'
 import { OutboundFileService } from './outbound-file.service'
@@ -46,13 +47,7 @@ vi.mock('fs', async () => {
   }
 })
 
-const currentDate = (): string => {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}${month}${day}`
-}
+const currentDate = (): string => formatDatePacificCompact(new Date())
 
 describe('OutboundFileService', () => {
   let service: OutboundFileService

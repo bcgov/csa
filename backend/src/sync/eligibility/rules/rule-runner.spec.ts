@@ -42,6 +42,8 @@ const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile =>
   ...overrides,
 })
 
+const REF_DATE = new Date('2026-02-10')
+
 describe('runEligibility', () => {
   it('should return null when no rules match (all return null)', () => {
     const passThrough: EligibilityRule = {
@@ -49,7 +51,7 @@ describe('runEligibility', () => {
       evaluate: () => null,
     }
 
-    const result = runEligibility(makeContact(), [passThrough])
+    const result = runEligibility(makeContact(), [passThrough], REF_DATE)
     expect(result).toBeNull()
   })
 
@@ -70,7 +72,7 @@ describe('runEligibility', () => {
       },
     }
 
-    const result = runEligibility(makeContact(), [rule1, rule2, rule3])
+    const result = runEligibility(makeContact(), [rule1, rule2, rule3], REF_DATE)
     expect(result).toEqual(expected)
   })
 
@@ -93,6 +95,6 @@ describe('runEligibility', () => {
       },
     }
 
-    runEligibility(makeContact(), [enricher, reader])
+    runEligibility(makeContact(), [enricher, reader], REF_DATE)
   })
 })

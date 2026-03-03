@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { pacificTodayISO } from 'src/common/utils'
 import { readFileSync } from 'fs'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import {
@@ -149,7 +150,7 @@ export class InboundResponseService {
 
   buildSystemComment(newMessage: string | null, existingComments: string | null): string | null {
     if (!newMessage) return existingComments
-    const date = new Date().toISOString().split('T')[0]
+    const date = pacificTodayISO()
     const dated = `[${date}] ${newMessage}`
     return existingComments ? `${dated}\n${existingComments}` : dated
   }

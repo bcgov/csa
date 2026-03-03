@@ -83,7 +83,7 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     primaryKey: 'ROW_ID',
     cursorLabel: 'Order Updated',
     searchSpec: () =>
-      `[Product] <> "Recovered Funds" AND [Order Status] = "Closed" AND ([Order Type] = "Variable" OR [Order Type] = "ADJ-Variable" OR [Order Type] = "Monthly Family Care Rate" OR [Order Type] = "Adj-Monthly Family Care Rate" OR [Order Type] = "Maintenance Payment") AND [Order Effective Start Date] >= "${formatDateTimePacific(firstDayOfPreviousMonth())}"`,
+      `[Product] <> "Recovered Funds" AND [Order Status] = "Closed" AND ([Order Type] = "Variable" OR [Order Type] = "ADJ-Variable" OR [Order Type] = "Monthly Family Care Rate" OR [Order Type] = "ADJ-Monthly Family Care Rate" OR [Order Type] = "Maintenance Payment") AND [Order Effective Start Date] >= "${formatDateTimePacific(firstDayOfPreviousMonth())}"`,
     fieldMap: STG_ORDER_MAP,
   },
 ]

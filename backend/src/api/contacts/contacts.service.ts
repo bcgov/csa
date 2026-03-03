@@ -591,10 +591,12 @@ export class ContactsService {
       orderBy: { createdAt: 'desc' },
     })
 
-    return details.map((detail) => enrichLabels({
-      ...detail,
-      batch: enrichLabels(detail.batch),
-    }))
+    return details.map((detail) =>
+      enrichLabels({
+        ...detail,
+        batch: enrichLabels(detail.batch),
+      }),
+    )
   }
 
   // Escape ILIKE special characters to prevent wildcard injection

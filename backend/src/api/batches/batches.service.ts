@@ -152,10 +152,12 @@ export class BatchesService {
       orderBy: { createdAt: 'desc' },
     })
 
-    return details.map((detail) => enrichLabels({
-      ...detail,
-      contact: enrichLabels(detail.contact),
-    }))
+    return details.map((detail) =>
+      enrichLabels({
+        ...detail,
+        contact: enrichLabels(detail.contact),
+      }),
+    )
   }
 
   async findOrCreatePendingBatch() {

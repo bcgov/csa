@@ -135,6 +135,7 @@ describe('BatchesService', () => {
               id: true,
               lastName: true,
               firstName: true,
+              middleName: true,
               din: true,
               csaStatus: true,
             },

@@ -86,13 +86,19 @@ const formatDateYMD = (dateString: string): string => {
 
 const formatDateTimeYMDHMS = (dateString: string): string => {
   const date = new Date(dateString)
-  const year = date.getFullYear()
-  const month = date.toLocaleString('en-US', { month: 'short' })
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  const seconds = String(date.getSeconds()).padStart(2, '0')
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }
+  const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(date)
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
 }
 
 function App() {
@@ -729,8 +735,13 @@ function App() {
         // Store the active column filter for pagination
         setActiveColumnFilter({ column: filterAnchor.column, query: filterSearchTerm.trim() })
         performColumnFilterSearch(filterAnchor.column, filterSearchTerm.trim(), currentPage)
-      } else if (filterSearchTerm.trim().length === 0 && isColumnFilterActive) {
-        // If column search is cleared, go back to regular filter
+      } else if (
+        filterSearchTerm.trim().length === 0 &&
+        isColumnFilterActive &&
+        activeColumnFilter &&
+        activeColumnFilter.column === filterAnchor.column
+      ) {
+        // Only clear filter if searching in the same column that has the active filter
         setIsColumnFilterActive(false)
         setActiveColumnFilter(null)
         fetchContacts(currentPage)
@@ -745,6 +756,7 @@ function App() {
     preDefinedFilter,
     isAuthenticated,
     isColumnFilterActive,
+    activeColumnFilter,
     fetchContacts,
     performColumnFilterSearch,
   ])
@@ -806,6 +818,8 @@ function App() {
     setIsColumnFilterActive(false)
     setActiveColumnFilter(null)
     setFilterSearchTerm('')
+    // Clear selected records when changing PDQ filter
+    setSelected([])
   }
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -1428,9 +1442,13 @@ function App() {
   // Filter handling functions
   const handleFilterClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
     setFilterAnchor({ element: event.currentTarget, column })
-    setFilterSearchTerm('')
-    // Reset column filter active state when switching columns to prevent unwanted data resets
-    setIsColumnFilterActive(false)
+    // If clicking on the same column that has an active filter, preserve the search term
+    if (activeColumnFilter && activeColumnFilter.column === column) {
+      setFilterSearchTerm(activeColumnFilter.query)
+    } else {
+      setFilterSearchTerm('')
+    }
+    // Do not reset column filter active state - filter should only be cleared explicitly
   }
 
   const handleFilterClose = () => {
@@ -1648,7 +1666,7 @@ function App() {
       product: contact.product || '',
       isOver18: contact.isOver18 || false,
       cgwrks3: '',
-      lastUpdated: contact.lastUpdatedAt ? new Date(contact.lastUpdatedAt).toLocaleString() : '',
+      lastUpdated: contact.lastUpdatedAt ? formatDateTimeYMDHMS(contact.lastUpdatedAt) : '',
       lastUpdatedBy: contact.lastUpdatedBy || '',
     }))
 
@@ -1835,7 +1853,7 @@ function App() {
       id: detail.id,
       contactId: detail.contactId,
       lastName: detail.contact.lastName,
-      middleName: '', // API doesn't return middleName from contact
+      middleName: detail.contact.middleName || '',
       givenName: detail.contact.firstName,
       transactionType: detail.transactionType,
       status: detail.status || '',
@@ -2326,7 +2344,38 @@ function App() {
                     <TableHead>
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                         <TableCell padding="checkbox">
-                          <Checkbox />
+                          <Checkbox
+                            indeterminate={
+                              selected.length > 0 &&
+                              selected.length < filteredData.length &&
+                              filteredData.some((row) => selected.includes(row.id))
+                            }
+                            checked={
+                              filteredData.length > 0 &&
+                              filteredData.every((row) => selected.includes(row.id))
+                            }
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                // Select all rows on current page
+                                setSelected((prev) => {
+                                  const currentPageIds = filteredData.map((row) => row.id)
+                                  const newSelected = [...prev]
+                                  currentPageIds.forEach((id) => {
+                                    if (!newSelected.includes(id)) {
+                                      newSelected.push(id)
+                                    }
+                                  })
+                                  return newSelected
+                                })
+                              } else {
+                                // Deselect all rows on current page
+                                setSelected((prev) => {
+                                  const currentPageIds = filteredData.map((row) => row.id)
+                                  return prev.filter((id) => !currentPageIds.includes(id))
+                                })
+                              }
+                            }}
+                          />
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -2341,7 +2390,11 @@ function App() {
                               onClick={(e) => handleFilterClick(e, 'lastName')}
                               sx={{
                                 padding: 0.5,
-                                color: columnFilters.lastName?.length > 0 ? '#1976d2' : 'inherit',
+                                color:
+                                  activeColumnFilter?.column === 'lastName' ||
+                                  columnFilters.lastName?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
                               }}
                             >
                               <FilterListIcon fontSize="small" />
@@ -2361,7 +2414,11 @@ function App() {
                               onClick={(e) => handleFilterClick(e, 'firstName')}
                               sx={{
                                 padding: 0.5,
-                                color: columnFilters.firstName?.length > 0 ? '#1976d2' : 'inherit',
+                                color:
+                                  activeColumnFilter?.column === 'firstName' ||
+                                  columnFilters.firstName?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
                               }}
                             >
                               <FilterListIcon fontSize="small" />
@@ -2381,7 +2438,11 @@ function App() {
                               onClick={(e) => handleFilterClick(e, 'middleName')}
                               sx={{
                                 padding: 0.5,
-                                color: columnFilters.middleName?.length > 0 ? '#1976d2' : 'inherit',
+                                color:
+                                  activeColumnFilter?.column === 'middleName' ||
+                                  columnFilters.middleName?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
                               }}
                             >
                               <FilterListIcon fontSize="small" />
@@ -2401,7 +2462,11 @@ function App() {
                               onClick={(e) => handleFilterClick(e, 'dob')}
                               sx={{
                                 padding: 0.5,
-                                color: columnFilters.dob?.length > 0 ? '#1976d2' : 'inherit',
+                                color:
+                                  activeColumnFilter?.column === 'dob' ||
+                                  columnFilters.dob?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
                               }}
                             >
                               <FilterListIcon fontSize="small" />
@@ -2421,7 +2486,11 @@ function App() {
                               onClick={(e) => handleFilterClick(e, 'din')}
                               sx={{
                                 padding: 0.5,
-                                color: columnFilters.din?.length > 0 ? '#1976d2' : 'inherit',
+                                color:
+                                  activeColumnFilter?.column === 'din' ||
+                                  columnFilters.din?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
                               }}
                             >
                               <FilterListIcon fontSize="small" />
@@ -2441,7 +2510,11 @@ function App() {
                               onClick={(e) => handleFilterClick(e, 'csaStatus')}
                               sx={{
                                 padding: 0.5,
-                                color: columnFilters.csaStatus?.length > 0 ? '#1976d2' : 'inherit',
+                                color:
+                                  activeColumnFilter?.column === 'csaStatus' ||
+                                  columnFilters.csaStatus?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
                               }}
                             >
                               <FilterListIcon fontSize="small" />
@@ -2462,7 +2535,10 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  columnFilters.statusEffective?.length > 0 ? '#1976d2' : 'inherit',
+                                  activeColumnFilter?.column === 'statusEffective' ||
+                                  columnFilters.statusEffective?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
                               }}
                             >
                               <FilterListIcon fontSize="small" />
@@ -2482,7 +2558,11 @@ function App() {
                               onClick={(e) => handleFilterClick(e, 'caseNumber')}
                               sx={{
                                 padding: 0.5,
-                                color: columnFilters.caseNumber?.length > 0 ? '#1976d2' : 'inherit',
+                                color:
+                                  activeColumnFilter?.column === 'caseNumber' ||
+                                  columnFilters.caseNumber?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
                               }}
                             >
                               <FilterListIcon fontSize="small" />
@@ -2502,7 +2582,11 @@ function App() {
                               onClick={(e) => handleFilterClick(e, 'caseStatus')}
                               sx={{
                                 padding: 0.5,
-                                color: columnFilters.caseStatus?.length > 0 ? '#1976d2' : 'inherit',
+                                color:
+                                  activeColumnFilter?.column === 'caseStatus' ||
+                                  columnFilters.caseStatus?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
                               }}
                             >
                               <FilterListIcon fontSize="small" />
@@ -2522,7 +2606,11 @@ function App() {
                               onClick={(e) => handleFilterClick(e, 'legacyFile')}
                               sx={{
                                 padding: 0.5,
-                                color: columnFilters.legacyFile?.length > 0 ? '#1976d2' : 'inherit',
+                                color:
+                                  activeColumnFilter?.column === 'legacyFile' ||
+                                  columnFilters.legacyFile?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
                               }}
                             >
                               <FilterListIcon fontSize="small" />
@@ -2542,7 +2630,11 @@ function App() {
                               onClick={(e) => handleFilterClick(e, 'cgwrks3')}
                               sx={{
                                 padding: 0.5,
-                                color: columnFilters.cgwrks3?.length > 0 ? '#1976d2' : 'inherit',
+                                color:
+                                  activeColumnFilter?.column === 'cgwrks3' ||
+                                  columnFilters.cgwrks3?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
                               }}
                             >
                               <FilterListIcon fontSize="small" />
@@ -2563,7 +2655,10 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  columnFilters.lastUpdated?.length > 0 ? '#1976d2' : 'inherit',
+                                  activeColumnFilter?.column === 'lastUpdated' ||
+                                  columnFilters.lastUpdated?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
                               }}
                             >
                               <FilterListIcon fontSize="small" />
@@ -2584,7 +2679,10 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  columnFilters.lastUpdatedBy?.length > 0 ? '#1976d2' : 'inherit',
+                                  activeColumnFilter?.column === 'lastUpdatedBy' ||
+                                  columnFilters.lastUpdatedBy?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
                               }}
                             >
                               <FilterListIcon fontSize="small" />
@@ -2916,15 +3014,12 @@ function App() {
                                 }}
                               >
                                 <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Person Name
+                                  Child/Youth Name
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                   {`${childData.firstName} ${childData.middleName} ${childData.lastName}`.trim()}
                                 </Typography>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Birth Name
-                                </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                   {`${childData.firstName} ${childData.middleName} ${childData.lastName}`.trim()}
                                 </Typography>
@@ -3810,7 +3905,7 @@ function App() {
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              Middle Name(s)
+                              Middle Name
                               <IconButton
                                 size="small"
                                 onClick={(e) => handleBatchDetailsFilterClick(e, 'middleName')}
@@ -3828,7 +3923,7 @@ function App() {
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              Given Name(s)
+                              Given Name
                               <IconButton
                                 size="small"
                                 onClick={(e) => handleBatchDetailsFilterClick(e, 'givenName')}

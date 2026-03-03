@@ -121,11 +121,22 @@ const CHANGED_CONTACTS_CTE = `
  *  - MIS contracts join via service_provider_id on placements
  *  - MIS payments join via contract_number on contracts
  */
-export function buildLoadContactProfilesSql(threshold: Date | null): {
+export function buildLoadContactProfilesSql(
+  threshold: Date | null,
+  agedOutContactIds?: string[],
+): {
   sql: string
   params: unknown[]
 } {
   const isIncremental = threshold !== null
+  const hasAgedOut = isIncremental && agedOutContactIds && agedOutContactIds.length > 0
+
+  let eligibleCasesFilter = ''
+  if (isIncremental) {
+    eligibleCasesFilter = hasAgedOut
+      ? 'WHERE cases.CONTACT_ROW_ID IN (SELECT CONTACT_ROW_ID FROM changed_contacts) OR cases.CONTACT_ROW_ID = ANY($2::TEXT[])'
+      : 'WHERE cases.CONTACT_ROW_ID IN (SELECT CONTACT_ROW_ID FROM changed_contacts)'
+  }
 
   const sql = `
   WITH${isIncremental ? CHANGED_CONTACTS_CTE : ''}
@@ -136,7 +147,7 @@ export function buildLoadContactProfilesSql(threshold: Date | null): {
         cases.X_LEGACY_FILE_NUM,
         cases.PERSON_ID_MIS
       FROM stg_icm_cases cases
-      ${isIncremental ? 'WHERE cases.CONTACT_ROW_ID IN (SELECT CONTACT_ROW_ID FROM changed_contacts)' : ''}
+      ${eligibleCasesFilter}
     ),
 
     latest_legal_auth AS (
@@ -393,6 +404,20 @@ export function buildLoadContactProfilesSql(threshold: Date | null): {
 
   return {
     sql,
-    params: isIncremental ? [threshold] : [],
+    params: hasAgedOut ? [threshold, agedOutContactIds] : isIncremental ? [threshold] : [],
   }
+}
+
+export function buildFindAgedOutContactIdsSql(cutoffDate: Date): {
+  sql: string
+  params: [Date]
+} {
+  const sql = `
+    SELECT person_id_icm
+    FROM csa.contacts
+    WHERE csa_status IN ('eligible', 'in_pay', 'not_eligible_out_of_pay')
+      AND date_of_birth IS NOT NULL
+      AND date_of_birth < $1
+  `
+  return { sql, params: [cutoffDate] }
 }

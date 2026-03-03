@@ -10,6 +10,9 @@ export class BatchDto {
   @ApiProperty()
   status: string
 
+  @ApiProperty({ description: 'Display label for batch status' })
+  statusLabel: string
+
   @ApiProperty()
   recordCount: number
 

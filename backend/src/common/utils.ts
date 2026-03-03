@@ -1,5 +1,9 @@
 import { DateTime } from 'luxon'
-import { CSA_STATUS_LABELS } from './state-machine/constants'
+import {
+  BATCH_DETAIL_STATUS_LABELS,
+  BATCH_STATUS_LABELS,
+  CSA_STATUS_LABELS,
+} from './state-machine/constants'
 
 // Date Helpers
 
@@ -76,6 +80,16 @@ export function enrichLabels<T extends Record<string, any>>(record: T): T {
     labels.csaStatusLabel = CSA_STATUS_LABELS[record.csaStatus] ?? record.csaStatus
   } else if ('csaStatus' in record) {
     labels.csaStatusLabel = ''
+  }
+
+  if ('status' in record && record.status) {
+    if ('transactionType' in record) {
+      labels.statusLabel = BATCH_DETAIL_STATUS_LABELS[record.status] ?? record.status
+    } else {
+      labels.statusLabel = BATCH_STATUS_LABELS[record.status] ?? record.status
+    }
+  } else if ('status' in record) {
+    labels.statusLabel = ''
   }
 
   const flags: Record<string, boolean> = {}

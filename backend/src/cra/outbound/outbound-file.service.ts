@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { formatDatePacificCompact } from 'src/common/utils'
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
@@ -151,11 +152,7 @@ export class OutboundFileService {
     return value.toString().padStart(length, '0')
   }
   currentDate(): string {
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = String(now.getMonth() + 1).padStart(2, '0')
-    const day = String(now.getDate()).padStart(2, '0')
-    return `${year}${month}${day}`
+    return formatDatePacificCompact(new Date())
   }
 
   /*================= FILE NAME CREATION ================*/

@@ -2,10 +2,12 @@ import { ContactProfile, EligibilityResult, PlacementRecord } from '../eligibili
 
 export interface EligibilityContext {
   contact: ContactProfile
+  referenceDate: Date
   hasPlacement?: boolean
   hasNonPlacement?: boolean
   eligiblePlacements?: PlacementRecord[]
   contractNumbers?: string[]
+  agreementRowIds?: string[]
 }
 
 // A single step in the eligibility decision rules

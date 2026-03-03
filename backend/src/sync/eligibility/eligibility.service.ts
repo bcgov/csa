@@ -4,12 +4,12 @@ import { TRANSACTION_TYPES } from 'src/api/contacts/constants'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_STATUS } from 'src/common/state-machine/constants/batch-status.constants'
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
-import { normalize } from 'src/common/utils'
+import { getAgeCutoffDate, normalize, pacificToday } from 'src/common/utils'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobsService } from 'src/jobs/jobs.service'
 import { CANCEL_REASON } from './cancellation/cancellation-reason.constants'
 import { ELIGIBILITY_CONFIG, PROTECTED_STATUSES } from './eligibility.config'
-import { buildLoadContactProfilesSql } from './eligibility.queries'
+import { buildFindAgedOutContactIdsSql, buildLoadContactProfilesSql } from './eligibility.queries'
 import {
   AgreementRecord,
   ContactProfile,
@@ -304,6 +304,7 @@ export class EligibilityService {
   ) {}
 
   async run(): Promise<EligibilityRunResult> {
+    const referenceDate = pacificToday()
     const threshold = await this.computeThreshold()
     this.logger.log(
       threshold
@@ -311,7 +312,15 @@ export class EligibilityService {
         : 'Full load mode (no previous successful run)',
     )
 
-    const profiles = await this.loadContactProfiles(threshold)
+    let agedOutIds: string[] = []
+    if (threshold) {
+      agedOutIds = await this.findAgedOutContactIds(referenceDate)
+      if (agedOutIds.length > 0) {
+        this.logger.log(`Found ${agedOutIds.length} aged-out contacts to include`)
+      }
+    }
+
+    const profiles = await this.loadContactProfiles(threshold, agedOutIds)
 
     this.logger.log(`Loaded ${profiles.length} contact profiles from staging`)
 
@@ -327,6 +336,12 @@ export class EligibilityService {
     const updates: Array<{ profile: ContactProfile; result: EligibilityResult }> = []
 
     for (const profile of profiles) {
+      if (!profile.dateOfBirth) {
+        this.logger.warn(`Skipping contact ${profile.personIdIcm}: missing date of birth`)
+        stats.skipped++
+        continue
+      }
+
       // Protected statuses: preserve existing csa_status, still upsert data
       if (
         profile.csaStatus &&
@@ -343,7 +358,7 @@ export class EligibilityService {
         continue
       }
 
-      const result = runEligibility(profile, RULES)
+      const result = runEligibility(profile, RULES, referenceDate)
       if (!result) continue
 
       if (result.newStatus) {
@@ -390,8 +405,18 @@ export class EligibilityService {
     return new Date(lastSuccess.getTime() - lookbackDays * 24 * 60 * 60 * 1000)
   }
 
-  private async loadContactProfiles(threshold: Date | null): Promise<ContactProfile[]> {
-    const { sql, params } = buildLoadContactProfilesSql(threshold)
+  private async findAgedOutContactIds(referenceDate: Date): Promise<string[]> {
+    const cutoff = getAgeCutoffDate(referenceDate)
+    const { sql, params } = buildFindAgedOutContactIdsSql(cutoff)
+    const rows = await this.prisma.$queryRawUnsafe<{ person_id_icm: string }[]>(sql, ...params)
+    return rows.map((r) => r.person_id_icm)
+  }
+
+  private async loadContactProfiles(
+    threshold: Date | null,
+    agedOutContactIds?: string[],
+  ): Promise<ContactProfile[]> {
+    const { sql, params } = buildLoadContactProfilesSql(threshold, agedOutContactIds)
     const rows = await this.prisma.$queryRawUnsafe<any[]>(sql, ...params)
 
     return rows.map((raw) => {
@@ -399,6 +424,7 @@ export class EligibilityService {
       const icmPlacements: PlacementRecord[] = (raw.icmPlacements ?? []).map(
         (placement: any): PlacementRecord => ({
           type: placement.type,
+          rawType: null,
           status: placement.status,
           startDate: placement.startDate ? new Date(placement.startDate) : null,
           endDate: placement.endDate ? new Date(placement.endDate) : null,
@@ -419,6 +445,7 @@ export class EligibilityService {
       const misPlacements: PlacementRecord[] = (raw.misPlacements ?? []).map(
         (placement: any): PlacementRecord => ({
           type: placement.type?.startsWith('PL ') ? 'Placement' : 'Non-Placement Location',
+          rawType: placement.type ?? null,
           status: placement.status,
           startDate: placement.startDate ? new Date(placement.startDate) : null,
           endDate: placement.endDate ? new Date(placement.endDate) : null,

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { pacificTodayISO } from 'src/common/utils'
 import { ConfigService } from '@nestjs/config'
 import { from as copyFrom } from 'pg-copy-streams'
 import { PrismaService } from 'src/common/database/prisma.service'
@@ -93,7 +94,7 @@ export class MisService {
   }
 
   private async moveToProcessed(key: string): Promise<void> {
-    const date = new Date().toISOString().split('T')[0]
+    const date = pacificTodayISO()
     const prefix = this.configService.get<string>('sync.misS3Prefix') || ''
     const filename = key.replace(prefix, '')
     const processedKey = `${prefix}PROCESSED/${date}/${filename}`

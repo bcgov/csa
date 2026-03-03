@@ -31,12 +31,17 @@ export const step1B_CancellationCheck: EligibilityRule = {
         .map((p) => ({ type: p.type, serviceType: p.serviceType ?? null, status: p.status })),
       misPlacements: contact.placements
         .filter((p) => p.source === 'MIS')
-        .map((p) => ({ type: p.type, status: p.status })),
+        .map((p) => ({ type: p.rawType, status: p.status })),
     })
 
     if (result.isIneligible) {
       const careEndDate = determineCareEndDate(contact.orders, contact.placements)
-      return step9_UpdateNotEligible(contact.csaStatus, result.cancelReasonCode, careEndDate)
+      return step9_UpdateNotEligible(
+        contact.csaStatus,
+        result.cancelReasonCode,
+        careEndDate,
+        ctx.referenceDate,
+      )
     }
 
     return null

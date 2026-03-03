@@ -5,6 +5,7 @@ import { EligibilityContext } from '../rule.interface'
 import { step1A_AgeCheck } from './step1a-age-check'
 
 const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile => ({
+  caseRowId: 'CASE-1',
   personIdIcm: 'ICM-1',
   personIdMis: 'MIS-1',
   firstName: 'John',
@@ -23,6 +24,7 @@ const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile =>
   serviceOffice: null,
   assignedTo: null,
   csaStatus: null,
+  csaStatusEffectiveDate: null,
   existingContactId: null,
   din: null,
   csaSentDate: null,
@@ -37,30 +39,33 @@ const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile =>
   birthCountry: null,
   isIneligible: false,
   deceased: null,
+  cancelReasonCode: null,
+  careEndDate: null,
   placements: [],
   orders: [],
   agreements: [],
   ...overrides,
 })
 
-const makeCtx = (overrides: Partial<ContactProfile> = {}): EligibilityContext => ({
-  contact: makeContact(overrides),
-})
-
 // Reference date for all tests
 const REF_DATE = new Date('2026-02-10')
+
+const makeCtx = (overrides: Partial<ContactProfile> = {}): EligibilityContext => ({
+  contact: makeContact(overrides),
+  referenceDate: REF_DATE,
+})
 
 describe('step1A_AgeCheck', () => {
   it('should return null (continue chain) when child is under 18', () => {
     const ctx = makeCtx({ dateOfBirth: new Date('2010-06-15') })
-    const result = step1A_AgeCheck.evaluate(ctx, REF_DATE)
+    const result = step1A_AgeCheck.evaluate(ctx)
     expect(result).toBeNull()
   })
 
   it('should return null when child turns 18 in current month (still eligible through end of birth month)', () => {
     // Born Feb 2008, ref date Feb 2026->eligible through end of Feb 2026
     const ctx = makeCtx({ dateOfBirth: new Date('2008-02-10') })
-    const result = step1A_AgeCheck.evaluate(ctx, REF_DATE)
+    const result = step1A_AgeCheck.evaluate(ctx)
     expect(result).toBeNull()
   })
 
@@ -70,7 +75,7 @@ describe('step1A_AgeCheck', () => {
       dateOfBirth: new Date('2008-01-10'),
       csaStatus: CSA_STATUS.ELIGIBLE,
     })
-    const result = step1A_AgeCheck.evaluate(ctx, REF_DATE)
+    const result = step1A_AgeCheck.evaluate(ctx)
     expect(result).not.toBeNull()
     expect(result!.step).toBe(10)
     expect(result!.newStatus).toBe(CSA_STATUS.OVER_18)
@@ -81,13 +86,7 @@ describe('step1A_AgeCheck', () => {
       dateOfBirth: new Date('2008-01-10'),
       csaStatus: CSA_STATUS.OVER_18,
     })
-    const result = step1A_AgeCheck.evaluate(ctx, REF_DATE)
-    expect(result).toBeNull()
-  })
-
-  it('should return null when dateOfBirth is null', () => {
-    const ctx = makeCtx({ dateOfBirth: null })
-    const result = step1A_AgeCheck.evaluate(ctx, REF_DATE)
+    const result = step1A_AgeCheck.evaluate(ctx)
     expect(result).toBeNull()
   })
 
@@ -97,7 +96,7 @@ describe('step1A_AgeCheck', () => {
       dateOfBirth: new Date('2008-01-31'),
       csaStatus: CSA_STATUS.ELIGIBLE,
     })
-    const result = step1A_AgeCheck.evaluate(ctx, REF_DATE)
+    const result = step1A_AgeCheck.evaluate(ctx)
     expect(result).not.toBeNull()
     expect(result!.step).toBe(10)
   })

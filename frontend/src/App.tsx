@@ -75,6 +75,24 @@ const VALID_BATCH_STATUSES = [
   'cancellation_refused_cra', // Cancellation Refused - CRA
 ]
 
+// CSA Status options for filter dropdown
+const CSA_STATUS_FILTER_OPTIONS = [
+  { value: 'not_eligible_out_of_pay', label: 'Not Eligible - Out of Pay' },
+  { value: 'eligible', label: 'Eligible' },
+  { value: 'on_hold', label: 'On Hold' },
+  { value: 'eligible_tbd', label: 'Eligible - TBD' },
+  { value: 'in_batch_application', label: 'In Batch - Application' },
+  { value: 'batch_sent_application', label: 'Batch Sent - Application' },
+  { value: 'application_refused_cra', label: 'Application Refused - CRA' },
+  { value: 'in_pay', label: 'In Pay' },
+  { value: 'not_eligible_in_pay', label: 'Not Eligible - In Pay' },
+  { value: 'not_eligible_ip_tbd', label: 'Not Eligible - IP - TBD' },
+  { value: 'in_batch_cancellation', label: 'In Batch - Cancellation' },
+  { value: 'batch_sent_cancellation', label: 'Batch Sent - Cancellation' },
+  { value: 'cancellation_refused_cra', label: 'Cancellation Refused - CRA' },
+  { value: 'over_18', label: 'Over 18' },
+]
+
 // Date formatting helpers
 const formatDateYMD = (dateString: string): string => {
   const date = new Date(dateString)
@@ -1266,6 +1284,16 @@ function App() {
             await fetchContacts(currentPage)
           }
         }
+
+        // Refresh Batch Requests table
+        const updatedBatches = await getAllBatches()
+        setBatches(updatedBatches)
+
+        // Refresh Batch Details table for the currently selected batch
+        if (selectedBatch) {
+          const updatedDetails = await getBatchContacts(selectedBatch)
+          setBatchDetails(updatedDetails)
+        }
       }
     } catch (error) {
       console.error('Add to batch error:', error)
@@ -1496,7 +1524,7 @@ function App() {
       batchId: String(item.batch.id),
       createdDate: new Date(item.createdAt).toLocaleDateString(),
       batchDate: item.batch.batchDate ? new Date(item.batch.batchDate).toLocaleDateString() : '',
-      status: item.batch.status || '',
+      status: item.batch.statusLabel || item.batch.status || '',
       transactionType: item.transactionType || '',
     }))
     const values = transformedData.map((row) => row[column as keyof typeof row])
@@ -1543,7 +1571,7 @@ function App() {
               })
             : ''
         case 'status':
-          return batch.status
+          return batch.statusLabel || batch.status
         case 'recordCount':
           return String(batch.recordCount)
         case 'createdDate':
@@ -1768,7 +1796,7 @@ function App() {
       batchId: String(item.batch.id),
       createdDate: new Date(item.createdAt).toLocaleDateString(),
       batchDate: item.batch.batchDate ? new Date(item.batch.batchDate).toLocaleDateString() : '',
-      status: item.batch.status || '',
+      status: item.batch.statusLabel || item.batch.status || '',
       transactionType: item.transactionType || '',
     }))
 
@@ -1812,7 +1840,7 @@ function App() {
             day: '2-digit',
           })
         : '',
-      status: batch.status,
+      status: batch.statusLabel || batch.status,
       recordCount: batch.recordCount,
       createdDate: new Date(batch.createdAt).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -2820,23 +2848,73 @@ function App() {
                       </Button>
                     </Box>
                     {/* Search bar for filtering items */}
-                    <TextField
-                      size="small"
-                      fullWidth
-                      placeholder="Search"
-                      value={filterSearchTerm}
-                      onChange={(e) => setFilterSearchTerm(e.target.value)}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Box component="span" sx={{ fontSize: '18px' }}>
-                              🔍
-                            </Box>
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{ mb: 1 }}
-                    />
+                    {filterAnchor.column === 'csaStatus' ? (
+                      <>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          placeholder="Search status..."
+                          value={filterSearchTerm}
+                          onChange={(e) => setFilterSearchTerm(e.target.value)}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <Box component="span" sx={{ fontSize: '18px' }}>
+                                  🔍
+                                </Box>
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{ mb: 1 }}
+                        />
+                        <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                          {CSA_STATUS_FILTER_OPTIONS.filter((option) =>
+                            option.label.toLowerCase().includes(filterSearchTerm.toLowerCase()),
+                          ).map((option) => (
+                            <MenuItem
+                              key={option.value}
+                              onClick={() => {
+                                setFilterSearchTerm(option.value)
+                                setActiveColumnFilter({ column: 'csaStatus', query: option.value })
+                                performColumnFilterSearch('csaStatus', option.value, 1)
+                                setCurrentPage(1)
+                                setIsColumnFilterActive(true)
+                                handleFilterClose()
+                              }}
+                              sx={{
+                                fontSize: '0.875rem',
+                                py: 0.75,
+                                backgroundColor:
+                                  activeColumnFilter?.column === 'csaStatus' &&
+                                  activeColumnFilter?.query === option.value
+                                    ? 'rgba(25, 118, 210, 0.08)'
+                                    : 'transparent',
+                              }}
+                            >
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </Box>
+                      </>
+                    ) : (
+                      <TextField
+                        size="small"
+                        fullWidth
+                        placeholder="Search"
+                        value={filterSearchTerm}
+                        onChange={(e) => setFilterSearchTerm(e.target.value)}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Box component="span" sx={{ fontSize: '18px' }}>
+                                🔍
+                              </Box>
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{ mb: 1 }}
+                      />
+                    )}
                   </Box>
                 </Menu>
 

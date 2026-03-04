@@ -75,6 +75,24 @@ const VALID_BATCH_STATUSES = [
   'cancellation_refused_cra', // Cancellation Refused - CRA
 ]
 
+// CSA Status options for filter dropdown
+const CSA_STATUS_FILTER_OPTIONS = [
+  { value: 'not_eligible_out_of_pay', label: 'Not Eligible - Out of Pay' },
+  { value: 'eligible', label: 'Eligible' },
+  { value: 'on_hold', label: 'On Hold' },
+  { value: 'eligible_tbd', label: 'Eligible - TBD' },
+  { value: 'in_batch_application', label: 'In Batch - Application' },
+  { value: 'batch_sent_application', label: 'Batch Sent - Application' },
+  { value: 'application_refused_cra', label: 'Application Refused - CRA' },
+  { value: 'in_pay', label: 'In Pay' },
+  { value: 'not_eligible_in_pay', label: 'Not Eligible - In Pay' },
+  { value: 'not_eligible_ip_tbd', label: 'Not Eligible - IP - TBD' },
+  { value: 'in_batch_cancellation', label: 'In Batch - Cancellation' },
+  { value: 'batch_sent_cancellation', label: 'Batch Sent - Cancellation' },
+  { value: 'cancellation_refused_cra', label: 'Cancellation Refused - CRA' },
+  { value: 'over_18', label: 'Over 18' },
+]
+
 // Date formatting helpers
 const formatDateYMD = (dateString: string): string => {
   const date = new Date(dateString)
@@ -1266,6 +1284,16 @@ function App() {
             await fetchContacts(currentPage)
           }
         }
+
+        // Refresh Batch Requests table
+        const updatedBatches = await getAllBatches()
+        setBatches(updatedBatches)
+
+        // Refresh Batch Details table for the currently selected batch
+        if (selectedBatch) {
+          const updatedDetails = await getBatchContacts(selectedBatch)
+          setBatchDetails(updatedDetails)
+        }
       }
     } catch (error) {
       console.error('Add to batch error:', error)
@@ -1496,7 +1524,7 @@ function App() {
       batchId: String(item.batch.id),
       createdDate: new Date(item.createdAt).toLocaleDateString(),
       batchDate: item.batch.batchDate ? new Date(item.batch.batchDate).toLocaleDateString() : '',
-      status: item.batch.status || '',
+      status: item.batch.statusLabel || item.batch.status || '',
       transactionType: item.transactionType || '',
     }))
     const values = transformedData.map((row) => row[column as keyof typeof row])
@@ -1543,7 +1571,7 @@ function App() {
               })
             : ''
         case 'status':
-          return batch.status
+          return batch.statusLabel || batch.status
         case 'recordCount':
           return String(batch.recordCount)
         case 'createdDate':
@@ -1610,6 +1638,8 @@ function App() {
       lastName: contact.lastName || '',
       akaLastName: contact.akaLastName || '',
       akaFirstName: contact.akaFirstName || '',
+      personIdIcm: contact.personIdIcm || '',
+      personIdMis: contact.personIdIms || '',
       gender: contact.gender || '',
       dob: contact.dateOfBirth ? formatDateYMD(contact.dateOfBirth) : '',
       age: contact.age || 0,
@@ -1622,6 +1652,7 @@ function App() {
       caseNumber: contact.caseNumber || '',
       caseType: contact.caseType || '',
       caseStatus: contact.caseStatus || '',
+      caseLoad: contact.caseLoad || '',
       legacyFile: contact.legacyFileNumber || '',
       serviceOffice: contact.serviceOffice || '',
       assignedTo: contact.assignedTo || '',
@@ -1651,6 +1682,7 @@ function App() {
       serviceProviderName: contact.serviceProviderName || '',
       providerId: contact.providerId || '',
       placeOfServiceName: contact.placeOfServiceName || '',
+      sourceAgreement: '', // Placeholder - backend field not yet available
       agreementType: contact.agreementType || '',
       agreementStatus: contact.agreementStatus || '',
       agreementStartDate: contact.agreementStartDate
@@ -1764,7 +1796,7 @@ function App() {
       batchId: String(item.batch.id),
       createdDate: new Date(item.createdAt).toLocaleDateString(),
       batchDate: item.batch.batchDate ? new Date(item.batch.batchDate).toLocaleDateString() : '',
-      status: item.batch.status || '',
+      status: item.batch.statusLabel || item.batch.status || '',
       transactionType: item.transactionType || '',
     }))
 
@@ -1808,7 +1840,7 @@ function App() {
             day: '2-digit',
           })
         : '',
-      status: batch.status,
+      status: batch.statusLabel || batch.status,
       recordCount: batch.recordCount,
       createdDate: new Date(batch.createdAt).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -1856,7 +1888,7 @@ function App() {
       middleName: detail.contact.middleName || '',
       givenName: detail.contact.firstName,
       transactionType: detail.transactionType,
-      status: detail.status || '',
+      status: detail.statusLabel || detail.status || '',
       systemComments: detail.systemComments || '',
     }))
   }, [batchDetails])
@@ -2816,23 +2848,73 @@ function App() {
                       </Button>
                     </Box>
                     {/* Search bar for filtering items */}
-                    <TextField
-                      size="small"
-                      fullWidth
-                      placeholder="Search"
-                      value={filterSearchTerm}
-                      onChange={(e) => setFilterSearchTerm(e.target.value)}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Box component="span" sx={{ fontSize: '18px' }}>
-                              🔍
-                            </Box>
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{ mb: 1 }}
-                    />
+                    {filterAnchor.column === 'csaStatus' ? (
+                      <>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          placeholder="Search status..."
+                          value={filterSearchTerm}
+                          onChange={(e) => setFilterSearchTerm(e.target.value)}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <Box component="span" sx={{ fontSize: '18px' }}>
+                                  🔍
+                                </Box>
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{ mb: 1 }}
+                        />
+                        <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                          {CSA_STATUS_FILTER_OPTIONS.filter((option) =>
+                            option.label.toLowerCase().includes(filterSearchTerm.toLowerCase()),
+                          ).map((option) => (
+                            <MenuItem
+                              key={option.value}
+                              onClick={() => {
+                                setFilterSearchTerm(option.value)
+                                setActiveColumnFilter({ column: 'csaStatus', query: option.value })
+                                performColumnFilterSearch('csaStatus', option.value, 1)
+                                setCurrentPage(1)
+                                setIsColumnFilterActive(true)
+                                handleFilterClose()
+                              }}
+                              sx={{
+                                fontSize: '0.875rem',
+                                py: 0.75,
+                                backgroundColor:
+                                  activeColumnFilter?.column === 'csaStatus' &&
+                                  activeColumnFilter?.query === option.value
+                                    ? 'rgba(25, 118, 210, 0.08)'
+                                    : 'transparent',
+                              }}
+                            >
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </Box>
+                      </>
+                    ) : (
+                      <TextField
+                        size="small"
+                        fullWidth
+                        placeholder="Search"
+                        value={filterSearchTerm}
+                        onChange={(e) => setFilterSearchTerm(e.target.value)}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Box component="span" sx={{ fontSize: '18px' }}>
+                                🔍
+                              </Box>
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{ mb: 1 }}
+                      />
+                    )}
                   </Box>
                 </Menu>
 
@@ -3004,59 +3086,210 @@ function App() {
                               </Typography>
                               <Box
                                 sx={{
-                                  display: 'grid',
-                                  gridTemplateColumns: 'auto 1fr',
-                                  gap: 1,
-                                  rowGap: 1.5,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: 1.5,
                                   backgroundColor: '#f9f9f9',
                                   p: 2,
                                   borderRadius: 1,
                                 }}
                               >
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Child/Youth Name
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {`${childData.firstName} ${childData.middleName} ${childData.lastName}`.trim()}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    Child/Youth Name
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {[childData.firstName, childData.middleName, childData.lastName]
+                                      .filter(Boolean)
+                                      .join(' ') || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {`${childData.firstName} ${childData.middleName} ${childData.lastName}`.trim()}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    Gender
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {childData.gender || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  AKA Last Name
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.akaLastName || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    Person ID ICM
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {childData.personIdIcm || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Birth Place
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {[
-                                    childData.birthCity,
-                                    childData.birthProvince,
-                                    childData.birthCountry,
-                                  ]
-                                    .filter(Boolean)
-                                    .join(', ') || '-'}{' '}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    Person ID MIS
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {childData.personIdMis || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Gender
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.gender || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    DIN
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {childData.din || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Age
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.age || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    AKA Last Name
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {childData.akaLastName || '-'}
+                                  </Typography>
+                                </Box>
+
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    AKA First Name
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {childData.akaFirstName || '-'}
+                                  </Typography>
+                                </Box>
+
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    Birth Place
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {[
+                                      childData.birthCity,
+                                      childData.birthProvince,
+                                      childData.birthCountry,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(', ') || '-'}
+                                  </Typography>
+                                </Box>
+
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    Age
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {childData.age || '-'}
+                                  </Typography>
+                                </Box>
                               </Box>
                             </Box>
 
@@ -3080,13 +3313,10 @@ function App() {
                                 }}
                               >
                                 <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Service Office
+                                  Case Status
                                 </Typography>
-                                <Typography
-                                  variant="body2"
-                                  sx={{ fontWeight: 500, color: '#1976d2', cursor: 'pointer' }}
-                                >
-                                  {childData.serviceOffice || '-'}
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.caseStatus || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
@@ -3096,14 +3326,7 @@ function App() {
                                   variant="body2"
                                   sx={{ fontWeight: 500, color: '#1976d2', cursor: 'pointer' }}
                                 >
-                                  {childData.caseNumber}
-                                </Typography>
-
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Assigned to
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.assignedTo || '-'}
+                                  {childData.caseNumber || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
@@ -3114,10 +3337,34 @@ function App() {
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Case Status
+                                  Caseload
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.caseStatus}
+                                  {childData.caseLoad || '-'}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Legacy File No.
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.legacyFile || '-'}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Service Office
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  sx={{ fontWeight: 500, color: '#1976d2', cursor: 'pointer' }}
+                                >
+                                  {childData.serviceOffice || '-'}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Assigned to
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.assignedTo || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
@@ -3125,13 +3372,6 @@ function App() {
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                   {childData.effectiveLegalStatus || '-'}
-                                </Typography>
-
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Legacy File No.
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.legacyFile}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
@@ -3170,27 +3410,10 @@ function App() {
                                 }}
                               >
                                 <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Actual Resource
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  sx={{ fontWeight: 500, color: '#1976d2', cursor: 'pointer' }}
-                                >
-                                  {childData.placementStatus || '-'}
-                                </Typography>
-
-                                <Typography variant="caption" sx={{ color: '#666' }}>
                                   Placement/Location No.
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                   {childData.placementLocation || '-'}
-                                </Typography>
-
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Actual Start Date
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.actualStartDate || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
@@ -3201,17 +3424,31 @@ function App() {
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Actual End Date
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.actualEndDate || '-'}
-                                </Typography>
-
-                                <Typography variant="caption" sx={{ color: '#666' }}>
                                   Sub-type
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                   {childData.locationSubType || '-'}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Status
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.placementStatus || '-'}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Actual Start Date
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.actualStartDate || '-'}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Actual End Date
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.actualEndDate || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
@@ -3266,34 +3503,17 @@ function App() {
                                 }}
                               >
                                 <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Actual Agreement
+                                  Agreement Status
                                 </Typography>
-                                <Typography
-                                  variant="body2"
-                                  sx={{ fontWeight: 500, color: '#1976d2', cursor: 'pointer' }}
-                                >
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                   {childData.agreementStatus || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Start Date
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.agreementStartDate || '-'}
-                                </Typography>
-
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Provider
+                                  Provider Name
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                   {childData.serviceProviderName || '-'}
-                                </Typography>
-
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  End Date
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.agreementEndDate || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
@@ -3304,17 +3524,17 @@ function App() {
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Termination Date
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.terminationDate || '-'}
-                                </Typography>
-
-                                <Typography variant="caption" sx={{ color: '#666' }}>
                                   Place of Service
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                   {childData.placeOfServiceName || '-'}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Source
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.sourceAgreement || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
@@ -3325,14 +3545,35 @@ function App() {
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
-                                  MCFD Contract
+                                  Start Date
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.agreementStartDate || '-'}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  End Date
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.agreementEndDate || '-'}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  Termination Date
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {childData.terminationDate || '-'}
+                                </Typography>
+
+                                <Typography variant="caption" sx={{ color: '#666' }}>
+                                  MCFD Contract No.
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                   {childData.mcfdContract || '-'}
                                 </Typography>
 
                                 <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Product Type
+                                  Product
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                   {childData.product || '-'}

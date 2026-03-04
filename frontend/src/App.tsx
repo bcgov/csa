@@ -3008,83 +3008,210 @@ function App() {
                               </Typography>
                               <Box
                                 sx={{
-                                  display: 'grid',
-                                  gridTemplateColumns: 'auto 1fr',
-                                  gap: 1,
-                                  rowGap: 1.5,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: 1.5,
                                   backgroundColor: '#f9f9f9',
                                   p: 2,
                                   borderRadius: 1,
                                 }}
                               >
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Child/Youth Name
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {`${childData.firstName} ${childData.middleName} ${childData.lastName}`.trim()}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    Child/Youth Name
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {[childData.firstName, childData.middleName, childData.lastName]
+                                      .filter(Boolean)
+                                      .join(' ') || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Gender
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.gender || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    Gender
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {childData.gender || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Person ID ICM
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.personIdIcm || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    Person ID ICM
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {childData.personIdIcm || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Person ID MIS
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.personIdMis || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    Person ID MIS
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {childData.personIdMis || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  DIN
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.din || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    DIN
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {childData.din || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  AKA Last Name
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.akaLastName || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    AKA Last Name
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {childData.akaLastName || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  AKA First Name
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.akaFirstName || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    AKA First Name
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {childData.akaFirstName || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Birth Place
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {[
-                                    childData.birthCity,
-                                    childData.birthProvince,
-                                    childData.birthCountry,
-                                  ]
-                                    .filter(Boolean)
-                                    .join(', ') || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    Birth Place
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {[
+                                      childData.birthCity,
+                                      childData.birthProvince,
+                                      childData.birthCountry,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(', ') || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Age
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.age || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', flexShrink: 0 }}
+                                  >
+                                    Age
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500, textAlign: 'right' }}
+                                  >
+                                    {childData.age || '-'}
+                                  </Typography>
+                                </Box>
                               </Box>
                             </Box>
 

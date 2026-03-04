@@ -189,6 +189,7 @@ export interface Batch {
   id: number
   batchDate: string | null
   status: string
+  statusLabel: string
   recordCount: number
   createdAt: string
   systemComments: string | null
@@ -209,6 +210,7 @@ export interface ContactBatchDetail {
     id: number
     batchDate: string
     status: string
+    statusLabel: string
   }
 }
 

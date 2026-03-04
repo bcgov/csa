@@ -1266,6 +1266,16 @@ function App() {
             await fetchContacts(currentPage)
           }
         }
+
+        // Refresh Batch Requests table
+        const updatedBatches = await getAllBatches()
+        setBatches(updatedBatches)
+
+        // Refresh Batch Details table for the currently selected batch
+        if (selectedBatch) {
+          const updatedDetails = await getBatchContacts(selectedBatch)
+          setBatchDetails(updatedDetails)
+        }
       }
     } catch (error) {
       console.error('Add to batch error:', error)

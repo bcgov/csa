@@ -357,6 +357,23 @@ describe('BatchesService', () => {
       )
     })
 
+    it('should throw and not delete batch detail if CSA transition fails', async () => {
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING }
+      const detail = { id: 10, contactId: 100, batchId: 1 }
+
+      mockPrismaService.batch.findFirst.mockResolvedValue(pendingBatch)
+      mockPrismaService.contactBatchDetail.findFirst.mockResolvedValue(detail)
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: false,
+        reason: 'Invalid transition',
+      })
+
+      await expect(service.removeContactFromPendingBatch(100, 'user1')).rejects.toThrow(
+        'Failed to transition contact 100 on REMOVE_FROM_BATCH',
+      )
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled()
+    })
+
     it('should throw NotFoundException if no pending batch', async () => {
       mockPrismaService.batch.findFirst.mockResolvedValue(null)
 

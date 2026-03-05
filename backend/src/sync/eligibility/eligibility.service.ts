@@ -794,6 +794,7 @@ export class EligibilityService {
       await this.prisma.$executeRawUnsafe(
         `UPDATE contacts SET
            csa_status = $1,
+           pre_batch_status = $3,
            csa_status_effective_date = NOW(),
            icm_integration_status = true,
            last_updated_at = NOW(),
@@ -801,6 +802,7 @@ export class EligibilityService {
          WHERE id = ANY($2)`,
         CSA_STATUS.IN_BATCH_APPLICATION,
         appDbIds,
+        CSA_STATUS.ELIGIBLE,
       )
     }
 
@@ -808,6 +810,7 @@ export class EligibilityService {
       await this.prisma.$executeRawUnsafe(
         `UPDATE contacts SET
            csa_status = $1,
+           pre_batch_status = $3,
            csa_status_effective_date = NOW(),
            icm_integration_status = true,
            last_updated_at = NOW(),
@@ -815,6 +818,7 @@ export class EligibilityService {
          WHERE id = ANY($2)`,
         CSA_STATUS.IN_BATCH_CANCELLATION,
         cancelDbIds,
+        CSA_STATUS.NOT_ELIGIBLE_IN_PAY,
       )
     }
 

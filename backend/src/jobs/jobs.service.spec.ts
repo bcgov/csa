@@ -139,6 +139,22 @@ describe('JobsService', () => {
     })
   })
 
+  describe('resetToRunning', () => {
+    it('should reset a failed job to RUNNING with fresh startedAt', async () => {
+      await service.resetToRunning(1)
+
+      expect(prisma.jobRun.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          status: JobStatus.RUNNING,
+          startedAt: expect.any(Date),
+          completedAt: null,
+          error: null,
+        },
+      })
+    })
+  })
+
   describe('getFailedJobs', () => {
     it('should return all failed jobs', async () => {
       await service.getFailedJobs()

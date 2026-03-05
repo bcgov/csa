@@ -61,6 +61,18 @@ export class JobsService {
     })
   }
 
+  async resetToRunning(id: number) {
+    return this.prisma.jobRun.update({
+      where: { id },
+      data: {
+        status: JobStatus.RUNNING,
+        startedAt: new Date(),
+        completedAt: null,
+        error: null,
+      },
+    })
+  }
+
   async getFailedJobs() {
     return this.prisma.jobRun.findMany({
       where: {

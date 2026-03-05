@@ -128,15 +128,12 @@ export class JobRunner {
   }
 
   // Process failed jobs and stuck running jobs
-  // TODO: define when to consider jobs as failed
   async processFailedJobs(): Promise<void> {
-    // First, mark stuck RUNNING jobs as FAILED
     const stuckResult = await this.jobsService.markStuckJobsAsFailed(60) // 1 hour threshold
     if (stuckResult.count > 0) {
       this.logger.log(`Marked ${stuckResult.count} stuck jobs as FAILED`)
     }
 
-    // Then, retry all FAILED jobs
     const failedJobs = await this.jobsService.getFailedJobs()
     this.logger.log(`Found ${failedJobs.length} failed jobs to retry`)
 
@@ -144,12 +141,13 @@ export class JobRunner {
       try {
         this.logger.log(`Retrying job ${job.id} [${job.jobType}]`)
 
-        // Re-run the job (creates a new job run)
-        await this.runJobType(job.jobType as JobType, job.jobTrigger as JobTrigger, {
-          parentJobId: job.parentJobId ?? undefined,
-          metadata: job.metadata as Record<string, unknown>,
-        })
+        await this.jobsService.resetToRunning(job.id)
+        await this.executeJob(job.id)
       } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          this.logger.warn(`Job ${job.jobType} is already running, skipping retry of job ${job.id}`)
+          continue
+        }
         this.logger.error(`Error retrying job ${job.id}: ${error}`)
       }
     }

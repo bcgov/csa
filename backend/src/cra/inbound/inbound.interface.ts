@@ -82,5 +82,5 @@ export interface CreateFileTransferObj {
   fileName: string
   fileSize: string
   deliveredAt: string
-  referenceNumbers?: (string | number)[]
+  referenceNumbers?: string[]
 }

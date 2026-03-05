@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
 import {
   BATCH_DETAIL_STATUS,
@@ -9,7 +9,7 @@ import {
 } from 'src/common/state-machine/constants'
 import type { TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
-import { enrichLabels } from 'src/common/utils'
+import { appendSystemComment, enrichLabels } from 'src/common/utils'
 import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
 import { ContactsService } from '../contacts/contacts.service'
 import { BulkOperationResponse } from '../contacts/interfaces'
@@ -314,21 +314,11 @@ export class BatchesService {
       select: { systemComments: true },
     })
 
-    const systemComments = this.buildSystemComment(batchMessage, batch?.systemComments ?? null)
+    const systemComments = appendSystemComment(batchMessage, batch?.systemComments ?? null)
 
     await this.updateBatchStatus(batchId, batchEvent, {
       additionalData: systemComments != null ? { systemComments } : {},
     })
-  }
-
-  private buildSystemComment(
-    newMessage: string | null,
-    existingComments: string | null,
-  ): string | null {
-    if (!newMessage) return existingComments
-    const date = new Date().toISOString().split('T')[0]
-    const dated = `[${date}] ${newMessage}`
-    return existingComments ? `${dated}\n${existingComments}` : dated
   }
 
   async removeContactFromPendingBatch(contactId: number, userId?: string): Promise<void> {
@@ -351,7 +341,19 @@ export class BatchesService {
       throw new NotFoundException(`Contact ${contactId} not found in pending batch`)
     }
 
-    // Delete the detail and update count
+    const transition = await this.contactsService.updateCsaStatus(
+      contactId,
+      CSA_EVENT.REMOVE_FROM_BATCH,
+      'USER',
+      { userId },
+    )
+
+    if (!transition.success) {
+      throw new BadRequestException(
+        `Failed to transition contact ${contactId} on REMOVE_FROM_BATCH: ${transition.reason}`,
+      )
+    }
+
     await this.prisma.$transaction([
       this.prisma.contactBatchDetail.delete({
         where: { id: detail.id },
@@ -365,9 +367,5 @@ export class BatchesService {
         },
       }),
     ])
-
-    await this.contactsService.updateCsaStatus(contactId, CSA_EVENT.REMOVE_FROM_BATCH, 'USER', {
-      userId,
-    })
   }
 }

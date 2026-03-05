@@ -115,6 +115,19 @@ export function pacificTodayISO(): string {
   return DateTime.now().setZone(PACIFIC_ZONE).toISODate()!
 }
 
+export function pacificNowISO(): string {
+  return DateTime.now().setZone(PACIFIC_ZONE).toFormat('yyyy-MM-dd HH:mm:ss')
+}
+
+export function appendSystemComment(
+  newMessage: string | null,
+  existingComments: string | null,
+): string | null {
+  if (!newMessage) return existingComments
+  const dated = `[${pacificNowISO()}] ${newMessage}`
+  return existingComments ? `${dated}\n${existingComments}` : dated
+}
+
 // A child is eligible through the last day of their birth month at age 18.
 export function getAgeCutoffDate(referenceDate: Date = pacificToday()): Date {
   const d = new Date(referenceDate)

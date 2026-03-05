@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { pacificTodayISO } from 'src/common/utils'
+import { appendSystemComment } from 'src/common/utils'
 import { readFileSync } from 'fs'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import {
@@ -148,13 +148,6 @@ export class InboundResponseService {
     return errorMessages.join('; ')
   }
 
-  buildSystemComment(newMessage: string | null, existingComments: string | null): string | null {
-    if (!newMessage) return existingComments
-    const date = pacificTodayISO()
-    const dated = `[${date}] ${newMessage}`
-    return existingComments ? `${dated}\n${existingComments}` : dated
-  }
-
   getBatchSystemCommentByCode(fileStatCd: string): string {
     if (FILE_STAT_MESSAGE[fileStatCd]) {
       return FILE_STAT_MESSAGE[fileStatCd]
@@ -169,14 +162,14 @@ export class InboundResponseService {
       const fileError = this.getBatchSystemCommentByCode(detail.fileStatCd)
       return {
         outcome: DETAIL_OUTCOME.FILE_ERROR,
-        systemComments: this.buildSystemComment(fileError, existingComments),
+        systemComments: appendSystemComment(fileError, existingComments),
         din: null,
       }
     }
 
     const rejectCodes = this.returnAllRejectCode(detail)
     const errorMessage = this.getErrorMessageByRejectCode(rejectCodes)
-    const systemComments = this.buildSystemComment(errorMessage || null, existingComments)
+    const systemComments = appendSystemComment(errorMessage || null, existingComments)
     const din = detail.ccraDinNum?.trim() || null
 
     if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_ACCEPTED) {

@@ -81,6 +81,7 @@ describe('SendCraFileHandler', () => {
       },
       contactBatchDetail: {
         findMany: vi.fn(),
+        update: vi.fn(),
       },
       transferFile: {
         create: vi.fn(),
@@ -404,7 +405,19 @@ describe('SendCraFileHandler', () => {
       await handler.onStart(mockContext)
       await handler.onFailure(mockContext, new Error('Connection refused'))
 
-      expect(mockBatchesService.updateBatchStatus).toHaveBeenCalledWith(10, BATCH_EVENT.SEND_FAILED)
+      expect(mockBatchesService.updateBatchStatus).toHaveBeenCalledWith(
+        10,
+        BATCH_EVENT.SEND_FAILED,
+        { additionalData: { systemComments: expect.stringContaining('Connection refused') } },
+      )
+      expect(mockPrisma.contactBatchDetail.update).toHaveBeenCalledWith({
+        where: { id: 100 },
+        data: {
+          systemComments: expect.stringContaining('Connection refused'),
+          lastUpdatedAt: expect.any(Date),
+          lastUpdatedBy: 'SYSTEM',
+        },
+      })
     })
 
     it('should not transition if no batch was found', async () => {

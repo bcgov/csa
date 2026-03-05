@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { pacificToday } from 'src/common/utils'
+import { appendSystemComment, pacificToday } from 'src/common/utils'
 import type { Batch, Contact, ContactBatchDetail } from '@prisma/client'
 import { BatchesService } from 'src/api/batches/batches.service'
 import { ContactsService } from 'src/api/contacts/contacts.service'
@@ -175,9 +175,23 @@ export class SendCraFileHandler extends BaseJob {
 
     if (this.batch) {
       this.logger.error(`File transfer failed for batch ${this.batch.id}`, error)
-      await this.batchesService.updateBatchStatus(this.batch.id, BATCH_EVENT.SEND_FAILED)
-      // TODO: Revert each contact's CSA status via CRA_FILE_REJECTED
-      // State transition to confirm
+      const errorMessage = error.message || 'File transfer failed'
+      await this.batchesService.updateBatchStatus(this.batch.id, BATCH_EVENT.SEND_FAILED, {
+        additionalData: {
+          systemComments: appendSystemComment(errorMessage, this.batch.systemComments),
+        },
+      })
+
+      for (const detail of this.batchDetails) {
+        await this.prisma.contactBatchDetail.update({
+          where: { id: detail.id },
+          data: {
+            systemComments: appendSystemComment(errorMessage, detail.systemComments),
+            lastUpdatedAt: new Date(),
+            lastUpdatedBy: 'SYSTEM',
+          },
+        })
+      }
     }
   }
 }

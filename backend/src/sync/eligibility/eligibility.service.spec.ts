@@ -407,6 +407,13 @@ describe('EligibilityService', () => {
 
     expect(result.autoBatched.application).toBe(1)
     expect(result.autoBatched.cancellation).toBe(0)
+    // Verify pre_batch_status is set for REMOVE_FROM_BATCH support
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(
+      expect.stringContaining('pre_batch_status'),
+      'in_batch_application',
+      [1],
+      'eligible',
+    )
   })
 
   it('should auto-batch not_eligible_in_pay contacts as cancellation', async () => {
@@ -426,6 +433,13 @@ describe('EligibilityService', () => {
 
     expect(result.autoBatched.application).toBe(0)
     expect(result.autoBatched.cancellation).toBe(1)
+    // Verify pre_batch_status is set for REMOVE_FROM_BATCH support
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(
+      expect.stringContaining('pre_batch_status'),
+      'in_batch_cancellation',
+      [2],
+      'not_eligible_in_pay',
+    )
   })
 
   it('should create pending batch when none exists', async () => {

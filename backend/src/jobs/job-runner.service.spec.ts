@@ -58,6 +58,7 @@ describe('JobRunner', () => {
             markFailed: vi.fn().mockResolvedValue(mockJobRun),
             getFailedJobs: vi.fn().mockResolvedValue([]),
             markStuckJobsAsFailed: vi.fn().mockResolvedValue({ count: 0 }),
+            resetToRunning: vi.fn().mockResolvedValue(mockJobRun),
           },
         },
         {
@@ -225,7 +226,7 @@ describe('JobRunner', () => {
   })
 
   describe('processFailedJobs', () => {
-    it('should mark stuck jobs as failed and retry failed jobs', async () => {
+    it('should mark stuck jobs as failed and retry failed jobs in-place', async () => {
       const failedJob = {
         id: 2,
         jobType: JobType.INGEST_DATA,
@@ -242,11 +243,12 @@ describe('JobRunner', () => {
 
       expect(jobsService.markStuckJobsAsFailed).toHaveBeenCalledWith(60)
       expect(jobsService.getFailedJobs).toHaveBeenCalled()
-      // Should create a new job for retry
-      expect(jobsService.createJob).toHaveBeenCalled()
+      // Should reset existing job to RUNNING (not create a new one)
+      expect(jobsService.resetToRunning).toHaveBeenCalledWith(2)
+      expect(jobsService.createJob).not.toHaveBeenCalled()
     })
 
-    it('should handle errors during retry gracefully', async () => {
+    it('should skip retry when job of same type is already running (P2002)', async () => {
       const failedJob = {
         id: 2,
         jobType: JobType.INGEST_DATA,
@@ -256,7 +258,28 @@ describe('JobRunner', () => {
         parentJobId: null,
       }
       vi.mocked(jobsService.getFailedJobs).mockResolvedValue([failedJob])
-      vi.mocked(jobsService.createJob).mockRejectedValue(new Error('DB error'))
+      vi.mocked(jobsService.resetToRunning).mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: '5.0.0',
+        }),
+      )
+
+      await expect(runner.processFailedJobs()).resolves.toBeUndefined()
+      expect(mockHandler.execute).not.toHaveBeenCalled()
+    })
+
+    it('should handle non-P2002 errors during retry gracefully', async () => {
+      const failedJob = {
+        id: 2,
+        jobType: JobType.INGEST_DATA,
+        jobTrigger: JobTrigger.CRON,
+        retryCount: 1,
+        metadata: {},
+        parentJobId: null,
+      }
+      vi.mocked(jobsService.getFailedJobs).mockResolvedValue([failedJob])
+      vi.mocked(jobsService.resetToRunning).mockRejectedValue(new Error('DB error'))
 
       // Should not throw
       await expect(runner.processFailedJobs()).resolves.toBeUndefined()

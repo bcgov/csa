@@ -40,7 +40,7 @@ model Contact {
   serviceOffice              String?   @map("service_office")
   assignedTo                 String?   @map("assigned_to")
   csaStatus                  String?   @map("csa_status")
-  csaStatusEffectiveDate     DateTime? @map("csa_status_effective_date") @db.Date
+  csaStatusEffectiveDate     DateTime? @map("csa_status_effective_date") @db.Timestamptz()
   csaSentDate                DateTime? @map("csa_sent_date") @db.Timestamptz()
   din                        String?   @map("din")
   effectiveLegalStatus       String?   @map("effective_legal_status")

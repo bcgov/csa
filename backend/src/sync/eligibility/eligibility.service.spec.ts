@@ -523,7 +523,7 @@ describe('buildLoadContactProfilesSql', () => {
   it('should include changed_contacts CTE when threshold provided', () => {
     const { sql, params } = buildLoadContactProfilesSql(new Date('2026-02-12'))
     expect(sql).toContain('changed_contacts')
-    expect(sql).toContain('IN (SELECT CONTACT_ROW_ID FROM changed_contacts)')
+    expect(sql).toContain('IN (SELECT X_CONTACT_NUM FROM changed_contacts)')
     expect(params).toHaveLength(1)
   })
 
@@ -533,19 +533,19 @@ describe('buildLoadContactProfilesSql', () => {
     expect(params).toHaveLength(0)
   })
 
-  it('should deduplicate contacts using DISTINCT ON and group ICM data by CONTACT_ROW_ID', () => {
+  it('should deduplicate contacts using DISTINCT ON X_CONTACT_NUM and group data by X_CONTACT_NUM', () => {
     const { sql } = buildLoadContactProfilesSql(null)
 
-    // Final SELECT deduplicates by CONTACT_ROW_ID
-    expect(sql).toContain('DISTINCT ON (cases.CONTACT_ROW_ID)')
+    // Final SELECT deduplicates by X_CONTACT_NUM (person ID)
+    expect(sql).toContain('DISTINCT ON (cases.X_CONTACT_NUM)')
 
-    // ICM aggregation CTEs group by CONTACT_ROW_ID (not CASE_ROW_ID)
-    expect(sql).toContain('GROUP BY eligible_cases.CONTACT_ROW_ID')
+    // Aggregation CTEs group by X_CONTACT_NUM (not CONTACT_ROW_ID)
+    expect(sql).toContain('GROUP BY eligible_cases.X_CONTACT_NUM')
 
-    // ICM agg joins use CONTACT_ROW_ID
-    expect(sql).toContain('icm_plc.CONTACT_ROW_ID = cases.CONTACT_ROW_ID')
-    expect(sql).toContain('icm_ord.CONTACT_ROW_ID = cases.CONTACT_ROW_ID')
-    expect(sql).toContain('icm_agr.CONTACT_ROW_ID = cases.CONTACT_ROW_ID')
+    // Agg joins use X_CONTACT_NUM
+    expect(sql).toContain('icm_plc.X_CONTACT_NUM = cases.X_CONTACT_NUM')
+    expect(sql).toContain('icm_ord.X_CONTACT_NUM = cases.X_CONTACT_NUM')
+    expect(sql).toContain('icm_agr.X_CONTACT_NUM = cases.X_CONTACT_NUM')
 
     // No remaining CASE_ROW_ID joins in final SELECT
     expect(sql).not.toMatch(/LEFT JOIN.*CASE_ROW_ID = cases\.ROW_ID/)
@@ -575,10 +575,10 @@ describe('buildLoadContactProfilesSql', () => {
     // MIS payments join via contract_number through contracts
     expect(sql).toContain('mis_pay.contract_number = mis_con.contract_number')
 
-    // Final SELECT joins MIS aggs on CONTACT_ROW_ID
-    expect(sql).toContain('mis_pay.CONTACT_ROW_ID = cases.CONTACT_ROW_ID')
-    expect(sql).toContain('mis_con.CONTACT_ROW_ID = cases.CONTACT_ROW_ID')
-    expect(sql).toContain('mis_plc.CONTACT_ROW_ID = cases.CONTACT_ROW_ID')
+    // Final SELECT joins MIS aggs on X_CONTACT_NUM
+    expect(sql).toContain('mis_pay.X_CONTACT_NUM = cases.X_CONTACT_NUM')
+    expect(sql).toContain('mis_con.X_CONTACT_NUM = cases.X_CONTACT_NUM')
+    expect(sql).toContain('mis_plc.X_CONTACT_NUM = cases.X_CONTACT_NUM')
 
     // No MIS joins through contacts master table
     expect(sql).not.toContain('master_contacts.person_id_mis')

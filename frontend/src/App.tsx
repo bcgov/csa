@@ -93,28 +93,32 @@ const CSA_STATUS_FILTER_OPTIONS = [
   { value: 'over_18', label: 'Over 18' },
 ]
 
-// Date formatting helpers
+const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
+
+const toYMD = (date: Date, timeZone: string): string => {
+  const parts = new Intl.DateTimeFormat('en-CA', { ...DATE_FORMAT, timeZone }).formatToParts(date)
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
+  return `${get('year')}-${get('month')}-${get('day')}`
+}
+
 const formatDateYMD = (dateString: string): string => {
-  const date = new Date(dateString)
-  const year = date.getFullYear()
-  const month = date.toLocaleString('en-US', { month: 'short' })
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return toYMD(new Date(dateString + 'T00:00:00Z'), 'UTC')
+}
+
+const formatDateTimeYMD = (dateString: string): string => {
+  return toYMD(new Date(dateString), 'America/Vancouver')
 }
 
 const formatDateTimeYMDHMS = (dateString: string): string => {
   const date = new Date(dateString)
-  const options: Intl.DateTimeFormatOptions = {
-    timeZone: 'America/Los_Angeles',
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    ...DATE_FORMAT,
+    timeZone: 'America/Vancouver',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
-  }
-  const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(date)
+  }).formatToParts(date)
   const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
   return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
 }
@@ -126,7 +130,6 @@ const capitalize = (str: string): string => {
 }
 
 function App() {
-  // Use Keycloak authentication
   const {
     isAuthenticated: keycloakAuthenticated,
     isLoading,
@@ -1528,8 +1531,8 @@ function App() {
     // Transform API data to match the table structure, then get unique values
     const transformedData = contactBatchHistory.map((item) => ({
       batchId: String(item.batch.id),
-      createdDate: new Date(item.createdAt).toLocaleDateString(),
-      batchDate: item.batch.batchDate ? new Date(item.batch.batchDate).toLocaleDateString() : '',
+      createdDate: formatDateTimeYMD(item.createdAt),
+      batchDate: item.batch.batchDate ? formatDateYMD(item.batch.batchDate) : '',
       status: item.batch.statusLabel || item.batch.status || '',
       transactionType: capitalize(item.transactionType) || '',
     }))
@@ -1569,23 +1572,13 @@ function App() {
         case 'batchId':
           return `1-${batch.id}`
         case 'batchDate':
-          return batch.batchDate
-            ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: '2-digit',
-              })
-            : ''
+          return batch.batchDate ? formatDateYMD(batch.batchDate) : ''
         case 'status':
           return batch.statusLabel || batch.status
         case 'recordCount':
           return String(batch.recordCount)
         case 'createdDate':
-          return new Date(batch.createdAt).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: '2-digit',
-          })
+          return formatDateTimeYMD(batch.createdAt)
         case 'systemComments':
           return batch.systemComments || ''
         default:
@@ -1663,10 +1656,8 @@ function App() {
       serviceOffice: contact.serviceOffice || '',
       assignedTo: contact.assignedTo || '',
       effectiveLegalStatus: contact.effectiveLegalStatus || '',
-      effectiveDate: contact.effectiveDate
-        ? new Date(contact.effectiveDate).toLocaleDateString()
-        : '',
-      expiryDate: contact.expiryDate ? new Date(contact.expiryDate).toLocaleDateString() : '',
+      effectiveDate: contact.effectiveDate ? formatDateYMD(contact.effectiveDate) : '',
+      expiryDate: contact.expiryDate ? formatDateYMD(contact.expiryDate) : '',
       // Birth location
       birthCity: contact.birthCity || '',
       birthProvince: contact.birthProvince || '',
@@ -1676,12 +1667,8 @@ function App() {
       locationType: contact.locationType || '',
       locationSubType: contact.locationSubType || '',
       placementStatus: contact.placementStatus || '',
-      actualStartDate: contact.actualStartDate
-        ? new Date(contact.actualStartDate).toLocaleDateString()
-        : '',
-      actualEndDate: contact.actualEndDate
-        ? new Date(contact.actualEndDate).toLocaleDateString()
-        : '',
+      actualStartDate: contact.actualStartDate ? formatDateTimeYMD(contact.actualStartDate) : '',
+      actualEndDate: contact.actualEndDate ? formatDateTimeYMD(contact.actualEndDate) : '',
       paidUnpaid: contact.paidUnpaid || '',
       sourcePlacement: contact.sourcePlacement || '',
       // Service provider and agreement fields
@@ -1692,14 +1679,10 @@ function App() {
       agreementType: contact.agreementType || '',
       agreementStatus: contact.agreementStatus || '',
       agreementStartDate: contact.agreementStartDate
-        ? new Date(contact.agreementStartDate).toLocaleDateString()
+        ? formatDateTimeYMD(contact.agreementStartDate)
         : '',
-      agreementEndDate: contact.agreementEndDate
-        ? new Date(contact.agreementEndDate).toLocaleDateString()
-        : '',
-      terminationDate: contact.terminationDate
-        ? new Date(contact.terminationDate).toLocaleDateString()
-        : '',
+      agreementEndDate: contact.agreementEndDate ? formatDateTimeYMD(contact.agreementEndDate) : '',
+      terminationDate: contact.terminationDate ? formatDateTimeYMD(contact.terminationDate) : '',
       mcfdContract: contact.mcfdContract || '',
       product: contact.product || '',
       isOver18: contact.isOver18 || false,
@@ -1800,8 +1783,8 @@ function App() {
     let data = contactBatchHistory.map((item) => ({
       id: item.id,
       batchId: String(item.batch.id),
-      createdDate: new Date(item.createdAt).toLocaleDateString(),
-      batchDate: item.batch.batchDate ? new Date(item.batch.batchDate).toLocaleDateString() : '',
+      createdDate: formatDateTimeYMD(item.createdAt),
+      batchDate: item.batch.batchDate ? formatDateYMD(item.batch.batchDate) : '',
       status: item.batch.statusLabel || item.batch.status || '',
       transactionType: capitalize(item.transactionType) || '',
     }))
@@ -1839,20 +1822,10 @@ function App() {
     let data = batches.map((batch) => ({
       id: batch.id,
       batchId: `1-${batch.id}`, // Format as "1-{id}"
-      batchDate: batch.batchDate
-        ? new Date(batch.batchDate).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: '2-digit',
-          })
-        : '',
+      batchDate: batch.batchDate ? formatDateYMD(batch.batchDate) : '',
       status: batch.statusLabel || batch.status,
       recordCount: batch.recordCount,
-      createdDate: new Date(batch.createdAt).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-      }),
+      createdDate: formatDateTimeYMD(batch.createdAt),
       systemComments: batch.systemComments || '',
     }))
 

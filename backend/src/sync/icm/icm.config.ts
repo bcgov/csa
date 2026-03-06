@@ -1,6 +1,6 @@
 import {
-  daysAgo,
-  firstDayOfPreviousMonth,
+  daysAgoPacific,
+  firstDayOfPreviousMonthPacific,
   formatDatePacific,
   formatDateTimePacific,
   getAgeCutoffDate,
@@ -45,7 +45,7 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     primaryKey: 'ROW_ID',
     cursorLabel: 'Updated',
     searchSpec: () =>
-      `[Status] = "Active" OR [Status] = "Interrupted" OR ([Status] = "Ended" AND [End Date] >= "${formatDatePacific(daysAgo(30))}")`,
+      `[Status] = "Active" OR [Status] = "Interrupted" OR ([Status] = "Ended" AND [End Date] >= "${formatDatePacific(daysAgoPacific(30))}")`,
     fieldMap: STG_ICM_PLACEMENTS_MAP,
   },
   {
@@ -83,7 +83,7 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     primaryKey: 'ROW_ID',
     cursorLabel: 'Order Updated',
     searchSpec: () =>
-      `[Product] <> "Recovered Funds" AND [Order Status] = "Closed" AND ([Order Type] = "Variable" OR [Order Type] = "ADJ-Variable" OR [Order Type] = "Monthly Family Care Rate" OR [Order Type] = "ADJ-Monthly Family Care Rate" OR [Order Type] = "Maintenance Payment") AND [Order Effective Start Date] >= "${formatDateTimePacific(firstDayOfPreviousMonth())}"`,
+      `[Product] <> "Recovered Funds" AND [Order Status] = "Closed" AND ([Order Type] = "Variable" OR [Order Type] = "ADJ-Variable" OR [Order Type] = "Monthly Family Care Rate" OR [Order Type] = "ADJ-Monthly Family Care Rate" OR [Order Type] = "Maintenance Payment") AND [Order Effective Start Date] >= "${formatDateTimePacific(firstDayOfPreviousMonthPacific())}"`,
     fieldMap: STG_ORDER_MAP,
   },
 ]

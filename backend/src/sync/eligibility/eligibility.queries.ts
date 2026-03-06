@@ -9,30 +9,30 @@ const ICM_STATUS_CASE = `CASE UPPER(TRIM(cases.X_CSA_PAY_STATUS))\n${Object.entr
 const CHANGED_CONTACTS_CTE = `
     changed_contacts AS (
       -- ICM: cases with recent ingested_at
-      SELECT DISTINCT cases.CONTACT_ROW_ID
+      SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       WHERE cases.ingested_at >= $1
 
       UNION
 
       -- ICM: placements with recent ingested_at
-      SELECT DISTINCT cases.CONTACT_ROW_ID
+      SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
       WHERE icm_plc.ingested_at >= $1
 
       UNION
 
-      -- ICM: legal authority with recent ingested_at (joins on PersonIcmId)
-      SELECT DISTINCT cases.CONTACT_ROW_ID
+      -- ICM: legal authority with recent ingested_at (joins on CONTACT_ROW_ID)
+      SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
       WHERE legal_auth.ingested_at >= $1
 
       UNION
 
-      -- ICM: legal authority admin with recent ingested_at (via legal authority on PersonIcmId)
-      SELECT DISTINCT cases.CONTACT_ROW_ID
+      -- ICM: legal authority admin with recent ingested_at (via legal authority on CONTACT_ROW_ID)
+      SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
       INNER JOIN stg_icm_legal_authority_admin legal_admin ON legal_admin.LGL_AUTH_CD = legal_auth.LGL_AUTH_CD
@@ -41,7 +41,7 @@ const CHANGED_CONTACTS_CTE = `
       UNION
 
       -- ICM: orders with recent ingested_at
-      SELECT DISTINCT cases.CONTACT_ROW_ID
+      SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
       INNER JOIN stg_icm_orders icm_ord ON icm_ord.AGREEMENT_ROW_ID = icm_plc.AGREEMENT_ROW_ID
@@ -50,7 +50,7 @@ const CHANGED_CONTACTS_CTE = `
       UNION
 
       -- ICM: agreements with recent ingested_at
-      SELECT DISTINCT cases.CONTACT_ROW_ID
+      SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
       INNER JOIN stg_icm_agreement icm_agr ON icm_agr.ROW_ID = icm_plc.AGREEMENT_ROW_ID
@@ -59,7 +59,7 @@ const CHANGED_CONTACTS_CTE = `
       UNION
 
       -- MIS: placements with recent last_updated_date (via person_id_mis on cases)
-      SELECT DISTINCT cases.CONTACT_ROW_ID
+      SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
       WHERE mis_plc.last_updated_date::DATE >= $1
@@ -67,7 +67,7 @@ const CHANGED_CONTACTS_CTE = `
       UNION
 
       -- MIS: contracts with recent last_updated_date (via service_provider_id on placements)
-      SELECT DISTINCT cases.CONTACT_ROW_ID
+      SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
       INNER JOIN stg_mis_contracts mis_con ON mis_con.service_provider_id = mis_plc.service_provider_id
@@ -76,7 +76,7 @@ const CHANGED_CONTACTS_CTE = `
       UNION
 
       -- MIS: payments with recent last_updated_date (via contract_number on contracts, service_provider_id on placements)
-      SELECT DISTINCT cases.CONTACT_ROW_ID
+      SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
       INNER JOIN stg_mis_contracts mis_con ON mis_con.service_provider_id = mis_plc.service_provider_id
@@ -94,10 +94,10 @@ const CHANGED_CONTACTS_CTE = `
  *
  * When threshold is null (full load), no filtering is applied.
  *
- * Deduplication: A contact (CONTACT_ROW_ID) may have multiple case rows in
- * stg_icm_cases. ICM aggregation CTEs group by CONTACT_ROW_ID (via eligible_cases)
+ * Deduplication: A person (X_CONTACT_NUM) may have multiple case rows in
+ * stg_icm_cases (different CONTACT_ROW_IDs). Aggregation CTEs group by X_CONTACT_NUM
  * so arrays combine data across all cases. DISTINCT ON in the final SELECT
- * picks arbitrary one case row for scalar fields (to be refined with business rules).
+ * picks one case row per person for scalar fields.
  *
  * Join topology (matches ICM/MIS data model):
  *  ICM: Cases -[CaseId]-> N Placements -[AgreementID]-> 1 Agreement -[AgreementID]-> N Orders
@@ -107,7 +107,7 @@ const CHANGED_CONTACTS_CTE = `
  * CTEs:
  *  - changed_contacts (incremental only): contacts with recently changed data
  *  - eligible_cases: all case rows from staging (filtered by change detection in incremental mode)
- *  - latest_legal_auth: most recent legal authority per contact (DISTINCT ON CONTACT_ROW_ID)
+ *  - latest_legal_auth: most recent legal authority per person (DISTINCT ON X_CONTACT_NUM)
  *  - icm_placements_agg: active/interrupted ICM placements grouped by contact
  *  - icm_orders_agg: ICM orders grouped by contact (via placement -> agreement)
  *  - icm_agreements_agg: ICM agreements grouped by contact (via placement)
@@ -116,7 +116,7 @@ const CHANGED_CONTACTS_CTE = `
  *  - mis_placements_agg: active/interrupted/ended MIS placements grouped by contact (via PERSON_ID_MIS)
  *
  * Join keys:
- *  - ICM data joins on CONTACT_ROW_ID (aggregated across all cases)
+ *  - ICM data joins on CONTACT_ROW_ID (table-to-table), aggregated by X_CONTACT_NUM (person)
  *  - MIS placements join on PERSON_ID_MIS (via eligible_cases CTE)
  *  - MIS contracts join via service_provider_id on placements
  *  - MIS payments join via contract_number on contracts
@@ -134,8 +134,8 @@ export function buildLoadContactProfilesSql(
   let eligibleCasesFilter = ''
   if (isIncremental) {
     eligibleCasesFilter = hasAgedOut
-      ? 'WHERE cases.CONTACT_ROW_ID IN (SELECT CONTACT_ROW_ID FROM changed_contacts) OR cases.CONTACT_ROW_ID = ANY($2::TEXT[])'
-      : 'WHERE cases.CONTACT_ROW_ID IN (SELECT CONTACT_ROW_ID FROM changed_contacts)'
+      ? 'WHERE cases.X_CONTACT_NUM IN (SELECT X_CONTACT_NUM FROM changed_contacts) OR cases.X_CONTACT_NUM = ANY($2::TEXT[])'
+      : 'WHERE cases.X_CONTACT_NUM IN (SELECT X_CONTACT_NUM FROM changed_contacts)'
   }
 
   const sql = `
@@ -144,6 +144,7 @@ export function buildLoadContactProfilesSql(
       SELECT
         cases.ROW_ID,
         cases.CONTACT_ROW_ID,
+        cases.X_CONTACT_NUM,
         cases.X_LEGACY_FILE_NUM,
         cases.PERSON_ID_MIS
       FROM stg_icm_cases cases
@@ -151,15 +152,15 @@ export function buildLoadContactProfilesSql(
     ),
 
     latest_legal_auth AS (
-      SELECT DISTINCT ON (eligible_cases.CONTACT_ROW_ID)
-        eligible_cases.CONTACT_ROW_ID,
+      SELECT DISTINCT ON (eligible_cases.X_CONTACT_NUM)
+        eligible_cases.X_CONTACT_NUM,
         legal_auth.LGL_AUTH_CD,
         legal_auth.EFF_LGL_STATUS,
         legal_auth.EXPIRY_DT,
         legal_auth.START_DT
       FROM stg_icm_legal_authority legal_auth
       INNER JOIN eligible_cases ON eligible_cases.CONTACT_ROW_ID = legal_auth.PAR_ROW_ID
-      ORDER BY eligible_cases.CONTACT_ROW_ID, legal_auth.START_DT DESC NULLS LAST
+      ORDER BY eligible_cases.X_CONTACT_NUM, legal_auth.START_DT DESC NULLS LAST
     ),
 
     unique_legal_admin AS (
@@ -171,7 +172,7 @@ export function buildLoadContactProfilesSql(
 
     icm_placements_agg AS (
       SELECT
-        eligible_cases.CONTACT_ROW_ID,
+        eligible_cases.X_CONTACT_NUM,
         json_agg(json_build_object(
           'type', icm_plc.X_TYPE,
           'status', icm_plc.X_STATUS,
@@ -190,12 +191,12 @@ export function buildLoadContactProfilesSql(
       FROM stg_icm_placements icm_plc
       INNER JOIN eligible_cases ON eligible_cases.ROW_ID = icm_plc.CASE_ROW_ID
       WHERE UPPER(TRIM(icm_plc.X_STATUS)) IN ('ACTIVE', 'INTERRUPTED')
-      GROUP BY eligible_cases.CONTACT_ROW_ID
+      GROUP BY eligible_cases.X_CONTACT_NUM
     ),
 
     icm_orders_agg AS (
       SELECT
-        CONTACT_ROW_ID,
+        X_CONTACT_NUM,
         json_agg(json_build_object(
           'orderType', NAME,
           'orderStatus', STATUS_CD,
@@ -209,7 +210,7 @@ export function buildLoadContactProfilesSql(
         )) AS data
       FROM (
         SELECT DISTINCT
-          eligible_cases.CONTACT_ROW_ID,
+          eligible_cases.X_CONTACT_NUM,
           icm_ord.NAME,
           icm_ord.STATUS_CD,
           icm_ord.X_EFF_START_DT,
@@ -224,12 +225,12 @@ export function buildLoadContactProfilesSql(
           ON icm_ord.AGREEMENT_ROW_ID = icm_plc.AGREEMENT_ROW_ID
         INNER JOIN eligible_cases ON eligible_cases.ROW_ID = icm_plc.CASE_ROW_ID
       ) unique_orders
-      GROUP BY CONTACT_ROW_ID
+      GROUP BY X_CONTACT_NUM
     ),
 
     icm_agreements_agg AS (
       SELECT
-        CONTACT_ROW_ID,
+        X_CONTACT_NUM,
         json_agg(json_build_object(
           'rowId', ROW_ID,
           'agreementType', AGREE_CD,
@@ -241,7 +242,7 @@ export function buildLoadContactProfilesSql(
         )) AS data
       FROM (
         SELECT DISTINCT
-          eligible_cases.CONTACT_ROW_ID,
+          eligible_cases.X_CONTACT_NUM,
           icm_agr.ROW_ID,
           icm_agr.AGREE_CD,
           icm_agr.STAT_CD,
@@ -254,12 +255,12 @@ export function buildLoadContactProfilesSql(
           ON icm_agr.ROW_ID = icm_plc.AGREEMENT_ROW_ID
         INNER JOIN eligible_cases ON eligible_cases.ROW_ID = icm_plc.CASE_ROW_ID
       ) unique_agreements
-      GROUP BY CONTACT_ROW_ID
+      GROUP BY X_CONTACT_NUM
     ),
 
     mis_payments_agg AS (
       SELECT
-        CONTACT_ROW_ID,
+        X_CONTACT_NUM,
         json_agg(json_build_object(
           'orderType', payment_type,
           'orderStatus', payment_status,
@@ -271,7 +272,7 @@ export function buildLoadContactProfilesSql(
         )) AS data
       FROM (
         SELECT DISTINCT
-          eligible_cases.CONTACT_ROW_ID,
+          eligible_cases.X_CONTACT_NUM,
           mis_pay.payment_type,
           mis_pay.payment_status,
           mis_pay.payment_effective_start_date,
@@ -285,12 +286,12 @@ export function buildLoadContactProfilesSql(
         INNER JOIN eligible_cases
           ON mis_plc.person_id_mis = eligible_cases.PERSON_ID_MIS
       ) unique_payments
-      GROUP BY CONTACT_ROW_ID
+      GROUP BY X_CONTACT_NUM
     ),
 
     mis_contracts_agg AS (
       SELECT
-        CONTACT_ROW_ID,
+        X_CONTACT_NUM,
         json_agg(json_build_object(
           'contractNumber', contract_number,
           'serviceProviderName', service_provider_name,
@@ -303,7 +304,7 @@ export function buildLoadContactProfilesSql(
         )) AS data
       FROM (
         SELECT DISTINCT
-          eligible_cases.CONTACT_ROW_ID,
+          eligible_cases.X_CONTACT_NUM,
           mis_con.contract_number,
           mis_con.service_provider_name,
           mis_con.service_provider_id,
@@ -317,12 +318,12 @@ export function buildLoadContactProfilesSql(
         INNER JOIN eligible_cases
           ON mis_plc.person_id_mis = eligible_cases.PERSON_ID_MIS
       ) unique_contracts
-      GROUP BY CONTACT_ROW_ID
+      GROUP BY X_CONTACT_NUM
     ),
 
     mis_placements_agg AS (
       SELECT
-        eligible_cases.CONTACT_ROW_ID,
+        eligible_cases.X_CONTACT_NUM,
         json_agg(json_build_object(
           'type', mis_plc.type,
           'status', mis_plc.status,
@@ -339,12 +340,12 @@ export function buildLoadContactProfilesSql(
       INNER JOIN eligible_cases
         ON mis_plc.person_id_mis = eligible_cases.PERSON_ID_MIS
       WHERE UPPER(TRIM(mis_plc.status)) IN ('ACTIVE', 'INTERRUPTED', 'ENDED')
-      GROUP BY eligible_cases.CONTACT_ROW_ID
+      GROUP BY eligible_cases.X_CONTACT_NUM
     )
 
-  SELECT DISTINCT ON (cases.CONTACT_ROW_ID)
+  SELECT DISTINCT ON (cases.X_CONTACT_NUM)
     cases.ROW_ID            AS "caseRowId",
-    cases.CONTACT_ROW_ID    AS "personIdIcm",
+    cases.X_CONTACT_NUM     AS "personIdIcm",
     cases.SUBJECT_FST_NAME  AS "firstName",
     cases.SUBJECT_LAST_NAME AS "lastName",
     cases.SUBJECT_MID_NAME  AS "middleName",
@@ -388,18 +389,18 @@ export function buildLoadContactProfilesSql(
   FROM stg_icm_cases cases
   INNER JOIN eligible_cases ON eligible_cases.ROW_ID = cases.ROW_ID
   LEFT JOIN latest_legal_auth legal_auth
-    ON legal_auth.CONTACT_ROW_ID = cases.CONTACT_ROW_ID
+    ON legal_auth.X_CONTACT_NUM = cases.X_CONTACT_NUM
   LEFT JOIN unique_legal_admin legal_admin
     ON legal_admin.LGL_AUTH_CD = legal_auth.LGL_AUTH_CD
   LEFT JOIN contacts master_contacts
-    ON master_contacts.person_id_icm = cases.CONTACT_ROW_ID
-  LEFT JOIN icm_placements_agg icm_plc ON icm_plc.CONTACT_ROW_ID = cases.CONTACT_ROW_ID
-  LEFT JOIN icm_orders_agg icm_ord ON icm_ord.CONTACT_ROW_ID = cases.CONTACT_ROW_ID
-  LEFT JOIN icm_agreements_agg icm_agr ON icm_agr.CONTACT_ROW_ID = cases.CONTACT_ROW_ID
-  LEFT JOIN mis_payments_agg mis_pay ON mis_pay.CONTACT_ROW_ID = cases.CONTACT_ROW_ID
-  LEFT JOIN mis_contracts_agg mis_con ON mis_con.CONTACT_ROW_ID = cases.CONTACT_ROW_ID
-  LEFT JOIN mis_placements_agg mis_plc ON mis_plc.CONTACT_ROW_ID = cases.CONTACT_ROW_ID
-  ORDER BY cases.CONTACT_ROW_ID
+    ON master_contacts.person_id_icm = cases.X_CONTACT_NUM
+  LEFT JOIN icm_placements_agg icm_plc ON icm_plc.X_CONTACT_NUM = cases.X_CONTACT_NUM
+  LEFT JOIN icm_orders_agg icm_ord ON icm_ord.X_CONTACT_NUM = cases.X_CONTACT_NUM
+  LEFT JOIN icm_agreements_agg icm_agr ON icm_agr.X_CONTACT_NUM = cases.X_CONTACT_NUM
+  LEFT JOIN mis_payments_agg mis_pay ON mis_pay.X_CONTACT_NUM = cases.X_CONTACT_NUM
+  LEFT JOIN mis_contracts_agg mis_con ON mis_con.X_CONTACT_NUM = cases.X_CONTACT_NUM
+  LEFT JOIN mis_placements_agg mis_plc ON mis_plc.X_CONTACT_NUM = cases.X_CONTACT_NUM
+  ORDER BY cases.X_CONTACT_NUM
 `
 
   return {

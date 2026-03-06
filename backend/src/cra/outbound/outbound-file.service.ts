@@ -62,88 +62,88 @@ export class OutboundFileService {
 
     writeFileSync(outputPath, lines.join('\n'), 'utf8')
 
-    this.logger.log(`File Created Successfuly===> : ${outputPath}`)
+    this.logger.log(`File created: ${outputPath}`)
     return { filePath: outputPath, fileName: fileName, recordCount: lines.length }
   }
 
-  /* ========= HEADER 6133 ========= */
-  private buildHeader(h: CraHeader): string {
+  private buildHeader(header: CraHeader): string {
+    // 6133
     return (
       this.padRight(String(HEADER_TRAN_CODE), 4) +
       this.padRight(VERSION_NUM, 5) +
-      this.padRight(h.processDate, 8) +
+      this.padRight(header.processDate, 8) +
       this.padRight(BUSINESS_NUM, 15) +
       this.padLeftZero(parseInt(HEADER_RECORD_CONT), 8) +
-      this.padRight(h.filler || '', 25)
+      this.padRight(header.filler || '', 25)
     )
   }
 
-  /* ========= DETAIL 6134 ========= */
-  private buildAppDetail(d: CraDetail): string {
+  private buildAppDetail(detail: CraDetail): string {
+    // 6134
     return (
       this.padRight(DETAIL_TRAN_CODE, 4) +
-      this.padRight(d.referenceNum, 20) +
+      this.padRight(detail.referenceNum, 20) +
       this.padRight(BUSINESS_NUM, 15) +
-      this.padRight(d.tranType, 1) +
-      this.padRight(d.childGivenName, 30) +
-      this.padRight(d.childInitial, 1) +
-      this.padRight(d.childSurName, 30) +
-      this.padRight(d.childGivenNameAka, 30) +
-      this.padRight(d.childSurNameAka, 30) +
-      this.padRight(d.childBirthDate, 8) +
-      this.padRight(d.childSex, 1) +
-      this.padRight(d.childBirthCity, 28) +
-      this.padRight(d.childBirthProv, 2) +
-      this.padRight(d.childBirthCountry, 2) +
-      this.padRight(d.prevRecipSin || '', 9) +
-      this.padRight(d.filler1 || '', 6) +
-      this.padRight(d.prevRecipGivenName || '', 30) +
-      this.padRight(d.prevRecipSurName || '', 30) +
-      this.padRight(d.appStartDate, 8) +
-      this.padRight(d.newBornCode, 1) +
-      this.padRight(d.filler2 || '', 10) +
-      this.padRight(d.ccraDinNum, 9) +
-      this.padRight(d.filler3 || '', 15)
+      this.padRight(detail.tranType, 1) +
+      this.padRight(detail.childGivenName, 30) +
+      this.padRight(detail.childInitial, 1) +
+      this.padRight(detail.childSurName, 30) +
+      this.padRight(detail.childGivenNameAka, 30) +
+      this.padRight(detail.childSurNameAka, 30) +
+      this.padRight(detail.childBirthDate, 8) +
+      this.padRight(detail.childSex, 1) +
+      this.padRight(detail.childBirthCity, 28) +
+      this.padRight(detail.childBirthProv, 2) +
+      this.padRight(detail.childBirthCountry, 2) +
+      this.padRight(detail.prevRecipSin || '', 9) +
+      this.padRight(detail.filler1 || '', 6) +
+      this.padRight(detail.prevRecipGivenName || '', 30) +
+      this.padRight(detail.prevRecipSurName || '', 30) +
+      this.padRight(detail.appStartDate, 8) +
+      this.padRight(detail.newBornCode, 1) +
+      this.padRight(detail.filler2 || '', 10) +
+      this.padRight(detail.ccraDinNum, 9) +
+      this.padRight(detail.filler3 || '', 15)
     )
   }
-  private buildCanDetail(d: CraDetail): string {
+  private buildCanDetail(detail: CraDetail): string {
+    // 6134
     return (
       this.padRight(DETAIL_TRAN_CODE, 4) +
-      this.padRight(d.referenceNum, 20) +
+      this.padRight(detail.referenceNum, 20) +
       this.padRight(BUSINESS_NUM, 15) +
-      this.padRight(d.tranType, 1) +
-      this.padRight(d.childGivenName, 30) +
-      this.padRight(d.childInitial, 1) +
-      this.padRight(d.childSurName, 30) +
-      this.padRight(d.childGivenNameAka, 30) +
-      this.padRight(d.childSurNameAka, 30) +
-      this.padRight(d.childBirthDate, 8) +
-      this.padRight(d.childSex, 1) +
-      this.padRight(d.childBirthCity, 28) +
-      this.padRight(d.childBirthProv, 2) +
-      this.padRight(d.childBirthCountry, 2) +
-      this.padRight(d.filler1 || '', 75) +
-      this.padRight(d.filler2 || '', 8) +
-      this.padRight(d.filler3 || '', 1) +
-      this.padRight(d.cancelEndDate, 8) +
-      this.padRight(d.cancelReasonCode, 2) +
-      this.padRight(d.ccraDinNum, 9)
+      this.padRight(detail.tranType, 1) +
+      this.padRight(detail.childGivenName, 30) +
+      this.padRight(detail.childInitial, 1) +
+      this.padRight(detail.childSurName, 30) +
+      this.padRight(detail.childGivenNameAka, 30) +
+      this.padRight(detail.childSurNameAka, 30) +
+      this.padRight(detail.childBirthDate, 8) +
+      this.padRight(detail.childSex, 1) +
+      this.padRight(detail.childBirthCity, 28) +
+      this.padRight(detail.childBirthProv, 2) +
+      this.padRight(detail.childBirthCountry, 2) +
+      this.padRight(detail.filler1 || '', 75) +
+      this.padRight(detail.filler2 || '', 8) +
+      this.padRight(detail.filler3 || '', 1) +
+      this.padRight(detail.cancelEndDate, 8) +
+      this.padRight(detail.cancelReasonCode, 2) +
+      this.padRight(detail.ccraDinNum, 9)
     )
   }
 
-  /* ========= TRAILER 6135 ========= */
-  private buildTrailer(t: CraTrailer): string {
+  private buildTrailer(trailer: CraTrailer): string {
+    // 6135
     return (
       this.padRight(TRAILER_TRAN_CODE, 4) +
       this.padRight(VERSION_NUM, 5) +
-      this.padRight(t.processDate, 8) +
+      this.padRight(trailer.processDate, 8) +
       this.padRight(BUSINESS_NUM, 15) +
-      this.padLeftZero(t.recordCount + 2, 8) +
-      this.padRight(t.filler, 25)
+      this.padLeftZero(trailer.recordCount + 2, 8) +
+      this.padRight(trailer.filler, 25)
     )
   }
 
-  /* ========= HELPERS ========= */
   private padRight(value: string | number, length: number): string {
     return String(value ?? '').padEnd(length, ' ')
   }
@@ -154,8 +154,6 @@ export class OutboundFileService {
   currentDate(): string {
     return formatDatePacificCompact(new Date())
   }
-
-  /*================= FILE NAME CREATION ================*/
 
   createFileName(sequenceNumber: number): string {
     const paddedSequence = String(sequenceNumber).padStart(4, '0')

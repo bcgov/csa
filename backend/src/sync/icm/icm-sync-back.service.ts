@@ -27,7 +27,7 @@ export class IcmSyncBackService {
       where: { icmIntegrationStatus: true },
       select: {
         id: true,
-        personIdIcm: true,
+        contactIdIcm: true,
         csaStatus: true,
         csaStatusEffectiveDate: true,
         din: true,
@@ -79,7 +79,7 @@ export class IcmSyncBackService {
       where: { id: contactId },
       select: {
         id: true,
-        personIdIcm: true,
+        contactIdIcm: true,
         csaStatus: true,
         csaStatusEffectiveDate: true,
         din: true,
@@ -111,14 +111,14 @@ export class IcmSyncBackService {
   }
 
   private toPayload(contact: {
-    personIdIcm: string
+    contactIdIcm: string | null
     csaStatus: string | null
     csaStatusEffectiveDate: Date | null
     din: string | null
     csaSentDate: Date | null
   }): IcmContactUpdatePayload {
     return {
-      Id: contact.personIdIcm,
+      Id: contact.contactIdIcm ?? '',
       'CSA Status': contact.csaStatus
         ? (CSA_STATUS_LABELS[contact.csaStatus] ?? contact.csaStatus)
         : '',

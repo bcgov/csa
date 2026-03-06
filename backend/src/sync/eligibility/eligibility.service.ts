@@ -68,6 +68,7 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
     conflictMode: 'skip',
     required: true,
   },
+  { dbColumn: 'contact_id_icm', pgType: 'text', extract: (c) => c.profile.contactIdIcm },
   { dbColumn: 'person_id_mis', pgType: 'text', extract: (c) => c.profile.personIdMis },
   { dbColumn: 'first_name', pgType: 'text', extract: (c) => c.profile.firstName, required: true },
   { dbColumn: 'last_name', pgType: 'text', extract: (c) => c.profile.lastName, required: true },
@@ -531,6 +532,7 @@ export class EligibilityService {
 
       return {
         caseRowId: raw.caseRowId,
+        contactIdIcm: raw.contactIdIcm ?? null,
         personIdIcm: raw.personIdIcm,
         personIdMis: raw.personIdMis ?? '',
         firstName: raw.firstName ?? '',

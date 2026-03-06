@@ -3,6 +3,7 @@ import { CsaStatus } from 'src/common/state-machine/constants/csa-status.constan
 // Denormalized contact loaded from staging tables + existing master data
 export interface ContactProfile {
   caseRowId: string
+  contactIdIcm: string | null
   personIdIcm: string
   personIdMis: string
 

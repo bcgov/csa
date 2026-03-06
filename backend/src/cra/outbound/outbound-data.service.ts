@@ -46,7 +46,7 @@ export interface BatchDetailWithContact {
 export class OutboundDataService {
   buildCraFileData(batchDetails: BatchDetailWithContact[]): CraFileData {
     const processDate = formatDatePacificCompact(new Date())
-    const details = batchDetails.map((bd) => this.mapToDetail(bd))
+    const details = batchDetails.map((batchDetail) => this.mapToDetail(batchDetail))
 
     return {
       header: {
@@ -69,13 +69,13 @@ export class OutboundDataService {
     }
   }
 
-  private mapToDetail(bd: BatchDetailWithContact): CraDetail {
-    const { contact } = bd
-    const isApplication = bd.transactionType === 'application'
+  private mapToDetail(batchDetail: BatchDetailWithContact): CraDetail {
+    const { contact } = batchDetail
+    const isApplication = batchDetail.transactionType === 'application'
 
     return {
       tranCode: DETAIL_TRAN_CODE,
-      referenceNum: bd.referenceNumber ?? '',
+      referenceNum: batchDetail.referenceNumber ?? '',
       businessNum: BUSINESS_NUM,
       tranType: isApplication ? TRAN_TYPE.APPLICATION : TRAN_TYPE.CANCELLATION,
 
@@ -90,7 +90,7 @@ export class OutboundDataService {
       childSex: this.mapGender(contact.gender),
       childBirthCity: contact.birthCity ?? '',
       childBirthProv: contact.birthProvince ?? '',
-      childBirthCountry: contact.birthCountry ?? '',
+      childBirthCountry: this.mapCountryCode(contact.birthCountry),
 
       prevRecipSin: '',
       filler1: '',
@@ -109,11 +109,16 @@ export class OutboundDataService {
     }
   }
 
+  private mapCountryCode(country: string | null): string {
+    if (!country || country.trim() === '') return 'CA'
+    return normalize(country) === 'CANADA' ? 'CA' : 'EX'
+  }
+
   private mapGender(gender: string | null): string {
-    const g = normalize(gender)
-    if (g === 'M' || g === 'F') return g
-    if (g?.startsWith('MAN')) return 'M'
-    if (g?.startsWith('WOMAN')) return 'F'
+    const normalized = normalize(gender)
+    if (normalized === 'M' || normalized === 'F') return normalized
+    if (normalized?.startsWith('MAN')) return 'M'
+    if (normalized?.startsWith('WOMAN')) return 'F'
     return 'X'
   }
 
@@ -127,10 +132,10 @@ export class OutboundDataService {
 
   private formatDate(date: Date | string | null): string {
     if (!date) return ''
-    const d = typeof date === 'string' ? new Date(date) : date
-    const year = d.getUTCFullYear()
-    const month = String(d.getUTCMonth() + 1).padStart(2, '0')
-    const day = String(d.getUTCDate()).padStart(2, '0')
+    const dateValue = typeof date === 'string' ? new Date(date) : date
+    const year = dateValue.getUTCFullYear()
+    const month = String(dateValue.getUTCMonth() + 1).padStart(2, '0')
+    const day = String(dateValue.getUTCDate()).padStart(2, '0')
     return `${year}${month}${day}`
   }
 }

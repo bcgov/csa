@@ -49,7 +49,6 @@ export class SendCraFileHandler extends BaseJob {
   async onStart(context: JobContext): Promise<void> {
     await super.onStart(context)
 
-    // Find actionable batch (system_error prioritized for retry, then pending)
     this.batch = await this.prisma.batch.findFirst({
       where: { status: { in: [BATCH_STATUS.SYSTEM_ERROR, BATCH_STATUS.PENDING] } },
       orderBy: { createdAt: 'asc' },
@@ -60,7 +59,6 @@ export class SendCraFileHandler extends BaseJob {
       return
     }
 
-    // Get batch details with contacts
     this.batchDetails = await this.prisma.contactBatchDetail.findMany({
       where: { batchId: this.batch.id },
       include: { contact: true },
@@ -71,10 +69,10 @@ export class SendCraFileHandler extends BaseJob {
       return
     }
 
-    // Transition batch->in_progress
+    await this.ensureBatchDetailsReady()
+
     await this.batchesService.updateBatchStatus(this.batch.id, BATCH_EVENT.SEND_TO_CRA)
 
-    // Transition batch details->in_progress (skip if already in_progress on retry)
     for (const detail of this.batchDetails) {
       if (detail.status !== BATCH_DETAIL_STATUS.IN_PROGRESS) {
         await this.batchesService.updateBatchDetailStatus(detail.id, BATCH_EVENT.SEND_TO_CRA)
@@ -87,19 +85,16 @@ export class SendCraFileHandler extends BaseJob {
       return { success: true, message: 'No batch to process' }
     }
 
-    // Build CRA file data
     const { header, details, trailer } = this.outboundDataService.buildCraFileData(
       this.batchDetails,
     )
 
-    // Get next sequence number (wraps 9999->1)
     const lastSequence = await this.prisma.transferFile.aggregate({
       _max: { sequenceNumber: true },
       where: { direction: FILE_DIRECTION.OUTBOUND },
     })
     const nextSequence = ((lastSequence._max.sequenceNumber ?? this.lastSequenceNumber) % 9999) + 1
 
-    // Create file on local storage
     const { filePath, fileName, recordCount } = this.outboundFileService.createFile(
       header,
       details,
@@ -108,10 +103,8 @@ export class SendCraFileHandler extends BaseJob {
       nextSequence,
     )
 
-    // Transfer file
     await this.outboundTransferService.sendFileToTransferService(filePath, fileName, DESTINATION_ID)
 
-    // Create TransferFile record
     await this.prisma.transferFile.create({
       data: {
         batchId: this.batch.id,
@@ -120,7 +113,7 @@ export class SendCraFileHandler extends BaseJob {
         fileName,
         deliveredAt: new Date(),
         referenceNumbers: this.batchDetails
-          .map((d) => d.referenceNumber)
+          .map((detail) => detail.referenceNumber)
           .filter(Boolean) as string[],
         sequenceNumber: nextSequence,
       },
@@ -149,7 +142,6 @@ export class SendCraFileHandler extends BaseJob {
 
     const now = new Date()
 
-    // Update contact CSA statuses and set csaSentDate
     for (const detail of this.batchDetails) {
       await this.contactsService.updateCsaStatus(
         detail.contactId,
@@ -164,10 +156,27 @@ export class SendCraFileHandler extends BaseJob {
       data: { batchDate: pacificToday() },
     })
 
-    // Fire sync flagged contacts to ICM Job
     this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM).catch((err) => {
       this.logger.warn(`Post-CRA ICM sync failed: ${(err as Error).message}`)
     })
+  }
+
+  private async ensureBatchDetailsReady(): Promise<void> {
+    const missingRefDetails = this.batchDetails.filter((detail) => !detail.referenceNumber)
+    if (missingRefDetails.length > 0) {
+      this.logger.warn(
+        `Batch ${this.batch!.id}: ${missingRefDetails.length} details missing referenceNumber, backfilling`,
+      )
+      for (const detail of missingRefDetails) {
+        const caseNumber = detail.contact.caseNumber ?? ''
+        const referenceNumber = `${caseNumber}-${detail.id}`
+        await this.prisma.contactBatchDetail.update({
+          where: { id: detail.id },
+          data: { referenceNumber },
+        })
+        ;(detail as any).referenceNumber = referenceNumber
+      }
+    }
   }
 
   async onFailure(context: JobContext, error: Error): Promise<void> {

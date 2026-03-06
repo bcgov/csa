@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  firstDayOfPreviousMonth,
-  formatDate,
+  enrichLabels,
+  firstDayOfPreviousMonthPacific,
   formatDatePacific,
   formatDatePacificCompact,
-  formatDateTime,
   formatDateTimePacific,
   getAgeCutoffDate,
   isEligibleAge,
@@ -12,49 +11,42 @@ import {
   parseDateAsPacific,
 } from './utils'
 
-describe('formatDate', () => {
-  it('should format as MM/DD/YYYY', () => {
-    expect(formatDate(new Date(2026, 1, 10))).toBe('02/10/2026')
-  })
-
-  it('should zero-pad month and day', () => {
-    expect(formatDate(new Date(2026, 0, 5))).toBe('01/05/2026')
-  })
-})
-
-describe('formatDateTime', () => {
-  it('should append 00:00:00', () => {
-    expect(formatDateTime(new Date(2026, 1, 10))).toBe('02/10/2026 00:00:00')
-  })
-})
-
-describe('firstDayOfPreviousMonth', () => {
+describe('firstDayOfPreviousMonthPacific', () => {
   it('should return first day of previous month', () => {
-    const result = firstDayOfPreviousMonth(new Date(2026, 1, 15))
-    expect(result.getFullYear()).toBe(2026)
-    expect(result.getMonth()).toBe(0) // January
-    expect(result.getDate()).toBe(1)
+    const result = firstDayOfPreviousMonthPacific(new Date('2026-02-15T00:00:00Z'))
+    expect(result.getUTCFullYear()).toBe(2026)
+    expect(result.getUTCMonth()).toBe(0) // January
+    expect(result.getUTCDate()).toBe(1)
   })
 
   it('should handle January (rolls back to December of previous year)', () => {
-    const result = firstDayOfPreviousMonth(new Date(2026, 0, 10))
-    expect(result.getFullYear()).toBe(2025)
-    expect(result.getMonth()).toBe(11) // December
-    expect(result.getDate()).toBe(1)
+    const result = firstDayOfPreviousMonthPacific(new Date('2026-01-10T00:00:00Z'))
+    expect(result.getUTCFullYear()).toBe(2025)
+    expect(result.getUTCMonth()).toBe(11) // December
+    expect(result.getUTCDate()).toBe(1)
   })
 
-  it('should handle March 31 correctly (the setMonth rollover bug)', () => {
-    const result = firstDayOfPreviousMonth(new Date(2026, 2, 31))
-    expect(result.getFullYear()).toBe(2026)
-    expect(result.getMonth()).toBe(1) // February
-    expect(result.getDate()).toBe(1)
+  it('should handle March correctly', () => {
+    const result = firstDayOfPreviousMonthPacific(new Date('2026-03-31T00:00:00Z'))
+    expect(result.getUTCFullYear()).toBe(2026)
+    expect(result.getUTCMonth()).toBe(1) // February
+    expect(result.getUTCDate()).toBe(1)
   })
 
-  it('should handle May 31 correctly (April has 30 days)', () => {
-    const result = firstDayOfPreviousMonth(new Date(2026, 4, 31))
-    expect(result.getFullYear()).toBe(2026)
-    expect(result.getMonth()).toBe(3) // April
-    expect(result.getDate()).toBe(1)
+  it('should handle May correctly (April has 30 days)', () => {
+    const result = firstDayOfPreviousMonthPacific(new Date('2026-05-31T00:00:00Z'))
+    expect(result.getUTCFullYear()).toBe(2026)
+    expect(result.getUTCMonth()).toBe(3) // April
+    expect(result.getUTCDate()).toBe(1)
+  })
+
+  it('should use Pacific month, not UTC month (boundary case)', () => {
+    // March 1 03:00 UTC = Feb 28 19:00 PST → Pacific month is February
+    // Previous Pacific month = January (not February as UTC would give)
+    const result = firstDayOfPreviousMonthPacific(new Date('2026-03-01T03:00:00Z'))
+    expect(result.getUTCFullYear()).toBe(2026)
+    expect(result.getUTCMonth()).toBe(0) // January (Pacific prev month)
+    expect(result.getUTCDate()).toBe(1)
   })
 })
 
@@ -239,52 +231,151 @@ describe('round-trip: parse then format (Pacific)', () => {
 
 describe('getAgeCutoffDate', () => {
   it('should return first day of month, 18 years before reference', () => {
-    const result = getAgeCutoffDate(new Date(2026, 1, 10))
-    expect(result.getFullYear()).toBe(2008)
-    expect(result.getMonth()).toBe(1) // February
-    expect(result.getDate()).toBe(1)
+    const result = getAgeCutoffDate(new Date('2026-02-10T00:00:00.000Z'))
+    expect(result.getUTCFullYear()).toBe(2008)
+    expect(result.getUTCMonth()).toBe(1) // February
+    expect(result.getUTCDate()).toBe(1)
   })
 
   it('should return first of month regardless of reference day', () => {
-    const result = getAgeCutoffDate(new Date(2026, 1, 28))
-    expect(result.getDate()).toBe(1)
-    expect(result.getMonth()).toBe(1)
+    const result = getAgeCutoffDate(new Date('2026-02-28T00:00:00.000Z'))
+    expect(result.getUTCDate()).toBe(1)
+    expect(result.getUTCMonth()).toBe(1)
   })
 
   it('should handle leap day reference (Feb 29->non-leap year)', () => {
-    // Feb 29, 2024->18 years back = 2006, which has no Feb 29
-    // Without fix: setFullYear rolls to Mar 1 2006, setDate(1)->Mar 1
-    // With fix: setDate(1)->Feb 1 2024, setFullYear->Feb 1 2006 ✓
-    const result = getAgeCutoffDate(new Date(2024, 1, 29))
-    expect(result.getFullYear()).toBe(2006)
-    expect(result.getMonth()).toBe(1) // February
-    expect(result.getDate()).toBe(1)
+    const result = getAgeCutoffDate(new Date('2024-02-29T00:00:00.000Z'))
+    expect(result.getUTCFullYear()).toBe(2006)
+    expect(result.getUTCMonth()).toBe(1) // February
+    expect(result.getUTCDate()).toBe(1)
   })
 })
 
 describe('isEligibleAge', () => {
-  const REF_DATE = new Date(2026, 1, 10) // Feb 10, 2026
+  const REF_DATE = new Date('2026-02-10T00:00:00.000Z')
 
   it('should return true for child under 18', () => {
-    expect(isEligibleAge(new Date(2010, 5, 15), REF_DATE)).toBe(true)
+    expect(isEligibleAge(new Date('2010-06-15T00:00:00.000Z'), REF_DATE)).toBe(true)
   })
 
   it('should return true for child turning 18 in current month', () => {
-    // Born Feb 5, 2008->eligible through end of Feb 2026
-    expect(isEligibleAge(new Date(2008, 1, 5), REF_DATE)).toBe(true)
+    // Born Feb 5, 2008 → eligible through end of Feb 2026
+    expect(isEligibleAge(new Date('2008-02-05T00:00:00.000Z'), REF_DATE)).toBe(true)
   })
 
   it('should return true for child born on first of cutoff month', () => {
-    // Born Feb 1, 2008->cutoff is Feb 1, 2008->eligible (>=)
-    expect(isEligibleAge(new Date(2008, 1, 1), REF_DATE)).toBe(true)
+    // Born Feb 1, 2008 → cutoff is Feb 1, 2008 → eligible (>=)
+    expect(isEligibleAge(new Date('2008-02-01T00:00:00.000Z'), REF_DATE)).toBe(true)
   })
 
   it('should return false for child born before cutoff month', () => {
-    // Born Jan 31, 2008->cutoff is Feb 1, 2008->not eligible
-    expect(isEligibleAge(new Date(2008, 0, 31), REF_DATE)).toBe(false)
+    // Born Jan 31, 2008 → cutoff is Feb 1, 2008 → not eligible
+    expect(isEligibleAge(new Date('2008-01-31T00:00:00.000Z'), REF_DATE)).toBe(false)
   })
 
   it('should return false for child clearly over 18', () => {
-    expect(isEligibleAge(new Date(2005, 5, 15), REF_DATE)).toBe(false)
+    expect(isEligibleAge(new Date('2005-06-15T00:00:00.000Z'), REF_DATE)).toBe(false)
+  })
+})
+
+describe('parseDateAsPacific — DST edge cases', () => {
+  it('should handle 2:00 AM during spring-forward (nonexistent time)', () => {
+    const result = parseDateAsPacific('03/08/2026 02:00:00')
+    expect(result).not.toBeNull()
+    expect(result!.toISOString()).toBe('2026-03-08T10:00:00.000Z')
+  })
+
+  it('should handle 2:30 AM during spring-forward (nonexistent time)', () => {
+    const result = parseDateAsPacific('03/08/2026 02:30:00')
+    expect(result).not.toBeNull()
+    expect(result!.toISOString()).toBe('2026-03-08T10:30:00.000Z')
+  })
+
+  it('should parse date-only on spring-forward day as midnight PST', () => {
+    const result = parseDateAsPacific('03/08/2026')
+    expect(result!.toISOString()).toBe('2026-03-08T08:00:00.000Z')
+  })
+
+  it('should parse date-only on fall-back day as midnight PDT', () => {
+    const result = parseDateAsPacific('11/01/2026')
+    expect(result!.toISOString()).toBe('2026-11-01T07:00:00.000Z')
+  })
+})
+
+describe('isEligibleAge — timezone boundary cases', () => {
+  it('should handle DOB as Prisma DATE (midnight UTC)', () => {
+    const dob = new Date('2008-02-01T00:00:00.000Z')
+    const ref = new Date('2026-02-10T00:00:00.000Z')
+    expect(isEligibleAge(dob, ref)).toBe(true)
+  })
+
+  it('should handle DOB one day before cutoff (Jan 31, 2008)', () => {
+    const dob = new Date('2008-01-31T00:00:00.000Z')
+    const ref = new Date('2026-02-10T00:00:00.000Z')
+    expect(isEligibleAge(dob, ref)).toBe(false)
+  })
+
+  it('should handle reference date at month boundary (March 1)', () => {
+    const ref = new Date('2026-03-01T00:00:00.000Z')
+    expect(isEligibleAge(new Date('2008-02-28T00:00:00.000Z'), ref)).toBe(false)
+    expect(isEligibleAge(new Date('2008-03-01T00:00:00.000Z'), ref)).toBe(true)
+  })
+})
+
+describe('enrichLabels', () => {
+  it('should convert DATE-only fields from Date to YYYY-MM-DD string', () => {
+    const record = {
+      dateOfBirth: new Date('2012-03-15T00:00:00.000Z'),
+      effectiveDate: new Date('2025-01-10T00:00:00.000Z'),
+      expiryDate: new Date('2026-12-31T00:00:00.000Z'),
+    }
+    const result = enrichLabels(record)
+    expect(result.dateOfBirth).toBe('2012-03-15')
+    expect(result.effectiveDate).toBe('2025-01-10')
+    expect(result.expiryDate).toBe('2026-12-31')
+  })
+
+  it('should convert all 7 DATE-only fields', () => {
+    const record = {
+      dateOfBirth: new Date('2012-03-15T00:00:00.000Z'),
+      effectiveDate: new Date('2025-01-10T00:00:00.000Z'),
+      expiryDate: new Date('2026-12-31T00:00:00.000Z'),
+      orderEffectiveStartDate: new Date('2025-06-01T00:00:00.000Z'),
+      orderEffectiveEndDate: new Date('2025-12-01T00:00:00.000Z'),
+      careEndDate: new Date('2026-03-01T00:00:00.000Z'),
+      batchDate: new Date('2026-02-20T00:00:00.000Z'),
+    }
+    const result = enrichLabels(record)
+    expect(result.dateOfBirth).toBe('2012-03-15')
+    expect(result.orderEffectiveStartDate).toBe('2025-06-01')
+    expect(result.orderEffectiveEndDate).toBe('2025-12-01')
+    expect(result.careEndDate).toBe('2026-03-01')
+    expect(result.batchDate).toBe('2026-02-20')
+  })
+
+  it('should not convert null or missing DATE-only fields', () => {
+    const record = { dateOfBirth: null, firstName: 'John' }
+    const result = enrichLabels(record)
+    expect(result.dateOfBirth).toBeNull()
+    expect(result).not.toHaveProperty('effectiveDate')
+  })
+
+  it('should not convert TIMESTAMPTZ fields', () => {
+    const ts = new Date('2025-06-15T14:30:00.000Z')
+    const record = { csaStatusEffectiveDate: ts, actualStartDate: ts }
+    const result = enrichLabels(record)
+    expect(result.csaStatusEffectiveDate).toBeInstanceOf(Date)
+    expect(result.actualStartDate).toBeInstanceOf(Date)
+  })
+
+  it('should still add labels and flags alongside date conversion', () => {
+    const record = {
+      csaStatus: 'eligible',
+      dateOfBirth: new Date('2012-03-15T00:00:00.000Z'),
+    }
+    const result = enrichLabels(record)
+    expect(result.csaStatusLabel).toBe('Eligible')
+    expect(result.dateOfBirth).toBe('2012-03-15')
+    expect(result.isOver18).toBeDefined()
   })
 })

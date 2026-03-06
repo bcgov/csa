@@ -100,14 +100,8 @@ describe('CRA Header format', () => {
   it('should build header in correct CRA sequence and length', () => {
     const result = (service as any).buildHeader(header)
 
-    // Field order check (CRA critical)
     expect(result.startsWith(String(HEADER_TRAN_CODE))).toBe(true)
-
-    // Exact length check
-    // 4 + 5 + 8 + 15 + 8 +25 = 65
-    expect(result.length).toBe(65)
-
-    // Padding checks
+    expect(result.length).toBe(65) // 4 + 5 + 8 + 15 + 8 + 25
     expect(result.substring(0, 4)).toBe(String(HEADER_TRAN_CODE))
     expect(result.substring(4, 9).trim()).toBe(VERSION_NUM)
     expect(result.substring(9, 17)).toBe(currentDate())
@@ -115,8 +109,6 @@ describe('CRA Header format', () => {
     expect(result.substring(32, 40)).toBe(HEADER_RECORD_CONT)
   })
 })
-
-//File detail test case
 
 describe('CRA Detail format', () => {
   let service: OutboundFileService
@@ -128,14 +120,10 @@ describe('CRA Detail format', () => {
   it('should pad fields correctly and maintain CRA Application field sequence', () => {
     const result = (service as any).buildAppDetail(details[0])
 
-    // Must start with detail transaction code
     expect(result.startsWith(String(DETAIL_TRAN_CODE))).toBe(true)
-
-    // Verify padding behavior
-    expect(result.substring(4, 24).startsWith('REF')).toBe(true) // padded right
+    expect(result.substring(4, 24).startsWith('REF')).toBe(true)
     expect(result.substring(24, 39).trim()).toBe(BUSINESS_NUM)
 
-    // Exact total length (CRA spec)  // to be 320
     expect(result.length).toBe(
       4 +
         20 +
@@ -165,14 +153,10 @@ describe('CRA Detail format', () => {
   it('should pad fields correctly and maintain CRA Cancelation field sequence', () => {
     const result = (service as any).buildCanDetail(details[1])
 
-    // Must start with detail transaction code
     expect(result.startsWith(String(DETAIL_TRAN_CODE))).toBe(true)
-
-    // Verify padding behavior
-    expect(result.substring(4, 24).startsWith('REF')).toBe(true) // padded right
+    expect(result.substring(4, 24).startsWith('REF')).toBe(true)
     expect(result.substring(24, 39).trim()).toBe(BUSINESS_NUM)
 
-    // Exact total length (CRA spec)  // to be 305
     expect(result.length).toBe(
       4 + 20 + 15 + 1 + 30 + 1 + 30 + 30 + 30 + 8 + 1 + 28 + 2 + 2 + 75 + 8 + 1 + 8 + 2 + 9,
     )
@@ -200,7 +184,7 @@ describe('OutboundDataService->OutboundFileService integration', () => {
     gender: 'F',
     birthCity: 'TORONTO',
     birthProvince: 'ON',
-    birthCountry: 'CA',
+    birthCountry: 'Canada',
     din: '987654321',
     effectiveDate: new Date('2024-06-01'),
     legacyFileNumber: 'LFN001',
@@ -298,7 +282,6 @@ describe('OutboundDataService->OutboundFileService integration', () => {
   })
 })
 
-// File trailer test case
 describe('CRA Trailer format', () => {
   let service: OutboundFileService
 
@@ -309,13 +292,8 @@ describe('CRA Trailer format', () => {
   it('should pad record count with leading zeros', () => {
     const result = (service as any).buildTrailer(trailer)
 
-    // Starts with trailer code
     expect(result.startsWith(TRAILER_TRAN_CODE)).toBe(true)
-
-    // Record count must be zero-padded
     expect(result.substring(result.length - 25)).toBe('                         ')
-
-    // Total length validation // 65
     expect(result.length).toBe(65)
   })
 })

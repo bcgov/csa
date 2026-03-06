@@ -70,11 +70,15 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
     sourceLabel: 'Key Player Place of Birth',
     masterField: 'birth_country',
   },
-
   {
     sourceField: 'CONTACT_ROW_ID',
     sourceLabel: 'Key Player Id',
     masterField: 'contact_row_id_icm',
+  },
+  {
+    sourceField: 'X_CONTACT_NUM',
+    sourceLabel: 'Key Player Contact Row Num',
+    masterField: 'person_id_icm',
   },
   { sourceField: 'CASE_NUM', sourceLabel: 'Case Num', masterField: 'case_number' },
   {

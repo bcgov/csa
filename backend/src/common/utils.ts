@@ -5,30 +5,14 @@ import {
   CSA_STATUS_LABELS,
 } from './state-machine/constants'
 
-// Date Helpers
-
-export function formatDate(date: Date): string {
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const dd = String(date.getDate()).padStart(2, '0')
-  return `${mm}/${dd}/${date.getFullYear()}`
+export function daysAgoPacific(days: number, referenceDate: Date = new Date()): Date {
+  const ref = DateTime.fromJSDate(referenceDate).setZone(PACIFIC_ZONE)
+  return ref.minus({ days }).toJSDate()
 }
 
-export function formatDateTime(date: Date): string {
-  return `${formatDate(date)} 00:00:00`
-}
-
-export function daysAgo(days: number, referenceDate: Date = new Date()): Date {
-  const d = new Date(referenceDate)
-  d.setDate(d.getDate() - days)
-  return d
-}
-
-export function firstDayOfPreviousMonth(referenceDate: Date = new Date()): Date {
-  const d = new Date(referenceDate)
-  d.setDate(1)
-  d.setMonth(d.getMonth() - 1)
-  d.setHours(0, 0, 0, 0)
-  return d
+export function firstDayOfPreviousMonthPacific(referenceDate: Date = new Date()): Date {
+  const ref = DateTime.fromJSDate(referenceDate).setZone(PACIFIC_ZONE)
+  return ref.minus({ months: 1 }).startOf('month').toJSDate()
 }
 
 const PACIFIC_ZONE = 'America/Vancouver'
@@ -74,6 +58,16 @@ export function parseCalendarDate(dateStr: string | null | undefined): string | 
   return dt.toISODate()!
 }
 
+const DATE_ONLY_FIELDS = new Set([
+  'dateOfBirth',
+  'effectiveDate',
+  'expiryDate',
+  'orderEffectiveStartDate',
+  'orderEffectiveEndDate',
+  'careEndDate',
+  'batchDate',
+])
+
 export function enrichLabels<T extends Record<string, any>>(record: T): T {
   const labels: Record<string, string> = {}
 
@@ -99,7 +93,14 @@ export function enrichLabels<T extends Record<string, any>>(record: T): T {
     flags.isOver18 = !isEligibleAge(record.dateOfBirth)
   }
 
-  return { ...record, ...labels, ...flags }
+  const dates: Record<string, string> = {}
+  for (const field of DATE_ONLY_FIELDS) {
+    if (field in record && record[field] instanceof Date) {
+      dates[field] = record[field].toISOString().split('T')[0]
+    }
+  }
+
+  return { ...record, ...labels, ...flags, ...dates }
 }
 
 export function normalize(value: string | null | undefined): string | undefined {
@@ -130,10 +131,7 @@ export function appendSystemComment(
 
 // A child is eligible through the last day of their birth month at age 18.
 export function getAgeCutoffDate(referenceDate: Date = pacificToday()): Date {
-  const d = new Date(referenceDate)
-  d.setDate(1)
-  d.setFullYear(d.getFullYear() - 18)
-  return d
+  return new Date(Date.UTC(referenceDate.getUTCFullYear() - 18, referenceDate.getUTCMonth(), 1))
 }
 
 export function isEligibleAge(dateOfBirth: Date, referenceDate: Date = pacificToday()): boolean {

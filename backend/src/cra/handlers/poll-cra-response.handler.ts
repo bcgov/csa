@@ -42,16 +42,13 @@ export class PollCraResponseHandler extends BaseJob {
   }
 
   async execute(_context: JobContext): Promise<JobResult> {
-    // shares across all the retries
     this.processedBatchIds = new Set<number>()
     this.recordsAccepted = 0
     this.recordsRejected = 0
     this.recordsRecycled = 0
 
-    // download, validate, track in DB
     await this.inboundFileService.downloadNewResponseFiles(DESTINATION_ID)
 
-    // newly downloaded + any previously failed
     const unprocessedResponseFiles = await this.prisma.transferFile.findMany({
       where: { direction: FILE_DIRECTION.INBOUND, isDetailsProcessed: false, isValid: true },
     })
@@ -69,12 +66,10 @@ export class PollCraResponseHandler extends BaseJob {
       totalRecordsProcessed += await this.processResponseFile(responseFile)
     }
 
-    // set bacth status based on batch details record
     for (const batchId of this.processedBatchIds) {
       await this.batchesService.aggregateBatchStatus(batchId)
     }
 
-    // Fire sync flagged contacts to ICM Job
     if (this.recordsAccepted + this.recordsRejected > 0) {
       this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM).catch((err) => {
         this.logger.warn(`Post-CRA ICM sync failed: ${(err as Error).message}`)
@@ -131,7 +126,7 @@ export class PollCraResponseHandler extends BaseJob {
       data: {
         isDetailsProcessed: true,
         deliveredAt: new Date(),
-        referenceNumbers: details.map((d) => d.referenceNum),
+        referenceNumbers: details.map((detail) => detail.referenceNum),
       },
     })
 

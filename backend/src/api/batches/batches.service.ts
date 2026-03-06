@@ -269,14 +269,16 @@ export class BatchesService {
       }
     }
 
-    result.batch = await this.prisma.batch.update({
-      where: { id: pendingBatch.id },
-      data: {
-        recordCount: {
-          increment: result.success.length,
+    result.batch = enrichLabels(
+      await this.prisma.batch.update({
+        where: { id: pendingBatch.id },
+        data: {
+          recordCount: {
+            increment: result.success.length,
+          },
         },
-      },
-    })
+      }),
+    )
 
     return result
   }

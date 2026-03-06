@@ -377,7 +377,6 @@ export class EligibilityService {
 
     this.logger.log(`Step counts: ${JSON.stringify(stats.stepCounts)}, updates: ${updates.length}`)
 
-    // Batch upsert contacts
     let validRows: UpsertContext[] = []
     if (updates.length > 0) {
       const upsertResult = await this.upsertContacts(updates)
@@ -679,17 +678,12 @@ export class EligibilityService {
 
     const allPersonIds = [...applicationPersonIds, ...cancellationPersonIds]
 
-    // Get contact database IDs and case numbers (needed for batch detail FK + reference number)
-    const contactRows = await this.prisma.$queryRawUnsafe<
-      { id: number; person_id_icm: string; case_number: string | null }[]
-    >(
-      `SELECT id, person_id_icm, case_number FROM contacts WHERE person_id_icm = ANY($1)`,
+    const contactRows = await this.prisma.$queryRawUnsafe<{ id: number; person_id_icm: string }[]>(
+      `SELECT id, person_id_icm FROM contacts WHERE person_id_icm = ANY($1)`,
       allPersonIds,
     )
     const idMap = new Map(contactRows.map((c) => [c.person_id_icm, c.id]))
-    const caseNumberMap = new Map(contactRows.map((c) => [c.id, c.case_number ?? '']))
 
-    // Find or create pending batch
     const [existingBatch] = await this.prisma.$queryRawUnsafe<{ id: number }[]>(
       `SELECT id FROM batches WHERE status = $1 LIMIT 1`,
       BATCH_STATUS.PENDING,
@@ -706,7 +700,6 @@ export class EligibilityService {
       batchId = newBatch.id
     }
 
-    // Filter out contacts already in the pending batch
     const allDbIds = allPersonIds
       .map((pid) => idMap.get(pid))
       .filter((id): id is number => id != null)
@@ -718,7 +711,6 @@ export class EligibilityService {
     )
     const alreadyInBatchIds = new Set(alreadyInBatch.map((r) => r.contact_id))
 
-    // Build arrays for batch insert
     const contactIds: number[] = []
     const batchIds: number[] = []
     const transactionTypes: string[] = []
@@ -750,25 +742,14 @@ export class EligibilityService {
       return { application: 0, cancellation: 0 }
     }
 
-    // Bulk insert batch details and set reference numbers (single atomic CTE)
-    const caseNumbers = contactIds.map((cid) => caseNumberMap.get(cid) ?? '')
     await this.prisma.$executeRawUnsafe(
-      `WITH inserted AS (
-         INSERT INTO contact_batch_details
-           (contact_id, batch_id, transaction_type, status, system_comments,
-            created_at, created_by, last_updated_at, last_updated_by)
-         SELECT * FROM unnest(
-           $1::int[], $2::int[], $3::text[], $4::text[], $5::text[],
-           $6::timestamptz[], $7::text[], $8::timestamptz[], $9::text[]
-         )
-         RETURNING id, contact_id
-       )
-       UPDATE contact_batch_details cbd
-       SET reference_number = v.case_number || '-' || i.id
-       FROM inserted i
-       JOIN unnest($10::int[], $11::text[]) AS v(contact_id, case_number)
-         ON i.contact_id = v.contact_id
-       WHERE cbd.id = i.id`,
+      `INSERT INTO contact_batch_details
+         (contact_id, batch_id, transaction_type, status, system_comments,
+          created_at, created_by, last_updated_at, last_updated_by)
+       SELECT * FROM unnest(
+         $1::int[], $2::int[], $3::text[], $4::text[], $5::text[],
+         $6::timestamptz[], $7::text[], $8::timestamptz[], $9::text[]
+       )`,
       contactIds,
       batchIds,
       transactionTypes,
@@ -778,11 +759,18 @@ export class EligibilityService {
       createdBys,
       contactIds.map(() => new Date()),
       lastUpdatedBys,
-      contactIds,
-      caseNumbers,
     )
 
-    // Update CSA status for application contacts
+    await this.prisma.$executeRawUnsafe(
+      `UPDATE contact_batch_details cbd
+       SET reference_number = COALESCE(c.case_number, '') || '-' || cbd.id
+       FROM contacts c
+       WHERE cbd.batch_id = $1
+         AND cbd.reference_number IS NULL
+         AND c.id = cbd.contact_id`,
+      batchId,
+    )
+
     const appDbIds = contactIds.filter(
       (_, i) => transactionTypes[i] === TRANSACTION_TYPES.APPLICATION,
     )
@@ -822,7 +810,6 @@ export class EligibilityService {
       )
     }
 
-    // Update batch record count
     await this.prisma.$executeRawUnsafe(
       `UPDATE batches SET record_count = record_count + $1 WHERE id = $2`,
       contactIds.length,

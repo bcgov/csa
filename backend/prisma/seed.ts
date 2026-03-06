@@ -135,7 +135,7 @@ function generateContact(csaStatus: string) {
       | typeof CSA_STATUS.NOT_ELIGIBLE_IP_TBD
       | typeof CSA_STATUS.IN_BATCH_CANCELLATION
       | typeof CSA_STATUS.BATCH_SENT_CANCELLATION
-      | typeof CSA_STATUS.CANCELLATION_REFUSED_CRA
+      | typeof CSA_STATUS.CANCELLATION_REFUSED_CRA,
   )
   const din = hasDin ? faker.string.alphanumeric(9).toUpperCase() : null
 

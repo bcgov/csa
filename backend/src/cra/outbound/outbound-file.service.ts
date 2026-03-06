@@ -145,11 +145,15 @@ export class OutboundFileService {
 
   /* ========= HELPERS ========= */
   private padRight(value: string | number, length: number): string {
-    return String(value ?? '')?.padEnd(length, ' ')?.slice(0, length)
+    return String(value ?? '')
+      ?.padEnd(length, ' ')
+      ?.slice(0, length)
   }
 
   private padLeftZero(value: number, length: number): string {
-    return String(value ?? '')?.padStart(length, '0')?.slice(0, length)
+    return String(value ?? '')
+      ?.padStart(length, '0')
+      ?.slice(0, length)
   }
   currentDate(): string {
     return formatDatePacificCompact(new Date())
@@ -157,7 +161,6 @@ export class OutboundFileService {
 
   private getCountryCode(countryName: string) {
     return countryName.toLowerCase() === 'canada' ? 'CA' : 'EX'
-
   }
 
   /*================= FILE NAME CREATION ================*/

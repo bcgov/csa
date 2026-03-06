@@ -18,7 +18,7 @@ const makeContact = (overrides = {}) => ({
   gender: 'F',
   birthCity: 'TORONTO',
   birthProvince: 'ON',
-  birthCountry: 'CA',
+  birthCountry: 'Canada',
   din: '987654321',
   effectiveDate: new Date(2024, 5, 1),
   legacyFileNumber: 'LFN001',
@@ -135,7 +135,7 @@ describe('OutboundDataService', () => {
         gender: 'F',
         birthCity: 'TORONTO',
         birthProvince: 'ON',
-        birthCountry: 'CA',
+        birthCountry: 'Canada',
         din: '987654321',
       })
       const batchDetails = [makeDetail({ contact })]
@@ -154,6 +154,46 @@ describe('OutboundDataService', () => {
       expect(detail.childBirthCountry).toBe('CA')
       expect(detail.ccraDinNum).toBe('987654321')
       expect(detail.businessNum).toBe(BUSINESS_NUM)
+    })
+
+    it('should map "Canada" to CA', () => {
+      const contact = makeContact({ birthCountry: 'Canada' })
+      const batchDetails = [makeDetail({ contact })]
+      const result = service.buildCraFileData(batchDetails)
+
+      expect(result.details[0].childBirthCountry).toBe('CA')
+    })
+
+    it('should map "canada" (lowercase) to CA', () => {
+      const contact = makeContact({ birthCountry: 'canada' })
+      const batchDetails = [makeDetail({ contact })]
+      const result = service.buildCraFileData(batchDetails)
+
+      expect(result.details[0].childBirthCountry).toBe('CA')
+    })
+
+    it('should map non-Canada country to EX', () => {
+      const contact = makeContact({ birthCountry: 'Philippines' })
+      const batchDetails = [makeDetail({ contact })]
+      const result = service.buildCraFileData(batchDetails)
+
+      expect(result.details[0].childBirthCountry).toBe('EX')
+    })
+
+    it('should default null birthCountry to CA', () => {
+      const contact = makeContact({ birthCountry: null })
+      const batchDetails = [makeDetail({ contact })]
+      const result = service.buildCraFileData(batchDetails)
+
+      expect(result.details[0].childBirthCountry).toBe('CA')
+    })
+
+    it('should default empty birthCountry to CA', () => {
+      const contact = makeContact({ birthCountry: '' })
+      const batchDetails = [makeDetail({ contact })]
+      const result = service.buildCraFileData(batchDetails)
+
+      expect(result.details[0].childBirthCountry).toBe('CA')
     })
 
     it('should set appStartDate from contact.effectiveDate for applications', () => {
@@ -364,6 +404,77 @@ describe('OutboundDataService', () => {
     })
   })
 
+  describe('formatDate — DATE column edge cases', () => {
+    it('should format Prisma DATE (midnight UTC) correctly', () => {
+      const contact = makeContact({ dateOfBirth: new Date('2015-02-15T00:00:00.000Z') })
+      const result = service.buildCraFileData([makeDetail({ contact })])
+
+      expect(result.details[0].childBirthDate).toBe('20150215')
+    })
+
+    it('should not shift date when UTC midnight is previous day in Pacific', () => {
+      const contact = makeContact({ dateOfBirth: new Date('2026-03-01T00:00:00.000Z') })
+      const result = service.buildCraFileData([makeDetail({ contact })])
+
+      expect(result.details[0].childBirthDate).toBe('20260301')
+    })
+
+    it('should handle effectiveDate at midnight UTC correctly', () => {
+      const contact = makeContact({ effectiveDate: new Date('2024-06-01T00:00:00.000Z') })
+      const result = service.buildCraFileData([
+        makeDetail({ transactionType: 'application', contact }),
+      ])
+
+      expect(result.details[0].appStartDate).toBe('20240601')
+    })
+
+    it('should handle careEndDate at midnight UTC correctly', () => {
+      const contact = makeContact({ careEndDate: new Date('2025-12-31T00:00:00.000Z') })
+      const result = service.buildCraFileData([
+        makeDetail({ transactionType: 'cancellation', contact }),
+      ])
+
+      expect(result.details[0].cancelEndDate).toBe('20251231')
+    })
+
+    it('should handle date with non-midnight UTC time correctly', () => {
+      const contact = makeContact({ dateOfBirth: new Date('2015-02-15T23:59:59.000Z') })
+      const result = service.buildCraFileData([makeDetail({ contact })])
+
+      expect(result.details[0].childBirthDate).toBe('20150215')
+    })
+
+    it('should handle date crossing UTC day boundary', () => {
+      const contact = makeContact({ dateOfBirth: new Date('2015-02-16T07:30:00.000Z') })
+      const result = service.buildCraFileData([makeDetail({ contact })])
+
+      expect(result.details[0].childBirthDate).toBe('20150216')
+    })
+
+    it('should handle leap year date (Feb 29)', () => {
+      const contact = makeContact({ dateOfBirth: new Date('2024-02-29T00:00:00.000Z') })
+      const result = service.buildCraFileData([makeDetail({ contact })])
+
+      expect(result.details[0].childBirthDate).toBe('20240229')
+    })
+
+    it('should handle year boundary (Dec 31 → Jan 1)', () => {
+      const contact = makeContact({ effectiveDate: new Date('2025-01-01T00:00:00.000Z') })
+      const result = service.buildCraFileData([
+        makeDetail({ transactionType: 'application', contact }),
+      ])
+
+      expect(result.details[0].appStartDate).toBe('20250101')
+    })
+
+    it('should handle string date input', () => {
+      const contact = makeContact({ dateOfBirth: '2015-02-15' })
+      const result = service.buildCraFileData([makeDetail({ contact })])
+
+      expect(result.details[0].childBirthDate).toBe('20150215')
+    })
+  })
+
   describe('Null/missing field handling', () => {
     it('should handle all nullable contact fields as empty strings', () => {
       const contact = makeContact({
@@ -394,7 +505,7 @@ describe('OutboundDataService', () => {
       expect(detail.childSex).toBe('X')
       expect(detail.childBirthCity).toBe('')
       expect(detail.childBirthProv).toBe('')
-      expect(detail.childBirthCountry).toBe('')
+      expect(detail.childBirthCountry).toBe('CA')
       expect(detail.ccraDinNum).toBe('')
       expect(detail.appStartDate).toBe('')
       expect(detail.prevRecipGivenName).toBe('')

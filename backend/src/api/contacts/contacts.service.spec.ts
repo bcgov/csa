@@ -1293,7 +1293,7 @@ describe('ContactsService', () => {
         {
           ...batchDetails[0],
           statusLabel: 'Processed',
-          batch: { ...batchDetails[0].batch, statusLabel: 'Processed' },
+          batch: { ...batchDetails[0].batch, batchDate: '2026-01-15', statusLabel: 'Processed' },
         },
       ])
       expect(prisma.contactBatchDetail.findMany).toHaveBeenCalledWith({

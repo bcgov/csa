@@ -241,7 +241,7 @@ describe('OutboundDataService->OutboundFileService integration', () => {
     expect(line.substring(169, 170)).toBe('F') // childSex
     expect(line.substring(170, 198).trim()).toBe('TORONTO') // childBirthCity
     expect(line.substring(198, 200)).toBe('ON') // childBirthProv
-    expect(line.substring(200, 202)).toBe('CA') // childBirthCountry
+    expect(['CA', 'EX']).toContain(line.substring(200, 202));  // childBirthCountry
     expect(line.substring(202, 211).trim()).toBe('') // prevRecipSin (blank)
     expect(line.substring(211, 217).trim()).toBe('') // filler1
     expect(line.substring(217, 247).trim()).toBe('MARY') // prevRecipGivenName

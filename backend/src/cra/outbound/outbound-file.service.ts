@@ -94,7 +94,7 @@ export class OutboundFileService {
       this.padRight(d.childSex, 1) +
       this.padRight(d.childBirthCity, 28) +
       this.padRight(d.childBirthProv, 2) +
-      this.padRight(d.childBirthCountry, 2) +
+      this.padRight(this.getCountryCode(d.childBirthCountry), 2) +
       this.padRight(d.prevRecipSin || '', 9) +
       this.padRight(d.filler1 || '', 6) +
       this.padRight(d.prevRecipGivenName || '', 30) +
@@ -121,7 +121,7 @@ export class OutboundFileService {
       this.padRight(d.childSex, 1) +
       this.padRight(d.childBirthCity, 28) +
       this.padRight(d.childBirthProv, 2) +
-      this.padRight(d.childBirthCountry, 2) +
+      this.padRight(this.getCountryCode(d.childBirthCountry), 2) +
       this.padRight(d.filler1 || '', 75) +
       this.padRight(d.filler2 || '', 8) +
       this.padRight(d.filler3 || '', 1) +
@@ -145,14 +145,19 @@ export class OutboundFileService {
 
   /* ========= HELPERS ========= */
   private padRight(value: string | number, length: number): string {
-    return String(value ?? '').padEnd(length, ' ')
+    return String(value ?? '')?.padEnd(length, ' ')?.slice(0, length)
   }
 
   private padLeftZero(value: number, length: number): string {
-    return value.toString().padStart(length, '0')
+    return String(value ?? '')?.padStart(length, '0')?.slice(0, length)
   }
   currentDate(): string {
     return formatDatePacificCompact(new Date())
+  }
+
+  private getCountryCode(countryName: string) {
+    return countryName.toLowerCase() === 'canada' ? 'CA' : 'EX'
+
   }
 
   /*================= FILE NAME CREATION ================*/

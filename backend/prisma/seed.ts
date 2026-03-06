@@ -128,7 +128,15 @@ function generateContact(csaStatus: string) {
   const orderAmount = faker.number.float({ min: 100, max: 10000, fractionDigits: 7 }).toFixed(7)
 
   // Status-dependent fields
-  const hasDin = STATUSES_WITH_DIN.has(csaStatus)
+  const hasDin = STATUSES_WITH_DIN.has(
+    csaStatus as
+      | typeof CSA_STATUS.IN_PAY
+      | typeof CSA_STATUS.NOT_ELIGIBLE_IN_PAY
+      | typeof CSA_STATUS.NOT_ELIGIBLE_IP_TBD
+      | typeof CSA_STATUS.IN_BATCH_CANCELLATION
+      | typeof CSA_STATUS.BATCH_SENT_CANCELLATION
+      | typeof CSA_STATUS.CANCELLATION_REFUSED_CRA
+  )
   const din = hasDin ? faker.string.alphanumeric(9).toUpperCase() : null
 
   const holdBy = csaStatus === CSA_STATUS.ON_HOLD ? 'seed' : null

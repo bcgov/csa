@@ -1650,9 +1650,7 @@ function App() {
       serviceOffice: contact.serviceOffice || '',
       assignedTo: contact.assignedTo || '',
       effectiveLegalStatus: contact.effectiveLegalStatus || '',
-      effectiveDate: contact.effectiveDate
-        ? formatDateYMD(contact.effectiveDate)
-        : '',
+      effectiveDate: contact.effectiveDate ? formatDateYMD(contact.effectiveDate) : '',
       expiryDate: contact.expiryDate ? formatDateYMD(contact.expiryDate) : '',
       // Birth location
       birthCity: contact.birthCity || '',
@@ -1663,12 +1661,8 @@ function App() {
       locationType: contact.locationType || '',
       locationSubType: contact.locationSubType || '',
       placementStatus: contact.placementStatus || '',
-      actualStartDate: contact.actualStartDate
-        ? formatDateTimeYMD(contact.actualStartDate)
-        : '',
-      actualEndDate: contact.actualEndDate
-        ? formatDateTimeYMD(contact.actualEndDate)
-        : '',
+      actualStartDate: contact.actualStartDate ? formatDateTimeYMD(contact.actualStartDate) : '',
+      actualEndDate: contact.actualEndDate ? formatDateTimeYMD(contact.actualEndDate) : '',
       paidUnpaid: contact.paidUnpaid || '',
       sourcePlacement: contact.sourcePlacement || '',
       // Service provider and agreement fields
@@ -1681,12 +1675,8 @@ function App() {
       agreementStartDate: contact.agreementStartDate
         ? formatDateTimeYMD(contact.agreementStartDate)
         : '',
-      agreementEndDate: contact.agreementEndDate
-        ? formatDateTimeYMD(contact.agreementEndDate)
-        : '',
-      terminationDate: contact.terminationDate
-        ? formatDateTimeYMD(contact.terminationDate)
-        : '',
+      agreementEndDate: contact.agreementEndDate ? formatDateTimeYMD(contact.agreementEndDate) : '',
+      terminationDate: contact.terminationDate ? formatDateTimeYMD(contact.terminationDate) : '',
       mcfdContract: contact.mcfdContract || '',
       product: contact.product || '',
       isOver18: contact.isOver18 || false,

@@ -5,7 +5,7 @@ import { IcmSyncBackService } from './icm-sync-back.service'
 
 const makeContact = (id: number, overrides = {}) => ({
   id,
-  personIdIcm: `ICM-${id}`,
+  contactIdIcm: `ICM-${id}`,
   csaStatus: 'eligible',
   csaStatusEffectiveDate: new Date('2026-01-15T20:00:00Z'),
   din: `DIN-${id}`,

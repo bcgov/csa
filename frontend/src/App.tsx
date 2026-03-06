@@ -1645,7 +1645,7 @@ function App() {
       akaLastName: contact.akaLastName || '',
       akaFirstName: contact.akaFirstName || '',
       personIdIcm: contact.personIdIcm || '',
-      personIdMis: contact.personIdIms || '',
+      personIdMis: contact.personIdMis || '',
       gender: contact.gender || '',
       dob: contact.dateOfBirth ? formatDateYMD(contact.dateOfBirth) : '',
       age: contact.age || 0,

@@ -71,6 +71,8 @@ export interface Contact {
   product?: string
   // Over 18 flag
   isOver18?: boolean
+  // Hold fields
+  holdBy?: string
 }
 
 export interface PaginatedContactsResponse {

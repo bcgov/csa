@@ -93,6 +93,23 @@ const CSA_STATUS_FILTER_OPTIONS = [
   { value: 'over_18', label: 'Over 18' },
 ]
 
+// Column field to display label mapping for filter menu
+const COLUMN_LABELS: Record<string, string> = {
+  lastName: 'Last Name',
+  firstName: 'First Name',
+  middleName: 'Middle Name',
+  dob: 'Date Of Birth',
+  din: 'DIN',
+  csaStatus: 'CSA Status',
+  statusEffective: 'Status Effective Date',
+  caseNumber: 'Case Number',
+  caseStatus: 'Case Status',
+  legacyFile: 'Legacy File No.',
+  cgwrks3: 'Set on Hold By',
+  lastUpdated: 'Last Updated',
+  lastUpdatedBy: 'Last Updated By',
+}
+
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
 
 const toYMD = (date: Date, timeZone: string): string => {
@@ -755,6 +772,11 @@ function App() {
     // Numeric columns only need 1 character, text columns need 3
     const numericColumns = ['age']
     const minChars = numericColumns.includes(filterAnchor.column) ? 1 : 3
+
+    // Skip debounce search for csaStatus since it uses dropdown selection, not text search
+    if (filterAnchor.column === 'csaStatus') {
+      return
+    }
 
     // Debounce column search - wait 500ms after user stops typing
     const columnSearchTimer = setTimeout(() => {
@@ -1454,9 +1476,41 @@ function App() {
         severity: 'success',
       })
 
+      // Refresh the eligibility list to reflect updated CSA status
+      const apiFilters = [
+        'All Records',
+        'Pending User review/action',
+        'All children On Hold from CSA',
+        'Children In Pay',
+        'Children Out of Pay',
+        'CRA Refused CSA List',
+        'Children within a batch',
+        'Children over 18 years (never eligible)',
+      ]
+
+      if (apiFilters.includes(preDefinedFilter)) {
+        // Reload based on active filter/search
+        if (isColumnFilterActive && activeColumnFilter) {
+          await performColumnFilterSearch(
+            activeColumnFilter.column,
+            activeColumnFilter.query,
+            currentPage,
+          )
+        } else if (isSearchActive && searchTerm.trim().length >= 3) {
+          await performFullTextSearch(searchTerm.trim(), currentPage)
+        } else {
+          await fetchContacts(currentPage)
+        }
+      }
+
+      // Refresh Batch Requests table
+      const updatedBatches = await getAllBatches()
+      setBatches(updatedBatches)
+
       // Refresh batch details for the selected batch
       if (selectedBatch) {
-        await handleBatchClick(selectedBatch)
+        const updatedDetails = await getBatchContacts(selectedBatch)
+        setBatchDetails(updatedDetails)
       }
 
       // Clear selection
@@ -1479,8 +1533,11 @@ function App() {
   // Filter handling functions
   const handleFilterClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
     setFilterAnchor({ element: event.currentTarget, column })
-    // If clicking on the same column that has an active filter, preserve the search term
-    if (activeColumnFilter && activeColumnFilter.column === column) {
+    // For csaStatus, always start with empty search term since selected item is highlighted
+    // For other columns, preserve the search term if clicking on same column with active filter
+    if (column === 'csaStatus') {
+      setFilterSearchTerm('')
+    } else if (activeColumnFilter && activeColumnFilter.column === column) {
       setFilterSearchTerm(activeColumnFilter.query)
     } else {
       setFilterSearchTerm('')
@@ -1686,7 +1743,7 @@ function App() {
       mcfdContract: contact.mcfdContract || '',
       product: contact.product || '',
       isOver18: contact.isOver18 || false,
-      cgwrks3: '',
+      cgwrks3: contact.holdBy || '',
       lastUpdated: contact.lastUpdatedAt ? formatDateTimeYMDHMS(contact.lastUpdatedAt) : '',
       lastUpdatedBy: contact.lastUpdatedBy || '',
     }))
@@ -2813,7 +2870,7 @@ function App() {
                       }}
                     >
                       <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                        Filter by {filterAnchor.column}
+                        Filter by {COLUMN_LABELS[filterAnchor.column] || filterAnchor.column}
                       </Typography>
                       <Button
                         size="small"
@@ -2853,7 +2910,6 @@ function App() {
                             <MenuItem
                               key={option.value}
                               onClick={() => {
-                                setFilterSearchTerm(option.value)
                                 setActiveColumnFilter({ column: 'csaStatus', query: option.value })
                                 performColumnFilterSearch('csaStatus', option.value, 1)
                                 setCurrentPage(1)

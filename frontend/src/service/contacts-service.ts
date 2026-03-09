@@ -9,6 +9,7 @@ export interface Contact {
   akaFirstName: string
   personIdIcm: string
   personIdIms: string
+  personIdMis: string
   caseNumber: string
   caseType: string
   caseStatus: string

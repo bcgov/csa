@@ -93,6 +93,23 @@ const CSA_STATUS_FILTER_OPTIONS = [
   { value: 'over_18', label: 'Over 18' },
 ]
 
+// Column field to display label mapping for filter menu
+const COLUMN_LABELS: Record<string, string> = {
+  lastName: 'Last Name',
+  firstName: 'First Name',
+  middleName: 'Middle Name',
+  dob: 'Date Of Birth',
+  din: 'DIN',
+  csaStatus: 'CSA Status',
+  statusEffective: 'Status Effective Date',
+  caseNumber: 'Case Number',
+  caseStatus: 'Case Status',
+  legacyFile: 'Legacy File No.',
+  cgwrks3: 'Set on Hold By',
+  lastUpdated: 'Last Updated',
+  lastUpdatedBy: 'Last Updated By',
+}
+
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
 
 const toYMD = (date: Date, timeZone: string): string => {
@@ -121,6 +138,12 @@ const formatDateTimeYMDHMS = (dateString: string): string => {
   }).formatToParts(date)
   const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
   return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
+}
+
+// Capitalize first letter of a string
+const capitalize = (str: string): string => {
+  if (!str) return str
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
 }
 
 function App() {
@@ -749,6 +772,11 @@ function App() {
     // Numeric columns only need 1 character, text columns need 3
     const numericColumns = ['age']
     const minChars = numericColumns.includes(filterAnchor.column) ? 1 : 3
+
+    // Skip debounce search for csaStatus since it uses dropdown selection, not text search
+    if (filterAnchor.column === 'csaStatus') {
+      return
+    }
 
     // Debounce column search - wait 500ms after user stops typing
     const columnSearchTimer = setTimeout(() => {
@@ -1448,9 +1476,41 @@ function App() {
         severity: 'success',
       })
 
+      // Refresh the eligibility list to reflect updated CSA status
+      const apiFilters = [
+        'All Records',
+        'Pending User review/action',
+        'All children On Hold from CSA',
+        'Children In Pay',
+        'Children Out of Pay',
+        'CRA Refused CSA List',
+        'Children within a batch',
+        'Children over 18 years (never eligible)',
+      ]
+
+      if (apiFilters.includes(preDefinedFilter)) {
+        // Reload based on active filter/search
+        if (isColumnFilterActive && activeColumnFilter) {
+          await performColumnFilterSearch(
+            activeColumnFilter.column,
+            activeColumnFilter.query,
+            currentPage,
+          )
+        } else if (isSearchActive && searchTerm.trim().length >= 3) {
+          await performFullTextSearch(searchTerm.trim(), currentPage)
+        } else {
+          await fetchContacts(currentPage)
+        }
+      }
+
+      // Refresh Batch Requests table
+      const updatedBatches = await getAllBatches()
+      setBatches(updatedBatches)
+
       // Refresh batch details for the selected batch
       if (selectedBatch) {
-        await handleBatchClick(selectedBatch)
+        const updatedDetails = await getBatchContacts(selectedBatch)
+        setBatchDetails(updatedDetails)
       }
 
       // Clear selection
@@ -1473,8 +1533,11 @@ function App() {
   // Filter handling functions
   const handleFilterClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
     setFilterAnchor({ element: event.currentTarget, column })
-    // If clicking on the same column that has an active filter, preserve the search term
-    if (activeColumnFilter && activeColumnFilter.column === column) {
+    // For csaStatus, always start with empty search term since selected item is highlighted
+    // For other columns, preserve the search term if clicking on same column with active filter
+    if (column === 'csaStatus') {
+      setFilterSearchTerm('')
+    } else if (activeColumnFilter && activeColumnFilter.column === column) {
       setFilterSearchTerm(activeColumnFilter.query)
     } else {
       setFilterSearchTerm('')
@@ -1528,7 +1591,7 @@ function App() {
       createdDate: formatDateTimeYMD(item.createdAt),
       batchDate: item.batch.batchDate ? formatDateYMD(item.batch.batchDate) : '',
       status: item.batch.statusLabel || item.batch.status || '',
-      transactionType: item.transactionType || '',
+      transactionType: capitalize(item.transactionType) || '',
     }))
     const values = transformedData.map((row) => row[column as keyof typeof row])
     return Array.from(new Set(values)).filter((v) => v !== undefined && v !== '')
@@ -1632,7 +1695,7 @@ function App() {
       akaLastName: contact.akaLastName || '',
       akaFirstName: contact.akaFirstName || '',
       personIdIcm: contact.personIdIcm || '',
-      personIdMis: contact.personIdIms || '',
+      personIdMis: contact.personIdMis || '',
       gender: contact.gender || '',
       dob: contact.dateOfBirth ? formatDateYMD(contact.dateOfBirth) : '',
       age: contact.age || 0,
@@ -1680,7 +1743,7 @@ function App() {
       mcfdContract: contact.mcfdContract || '',
       product: contact.product || '',
       isOver18: contact.isOver18 || false,
-      cgwrks3: '',
+      cgwrks3: contact.holdBy || '',
       lastUpdated: contact.lastUpdatedAt ? formatDateTimeYMDHMS(contact.lastUpdatedAt) : '',
       lastUpdatedBy: contact.lastUpdatedBy || '',
     }))
@@ -1780,7 +1843,7 @@ function App() {
       createdDate: formatDateTimeYMD(item.createdAt),
       batchDate: item.batch.batchDate ? formatDateYMD(item.batch.batchDate) : '',
       status: item.batch.statusLabel || item.batch.status || '',
-      transactionType: item.transactionType || '',
+      transactionType: capitalize(item.transactionType) || '',
     }))
 
     // Apply global search across all columns
@@ -1860,7 +1923,7 @@ function App() {
       lastName: detail.contact.lastName,
       middleName: detail.contact.middleName || '',
       givenName: detail.contact.firstName,
-      transactionType: detail.transactionType,
+      transactionType: capitalize(detail.transactionType),
       status: detail.statusLabel || detail.status || '',
       systemComments: detail.systemComments || '',
     }))
@@ -2807,7 +2870,7 @@ function App() {
                       }}
                     >
                       <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                        Filter by {filterAnchor.column}
+                        Filter by {COLUMN_LABELS[filterAnchor.column] || filterAnchor.column}
                       </Typography>
                       <Button
                         size="small"
@@ -2847,7 +2910,6 @@ function App() {
                             <MenuItem
                               key={option.value}
                               onClick={() => {
-                                setFilterSearchTerm(option.value)
                                 setActiveColumnFilter({ column: 'csaStatus', query: option.value })
                                 performColumnFilterSearch('csaStatus', option.value, 1)
                                 setCurrentPage(1)
@@ -3070,20 +3132,17 @@ function App() {
                                 <Box
                                   sx={{
                                     display: 'flex',
-                                    justifyContent: 'space-between',
+                                    gap: 2,
                                     alignItems: 'baseline',
                                   }}
                                 >
                                   <Typography
                                     variant="caption"
-                                    sx={{ color: '#666', flexShrink: 0 }}
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
                                   >
                                     Child/Youth Name
                                   </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ fontWeight: 500, textAlign: 'right' }}
-                                  >
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                     {[childData.firstName, childData.middleName, childData.lastName]
                                       .filter(Boolean)
                                       .join(' ') || '-'}
@@ -3093,20 +3152,17 @@ function App() {
                                 <Box
                                   sx={{
                                     display: 'flex',
-                                    justifyContent: 'space-between',
+                                    gap: 2,
                                     alignItems: 'baseline',
                                   }}
                                 >
                                   <Typography
                                     variant="caption"
-                                    sx={{ color: '#666', flexShrink: 0 }}
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
                                   >
                                     Gender
                                   </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ fontWeight: 500, textAlign: 'right' }}
-                                  >
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                     {childData.gender || '-'}
                                   </Typography>
                                 </Box>
@@ -3114,20 +3170,17 @@ function App() {
                                 <Box
                                   sx={{
                                     display: 'flex',
-                                    justifyContent: 'space-between',
+                                    gap: 2,
                                     alignItems: 'baseline',
                                   }}
                                 >
                                   <Typography
                                     variant="caption"
-                                    sx={{ color: '#666', flexShrink: 0 }}
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
                                   >
                                     Person ID ICM
                                   </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ fontWeight: 500, textAlign: 'right' }}
-                                  >
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                     {childData.personIdIcm || '-'}
                                   </Typography>
                                 </Box>
@@ -3135,20 +3188,17 @@ function App() {
                                 <Box
                                   sx={{
                                     display: 'flex',
-                                    justifyContent: 'space-between',
+                                    gap: 2,
                                     alignItems: 'baseline',
                                   }}
                                 >
                                   <Typography
                                     variant="caption"
-                                    sx={{ color: '#666', flexShrink: 0 }}
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
                                   >
                                     Person ID MIS
                                   </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ fontWeight: 500, textAlign: 'right' }}
-                                  >
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                     {childData.personIdMis || '-'}
                                   </Typography>
                                 </Box>
@@ -3156,20 +3206,17 @@ function App() {
                                 <Box
                                   sx={{
                                     display: 'flex',
-                                    justifyContent: 'space-between',
+                                    gap: 2,
                                     alignItems: 'baseline',
                                   }}
                                 >
                                   <Typography
                                     variant="caption"
-                                    sx={{ color: '#666', flexShrink: 0 }}
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
                                   >
                                     DIN
                                   </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ fontWeight: 500, textAlign: 'right' }}
-                                  >
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                     {childData.din || '-'}
                                   </Typography>
                                 </Box>
@@ -3177,20 +3224,17 @@ function App() {
                                 <Box
                                   sx={{
                                     display: 'flex',
-                                    justifyContent: 'space-between',
+                                    gap: 2,
                                     alignItems: 'baseline',
                                   }}
                                 >
                                   <Typography
                                     variant="caption"
-                                    sx={{ color: '#666', flexShrink: 0 }}
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
                                   >
                                     AKA Last Name
                                   </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ fontWeight: 500, textAlign: 'right' }}
-                                  >
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                     {childData.akaLastName || '-'}
                                   </Typography>
                                 </Box>
@@ -3198,20 +3242,17 @@ function App() {
                                 <Box
                                   sx={{
                                     display: 'flex',
-                                    justifyContent: 'space-between',
+                                    gap: 2,
                                     alignItems: 'baseline',
                                   }}
                                 >
                                   <Typography
                                     variant="caption"
-                                    sx={{ color: '#666', flexShrink: 0 }}
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
                                   >
                                     AKA First Name
                                   </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ fontWeight: 500, textAlign: 'right' }}
-                                  >
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                     {childData.akaFirstName || '-'}
                                   </Typography>
                                 </Box>
@@ -3219,20 +3260,17 @@ function App() {
                                 <Box
                                   sx={{
                                     display: 'flex',
-                                    justifyContent: 'space-between',
+                                    gap: 2,
                                     alignItems: 'baseline',
                                   }}
                                 >
                                   <Typography
                                     variant="caption"
-                                    sx={{ color: '#666', flexShrink: 0 }}
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
                                   >
                                     Birth Place
                                   </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ fontWeight: 500, textAlign: 'right' }}
-                                  >
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                     {[
                                       childData.birthCity,
                                       childData.birthProvince,
@@ -3246,20 +3284,17 @@ function App() {
                                 <Box
                                   sx={{
                                     display: 'flex',
-                                    justifyContent: 'space-between',
+                                    gap: 2,
                                     alignItems: 'baseline',
                                   }}
                                 >
                                   <Typography
                                     variant="caption"
-                                    sx={{ color: '#666', flexShrink: 0 }}
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
                                   >
                                     Age
                                   </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ fontWeight: 500, textAlign: 'right' }}
-                                  >
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                     {childData.age || '-'}
                                   </Typography>
                                 </Box>
@@ -3276,90 +3311,207 @@ function App() {
                               </Typography>
                               <Box
                                 sx={{
-                                  display: 'grid',
-                                  gridTemplateColumns: 'auto 1fr',
-                                  gap: 1,
-                                  rowGap: 1.5,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: 1.5,
                                   backgroundColor: '#f9f9f9',
                                   p: 2,
                                   borderRadius: 1,
                                 }}
                               >
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Case Status
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.caseStatus || '-'}
-                                </Typography>
-
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Case No.
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  sx={{ fontWeight: 500, color: '#1976d2', cursor: 'pointer' }}
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
                                 >
-                                  {childData.caseNumber || '-'}
-                                </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Case Status
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.caseStatus || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Case Type
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.caseType || '-'}
-                                </Typography>
-
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Caseload
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.caseLoad || '-'}
-                                </Typography>
-
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Legacy File No.
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.legacyFile || '-'}
-                                </Typography>
-
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Service Office
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  sx={{ fontWeight: 500, color: '#1976d2', cursor: 'pointer' }}
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
                                 >
-                                  {childData.serviceOffice || '-'}
-                                </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Case No.
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      color: '#1976d2',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    {childData.caseNumber || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Assigned to
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.assignedTo || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Case Type
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.caseType || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Legal Status Code
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.effectiveLegalStatus || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Caseload
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.caseLoad || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Effective Date
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.effectiveDate || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Legacy File No.
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.legacyFile || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Expiry Date
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.expiryDate || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Service Office
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      color: '#1976d2',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    {childData.serviceOffice || '-'}
+                                  </Typography>
+                                </Box>
+
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Assigned to
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.assignedTo || '-'}
+                                  </Typography>
+                                </Box>
+
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Legal Status Code
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.effectiveLegalStatus || '-'}
+                                  </Typography>
+                                </Box>
+
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Effective Date
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.effectiveDate || '-'}
+                                  </Typography>
+                                </Box>
+
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Expiry Date
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.expiryDate || '-'}
+                                  </Typography>
+                                </Box>
                               </Box>
                             </Box>
 
@@ -3373,86 +3525,173 @@ function App() {
                               </Typography>
                               <Box
                                 sx={{
-                                  display: 'grid',
-                                  gridTemplateColumns: 'auto 1fr',
-                                  gap: 1,
-                                  rowGap: 1.5,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: 1.5,
                                   backgroundColor: '#f9f9f9',
                                   p: 2,
                                   borderRadius: 1,
                                 }}
                               >
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Placement/Location No.
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.placementLocation || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Placement/Location No.
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.placementLocation || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Type
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.locationType || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Type
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.locationType || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Sub-type
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.locationSubType || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Sub-type
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.locationSubType || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Status
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.placementStatus || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Status
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.placementStatus || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Actual Start Date
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.actualStartDate || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Actual Start Date
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.actualStartDate || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Actual End Date
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.actualEndDate || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Actual End Date
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.actualEndDate || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Paid/Unpaid
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.paidUnpaid || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Paid/Unpaid
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.paidUnpaid || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Source
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.sourcePlacement ? (
-                                    <Typography
-                                      component="span"
-                                      sx={{
-                                        backgroundColor: '#e3f2fd',
-                                        color: '#1976d2',
-                                        px: 1,
-                                        py: 0.5,
-                                        borderRadius: 1,
-                                        fontSize: '0.75rem',
-                                      }}
-                                    >
-                                      {childData.sourcePlacement}
-                                    </Typography>
-                                  ) : (
-                                    '-'
-                                  )}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Source
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.sourcePlacement ? (
+                                      <Typography
+                                        component="span"
+                                        sx={{
+                                          backgroundColor: '#e3f2fd',
+                                          color: '#1976d2',
+                                          px: 1,
+                                          py: 0.5,
+                                          borderRadius: 1,
+                                          fontSize: '0.75rem',
+                                        }}
+                                      >
+                                        {childData.sourcePlacement}
+                                      </Typography>
+                                    ) : (
+                                      '-'
+                                    )}
+                                  </Typography>
+                                </Box>
                               </Box>
                             </Box>
 
@@ -3466,91 +3705,211 @@ function App() {
                               </Typography>
                               <Box
                                 sx={{
-                                  display: 'grid',
-                                  gridTemplateColumns: 'auto 1fr',
-                                  gap: 1,
-                                  rowGap: 1.5,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: 1.5,
                                   backgroundColor: '#f9f9f9',
                                   p: 2,
                                   borderRadius: 1,
                                 }}
                               >
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Agreement Status
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.agreementStatus || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Provider Name
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.serviceProviderName || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Provider Name
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.serviceProviderName || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Provider ID
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.providerId || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Provider ID
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.providerId || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Place of Service
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.placeOfServiceName || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Place of Service
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.placeOfServiceName || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Source
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.sourceAgreement || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Source
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.sourceAgreement || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Agreement Type
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.agreementType || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Agreement Type
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.agreementType || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Agreement Status
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.agreementStatus || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Start Date
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.agreementStartDate || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Start Date
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.agreementStartDate || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  End Date
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.agreementEndDate || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    End Date
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.agreementEndDate || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Termination Date
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.terminationDate || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Termination Date
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.terminationDate || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  MCFD Contract No.
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.mcfdContract || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    MCFD Contract No.
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.mcfdContract || '-'}
+                                  </Typography>
+                                </Box>
 
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                  Product
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {childData.product || '-'}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 2,
+                                    alignItems: 'baseline',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                                  >
+                                    Product
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {childData.product || '-'}
+                                  </Typography>
+                                </Box>
                               </Box>
                             </Box>
                           </Box>

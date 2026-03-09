@@ -773,6 +773,11 @@ function App() {
     const numericColumns = ['age']
     const minChars = numericColumns.includes(filterAnchor.column) ? 1 : 3
 
+    // Skip debounce search for csaStatus since it uses dropdown selection, not text search
+    if (filterAnchor.column === 'csaStatus') {
+      return
+    }
+
     // Debounce column search - wait 500ms after user stops typing
     const columnSearchTimer = setTimeout(() => {
       if (filterSearchTerm.trim().length >= minChars) {
@@ -1471,9 +1476,41 @@ function App() {
         severity: 'success',
       })
 
+      // Refresh the eligibility list to reflect updated CSA status
+      const apiFilters = [
+        'All Records',
+        'Pending User review/action',
+        'All children On Hold from CSA',
+        'Children In Pay',
+        'Children Out of Pay',
+        'CRA Refused CSA List',
+        'Children within a batch',
+        'Children over 18 years (never eligible)',
+      ]
+
+      if (apiFilters.includes(preDefinedFilter)) {
+        // Reload based on active filter/search
+        if (isColumnFilterActive && activeColumnFilter) {
+          await performColumnFilterSearch(
+            activeColumnFilter.column,
+            activeColumnFilter.query,
+            currentPage,
+          )
+        } else if (isSearchActive && searchTerm.trim().length >= 3) {
+          await performFullTextSearch(searchTerm.trim(), currentPage)
+        } else {
+          await fetchContacts(currentPage)
+        }
+      }
+
+      // Refresh Batch Requests table
+      const updatedBatches = await getAllBatches()
+      setBatches(updatedBatches)
+
       // Refresh batch details for the selected batch
       if (selectedBatch) {
-        await handleBatchClick(selectedBatch)
+        const updatedDetails = await getBatchContacts(selectedBatch)
+        setBatchDetails(updatedDetails)
       }
 
       // Clear selection

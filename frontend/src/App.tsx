@@ -93,6 +93,14 @@ const CSA_STATUS_FILTER_OPTIONS = [
   { value: 'over_18', label: 'Over 18' },
 ]
 
+// Case Status options for filter dropdown
+const CASE_STATUS_FILTER_OPTIONS = [
+  { value: 'Open', label: 'Open' },
+  { value: 'Closed', label: 'Closed' },
+  { value: 'Pending', label: 'Pending' },
+  { value: 'Admin Re-open', label: 'Admin Re-open' },
+]
+
 // Column field to display label mapping for filter menu
 const COLUMN_LABELS: Record<string, string> = {
   lastName: 'Last Name',
@@ -773,8 +781,8 @@ function App() {
     const numericColumns = ['age']
     const minChars = numericColumns.includes(filterAnchor.column) ? 1 : 3
 
-    // Skip debounce search for csaStatus since it uses dropdown selection, not text search
-    if (filterAnchor.column === 'csaStatus') {
+    // Skip debounce search for csaStatus and caseStatus since they use dropdown selection, not text search
+    if (filterAnchor.column === 'csaStatus' || filterAnchor.column === 'caseStatus') {
       return
     }
 
@@ -1533,9 +1541,9 @@ function App() {
   // Filter handling functions
   const handleFilterClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
     setFilterAnchor({ element: event.currentTarget, column })
-    // For csaStatus, always start with empty search term since selected item is highlighted
+    // For csaStatus and caseStatus, always start with empty search term since selected item is highlighted
     // For other columns, preserve the search term if clicking on same column with active filter
-    if (column === 'csaStatus') {
+    if (column === 'csaStatus' || column === 'caseStatus') {
       setFilterSearchTerm('')
     } else if (activeColumnFilter && activeColumnFilter.column === column) {
       setFilterSearchTerm(activeColumnFilter.query)
@@ -2921,6 +2929,53 @@ function App() {
                                 py: 0.75,
                                 backgroundColor:
                                   activeColumnFilter?.column === 'csaStatus' &&
+                                  activeColumnFilter?.query === option.value
+                                    ? 'rgba(25, 118, 210, 0.08)'
+                                    : 'transparent',
+                              }}
+                            >
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </Box>
+                      </>
+                    ) : filterAnchor.column === 'caseStatus' ? (
+                      <>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          placeholder="Search status..."
+                          value={filterSearchTerm}
+                          onChange={(e) => setFilterSearchTerm(e.target.value)}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <Box component="span" sx={{ fontSize: '18px' }}>
+                                  🔍
+                                </Box>
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{ mb: 1 }}
+                        />
+                        <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                          {CASE_STATUS_FILTER_OPTIONS.filter((option) =>
+                            option.label.toLowerCase().includes(filterSearchTerm.toLowerCase()),
+                          ).map((option) => (
+                            <MenuItem
+                              key={option.value}
+                              onClick={() => {
+                                setActiveColumnFilter({ column: 'caseStatus', query: option.value })
+                                performColumnFilterSearch('caseStatus', option.value, 1)
+                                setCurrentPage(1)
+                                setIsColumnFilterActive(true)
+                                handleFilterClose()
+                              }}
+                              sx={{
+                                fontSize: '0.875rem',
+                                py: 0.75,
+                                backgroundColor:
+                                  activeColumnFilter?.column === 'caseStatus' &&
                                   activeColumnFilter?.query === option.value
                                     ? 'rgba(25, 118, 210, 0.08)'
                                     : 'transparent',

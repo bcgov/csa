@@ -3354,7 +3354,6 @@ function App() {
                                     variant="body2"
                                     sx={{
                                       fontWeight: 500,
-                                      color: '#1976d2',
                                       cursor: 'pointer',
                                     }}
                                   >
@@ -3433,7 +3432,6 @@ function App() {
                                     variant="body2"
                                     sx={{
                                       fontWeight: 500,
-                                      color: '#1976d2',
                                       cursor: 'pointer',
                                     }}
                                   >

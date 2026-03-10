@@ -176,11 +176,11 @@ describe('parseDateAsPacific', () => {
     expect(afterFall!.toISOString()).toBe('2026-11-01T11:00:00.000Z')
   })
 
-  // it('should handle ambiguous 1:30 AM during fall-back (favors standard time)', () => {
-  //   // 1:30 AM occurs twice during fall-back. Luxon resolves to standard time (PST, UTC-8).
-  //   const result = parseDateAsPacific('11/01/2026 01:30:00')
-  //   expect(result!.toISOString()).toBe('2026-11-01T09:30:00.000Z')
-  // })
+  it('should handle ambiguous 1:30 AM during fall-back (favors standard time)', () => {
+    // 1:30 AM occurs twice during fall-back. Luxon resolves to standard time (PST, UTC-8).
+    const result = parseDateAsPacific('11/01/2026 01:30:00')
+    expect(result!.toISOString()).toBe('2026-11-01T09:30:00.000Z')
+  })
 })
 
 describe('parseCalendarDate', () => {

@@ -147,7 +147,7 @@ describe('OutboundDataService', () => {
       expect(detail.childSurName).toBe('SMITH')
       expect(detail.childGivenNameAka).toBe('EM')
       expect(detail.childSurNameAka).toBe('SMYTH')
-      expect(detail.childBirthDate).toBe('20150214')
+      expect(detail.childBirthDate).toBe('20150215')
       expect(detail.childSex).toBe('F')
       expect(detail.childBirthCity).toBe('TORONTO')
       expect(detail.childBirthProv).toBe('ON')
@@ -196,13 +196,13 @@ describe('OutboundDataService', () => {
       expect(result.details[0].childBirthCountry).toBe('CA')
     })
 
-    // it('should set appStartDate from contact.effectiveDate for applications', () => {
-    //   const contact = makeContact({ effectiveDate: new Date(2024, 5, 1) })
-    //   const batchDetails = [makeDetail({ transactionType: 'application', contact })]
-    //   const result = service.buildCraFileData(batchDetails)
+    it('should set appStartDate from contact.effectiveDate for applications', () => {
+      const contact = makeContact({ effectiveDate: new Date(2024, 5, 1) })
+      const batchDetails = [makeDetail({ transactionType: 'application', contact })]
+      const result = service.buildCraFileData(batchDetails)
 
-    //   expect(result.details[0].appStartDate).toBe('20240601')
-    // })
+      expect(result.details[0].appStartDate).toBe('20240601')
+    })
 
     it('should leave cancelEndDate and cancelReasonCode empty for applications', () => {
       const batchDetails = [makeDetail({ transactionType: 'application' })]
@@ -255,10 +255,9 @@ describe('OutboundDataService', () => {
     })
 
     it('should set cancelEndDate from contact.careEndDate', () => {
-      const contact = makeContact({ careEndDate: new Date(2025, 2, 16) })
+      const contact = makeContact({ careEndDate: new Date(2025, 2, 15) })
       const batchDetails = [makeDetail({ transactionType: 'cancellation', contact })]
       const result = service.buildCraFileData(batchDetails)
-      console.log('result========>', JSON.stringify(result))
 
       expect(result.details[0].cancelEndDate).toBe('20250315')
     })

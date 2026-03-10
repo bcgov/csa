@@ -36,11 +36,6 @@ export class InboundFileService {
   }
 
   async downloadNewResponseFiles(destinationId: string): Promise<DownloadedFile[]> {
-    // if (!this.craEnabled) {
-    //   this.logger.log('[CRA Disabled] Response file download skipped — no remote files to poll')
-    //   return []
-    // }
-
     const existingFiles = await this.prisma.transferFile.findMany({
       where: { direction: FILE_DIRECTION.INBOUND },
       select: { fileName: true },

@@ -9,6 +9,7 @@ export interface Contact {
   akaFirstName: string
   personIdIcm: string
   personIdIms: string
+  personIdMis: string
   caseNumber: string
   caseType: string
   caseStatus: string
@@ -70,6 +71,8 @@ export interface Contact {
   product?: string
   // Over 18 flag
   isOver18?: boolean
+  // Hold fields
+  holdBy?: string
 }
 
 export interface PaginatedContactsResponse {

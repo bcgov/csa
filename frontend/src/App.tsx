@@ -376,6 +376,7 @@ function App() {
       caseNumber: 'caseNumber',
       caseStatus: 'caseStatus',
       legacyFile: 'legacyFileNumber',
+      cgwrks3: 'holdBy',
       lastUpdated: 'lastUpdatedAt',
       lastUpdatedBy: 'lastUpdatedBy',
     }),

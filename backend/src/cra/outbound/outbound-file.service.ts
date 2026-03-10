@@ -145,11 +145,15 @@ export class OutboundFileService {
   }
 
   private padRight(value: string | number, length: number): string {
-    return String(value ?? '').padEnd(length, ' ')
+    return String(value ?? '')
+      ?.padEnd(length, ' ')
+      ?.slice(0, length)
   }
 
   private padLeftZero(value: number, length: number): string {
-    return value.toString().padStart(length, '0')
+    return String(value ?? '')
+      ?.padStart(length, '0')
+      ?.slice(0, length)
   }
   currentDate(): string {
     return formatDatePacificCompact(new Date())

@@ -791,17 +791,19 @@ function App() {
       'Children over 18 years (never eligible)',
     ]
 
+    const column = filterAnchor.column
+
     // Only trigger column filter search for API-based filters and when a column is selected
-    if (!apiFilters.includes(preDefinedFilter) || !isAuthenticated || !filterAnchor.column) {
+    if (!apiFilters.includes(preDefinedFilter) || !isAuthenticated || !column) {
       return
     }
 
     // Numeric columns only need 1 character, text columns need 3
     const numericColumns = ['age']
-    const minChars = numericColumns.includes(filterAnchor.column) ? 1 : 3
+    const minChars = numericColumns.includes(column) ? 1 : 3
 
     // Skip debounce search for csaStatus and caseStatus since they use dropdown selection, not text search
-    if (filterAnchor.column === 'csaStatus' || filterAnchor.column === 'caseStatus') {
+    if (column === 'csaStatus' || column === 'caseStatus') {
       return
     }
 
@@ -809,13 +811,13 @@ function App() {
     const columnSearchTimer = setTimeout(() => {
       if (filterSearchTerm.trim().length >= minChars) {
         // Store the active column filter for pagination
-        setActiveColumnFilter({ column: filterAnchor.column, query: filterSearchTerm.trim() })
-        performColumnFilterSearch(filterAnchor.column, filterSearchTerm.trim(), currentPage)
+        setActiveColumnFilter({ column: column, query: filterSearchTerm.trim() })
+        performColumnFilterSearch(column, filterSearchTerm.trim(), currentPage)
       } else if (
         filterSearchTerm.trim().length === 0 &&
         isColumnFilterActive &&
         activeColumnFilter &&
-        activeColumnFilter.column === filterAnchor.column
+        activeColumnFilter.column === column
       ) {
         // Only clear filter if searching in the same column that has the active filter
         setIsColumnFilterActive(false)
@@ -825,10 +827,11 @@ function App() {
     }, 500)
 
     return () => clearTimeout(columnSearchTimer)
+    // Note: currentPage is intentionally excluded - page changes are handled by the pagination effect above
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     filterSearchTerm,
-    filterAnchor.column,
+    filterAnchor,
     preDefinedFilter,
     isAuthenticated,
     isColumnFilterActive,

@@ -345,6 +345,7 @@ export function buildLoadContactProfilesSql(
 
   SELECT DISTINCT ON (cases.X_CONTACT_NUM)
     cases.ROW_ID            AS "caseRowId",
+    cases.CONTACT_ROW_ID    AS "contactIdIcm",
     cases.X_CONTACT_NUM     AS "personIdIcm",
     cases.SUBJECT_FST_NAME  AS "firstName",
     cases.SUBJECT_LAST_NAME AS "lastName",

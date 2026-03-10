@@ -12,14 +12,14 @@ RUN npm run prod-build
 
 
 # ---------- Build Caddy with Coraza plugin ----------
-FROM caddy:2.10.2-builder AS caddy-builder
+FROM caddy:2.11.2-builder AS caddy-builder
 RUN apk add --no-cache ca-certificates git
 RUN xcaddy build \
   --with github.com/corazawaf/coraza-caddy/v2
 
 
 # ---------- Runtime (OpenShift) ----------
-FROM caddy:2.10.2-alpine
+FROM caddy:2.11.2-alpine
 
 # Tools to remove file capabilities (fixes "Operation not permitted" on some OpenShift clusters)
 RUN apk add --no-cache ca-certificates libcap

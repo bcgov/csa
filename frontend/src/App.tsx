@@ -111,6 +111,14 @@ const BATCH_STATUS_FILTER_OPTIONS = [
   { value: 'error', label: 'Error' },
 ]
 
+// Batch Details Status options for filter dropdown
+const BATCH_DETAILS_STATUS_FILTER_OPTIONS = [
+  { value: 'Pending', label: 'Pending' },
+  { value: 'In Progress', label: 'In Progress' },
+  { value: 'Error', label: 'Error' },
+  { value: 'Processed', label: 'Processed' },
+]
+
 // Column field to display label mapping for filter menu
 const COLUMN_LABELS: Record<string, string> = {
   lastName: 'Last Name',
@@ -4738,93 +4746,6 @@ function App() {
           </Box>
 
           {/* Filter Menus - Outside tabs so they're always available */}
-          {/* Batch History Filter Menu */}
-          <Menu
-            anchorEl={batchHistoryFilterAnchor.element}
-            open={Boolean(batchHistoryFilterAnchor.element)}
-            onClose={handleBatchHistoryFilterClose}
-            PaperProps={{
-              sx: {
-                maxHeight: 400,
-                width: 250,
-              },
-            }}
-          >
-            <Box sx={{ p: 2 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  mb: 1,
-                }}
-              >
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  Filter by {batchHistoryFilterAnchor.column}
-                </Typography>
-                <Button
-                  size="small"
-                  onClick={() => {
-                    clearBatchHistoryColumnFilter(batchHistoryFilterAnchor.column)
-                    handleBatchHistoryFilterClose()
-                  }}
-                  sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-                >
-                  Clear
-                </Button>
-              </Box>
-              {/* Search bar for filtering items */}
-              <TextField
-                size="small"
-                fullWidth
-                placeholder="Search"
-                value={batchHistoryFilterSearchTerm}
-                onChange={(e) => setBatchHistoryFilterSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Box component="span" sx={{ fontSize: '18px' }}>
-                        🔍
-                      </Box>
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{ mb: 1 }}
-              />
-              <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                {batchHistoryFilterAnchor.column &&
-                  getBatchHistoryUniqueValues(batchHistoryFilterAnchor.column)
-                    .sort()
-                    .filter((value) =>
-                      String(value)
-                        .toLowerCase()
-                        .includes(batchHistoryFilterSearchTerm.toLowerCase()),
-                    )
-                    .map((value) => (
-                      <Box
-                        key={String(value)}
-                        sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
-                      >
-                        <Checkbox
-                          size="small"
-                          checked={
-                            batchHistoryColumnFilters[batchHistoryFilterAnchor.column]?.includes(
-                              String(value),
-                            ) || false
-                          }
-                          onChange={() =>
-                            handleBatchHistoryFilterChange(
-                              batchHistoryFilterAnchor.column,
-                              String(value),
-                            )
-                          }
-                        />
-                        <Typography variant="body2">{String(value)}</Typography>
-                      </Box>
-                    ))}
-              </Box>
-            </Box>
-          </Menu>
 
           {/* Batch Requests Filter Menu */}
           <Menu
@@ -4984,7 +4905,10 @@ function App() {
                 }}
               >
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  Filter by {batchDetailsFilterAnchor.column}
+                  Filter by{' '}
+                  {batchDetailsFilterAnchor.column === 'status'
+                    ? 'Status'
+                    : batchDetailsFilterAnchor.column}
                 </Typography>
                 <Button
                   size="small"
@@ -4998,62 +4922,107 @@ function App() {
                 </Button>
               </Box>
               {/* Search bar for filtering items */}
-              <TextField
-                size="small"
-                fullWidth
-                placeholder="Search"
-                value={batchDetailsFilterSearchTerm}
-                onChange={(e) => setBatchDetailsFilterSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Box component="span" sx={{ fontSize: '18px' }}>
-                        🔍
+              {batchDetailsFilterAnchor.column === 'status' ? (
+                <>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    placeholder="Search status..."
+                    value={batchDetailsFilterSearchTerm}
+                    onChange={(e) => setBatchDetailsFilterSearchTerm(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Box component="span" sx={{ fontSize: '18px' }}>
+                            🔍
+                          </Box>
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{ mb: 1 }}
+                  />
+                  <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                    {BATCH_DETAILS_STATUS_FILTER_OPTIONS.filter((option) =>
+                      option.label
+                        .toLowerCase()
+                        .includes(batchDetailsFilterSearchTerm.toLowerCase()),
+                    ).map((option) => (
+                      <Box
+                        key={option.value}
+                        sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                      >
+                        <Checkbox
+                          size="small"
+                          checked={
+                            batchDetailsColumnFilters['status']?.includes(option.value) || false
+                          }
+                          onChange={() => handleBatchDetailsFilterChange('status', option.value)}
+                        />
+                        <Typography variant="body2">{option.label}</Typography>
                       </Box>
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{ mb: 1 }}
-              />
-              <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                {batchDetailsFilterAnchor.column &&
-                  (() => {
-                    // Get unique values only from currently selected batch
-                    const values = currentBatchDetails.map(
-                      (row) => row[batchDetailsFilterAnchor.column as keyof typeof row],
-                    )
-                    return Array.from(new Set(values))
-                      .filter((v) => v !== undefined && v !== '')
-                      .sort()
-                      .filter((value) =>
-                        String(value)
-                          .toLowerCase()
-                          .includes(batchDetailsFilterSearchTerm.toLowerCase()),
-                      )
-                      .map((value) => (
-                        <Box
-                          key={String(value)}
-                          sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
-                        >
-                          <Checkbox
-                            size="small"
-                            checked={
-                              batchDetailsColumnFilters[batchDetailsFilterAnchor.column]?.includes(
-                                String(value),
-                              ) || false
-                            }
-                            onChange={() =>
-                              handleBatchDetailsFilterChange(
-                                batchDetailsFilterAnchor.column,
-                                String(value),
-                              )
-                            }
-                          />
-                          <Typography variant="body2">{String(value)}</Typography>
-                        </Box>
-                      ))
-                  })()}
-              </Box>
+                    ))}
+                  </Box>
+                </>
+              ) : (
+                <>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    placeholder="Search"
+                    value={batchDetailsFilterSearchTerm}
+                    onChange={(e) => setBatchDetailsFilterSearchTerm(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Box component="span" sx={{ fontSize: '18px' }}>
+                            🔍
+                          </Box>
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{ mb: 1 }}
+                  />
+                  <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                    {batchDetailsFilterAnchor.column &&
+                      (() => {
+                        // Get unique values only from currently selected batch
+                        const values = currentBatchDetails.map(
+                          (row) => row[batchDetailsFilterAnchor.column as keyof typeof row],
+                        )
+                        return Array.from(new Set(values))
+                          .filter((v) => v !== undefined && v !== '')
+                          .sort()
+                          .filter((value) =>
+                            String(value)
+                              .toLowerCase()
+                              .includes(batchDetailsFilterSearchTerm.toLowerCase()),
+                          )
+                          .map((value) => (
+                            <Box
+                              key={String(value)}
+                              sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                            >
+                              <Checkbox
+                                size="small"
+                                checked={
+                                  batchDetailsColumnFilters[
+                                    batchDetailsFilterAnchor.column
+                                  ]?.includes(String(value)) || false
+                                }
+                                onChange={() =>
+                                  handleBatchDetailsFilterChange(
+                                    batchDetailsFilterAnchor.column,
+                                    String(value),
+                                  )
+                                }
+                              />
+                              <Typography variant="body2">{String(value)}</Typography>
+                            </Box>
+                          ))
+                      })()}
+                  </Box>
+                </>
+              )}
             </Box>
           </Menu>
         </Box>

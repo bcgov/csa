@@ -7,6 +7,8 @@ export function step7_UpdateEligible(currentStatus: CsaStatus | null): Eligibili
     newStatus = CSA_STATUS.ELIGIBLE
   } else if (currentStatus === CSA_STATUS.NOT_ELIGIBLE_IN_PAY) {
     newStatus = CSA_STATUS.IN_PAY
+  } else {
+    newStatus = currentStatus
   }
   return { step: 7, newStatus, cancelReasonCode: null, careEndDate: null }
 }

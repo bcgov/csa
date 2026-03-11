@@ -17,6 +17,7 @@ import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { JobRunner } from 'src/jobs/job-runner.service'
+import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { OutboundDataService } from '../outbound/outbound-data.service'
 import { OutboundFileService } from '../outbound/outbound-file.service'
@@ -41,6 +42,7 @@ export class SendCraFileHandler extends BaseJob {
     private readonly outboundFileService: OutboundFileService,
     private readonly outboundTransferService: OutboundTransferService,
     private readonly jobRunner: JobRunner,
+    private readonly icmSyncBackService: IcmSyncBackService,
   ) {
     super()
     this.lastSequenceNumber = this.configService.get<number>('cra.lastSequenceNumber')!
@@ -156,9 +158,11 @@ export class SendCraFileHandler extends BaseJob {
       data: { batchDate: pacificToday() },
     })
 
-    this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM).catch((err) => {
-      this.logger.warn(`Post-CRA ICM sync failed: ${(err as Error).message}`)
-    })
+    if (await this.icmSyncBackService.hasFlaggedContacts()) {
+      this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM).catch((err) => {
+        this.logger.warn(`Post-CRA ICM sync failed: ${(err as Error).message}`)
+      })
+    }
   }
 
   private async ensureBatchDetailsReady(): Promise<void> {

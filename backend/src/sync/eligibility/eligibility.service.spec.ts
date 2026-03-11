@@ -15,9 +15,21 @@ describe('EligibilityService', () => {
   let mockJobsService: { getLastSuccessTimestamp: ReturnType<typeof vi.fn> }
   let mockConfigService: { get: ReturnType<typeof vi.fn> }
 
+  const allTablesPopulated = [
+    'stg_icm_cases',
+    'stg_icm_placements',
+    'stg_icm_legal_authority_admin',
+    'stg_icm_legal_authority',
+    'stg_icm_agreement',
+    'stg_icm_orders',
+    'stg_mis_payments',
+    'stg_mis_contracts',
+    'stg_mis_placements',
+  ].map((name) => ({ table_name: name, has_data: true }))
+
   beforeEach(async () => {
     mockPrisma = {
-      $queryRawUnsafe: vi.fn().mockResolvedValue([]),
+      $queryRawUnsafe: vi.fn().mockResolvedValueOnce(allTablesPopulated).mockResolvedValue([]),
       $executeRawUnsafe: vi.fn().mockResolvedValue(0),
     }
 
@@ -43,6 +55,25 @@ describe('EligibilityService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined()
+  })
+
+  it('should throw when staging tables are empty', async () => {
+    const partiallyEmpty = allTablesPopulated.map((t) =>
+      t.table_name === 'stg_mis_payments' || t.table_name === 'stg_icm_cases'
+        ? { ...t, has_data: false }
+        : t,
+    )
+    mockPrisma.$queryRawUnsafe.mockReset().mockResolvedValueOnce(partiallyEmpty)
+
+    await expect(service.run()).rejects.toThrow(
+      'Staging validation failed: empty tables [stg_icm_cases, stg_mis_payments]',
+    )
+  })
+
+  it('should proceed when all staging tables have data', async () => {
+    const result = await service.run()
+    expect(result.processed).toBe(0)
+    expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(expect.stringContaining('UNION ALL'))
   })
 
   it('should return zero counts when no staging data', async () => {
@@ -203,6 +234,23 @@ describe('EligibilityService', () => {
     expect(result.processed).toBe(2)
     expect(result.statusChanges).toBe(1)
     expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
+  })
+
+  it('should upsert contacts with no status transition (existing status preserved)', async () => {
+    mockPrisma.$queryRawUnsafe
+      .mockResolvedValueOnce([
+        makeEligibleContact({ csaStatus: 'eligible', existingContactId: 10 }),
+      ])
+      .mockResolvedValueOnce([{ id: 10, person_id_icm: 'ICM-ELIG' }]) // get contact DB IDs
+      .mockResolvedValueOnce([{ id: 100 }]) // find pending batch
+      .mockResolvedValueOnce([{ contact_id: 10 }]) // already in batch
+
+    const result = await service.run()
+
+    expect(result.processed).toBe(1)
+    expect(result.statusChanges).toBe(0)
+    expect(result.stepCounts.noChange).toBe(1)
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1) // upsert only
   })
 
   it('should pass threshold to query when last success exists', async () => {

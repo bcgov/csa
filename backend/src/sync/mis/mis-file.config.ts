@@ -5,18 +5,12 @@ export interface MisFileConfig {
   columns: string[]
 }
 
-export interface MisLastUpdatedConfig {
-  name: string
-  s3Key: string
-}
-
-// s3Key uses the MIS_S3_PREFIX from environment config
-// Column order must match CSV header order (COPY FROM STDIN with HEADER)
 export const MIS_FILE_CONFIGS: MisFileConfig[] = [
   {
     name: 'payments',
     s3Key: 'rap_payments.csv',
     stagingTable: 'stg_mis_payments',
+
     columns: [
       'id',
       'last_updated_date',
@@ -35,6 +29,7 @@ export const MIS_FILE_CONFIGS: MisFileConfig[] = [
     name: 'contracts',
     s3Key: 'rap_contracts.csv',
     stagingTable: 'stg_mis_contracts',
+
     columns: [
       'id',
       'last_updated_date',
@@ -52,6 +47,7 @@ export const MIS_FILE_CONFIGS: MisFileConfig[] = [
     name: 'placements',
     s3Key: 'rap_placements.csv',
     stagingTable: 'stg_mis_placements',
+
     columns: [
       'id',
       'last_updated_date',
@@ -70,8 +66,3 @@ export const MIS_FILE_CONFIGS: MisFileConfig[] = [
     ],
   },
 ]
-
-export const MIS_LAST_UPDATED_CONFIG: MisLastUpdatedConfig = {
-  name: 'last_updated',
-  s3Key: 'last_updated.csv',
-}

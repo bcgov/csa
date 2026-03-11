@@ -17,6 +17,7 @@ describe('IcmSyncBackService', () => {
   let service: IcmSyncBackService
   let prisma: {
     contact: {
+      findFirst: ReturnType<typeof vi.fn>
       findMany: ReturnType<typeof vi.fn>
       findUnique: ReturnType<typeof vi.fn>
       update: ReturnType<typeof vi.fn>
@@ -31,6 +32,7 @@ describe('IcmSyncBackService', () => {
   beforeEach(async () => {
     prisma = {
       contact: {
+        findFirst: vi.fn().mockResolvedValue(null),
         findMany: vi.fn().mockResolvedValue([]),
         findUnique: vi.fn(),
         update: vi.fn(),
@@ -52,6 +54,22 @@ describe('IcmSyncBackService', () => {
     }).compile()
 
     service = module.get(IcmSyncBackService)
+  })
+
+  describe('hasFlaggedContacts', () => {
+    it('should return true when flagged contacts exist', async () => {
+      prisma.contact.findFirst.mockResolvedValue({ id: 1 })
+
+      expect(await service.hasFlaggedContacts()).toBe(true)
+      expect(prisma.contact.findFirst).toHaveBeenCalledWith({
+        where: { icmIntegrationStatus: true },
+        select: { id: true },
+      })
+    })
+
+    it('should return false when no flagged contacts exist', async () => {
+      expect(await service.hasFlaggedContacts()).toBe(false)
+    })
   })
 
   describe('syncFlaggedContacts', () => {

@@ -6,12 +6,11 @@ import { PrismaService } from 'src/common/database/prisma.service'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import { FileStorageService } from './file-storage/file-storage.service'
-import { MIS_FILE_CONFIGS, MIS_LAST_UPDATED_CONFIG, MisFileConfig } from './mis-file.config'
+import { MIS_FILE_CONFIGS, MisFileConfig } from './mis-file.config'
 
 export interface MisResult {
   name: string
   rows: number
-  skipped?: boolean
 }
 
 @Injectable()
@@ -25,72 +24,41 @@ export class MisService {
   ) {}
 
   async ingestAll(): Promise<MisResult[]> {
-    // TODO mock to remove
     if (this.configService.get<string>('MIS_INGESTION_ENABLED') === 'false') {
       this.logger.log('MIS ingestion disabled, skipping')
       return []
     }
     const prefix = this.configService.get<string>('sync.misS3Prefix') || ''
 
-    const files: MisResult[] = []
+    // Phase 1: All files must exist
+    const missingFiles: string[] = []
     for (const config of MIS_FILE_CONFIGS) {
       const key = `${prefix}${config.s3Key}`
-      const fileExists = await this.fileStorage.exists(key)
-
-      if (!fileExists) {
-        this.logger.warn(`${config.name}: file not found at ${key}, skipping`)
-        files.push({ name: config.name, rows: 0, skipped: true })
-        continue
+      if (!(await this.fileStorage.exists(key))) {
+        missingFiles.push(config.s3Key)
       }
-
-      const result = await this.ingestFile(config, prefix)
-      files.push(result)
+    }
+    if (missingFiles.length > 0) {
+      throw new Error(`MIS ingestion aborted: missing files [${missingFiles.join(', ')}]`)
     }
 
-    return files
-  }
-
-  async readLastUpdated(): Promise<string | null> {
-    const prefix = this.configService.get<string>('sync.misS3Prefix') || ''
-    const key = `${prefix}${MIS_LAST_UPDATED_CONFIG.s3Key}`
-    const fileExists = await this.fileStorage.exists(key)
-
-    if (!fileExists) {
-      this.logger.warn(`last_updated: file not found at ${key}`)
-      return null
+    // Phase 2: Ingest all files
+    const results: MisResult[] = []
+    for (const config of MIS_FILE_CONFIGS) {
+      const key = `${prefix}${config.s3Key}`
+      const readable = await this.fileStorage.download(key)
+      this.logger.log(`${config.name}: S3 download successful for ${key}`)
+      const rows = await this.copyAndReload(config, readable)
+      this.logger.log(`${config.name}: loaded ${rows} rows via COPY`)
+      results.push({ name: config.name, rows })
     }
 
-    const readable = await this.fileStorage.download(key)
-    const chunks: Buffer[] = []
-    for await (const chunk of readable) {
-      chunks.push(Buffer.from(chunk))
-    }
-    const content = Buffer.concat(chunks).toString('utf-8').trim()
-
-    // Parse CSV: skip header line, read value
-    const lines = content
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean)
-    if (lines.length < 2) {
-      this.logger.warn(`last_updated: file has no data row`)
-      return null
+    // Phase 3: Move all to PROCESSED (non-fatal)
+    for (const config of MIS_FILE_CONFIGS) {
+      await this.moveToProcessed(`${prefix}${config.s3Key}`)
     }
 
-    const value = lines[1]
-    this.logger.log(`MIS last_updated: ${value}`)
-    return value
-  }
-
-  private async ingestFile(config: MisFileConfig, prefix: string): Promise<MisResult> {
-    const key = `${prefix}${config.s3Key}`
-    const readable = await this.fileStorage.download(key)
-    this.logger.log(`${config.name}: S3 download successful for ${key}`)
-
-    const rows = await this.truncateAndCopy(config, readable)
-    await this.moveToProcessed(key)
-    this.logger.log(`${config.name}: loaded ${rows} rows via COPY`)
-    return { name: config.name, rows }
+    return results
   }
 
   private async moveToProcessed(key: string): Promise<void> {
@@ -106,19 +74,20 @@ export class MisService {
     }
   }
 
-  private async truncateAndCopy(config: MisFileConfig, readable: Readable): Promise<number> {
+  private async copyAndReload(config: MisFileConfig, readable: Readable): Promise<number> {
     const pool = this.prisma.getPool()
     const client = await pool.connect()
+    const tempTable = `temp_${config.name}`
+    const colList = config.columns.join(', ')
 
     try {
       await client.query('BEGIN')
-      await client.query(`TRUNCATE TABLE ${config.stagingTable}`)
 
-      const colList = config.columns.join(', ')
-      const copyQuery = `COPY ${config.stagingTable} (${colList}) FROM STDIN WITH (FORMAT csv, HEADER true, NULL '')`
+      await client.query(
+        `CREATE TEMP TABLE ${tempTable} (LIKE ${config.stagingTable} INCLUDING DEFAULTS) ON COMMIT DROP`,
+      )
 
-      this.logger.log(`COPY query: ${copyQuery}`)
-      this.logger.log(`Column Count: ${config.columns.length}`)
+      const copyQuery = `COPY ${tempTable} (${colList}) FROM STDIN WITH (FORMAT csv, HEADER true, NULL '')`
       const copyStream = client.query(copyFrom(copyQuery))
 
       try {
@@ -132,6 +101,11 @@ export class MisService {
         await client.query('ROLLBACK')
         throw new Error(`${config.name}: CSV has no data rows`)
       }
+
+      await client.query(`TRUNCATE ${config.stagingTable}`)
+      await client.query(
+        `INSERT INTO ${config.stagingTable} (${colList}, ingested_at) SELECT ${colList}, NOW() FROM ${tempTable}`,
+      )
 
       await client.query('COMMIT')
       return copyStream.rowCount

@@ -82,14 +82,24 @@ describe('MisService', () => {
   })
 
   describe('ingestAll', () => {
-    it('should skip files that do not exist', async () => {
+    it('should throw when any MIS file is missing', async () => {
+      mockFileStorage.exists
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(false)
+
+      await expect(service.ingestAll()).rejects.toThrow(
+        'MIS ingestion aborted: missing files [rap_contracts.csv, rap_placements.csv]',
+      )
+      expect(mockFileStorage.download).not.toHaveBeenCalled()
+    })
+
+    it('should throw listing all missing files', async () => {
       mockFileStorage.exists.mockResolvedValue(false)
 
-      const files = await service.ingestAll()
-
-      expect(files).toHaveLength(3)
-      expect(files.every((r) => r.skipped === true)).toBe(true)
-      expect(files.every((r) => r.rows === 0)).toBe(true)
+      await expect(service.ingestAll()).rejects.toThrow(
+        'MIS ingestion aborted: missing files [rap_payments.csv, rap_contracts.csv, rap_placements.csv]',
+      )
     })
 
     it('should ingest all 3 MIS files when they exist', async () => {
@@ -98,7 +108,6 @@ describe('MisService', () => {
       expect(files).toHaveLength(3)
       expect(mockFileStorage.download).toHaveBeenCalledTimes(3)
       expect(files.every((r) => r.rows === 2)).toBe(true)
-      expect(files.every((r) => r.skipped === undefined)).toBe(true)
     })
 
     it('should prepend S3 prefix to file keys', async () => {
@@ -110,21 +119,23 @@ describe('MisService', () => {
       expect(existsKeys).toContain('csas3/rap_placements.csv')
     })
 
-    it('should move files to processed after successful ingestion', async () => {
+    it('should not move files if any ingestion fails', async () => {
+      mockFileStorage.download
+        .mockResolvedValueOnce(Readable.from(['HEADER\nrow1\nrow2']))
+        .mockRejectedValueOnce(new Error('S3 read error'))
+
+      await expect(service.ingestAll()).rejects.toThrow('S3 read error')
+      expect(mockFileStorage.move).not.toHaveBeenCalled()
+    })
+
+    it('should move all files to PROCESSED after all succeed', async () => {
       await service.ingestAll()
 
       expect(mockFileStorage.move).toHaveBeenCalledTimes(3)
-      const moveCalls = mockFileStorage.move.mock.calls
-      expect(moveCalls[0][0]).toBe('csas3/rap_payments.csv')
-      expect(moveCalls[0][1]).toMatch(/^csas3\/PROCESSED\/\d{4}-\d{2}-\d{2}\/rap_payments\.csv$/)
-    })
-
-    it('should not move files when they are skipped', async () => {
-      mockFileStorage.exists.mockResolvedValue(false)
-
-      await service.ingestAll()
-
-      expect(mockFileStorage.move).not.toHaveBeenCalled()
+      const moveKeys = mockFileStorage.move.mock.calls.map((c: unknown[]) => c[0])
+      expect(moveKeys).toContain('csas3/rap_payments.csv')
+      expect(moveKeys).toContain('csas3/rap_contracts.csv')
+      expect(moveKeys).toContain('csas3/rap_placements.csv')
     })
 
     it('should throw when CSV has no data rows', async () => {
@@ -134,66 +145,29 @@ describe('MisService', () => {
       )
 
       await expect(service.ingestAll()).rejects.toThrow('CSV has no data rows')
+      expect(mockFileStorage.move).not.toHaveBeenCalled()
     })
 
-    it('should rollback on empty CSV (preserving existing data)', async () => {
-      copyRowCount = 0
-      mockFileStorage.download.mockImplementation(() =>
-        Promise.resolve(Readable.from(['HEADER\n'])),
-      )
+    it('should use temp table, truncate, and reload pattern', async () => {
+      await service.ingestAll()
 
-      try {
-        await service.ingestAll()
-      } catch {
-        // Expected
-      }
+      const queryCalls = mockClient.query.mock.calls.map((call: unknown[]) => call[0])
+      const stringCalls = queryCalls.filter((q: unknown) => typeof q === 'string') as string[]
 
-      const rollbackCalls = mockClient.query.mock.calls.filter(
-        (call: unknown[]) => call[0] === 'ROLLBACK',
+      expect(stringCalls.some((q) => q.includes('CREATE TEMP TABLE'))).toBe(true)
+      expect(stringCalls.some((q) => q.includes('TRUNCATE'))).toBe(true)
+      expect(stringCalls.some((q) => q.includes('INSERT INTO') && !q.includes('ON CONFLICT'))).toBe(
+        true,
       )
-      expect(rollbackCalls.length).toBeGreaterThan(0)
     })
 
-    it('should continue if move fails (non-fatal)', async () => {
+    it('should succeed even if move to PROCESSED fails (non-fatal)', async () => {
       mockFileStorage.move.mockRejectedValue(new Error('Access Denied'))
 
       const files = await service.ingestAll()
 
       expect(files).toHaveLength(3)
       expect(files.every((r) => r.rows === 2)).toBe(true)
-    })
-  })
-
-  describe('readLastUpdated', () => {
-    it('should read last_updated value from CSV', async () => {
-      mockFileStorage.download.mockImplementation((key: string) => {
-        if (key.includes('last_updated')) {
-          return Promise.resolve(Readable.from(['LAST_UPDATED\n20260221\n']))
-        }
-        return Promise.resolve(Readable.from(['HEADER\nrow1\nrow2']))
-      })
-
-      const lastUpdated = await service.readLastUpdated()
-
-      expect(lastUpdated).toBe('20260221')
-    })
-
-    it('should return null when file is missing', async () => {
-      mockFileStorage.exists.mockImplementation((key: string) => {
-        if (key.includes('last_updated')) return Promise.resolve(false)
-        return Promise.resolve(true)
-      })
-
-      const lastUpdated = await service.readLastUpdated()
-
-      expect(lastUpdated).toBeNull()
-    })
-
-    it('should prepend S3 prefix to file key', async () => {
-      await service.readLastUpdated()
-
-      const existsKeys = mockFileStorage.exists.mock.calls.map((call: unknown[]) => call[0])
-      expect(existsKeys).toContain('csas3/last_updated.csv')
     })
   })
 })

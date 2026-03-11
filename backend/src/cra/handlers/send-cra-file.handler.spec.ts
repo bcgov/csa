@@ -72,6 +72,7 @@ describe('SendCraFileHandler', () => {
   let mockOutboundFileService: any
   let mockOutboundTransferService: any
   let mockJobRunner: any
+  let mockIcmSyncBackService: any
 
   beforeEach(() => {
     mockPrisma = {
@@ -122,6 +123,10 @@ describe('SendCraFileHandler', () => {
       runJobType: vi.fn().mockResolvedValue({ success: true }),
     }
 
+    mockIcmSyncBackService = {
+      hasFlaggedContacts: vi.fn().mockResolvedValue(true),
+    }
+
     const mockConfigService = {
       get: vi.fn((key: string) => {
         const config: Record<string, any> = {
@@ -140,6 +145,7 @@ describe('SendCraFileHandler', () => {
       mockOutboundFileService,
       mockOutboundTransferService,
       mockJobRunner,
+      mockIcmSyncBackService,
     )
   })
 
@@ -381,6 +387,14 @@ describe('SendCraFileHandler', () => {
       await handler.onSuccess(mockContext, result)
 
       expect(mockJobRunner.runJobType).toHaveBeenCalledWith(JobType.SYNC_ICM, JobTrigger.SYSTEM)
+    })
+
+    it('should not trigger SYNC_ICM when no contacts are flagged for sync-back', async () => {
+      mockIcmSyncBackService.hasFlaggedContacts.mockResolvedValue(false)
+      const result = { success: true, message: 'Batch 10 sent to CRA' }
+      await handler.onSuccess(mockContext, result)
+
+      expect(mockJobRunner.runJobType).not.toHaveBeenCalled()
     })
 
     it('should set batchDate on the batch', async () => {

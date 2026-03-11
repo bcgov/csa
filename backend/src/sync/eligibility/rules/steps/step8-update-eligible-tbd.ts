@@ -5,6 +5,8 @@ export function step8_UpdateEligibleTbd(currentStatus: CsaStatus | null): Eligib
   let newStatus: CsaStatus | null = null
   if (currentStatus === CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY || currentStatus === null) {
     newStatus = CSA_STATUS.ELIGIBLE_TBD
+  } else {
+    newStatus = currentStatus
   }
   return { step: 8, newStatus, cancelReasonCode: null, careEndDate: null }
 }

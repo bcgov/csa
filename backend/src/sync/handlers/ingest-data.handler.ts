@@ -5,6 +5,7 @@ import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { JobRunner } from 'src/jobs/job-runner.service'
+import { IcmSyncBackService } from '../icm/icm-sync-back.service'
 
 /*
  * Orchestrates the complete data sync flow:
@@ -17,7 +18,10 @@ export class IngestDataHandler extends BaseJob {
   readonly jobType = JobType.INGEST_DATA
   readonly inlineRetryAttempts = 0 // Orchestrator: children handle their own retries
 
-  constructor(private readonly jobRunner: JobRunner) {
+  constructor(
+    private readonly jobRunner: JobRunner,
+    private readonly icmSyncBackService: IcmSyncBackService,
+  ) {
     super()
   }
 
@@ -25,7 +29,6 @@ export class IngestDataHandler extends BaseJob {
     const parentJobId = context.jobRunId
 
     try {
-      // Step 1: Run ICM and MIS ingestion in parallel
       this.logger.log('Starting parallel ingestion from ICM and MIS...')
       const [icmResult, misResult] = await Promise.all([
         this.jobRunner.runJobType(JobType.INGEST_ICM, JobTrigger.CRON, { parentJobId }),
@@ -40,7 +43,6 @@ export class IngestDataHandler extends BaseJob {
         }
       }
 
-      // Step 2: Run eligibility processing
       this.logger.log('Running eligibility processing...')
       const eligibilityResult = await this.jobRunner.runJobType(
         JobType.RUN_ELIGIBILITY,
@@ -56,16 +58,22 @@ export class IngestDataHandler extends BaseJob {
         }
       }
 
-      // Step 3: Sync back to ICM (awaited so pod stays alive, but sync failure doesn't fail ingestion)
-      this.logger.log('Syncing flagged contacts back to ICM...')
-      const syncResult = await this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM, {
-        parentJobId,
-      })
+      let syncResult: JobResult | null = null
+      const hasFlagged = await this.icmSyncBackService.hasFlaggedContacts()
 
-      if (!syncResult.success) {
-        this.logger.warn(
-          `ICM sync-back failed: ${syncResult.message}. Retry will pick up flagged contacts.`,
-        )
+      if (hasFlagged) {
+        this.logger.log('Syncing flagged contacts back to ICM...')
+        syncResult = await this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM, {
+          parentJobId,
+        })
+
+        if (!syncResult.success) {
+          this.logger.warn(
+            `ICM sync-back failed: ${syncResult.message}. Retry will pick up flagged contacts.`,
+          )
+        }
+      } else {
+        this.logger.log('No contacts flagged for ICM sync, skipping')
       }
 
       return {

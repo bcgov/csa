@@ -49,6 +49,7 @@ describe('PollCraResponseHandler', () => {
   let mockBatchesService: any
   let mockContactsService: any
   let mockJobRunner: any
+  let mockIcmSyncBackService: any
 
   beforeEach(() => {
     mockInboundFileService = {
@@ -114,6 +115,10 @@ describe('PollCraResponseHandler', () => {
       runJobType: vi.fn().mockResolvedValue({ success: true }),
     }
 
+    mockIcmSyncBackService = {
+      hasFlaggedContacts: vi.fn().mockResolvedValue(true),
+    }
+
     handler = new PollCraResponseHandler(
       mockInboundFileService,
       mockInboundResponseService,
@@ -121,6 +126,7 @@ describe('PollCraResponseHandler', () => {
       mockBatchesService,
       mockContactsService,
       mockJobRunner,
+      mockIcmSyncBackService as any,
     )
   })
 
@@ -662,8 +668,8 @@ describe('PollCraResponseHandler', () => {
       expect(mockJobRunner.runJobType).toHaveBeenCalledWith(JobType.SYNC_ICM, JobTrigger.SYSTEM)
     })
 
-    it('should not trigger SYNC_ICM when no records were updated', async () => {
-      // Only recycled records — no accepted/rejected
+    it('should not trigger SYNC_ICM when no contacts are flagged for sync-back', async () => {
+      mockIcmSyncBackService.hasFlaggedContacts.mockResolvedValue(false)
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_RECYCLED })
       setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])

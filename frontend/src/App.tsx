@@ -3417,7 +3417,14 @@ function App() {
                                   >
                                     Birth Place
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {[
                                       childData.birthCity,
                                       childData.birthProvince,
@@ -3580,6 +3587,8 @@ function App() {
                                     sx={{
                                       fontWeight: 500,
                                       cursor: 'pointer',
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
                                     }}
                                   >
                                     {childData.serviceOffice || '-'}

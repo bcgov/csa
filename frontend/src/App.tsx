@@ -3289,7 +3289,14 @@ function App() {
                                   >
                                     Child/Youth Name
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {[childData.firstName, childData.middleName, childData.lastName]
                                       .filter(Boolean)
                                       .join(' ') || '-'}
@@ -3309,7 +3316,14 @@ function App() {
                                   >
                                     Gender
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.gender || '-'}
                                   </Typography>
                                 </Box>
@@ -3327,7 +3341,14 @@ function App() {
                                   >
                                     Person ID ICM
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.personIdIcm || '-'}
                                   </Typography>
                                 </Box>
@@ -3345,7 +3366,14 @@ function App() {
                                   >
                                     Person ID MIS
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.personIdMis || '-'}
                                   </Typography>
                                 </Box>
@@ -3363,7 +3391,14 @@ function App() {
                                   >
                                     DIN
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.din || '-'}
                                   </Typography>
                                 </Box>
@@ -3381,7 +3416,14 @@ function App() {
                                   >
                                     AKA Last Name
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.akaLastName || '-'}
                                   </Typography>
                                 </Box>
@@ -3399,7 +3441,14 @@ function App() {
                                   >
                                     AKA First Name
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.akaFirstName || '-'}
                                   </Typography>
                                 </Box>
@@ -3448,7 +3497,14 @@ function App() {
                                   >
                                     Age
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.age || '-'}
                                   </Typography>
                                 </Box>
@@ -3486,7 +3542,14 @@ function App() {
                                   >
                                     Case Status
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.caseStatus || '-'}
                                   </Typography>
                                 </Box>
@@ -3509,6 +3572,8 @@ function App() {
                                     sx={{
                                       fontWeight: 500,
                                       cursor: 'pointer',
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
                                     }}
                                   >
                                     {childData.caseNumber || '-'}
@@ -3553,7 +3618,14 @@ function App() {
                                   >
                                     Caseload
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.caseLoad || '-'}
                                   </Typography>
                                 </Box>
@@ -3571,7 +3643,14 @@ function App() {
                                   >
                                     Legacy File No.
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.legacyFile || '-'}
                                   </Typography>
                                 </Box>
@@ -3615,7 +3694,14 @@ function App() {
                                   >
                                     Assigned to
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.assignedTo || '-'}
                                   </Typography>
                                 </Box>
@@ -3633,7 +3719,14 @@ function App() {
                                   >
                                     Legal Status Code
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.effectiveLegalStatus || '-'}
                                   </Typography>
                                 </Box>
@@ -3651,7 +3744,14 @@ function App() {
                                   >
                                     Effective Date
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.effectiveDate || '-'}
                                   </Typography>
                                 </Box>
@@ -3669,7 +3769,14 @@ function App() {
                                   >
                                     Expiry Date
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.expiryDate || '-'}
                                   </Typography>
                                 </Box>
@@ -3707,7 +3814,14 @@ function App() {
                                   >
                                     Placement/Location No.
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.placementLocation || '-'}
                                   </Typography>
                                 </Box>
@@ -3725,7 +3839,14 @@ function App() {
                                   >
                                     Type
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.locationType || '-'}
                                   </Typography>
                                 </Box>
@@ -3743,7 +3864,14 @@ function App() {
                                   >
                                     Sub-type
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.locationSubType || '-'}
                                   </Typography>
                                 </Box>
@@ -3761,7 +3889,14 @@ function App() {
                                   >
                                     Status
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.placementStatus || '-'}
                                   </Typography>
                                 </Box>
@@ -3779,7 +3914,14 @@ function App() {
                                   >
                                     Actual Start Date
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.actualStartDate || '-'}
                                   </Typography>
                                 </Box>
@@ -3797,7 +3939,14 @@ function App() {
                                   >
                                     Actual End Date
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.actualEndDate || '-'}
                                   </Typography>
                                 </Box>
@@ -3815,7 +3964,14 @@ function App() {
                                   >
                                     Paid/Unpaid
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.paidUnpaid || '-'}
                                   </Typography>
                                 </Box>
@@ -3833,7 +3989,14 @@ function App() {
                                   >
                                     Source
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.sourcePlacement ? (
                                       <Typography
                                         component="span"
@@ -3887,7 +4050,14 @@ function App() {
                                   >
                                     Provider Name
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.serviceProviderName || '-'}
                                   </Typography>
                                 </Box>
@@ -3905,7 +4075,14 @@ function App() {
                                   >
                                     Provider ID
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.providerId || '-'}
                                   </Typography>
                                 </Box>
@@ -3923,7 +4100,14 @@ function App() {
                                   >
                                     Place of Service
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.placeOfServiceName || '-'}
                                   </Typography>
                                 </Box>
@@ -3941,7 +4125,14 @@ function App() {
                                   >
                                     Source
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.sourceAgreement || '-'}
                                   </Typography>
                                 </Box>
@@ -3959,7 +4150,14 @@ function App() {
                                   >
                                     Agreement Type
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.agreementType || '-'}
                                   </Typography>
                                 </Box>
@@ -3977,7 +4175,14 @@ function App() {
                                   >
                                     Agreement Status
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.agreementStatus || '-'}
                                   </Typography>
                                 </Box>
@@ -3995,7 +4200,14 @@ function App() {
                                   >
                                     Start Date
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.agreementStartDate || '-'}
                                   </Typography>
                                 </Box>
@@ -4013,7 +4225,14 @@ function App() {
                                   >
                                     End Date
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.agreementEndDate || '-'}
                                   </Typography>
                                 </Box>
@@ -4031,7 +4250,14 @@ function App() {
                                   >
                                     Termination Date
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.terminationDate || '-'}
                                   </Typography>
                                 </Box>
@@ -4049,7 +4275,14 @@ function App() {
                                   >
                                     MCFD Contract No.
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.mcfdContract || '-'}
                                   </Typography>
                                 </Box>
@@ -4067,7 +4300,14 @@ function App() {
                                   >
                                     Product
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.product || '-'}
                                   </Typography>
                                 </Box>

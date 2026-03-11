@@ -134,6 +134,16 @@ const COLUMN_LABELS: Record<string, string> = {
   cgwrks3: 'Set on Hold By',
   lastUpdated: 'Last Updated',
   lastUpdatedBy: 'Last Updated By',
+  // Batch table columns
+  batchId: 'Batch ID',
+  batchDate: 'Batch Date',
+  createdDate: 'Created Date',
+  status: 'Status',
+  transactionType: 'Transaction Type',
+  recordCount: 'Record Count',
+  createdBy: 'Created By',
+  contactId: 'Contact ID',
+  icmNumber: 'ICM Number',
 }
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
@@ -1923,7 +1933,7 @@ function App() {
     // Transform API data to match table structure
     let data = batches.map((batch) => ({
       id: batch.id,
-      batchId: `1-${batch.id}`, // Format as "1-{id}"
+      batchId: String(batch.id),
       batchDate: batch.batchDate ? formatDateYMD(batch.batchDate) : '',
       status: batch.statusLabel || batch.status,
       recordCount: batch.recordCount,
@@ -2570,19 +2580,6 @@ function App() {
                             >
                               Date Of Birth
                             </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'dob')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['dob'] || columnFilters.dob?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
                           </Box>
                         </TableCell>
                         <TableCell>
@@ -2640,20 +2637,6 @@ function App() {
                             >
                               Status Effective Date
                             </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'statusEffective')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['statusEffective'] ||
-                                  columnFilters.statusEffective?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
                           </Box>
                         </TableCell>
                         <TableCell>
@@ -2760,20 +2743,6 @@ function App() {
                             >
                               Last Updated
                             </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'lastUpdated')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['lastUpdated'] ||
-                                  columnFilters.lastUpdated?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
                           </Box>
                         </TableCell>
                         <TableCell>
@@ -3093,9 +3062,8 @@ function App() {
                     >
                       <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                         Filter by{' '}
-                        {batchHistoryFilterAnchor.column === 'status'
-                          ? 'Status'
-                          : batchHistoryFilterAnchor.column}
+                        {COLUMN_LABELS[batchHistoryFilterAnchor.column] ||
+                          batchHistoryFilterAnchor.column}
                       </Typography>
                       <Button
                         size="small"
@@ -4441,19 +4409,6 @@ function App() {
                               <TableCell sx={{ fontWeight: 600 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                   Batch Date
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => handleBatchHistoryFilterClick(e, 'batchDate')}
-                                    sx={{
-                                      padding: 0.5,
-                                      color:
-                                        batchHistoryColumnFilters.batchDate?.length > 0
-                                          ? '#1976d2'
-                                          : '#666',
-                                    }}
-                                  >
-                                    <FilterListIcon fontSize="small" />
-                                  </IconButton>
                                 </Box>
                               </TableCell>
                               <TableCell sx={{ fontWeight: 600 }}>
@@ -4641,19 +4596,6 @@ function App() {
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             Batch Date
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleBatchRequestsFilterClick(e, 'batchDate')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  batchRequestsColumnFilters.batchDate?.length > 0
-                                    ? '#1976d2'
-                                    : '#666',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
                           </Box>
                         </TableCell>
                         <TableCell>
@@ -5049,9 +4991,8 @@ function App() {
               >
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                   Filter by{' '}
-                  {batchRequestsFilterAnchor.column === 'status'
-                    ? 'Status'
-                    : batchRequestsFilterAnchor.column}
+                  {COLUMN_LABELS[batchRequestsFilterAnchor.column] ||
+                    batchRequestsFilterAnchor.column}
                 </Typography>
                 <Button
                   size="small"
@@ -5185,9 +5126,8 @@ function App() {
               >
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                   Filter by{' '}
-                  {batchDetailsFilterAnchor.column === 'status'
-                    ? 'Status'
-                    : batchDetailsFilterAnchor.column}
+                  {COLUMN_LABELS[batchDetailsFilterAnchor.column] ||
+                    batchDetailsFilterAnchor.column}
                 </Typography>
                 <Button
                   size="small"

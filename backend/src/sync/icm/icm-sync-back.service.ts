@@ -22,6 +22,14 @@ export class IcmSyncBackService {
     private readonly icmDataSource: IcmDataSource,
   ) {}
 
+  async hasFlaggedContacts(): Promise<boolean> {
+    const found = await this.prisma.contact.findFirst({
+      where: { icmIntegrationStatus: true },
+      select: { id: true },
+    })
+    return found !== null
+  }
+
   async syncFlaggedContacts(): Promise<SyncBackResult> {
     const flagged = await this.prisma.contact.findMany({
       where: { icmIntegrationStatus: true },

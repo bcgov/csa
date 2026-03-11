@@ -31,10 +31,9 @@ export class OutboundTransferService {
 
     const formData = new FormData()
     formData.append('file', fs.createReadStream(filePath), fileName)
-    formData.append('destinationId', destinationId)
     formData.append('fileName', fileName)
 
-    const url = this.fileTransferServiceUrl + '/api/transfers'
+    const url = `${this.fileTransferServiceUrl}/api/destinations/${destinationId}/transfers`
     const response = await firstValueFrom(
       this.httpService.post(url, formData, {
         headers: { ...formData.getHeaders() },

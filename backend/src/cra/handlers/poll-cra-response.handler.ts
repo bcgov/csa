@@ -9,6 +9,7 @@ import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { JobRunner } from 'src/jobs/job-runner.service'
+import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { InboundFileService } from '../inbound/inbound-file.service'
 import { InboundResponseService } from '../inbound/inbound-response.service'
@@ -37,6 +38,7 @@ export class PollCraResponseHandler extends BaseJob {
     private readonly batchesService: BatchesService,
     private readonly contactsService: ContactsService,
     private readonly jobRunner: JobRunner,
+    private readonly icmSyncBackService: IcmSyncBackService,
   ) {
     super()
   }
@@ -70,7 +72,7 @@ export class PollCraResponseHandler extends BaseJob {
       await this.batchesService.aggregateBatchStatus(batchId)
     }
 
-    if (this.recordsAccepted + this.recordsRejected > 0) {
+    if (await this.icmSyncBackService.hasFlaggedContacts()) {
       this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM).catch((err) => {
         this.logger.warn(`Post-CRA ICM sync failed: ${(err as Error).message}`)
       })

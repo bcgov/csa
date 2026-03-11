@@ -106,7 +106,7 @@ export interface AgreementRecord {
 // Result of running the eligibility decision tree on one contact/case
 export interface EligibilityResult {
   step?: 7 | 8 | 9 | 10
-  newStatus: CsaStatus | null // null = no change (current status not in update conditions)
+  newStatus: CsaStatus | null
   cancelReasonCode: string | null
   careEndDate: Date | null
 }
@@ -123,6 +123,6 @@ export interface EligibilityRunResult {
     step8: number
     step9: number
     step10: number
-    noChange: number // outcome step didn't match current status
+    noChange: number
   }
 }

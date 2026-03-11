@@ -96,7 +96,7 @@ export class InboundFileService {
   private async listRemoteFiles(destinationId: string): Promise<{ fileName: string }[]> {
     const response = await firstValueFrom(
       this.httpService.get(
-        `${this.fileTransferServiceUrl}/api/destinations/${destinationId}/remote-files`,
+        `${this.fileTransferServiceUrl}/api/destinations/${destinationId}/transfers/inbound`,
         { headers: { 'Content-Type': 'application/json' } },
       ),
     )
@@ -106,7 +106,7 @@ export class InboundFileService {
   private async downloadFile(destinationId: string, fileName: string): Promise<string> {
     const response = await firstValueFrom(
       this.httpService.get(
-        `${this.fileTransferServiceUrl}/api/destinations/${destinationId}/local/inbound/files/${fileName}`,
+        `${this.fileTransferServiceUrl}/api/destinations/${destinationId}/transfers/${fileName}`,
         { headers: { 'Content-Type': 'text/plain' }, responseType: 'arraybuffer' },
       ),
     )

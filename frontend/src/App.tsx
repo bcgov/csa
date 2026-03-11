@@ -4391,19 +4391,6 @@ function App() {
                               <TableCell sx={{ fontWeight: 600 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                   Created Date
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => handleBatchHistoryFilterClick(e, 'createdDate')}
-                                    sx={{
-                                      padding: 0.5,
-                                      color:
-                                        batchHistoryColumnFilters.createdDate?.length > 0
-                                          ? '#1976d2'
-                                          : '#666',
-                                    }}
-                                  >
-                                    <FilterListIcon fontSize="small" />
-                                  </IconButton>
                                 </Box>
                               </TableCell>
                               <TableCell sx={{ fontWeight: 600 }}>
@@ -4637,19 +4624,6 @@ function App() {
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             Created Date
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleBatchRequestsFilterClick(e, 'createdDate')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  batchRequestsColumnFilters.createdDate?.length > 0
-                                    ? '#1976d2'
-                                    : '#666',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
                           </Box>
                         </TableCell>
                         <TableCell>

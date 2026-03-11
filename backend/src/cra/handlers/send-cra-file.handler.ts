@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { readFile } from 'fs/promises'
 import { appendSystemComment, pacificToday } from 'src/common/utils'
 import type { Batch, Contact, ContactBatchDetail } from '@prisma/client'
 import { BatchesService } from 'src/api/batches/batches.service'
@@ -21,7 +22,7 @@ import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { OutboundDataService } from '../outbound/outbound-data.service'
 import { OutboundFileService } from '../outbound/outbound-file.service'
-import { OutboundTransferService } from '../outbound/outbound-transfer.service'
+import { CraTransferService } from '../transfer/cra-transfer.service'
 
 const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
@@ -40,7 +41,7 @@ export class SendCraFileHandler extends BaseJob {
     private readonly contactsService: ContactsService,
     private readonly outboundDataService: OutboundDataService,
     private readonly outboundFileService: OutboundFileService,
-    private readonly outboundTransferService: OutboundTransferService,
+    private readonly craTransferService: CraTransferService,
     private readonly jobRunner: JobRunner,
     private readonly icmSyncBackService: IcmSyncBackService,
   ) {
@@ -105,7 +106,8 @@ export class SendCraFileHandler extends BaseJob {
       nextSequence,
     )
 
-    await this.outboundTransferService.sendFileToTransferService(filePath, fileName, DESTINATION_ID)
+    const fileBuffer = await readFile(filePath)
+    await this.craTransferService.sendFile(fileName, fileBuffer)
 
     await this.prisma.transferFile.create({
       data: {

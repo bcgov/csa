@@ -1,4 +1,7 @@
 import { Injectable } from '@nestjs/common'
+import { existsSync, mkdirSync } from 'fs'
+import { writeFile } from 'fs/promises'
+import path from 'path'
 import { BatchesService } from 'src/api/batches/batches.service'
 import { ContactsService } from 'src/api/contacts/contacts.service'
 import { PrismaService } from 'src/common/database/prisma.service'
@@ -14,24 +17,21 @@ import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { InboundFileService } from '../inbound/inbound-file.service'
 import { InboundResponseService } from '../inbound/inbound-response.service'
 import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
+import { CraTransferService } from '../transfer/cra-transfer.service'
 
 const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
-/*
- * Checks for response files from CRA and processes them
- * Triggered by CronJob POLL_CRA_RESPONSE
- */
 @Injectable()
 export class PollCraResponseHandler extends BaseJob {
   readonly jobType = JobType.POLL_CRA_RESPONSE
 
-  // Per-run state shared across private methods
   private processedBatchIds!: Set<number>
   private recordsAccepted!: number
   private recordsRejected!: number
   private recordsRecycled!: number
 
   constructor(
+    private readonly craTransferService: CraTransferService,
     private readonly inboundFileService: InboundFileService,
     private readonly inboundResponseService: InboundResponseService,
     private readonly prisma: PrismaService,
@@ -49,7 +49,7 @@ export class PollCraResponseHandler extends BaseJob {
     this.recordsRejected = 0
     this.recordsRecycled = 0
 
-    await this.inboundFileService.downloadNewResponseFiles(DESTINATION_ID)
+    await this.downloadAndRegisterNewFiles()
 
     const unprocessedResponseFiles = await this.prisma.transferFile.findMany({
       where: { direction: FILE_DIRECTION.INBOUND, isDetailsProcessed: false, isValid: true },
@@ -92,6 +92,45 @@ export class PollCraResponseHandler extends BaseJob {
     }
   }
 
+  private async downloadAndRegisterNewFiles(): Promise<void> {
+    const existingFiles = await this.prisma.transferFile.findMany({
+      where: { direction: FILE_DIRECTION.INBOUND },
+      select: { fileName: true },
+    })
+    const existingNames = new Set(existingFiles.map((file) => file.fileName))
+
+    const remoteFiles = await this.craTransferService.listInboundFiles()
+    const newFiles = remoteFiles.filter((file) => !existingNames.has(file.fileName))
+
+    for (const file of newFiles) {
+      const fileBuffer = await this.craTransferService.downloadInboundFile(file.fileName)
+      const localFilePath = this.inboundFileService.getLocalFilePath(DESTINATION_ID, file.fileName)
+
+      const dir = path.dirname(localFilePath)
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true })
+      }
+      await writeFile(localFilePath, fileBuffer)
+
+      const valid = this.inboundFileService.isValidResponseFile(file.fileName)
+      if (!valid) {
+        this.logger.warn(`Invalid response file format: ${file.fileName}`)
+      }
+
+      await this.prisma.transferFile.create({
+        data: {
+          destinationId: DESTINATION_ID,
+          direction: FILE_DIRECTION.INBOUND,
+          fileName: file.fileName,
+          fileSize: String(fileBuffer.length),
+          downloadedAt: new Date(),
+          isValid: valid,
+          isDetailsProcessed: !valid,
+        },
+      })
+    }
+  }
+
   private async processResponseFile(responseFile: {
     id: number
     fileName: string
@@ -131,6 +170,8 @@ export class PollCraResponseHandler extends BaseJob {
         referenceNumbers: details.map((detail) => detail.referenceNum),
       },
     })
+
+    await this.craTransferService.moveToProcessed(responseFile.fileName)
 
     return details.length
   }
@@ -214,7 +255,6 @@ export class PollCraResponseHandler extends BaseJob {
       )
       this.recordsRejected++
     } else {
-      // recycled: no state change, just update system comments
       this.logger.log(`Detail ${batchDetail.id} recycled, no status change`)
       await this.prisma.contactBatchDetail.update({
         where: { id: batchDetail.id },

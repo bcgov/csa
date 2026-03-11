@@ -11,6 +11,15 @@ import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { DETAIL_OUTCOME } from '../inbound/inbound.interface'
 import { PollCraResponseHandler } from './poll-cra-response.handler'
 
+vi.mock('fs', () => ({
+  existsSync: vi.fn().mockReturnValue(true),
+  mkdirSync: vi.fn(),
+}))
+
+vi.mock('fs/promises', () => ({
+  writeFile: vi.fn().mockResolvedValue(undefined),
+}))
+
 const DESTINATION_ID = CRA_DATA_HANDLING_CONSTANT.DESTINATION_ID
 const { TRAN_STAT_CODE, FILE_STAT_CODE } = CRA_DATA_HANDLING_CONSTANT
 
@@ -21,7 +30,6 @@ const mockContext: JobContext = {
   retryCount: 0,
 }
 
-// Mock factory for CRA response details
 const makeDetail = (overrides = {}) => ({
   referenceNum: '100',
   tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED,
@@ -36,13 +44,12 @@ const makeDetail = (overrides = {}) => ({
   ...overrides,
 })
 
-// Valid response file name: {userId}.{envFlag}RSP{seq}.txt
-// In test env NODE_ENV is 'test' (not 'production'), so expected env flag is 'V'
 const VALID_FILE_NAME = 'craUserId.VRSP0001.txt'
 
 describe('PollCraResponseHandler', () => {
   let handler: PollCraResponseHandler
 
+  let mockCraTransferService: any
   let mockInboundFileService: any
   let mockInboundResponseService: any
   let mockPrisma: any
@@ -52,9 +59,15 @@ describe('PollCraResponseHandler', () => {
   let mockIcmSyncBackService: any
 
   beforeEach(() => {
+    mockCraTransferService = {
+      listInboundFiles: vi.fn().mockResolvedValue([]),
+      downloadInboundFile: vi.fn(),
+      moveToProcessed: vi.fn().mockResolvedValue(undefined),
+    }
+
     mockInboundFileService = {
-      downloadNewResponseFiles: vi.fn().mockResolvedValue([]),
-      getLocalFilePath: vi.fn().mockReturnValue('/tmp/cra-ftp/inbound/default.txt'),
+      getLocalFilePath: vi.fn().mockReturnValue('/tmp/cra/inbound/default.txt'),
+      isValidResponseFile: vi.fn().mockReturnValue(true),
     }
 
     mockInboundResponseService = {
@@ -78,7 +91,6 @@ describe('PollCraResponseHandler', () => {
           return { outcome: DETAIL_OUTCOME.RECYCLED, systemComments, din: null }
         }
 
-        // REJECTED, PROBLEM_DETECTED, NOT_SET, or any unknown code
         return { outcome: DETAIL_OUTCOME.REJECTED, systemComments, din: null }
       }),
     }
@@ -120,6 +132,7 @@ describe('PollCraResponseHandler', () => {
     }
 
     handler = new PollCraResponseHandler(
+      mockCraTransferService,
       mockInboundFileService,
       mockInboundResponseService,
       mockPrisma,
@@ -134,17 +147,13 @@ describe('PollCraResponseHandler', () => {
     expect(handler.jobType).toBe(JobType.POLL_CRA_RESPONSE)
   })
 
-  // Helpers
-
-  // Simulates a previously downloaded file.
   function setupUnprocessedFile(fileName: string, id = 1) {
     mockPrisma.transferFile.findMany.mockResolvedValue([
       { id, fileName, isDetailsProcessed: false, isValid: true },
     ])
-    mockInboundFileService.getLocalFilePath.mockReturnValue(`/tmp/cra-ftp/inbound/${fileName}`)
+    mockInboundFileService.getLocalFilePath.mockReturnValue(`/tmp/cra/inbound/${fileName}`)
   }
 
-  // Returns the given details object
   function setupParseFile(details: any[]) {
     mockInboundResponseService.parseFile.mockReturnValue({
       header: { recordCount: details.length + 2 },
@@ -152,7 +161,6 @@ describe('PollCraResponseHandler', () => {
     })
   }
 
-  // Returns a single batch detail lookup. Chain for multiple details.
   function setupBatchDetail(detailId: number, contactId: number, batchId: number) {
     mockPrisma.contactBatchDetail.findUnique.mockResolvedValueOnce({
       id: detailId,
@@ -165,8 +173,6 @@ describe('PollCraResponseHandler', () => {
 
   describe('No new files', () => {
     it('should return success with files_processed: 0 when no unprocessed files', async () => {
-      // Default: transferFile.findMany returns [] (no unprocessed files)
-
       const result = await handler.execute(mockContext)
 
       expect(result.success).toBe(true)
@@ -174,18 +180,15 @@ describe('PollCraResponseHandler', () => {
       expect(mockInboundResponseService.parseFile).not.toHaveBeenCalled()
     })
 
-    it('should still call downloadNewResponseFiles to download new files', async () => {
+    it('should still call listInboundFiles to check for new files', async () => {
       await handler.execute(mockContext)
 
-      expect(mockInboundFileService.downloadNewResponseFiles).toHaveBeenCalledWith(DESTINATION_ID)
+      expect(mockCraTransferService.listInboundFiles).toHaveBeenCalled()
     })
   })
 
   describe('Invalid file format', () => {
     it('should return files_processed: 0 when no valid response file found', async () => {
-      // downloadNewResponseFiles handles validation internally
-      // No unprocessed files in DB (default mock returns [])
-
       const result = await handler.execute(mockContext)
 
       expect(result.success).toBe(true)
@@ -743,7 +746,6 @@ describe('PollCraResponseHandler', () => {
       const result1 = await handler.execute(mockContext)
       expect(result1.metadata.records_accepted).toBe(1)
 
-      // Second execution: rejected detail (counters should reset)
       const detail2 = makeDetail({
         referenceNum: '200',
         tranStatCd: TRAN_STAT_CODE.TRAN_REJECTED,
@@ -758,7 +760,6 @@ describe('PollCraResponseHandler', () => {
 
       const result2 = await handler.execute(mockContext)
 
-      // Counters should reflect only the second execution, not accumulate
       expect(result2.metadata.records_accepted).toBe(0)
       expect(result2.metadata.records_rejected).toBe(1)
       expect(result2.metadata.records_recycled).toBe(0)
@@ -782,7 +783,7 @@ describe('PollCraResponseHandler', () => {
   })
 
   describe('File download and processing', () => {
-    it('should call downloadNewResponseFiles with destination', async () => {
+    it('should call listInboundFiles to check for new files', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
       setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
@@ -794,7 +795,7 @@ describe('PollCraResponseHandler', () => {
 
       await handler.execute(mockContext)
 
-      expect(mockInboundFileService.downloadNewResponseFiles).toHaveBeenCalledWith(DESTINATION_ID)
+      expect(mockCraTransferService.listInboundFiles).toHaveBeenCalled()
     })
 
     it('should call getLocalFilePath with destination and fileName', async () => {

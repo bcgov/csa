@@ -93,6 +93,32 @@ const CSA_STATUS_FILTER_OPTIONS = [
   { value: 'over_18', label: 'Over 18' },
 ]
 
+// Case Status options for filter dropdown
+const CASE_STATUS_FILTER_OPTIONS = [
+  { value: 'Open', label: 'Open' },
+  { value: 'Closed', label: 'Closed' },
+  { value: 'Pending', label: 'Pending' },
+  { value: 'Admin Re-open', label: 'Admin Re-open' },
+]
+
+// Batch Status options for filter dropdown (used in Batch History and Batch Requests)
+const BATCH_STATUS_FILTER_OPTIONS = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'system_error', label: 'System Error' },
+  { value: 'processed_with_errors', label: 'Processed with Errors' },
+  { value: 'processed', label: 'Processed' },
+  { value: 'error', label: 'Error' },
+]
+
+// Batch Details Status options for filter dropdown
+const BATCH_DETAILS_STATUS_FILTER_OPTIONS = [
+  { value: 'Pending', label: 'Pending' },
+  { value: 'In Progress', label: 'In Progress' },
+  { value: 'Error', label: 'Error' },
+  { value: 'Processed', label: 'Processed' },
+]
+
 // Column field to display label mapping for filter menu
 const COLUMN_LABELS: Record<string, string> = {
   lastName: 'Last Name',
@@ -212,10 +238,8 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterSearchTerm, setFilterSearchTerm] = useState('')
   const [isColumnFilterActive, setIsColumnFilterActive] = useState(false)
-  const [activeColumnFilter, setActiveColumnFilter] = useState<{
-    column: string
-    query: string
-  } | null>(null)
+  // Store multiple active column filters: column name -> query value
+  const [activeColumnFilters, setActiveColumnFilters] = useState<Record<string, string>>({})
   const [selectedChild, setSelectedChild] = useState<number | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<number>(1) // Default to first batch
 
@@ -350,6 +374,7 @@ function App() {
       caseNumber: 'caseNumber',
       caseStatus: 'caseStatus',
       legacyFile: 'legacyFileNumber',
+      cgwrks3: 'holdBy',
       lastUpdated: 'lastUpdatedAt',
       lastUpdatedBy: 'lastUpdatedBy',
     }),
@@ -590,45 +615,52 @@ function App() {
   )
 
   // Function to perform column-specific filter search
-  const performColumnFilterSearch = useCallback(
-    async (column: string, query: string, page: number) => {
+  // Build filters from all active column filters and perform search
+  const performColumnFiltersSearch = useCallback(
+    async (filters: Record<string, string>, page: number) => {
       setIsColumnFilterActive(true)
       setLoadingContacts(true)
       setContactsError(null)
       try {
-        const backendField = columnToFieldMapping[column]
-        if (!backendField) {
-          console.error('Unknown column:', column)
+        const numericColumns = ['age']
+        const columnFilters: Array<{ key: string; op: string; value: string | number }> = []
+
+        // Build filter conditions for all active column filters
+        for (const [column, query] of Object.entries(filters)) {
+          const backendField = columnToFieldMapping[column]
+          if (!backendField) {
+            console.error('Unknown column:', column)
+            continue
+          }
+
+          const isNumericColumn = numericColumns.includes(column)
+          const op = isNumericColumn ? 'eq' : 'like'
+
+          let value: string | number = query
+          if (isNumericColumn) {
+            const parsedValue = parseInt(query, 10)
+            if (isNaN(parsedValue)) {
+              continue // Skip invalid numeric input
+            }
+            value = parsedValue
+          }
+
+          columnFilters.push({ key: backendField, op, value })
+        }
+
+        if (columnFilters.length === 0) {
+          setLoadingContacts(false)
           return
         }
 
-        // Build filter for column-specific search
-        // Use 'eq' for numeric fields, 'like' for text fields
-        const numericColumns = ['age']
-        const isNumericColumn = numericColumns.includes(column)
-        const op = isNumericColumn ? 'eq' : 'like'
-
-        // For numeric columns, parse as integer and validate
-        let value: string | number = query
-        if (isNumericColumn) {
-          const parsedValue = parseInt(query, 10)
-          if (isNaN(parsedValue)) {
-            setLoadingContacts(false)
-            return // Don't make API call for invalid numeric input
-          }
-          value = parsedValue
-        }
-
-        const columnFilter = [{ key: backendField, op, value }]
-
         // Combine with existing pre-defined filter if needed
-        let combinedFilter = columnFilter
+        let combinedFilter = columnFilters
 
         // If there's a pre-defined filter other than "All Records", combine them
         if (preDefinedFilter !== 'All Records') {
           const baseFilter = getPreDefinedFilterConfig(preDefinedFilter)
           if (baseFilter) {
-            combinedFilter = [...baseFilter, ...columnFilter]
+            combinedFilter = [...baseFilter, ...columnFilters]
           }
         }
 
@@ -638,7 +670,7 @@ function App() {
         setTotalRecords(response.total)
         console.log('Column filter search results:', response.data)
         console.log('Total column filter records:', response.total)
-        console.log('Column:', column, 'Query:', query)
+        console.log('Active filters:', filters)
         console.log('Applied filter:', combinedFilter)
       } catch (error) {
         console.error('Failed to search column:', error)
@@ -693,9 +725,9 @@ function App() {
       return
     }
 
-    // If column filter is active, re-apply the column filter on page change
-    if (isColumnFilterActive && activeColumnFilter) {
-      performColumnFilterSearch(activeColumnFilter.column, activeColumnFilter.query, currentPage)
+    // If column filter is active, re-apply all column filters on page change
+    if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+      performColumnFiltersSearch(activeColumnFilters, currentPage)
     } else if (!isSearchActive) {
       // Only fetch regular contacts when no column filter or search is active
       fetchContacts(currentPage)
@@ -706,9 +738,9 @@ function App() {
     isAuthenticated,
     isSearchActive,
     isColumnFilterActive,
-    activeColumnFilter,
+    activeColumnFilters,
     fetchContacts,
-    performColumnFilterSearch,
+    performColumnFiltersSearch,
   ])
 
   // Full-text search effect - triggers when searchTerm has 3+ characters
@@ -764,50 +796,58 @@ function App() {
       'Children over 18 years (never eligible)',
     ]
 
+    const column = filterAnchor.column
+
     // Only trigger column filter search for API-based filters and when a column is selected
-    if (!apiFilters.includes(preDefinedFilter) || !isAuthenticated || !filterAnchor.column) {
+    if (!apiFilters.includes(preDefinedFilter) || !isAuthenticated || !column) {
       return
     }
 
     // Numeric columns only need 1 character, text columns need 3
     const numericColumns = ['age']
-    const minChars = numericColumns.includes(filterAnchor.column) ? 1 : 3
+    const minChars = numericColumns.includes(column) ? 1 : 3
 
-    // Skip debounce search for csaStatus since it uses dropdown selection, not text search
-    if (filterAnchor.column === 'csaStatus') {
+    // Skip debounce search for csaStatus and caseStatus since they use dropdown selection, not text search
+    if (column === 'csaStatus' || column === 'caseStatus') {
       return
     }
 
     // Debounce column search - wait 500ms after user stops typing
     const columnSearchTimer = setTimeout(() => {
       if (filterSearchTerm.trim().length >= minChars) {
-        // Store the active column filter for pagination
-        setActiveColumnFilter({ column: filterAnchor.column, query: filterSearchTerm.trim() })
-        performColumnFilterSearch(filterAnchor.column, filterSearchTerm.trim(), currentPage)
-      } else if (
-        filterSearchTerm.trim().length === 0 &&
-        isColumnFilterActive &&
-        activeColumnFilter &&
-        activeColumnFilter.column === filterAnchor.column
-      ) {
-        // Only clear filter if searching in the same column that has the active filter
-        setIsColumnFilterActive(false)
-        setActiveColumnFilter(null)
-        fetchContacts(currentPage)
+        // Add/update this column filter while preserving other active filters
+        const newFilters = { ...activeColumnFilters, [column]: filterSearchTerm.trim() }
+        setActiveColumnFilters(newFilters)
+        performColumnFiltersSearch(newFilters, currentPage)
+      } else if (filterSearchTerm.trim().length === 0 && activeColumnFilters[column]) {
+        // Remove this column filter when text is cleared
+        const newFilters = { ...activeColumnFilters }
+        delete newFilters[column]
+        setActiveColumnFilters(newFilters)
+
+        if (Object.keys(newFilters).length === 0) {
+          // No more active filters, fetch regular contacts
+          setIsColumnFilterActive(false)
+          fetchContacts(currentPage)
+        } else {
+          // Still have other filters active, re-apply them
+          performColumnFiltersSearch(newFilters, currentPage)
+        }
       }
     }, 500)
 
     return () => clearTimeout(columnSearchTimer)
+    // Note: currentPage is intentionally excluded - page changes are handled by the pagination effect above
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     filterSearchTerm,
-    filterAnchor.column,
+    filterAnchor,
     preDefinedFilter,
     isAuthenticated,
     isColumnFilterActive,
-    activeColumnFilter,
+    activeColumnFilters,
     fetchContacts,
-    performColumnFilterSearch,
+    performColumnFiltersSearch,
   ])
 
   // Fetch batches when component mounts
@@ -863,9 +903,9 @@ function App() {
     setCurrentPage(1) // Reset to first page when filter changes
     setSearchTerm('') // Clear search when changing filters
     setIsSearchActive(false) // Deactivate search mode
-    // Clear column filter when changing PDQ filter
+    // Clear all column filters when changing PDQ filter
     setIsColumnFilterActive(false)
-    setActiveColumnFilter(null)
+    setActiveColumnFilters({})
     setFilterSearchTerm('')
     // Clear selected records when changing PDQ filter
     setSelected([])
@@ -1388,12 +1428,8 @@ function App() {
 
       if (apiFilters.includes(preDefinedFilter)) {
         // Reload based on active filter/search
-        if (isColumnFilterActive && activeColumnFilter) {
-          await performColumnFilterSearch(
-            activeColumnFilter.column,
-            activeColumnFilter.query,
-            currentPage,
-          )
+        if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+          await performColumnFiltersSearch(activeColumnFilters, currentPage)
         } else if (isSearchActive && searchTerm.trim().length >= 3) {
           await performFullTextSearch(searchTerm.trim(), currentPage)
         } else {
@@ -1490,12 +1526,8 @@ function App() {
 
       if (apiFilters.includes(preDefinedFilter)) {
         // Reload based on active filter/search
-        if (isColumnFilterActive && activeColumnFilter) {
-          await performColumnFilterSearch(
-            activeColumnFilter.column,
-            activeColumnFilter.query,
-            currentPage,
-          )
+        if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+          await performColumnFiltersSearch(activeColumnFilters, currentPage)
         } else if (isSearchActive && searchTerm.trim().length >= 3) {
           await performFullTextSearch(searchTerm.trim(), currentPage)
         } else {
@@ -1533,12 +1565,12 @@ function App() {
   // Filter handling functions
   const handleFilterClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
     setFilterAnchor({ element: event.currentTarget, column })
-    // For csaStatus, always start with empty search term since selected item is highlighted
-    // For other columns, preserve the search term if clicking on same column with active filter
-    if (column === 'csaStatus') {
+    // For csaStatus and caseStatus, always start with empty search term since selected item is highlighted
+    // For other columns, preserve the search term if this column has an active filter
+    if (column === 'csaStatus' || column === 'caseStatus') {
       setFilterSearchTerm('')
-    } else if (activeColumnFilter && activeColumnFilter.column === column) {
-      setFilterSearchTerm(activeColumnFilter.query)
+    } else if (activeColumnFilters[column]) {
+      setFilterSearchTerm(activeColumnFilters[column])
     } else {
       setFilterSearchTerm('')
     }
@@ -1552,11 +1584,20 @@ function App() {
 
   const clearColumnFilter = (column: string) => {
     setColumnFilters((prev) => ({ ...prev, [column]: [] }))
-    // Reset column filter active state and refetch data
-    setIsColumnFilterActive(false)
-    setActiveColumnFilter(null)
+    // Remove only this column from active filters
+    const newFilters = { ...activeColumnFilters }
+    delete newFilters[column]
+    setActiveColumnFilters(newFilters)
     setFilterSearchTerm('')
-    fetchContacts(currentPage)
+
+    if (Object.keys(newFilters).length === 0) {
+      // No more active filters, fetch regular contacts
+      setIsColumnFilterActive(false)
+      fetchContacts(currentPage)
+    } else {
+      // Still have other filters, re-apply them
+      performColumnFiltersSearch(newFilters, currentPage)
+    }
   }
 
   // Batch History filter handling functions
@@ -2459,7 +2500,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'lastName' ||
+                                  activeColumnFilters['lastName'] ||
                                   columnFilters.lastName?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2483,7 +2524,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'firstName' ||
+                                  activeColumnFilters['firstName'] ||
                                   columnFilters.firstName?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2507,7 +2548,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'middleName' ||
+                                  activeColumnFilters['middleName'] ||
                                   columnFilters.middleName?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2531,8 +2572,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'dob' ||
-                                  columnFilters.dob?.length > 0
+                                  activeColumnFilters['dob'] || columnFilters.dob?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
                               }}
@@ -2555,8 +2595,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'din' ||
-                                  columnFilters.din?.length > 0
+                                  activeColumnFilters['din'] || columnFilters.din?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
                               }}
@@ -2579,7 +2618,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'csaStatus' ||
+                                  activeColumnFilters['csaStatus'] ||
                                   columnFilters.csaStatus?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2603,7 +2642,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'statusEffective' ||
+                                  activeColumnFilters['statusEffective'] ||
                                   columnFilters.statusEffective?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2627,7 +2666,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'caseNumber' ||
+                                  activeColumnFilters['caseNumber'] ||
                                   columnFilters.caseNumber?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2651,7 +2690,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'caseStatus' ||
+                                  activeColumnFilters['caseStatus'] ||
                                   columnFilters.caseStatus?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2675,7 +2714,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'legacyFile' ||
+                                  activeColumnFilters['legacyFile'] ||
                                   columnFilters.legacyFile?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2699,7 +2738,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'cgwrks3' ||
+                                  activeColumnFilters['cgwrks3'] ||
                                   columnFilters.cgwrks3?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2723,7 +2762,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'lastUpdated' ||
+                                  activeColumnFilters['lastUpdated'] ||
                                   columnFilters.lastUpdated?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2747,7 +2786,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'lastUpdatedBy' ||
+                                  activeColumnFilters['lastUpdatedBy'] ||
                                   columnFilters.lastUpdatedBy?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2910,8 +2949,12 @@ function App() {
                             <MenuItem
                               key={option.value}
                               onClick={() => {
-                                setActiveColumnFilter({ column: 'csaStatus', query: option.value })
-                                performColumnFilterSearch('csaStatus', option.value, 1)
+                                const newFilters = {
+                                  ...activeColumnFilters,
+                                  csaStatus: option.value,
+                                }
+                                setActiveColumnFilters(newFilters)
+                                performColumnFiltersSearch(newFilters, 1)
                                 setCurrentPage(1)
                                 setIsColumnFilterActive(true)
                                 handleFilterClose()
@@ -2920,8 +2963,57 @@ function App() {
                                 fontSize: '0.875rem',
                                 py: 0.75,
                                 backgroundColor:
-                                  activeColumnFilter?.column === 'csaStatus' &&
-                                  activeColumnFilter?.query === option.value
+                                  activeColumnFilters['csaStatus'] === option.value
+                                    ? 'rgba(25, 118, 210, 0.08)'
+                                    : 'transparent',
+                              }}
+                            >
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </Box>
+                      </>
+                    ) : filterAnchor.column === 'caseStatus' ? (
+                      <>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          placeholder="Search status..."
+                          value={filterSearchTerm}
+                          onChange={(e) => setFilterSearchTerm(e.target.value)}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <Box component="span" sx={{ fontSize: '18px' }}>
+                                  🔍
+                                </Box>
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{ mb: 1 }}
+                        />
+                        <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                          {CASE_STATUS_FILTER_OPTIONS.filter((option) =>
+                            option.label.toLowerCase().includes(filterSearchTerm.toLowerCase()),
+                          ).map((option) => (
+                            <MenuItem
+                              key={option.value}
+                              onClick={() => {
+                                const newFilters = {
+                                  ...activeColumnFilters,
+                                  caseStatus: option.value,
+                                }
+                                setActiveColumnFilters(newFilters)
+                                performColumnFiltersSearch(newFilters, 1)
+                                setCurrentPage(1)
+                                setIsColumnFilterActive(true)
+                                handleFilterClose()
+                              }}
+                              sx={{
+                                fontSize: '0.875rem',
+                                py: 0.75,
+                                backgroundColor:
+                                  activeColumnFilters['caseStatus'] === option.value
                                     ? 'rgba(25, 118, 210, 0.08)'
                                     : 'transparent',
                               }}
@@ -2996,7 +3088,10 @@ function App() {
                       }}
                     >
                       <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                        Filter by {batchHistoryFilterAnchor.column}
+                        Filter by{' '}
+                        {batchHistoryFilterAnchor.column === 'status'
+                          ? 'Status'
+                          : batchHistoryFilterAnchor.column}
                       </Typography>
                       <Button
                         size="small"
@@ -3010,55 +3105,103 @@ function App() {
                       </Button>
                     </Box>
                     {/* Search bar for filtering items */}
-                    <TextField
-                      size="small"
-                      fullWidth
-                      placeholder="Search"
-                      value={batchHistoryFilterSearchTerm}
-                      onChange={(e) => setBatchHistoryFilterSearchTerm(e.target.value)}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Box component="span" sx={{ fontSize: '18px' }}>
-                              🔍
-                            </Box>
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{ mb: 1 }}
-                    />
-                    <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                      {batchHistoryFilterAnchor.column &&
-                        getBatchHistoryUniqueValues(batchHistoryFilterAnchor.column)
-                          .sort()
-                          .filter((value) =>
-                            String(value)
+                    {batchHistoryFilterAnchor.column === 'status' ? (
+                      <>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          placeholder="Search status..."
+                          value={batchHistoryFilterSearchTerm}
+                          onChange={(e) => setBatchHistoryFilterSearchTerm(e.target.value)}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <Box component="span" sx={{ fontSize: '18px' }}>
+                                  🔍
+                                </Box>
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{ mb: 1 }}
+                        />
+                        <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                          {BATCH_STATUS_FILTER_OPTIONS.filter((option) =>
+                            option.label
                               .toLowerCase()
                               .includes(batchHistoryFilterSearchTerm.toLowerCase()),
-                          )
-                          .map((value) => (
+                          ).map((option) => (
                             <Box
-                              key={String(value)}
+                              key={option.value}
                               sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
                             >
                               <Checkbox
                                 size="small"
                                 checked={
-                                  batchHistoryColumnFilters[
-                                    batchHistoryFilterAnchor.column
-                                  ]?.includes(String(value)) || false
+                                  batchHistoryColumnFilters['status']?.includes(option.value) ||
+                                  false
                                 }
                                 onChange={() =>
-                                  handleBatchHistoryFilterChange(
-                                    batchHistoryFilterAnchor.column,
-                                    String(value),
-                                  )
+                                  handleBatchHistoryFilterChange('status', option.value)
                                 }
                               />
-                              <Typography variant="body2">{String(value)}</Typography>
+                              <Typography variant="body2">{option.label}</Typography>
                             </Box>
                           ))}
-                    </Box>
+                        </Box>
+                      </>
+                    ) : (
+                      <>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          placeholder="Search"
+                          value={batchHistoryFilterSearchTerm}
+                          onChange={(e) => setBatchHistoryFilterSearchTerm(e.target.value)}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <Box component="span" sx={{ fontSize: '18px' }}>
+                                  🔍
+                                </Box>
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{ mb: 1 }}
+                        />
+                        <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                          {batchHistoryFilterAnchor.column &&
+                            getBatchHistoryUniqueValues(batchHistoryFilterAnchor.column)
+                              .sort()
+                              .filter((value) =>
+                                String(value)
+                                  .toLowerCase()
+                                  .includes(batchHistoryFilterSearchTerm.toLowerCase()),
+                              )
+                              .map((value) => (
+                                <Box
+                                  key={String(value)}
+                                  sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                                >
+                                  <Checkbox
+                                    size="small"
+                                    checked={
+                                      batchHistoryColumnFilters[
+                                        batchHistoryFilterAnchor.column
+                                      ]?.includes(String(value)) || false
+                                    }
+                                    onChange={() =>
+                                      handleBatchHistoryFilterChange(
+                                        batchHistoryFilterAnchor.column,
+                                        String(value),
+                                      )
+                                    }
+                                  />
+                                  <Typography variant="body2">{String(value)}</Typography>
+                                </Box>
+                              ))}
+                        </Box>
+                      </>
+                    )}
                   </Box>
                 </Menu>
 
@@ -3354,7 +3497,6 @@ function App() {
                                     variant="body2"
                                     sx={{
                                       fontWeight: 500,
-                                      color: '#1976d2',
                                       cursor: 'pointer',
                                     }}
                                   >
@@ -3433,7 +3575,6 @@ function App() {
                                     variant="body2"
                                     sx={{
                                       fontWeight: 500,
-                                      color: '#1976d2',
                                       cursor: 'pointer',
                                     }}
                                   >
@@ -4624,93 +4765,6 @@ function App() {
           </Box>
 
           {/* Filter Menus - Outside tabs so they're always available */}
-          {/* Batch History Filter Menu */}
-          <Menu
-            anchorEl={batchHistoryFilterAnchor.element}
-            open={Boolean(batchHistoryFilterAnchor.element)}
-            onClose={handleBatchHistoryFilterClose}
-            PaperProps={{
-              sx: {
-                maxHeight: 400,
-                width: 250,
-              },
-            }}
-          >
-            <Box sx={{ p: 2 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  mb: 1,
-                }}
-              >
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  Filter by {batchHistoryFilterAnchor.column}
-                </Typography>
-                <Button
-                  size="small"
-                  onClick={() => {
-                    clearBatchHistoryColumnFilter(batchHistoryFilterAnchor.column)
-                    handleBatchHistoryFilterClose()
-                  }}
-                  sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-                >
-                  Clear
-                </Button>
-              </Box>
-              {/* Search bar for filtering items */}
-              <TextField
-                size="small"
-                fullWidth
-                placeholder="Search"
-                value={batchHistoryFilterSearchTerm}
-                onChange={(e) => setBatchHistoryFilterSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Box component="span" sx={{ fontSize: '18px' }}>
-                        🔍
-                      </Box>
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{ mb: 1 }}
-              />
-              <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                {batchHistoryFilterAnchor.column &&
-                  getBatchHistoryUniqueValues(batchHistoryFilterAnchor.column)
-                    .sort()
-                    .filter((value) =>
-                      String(value)
-                        .toLowerCase()
-                        .includes(batchHistoryFilterSearchTerm.toLowerCase()),
-                    )
-                    .map((value) => (
-                      <Box
-                        key={String(value)}
-                        sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
-                      >
-                        <Checkbox
-                          size="small"
-                          checked={
-                            batchHistoryColumnFilters[batchHistoryFilterAnchor.column]?.includes(
-                              String(value),
-                            ) || false
-                          }
-                          onChange={() =>
-                            handleBatchHistoryFilterChange(
-                              batchHistoryFilterAnchor.column,
-                              String(value),
-                            )
-                          }
-                        />
-                        <Typography variant="body2">{String(value)}</Typography>
-                      </Box>
-                    ))}
-              </Box>
-            </Box>
-          </Menu>
 
           {/* Batch Requests Filter Menu */}
           <Menu
@@ -4734,7 +4788,10 @@ function App() {
                 }}
               >
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  Filter by {batchRequestsFilterAnchor.column}
+                  Filter by{' '}
+                  {batchRequestsFilterAnchor.column === 'status'
+                    ? 'Status'
+                    : batchRequestsFilterAnchor.column}
                 </Typography>
                 <Button
                   size="small"
@@ -4748,55 +4805,100 @@ function App() {
                 </Button>
               </Box>
               {/* Search bar for filtering items */}
-              <TextField
-                size="small"
-                fullWidth
-                placeholder="Search"
-                value={batchRequestsFilterSearchTerm}
-                onChange={(e) => setBatchRequestsFilterSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Box component="span" sx={{ fontSize: '18px' }}>
-                        🔍
-                      </Box>
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{ mb: 1 }}
-              />
-              <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                {batchRequestsFilterAnchor.column &&
-                  getBatchRequestsUniqueValues(batchRequestsFilterAnchor.column)
-                    .sort()
-                    .filter((value) =>
-                      String(value)
+              {batchRequestsFilterAnchor.column === 'status' ? (
+                <>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    placeholder="Search status..."
+                    value={batchRequestsFilterSearchTerm}
+                    onChange={(e) => setBatchRequestsFilterSearchTerm(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Box component="span" sx={{ fontSize: '18px' }}>
+                            🔍
+                          </Box>
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{ mb: 1 }}
+                  />
+                  <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                    {BATCH_STATUS_FILTER_OPTIONS.filter((option) =>
+                      option.label
                         .toLowerCase()
                         .includes(batchRequestsFilterSearchTerm.toLowerCase()),
-                    )
-                    .map((value) => (
+                    ).map((option) => (
                       <Box
-                        key={String(value)}
+                        key={option.value}
                         sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
                       >
                         <Checkbox
                           size="small"
                           checked={
-                            batchRequestsColumnFilters[batchRequestsFilterAnchor.column]?.includes(
-                              String(value),
-                            ) || false
+                            batchRequestsColumnFilters['status']?.includes(option.value) || false
                           }
-                          onChange={() =>
-                            handleBatchRequestsFilterChange(
-                              batchRequestsFilterAnchor.column,
-                              String(value),
-                            )
-                          }
+                          onChange={() => handleBatchRequestsFilterChange('status', option.value)}
                         />
-                        <Typography variant="body2">{String(value)}</Typography>
+                        <Typography variant="body2">{option.label}</Typography>
                       </Box>
                     ))}
-              </Box>
+                  </Box>
+                </>
+              ) : (
+                <>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    placeholder="Search"
+                    value={batchRequestsFilterSearchTerm}
+                    onChange={(e) => setBatchRequestsFilterSearchTerm(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Box component="span" sx={{ fontSize: '18px' }}>
+                            🔍
+                          </Box>
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{ mb: 1 }}
+                  />
+                  <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                    {batchRequestsFilterAnchor.column &&
+                      getBatchRequestsUniqueValues(batchRequestsFilterAnchor.column)
+                        .sort()
+                        .filter((value) =>
+                          String(value)
+                            .toLowerCase()
+                            .includes(batchRequestsFilterSearchTerm.toLowerCase()),
+                        )
+                        .map((value) => (
+                          <Box
+                            key={String(value)}
+                            sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                          >
+                            <Checkbox
+                              size="small"
+                              checked={
+                                batchRequestsColumnFilters[
+                                  batchRequestsFilterAnchor.column
+                                ]?.includes(String(value)) || false
+                              }
+                              onChange={() =>
+                                handleBatchRequestsFilterChange(
+                                  batchRequestsFilterAnchor.column,
+                                  String(value),
+                                )
+                              }
+                            />
+                            <Typography variant="body2">{String(value)}</Typography>
+                          </Box>
+                        ))}
+                  </Box>
+                </>
+              )}
             </Box>
           </Menu>
 
@@ -4822,7 +4924,10 @@ function App() {
                 }}
               >
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  Filter by {batchDetailsFilterAnchor.column}
+                  Filter by{' '}
+                  {batchDetailsFilterAnchor.column === 'status'
+                    ? 'Status'
+                    : batchDetailsFilterAnchor.column}
                 </Typography>
                 <Button
                   size="small"
@@ -4836,62 +4941,107 @@ function App() {
                 </Button>
               </Box>
               {/* Search bar for filtering items */}
-              <TextField
-                size="small"
-                fullWidth
-                placeholder="Search"
-                value={batchDetailsFilterSearchTerm}
-                onChange={(e) => setBatchDetailsFilterSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Box component="span" sx={{ fontSize: '18px' }}>
-                        🔍
+              {batchDetailsFilterAnchor.column === 'status' ? (
+                <>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    placeholder="Search status..."
+                    value={batchDetailsFilterSearchTerm}
+                    onChange={(e) => setBatchDetailsFilterSearchTerm(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Box component="span" sx={{ fontSize: '18px' }}>
+                            🔍
+                          </Box>
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{ mb: 1 }}
+                  />
+                  <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                    {BATCH_DETAILS_STATUS_FILTER_OPTIONS.filter((option) =>
+                      option.label
+                        .toLowerCase()
+                        .includes(batchDetailsFilterSearchTerm.toLowerCase()),
+                    ).map((option) => (
+                      <Box
+                        key={option.value}
+                        sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                      >
+                        <Checkbox
+                          size="small"
+                          checked={
+                            batchDetailsColumnFilters['status']?.includes(option.value) || false
+                          }
+                          onChange={() => handleBatchDetailsFilterChange('status', option.value)}
+                        />
+                        <Typography variant="body2">{option.label}</Typography>
                       </Box>
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{ mb: 1 }}
-              />
-              <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                {batchDetailsFilterAnchor.column &&
-                  (() => {
-                    // Get unique values only from currently selected batch
-                    const values = currentBatchDetails.map(
-                      (row) => row[batchDetailsFilterAnchor.column as keyof typeof row],
-                    )
-                    return Array.from(new Set(values))
-                      .filter((v) => v !== undefined && v !== '')
-                      .sort()
-                      .filter((value) =>
-                        String(value)
-                          .toLowerCase()
-                          .includes(batchDetailsFilterSearchTerm.toLowerCase()),
-                      )
-                      .map((value) => (
-                        <Box
-                          key={String(value)}
-                          sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
-                        >
-                          <Checkbox
-                            size="small"
-                            checked={
-                              batchDetailsColumnFilters[batchDetailsFilterAnchor.column]?.includes(
-                                String(value),
-                              ) || false
-                            }
-                            onChange={() =>
-                              handleBatchDetailsFilterChange(
-                                batchDetailsFilterAnchor.column,
-                                String(value),
-                              )
-                            }
-                          />
-                          <Typography variant="body2">{String(value)}</Typography>
-                        </Box>
-                      ))
-                  })()}
-              </Box>
+                    ))}
+                  </Box>
+                </>
+              ) : (
+                <>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    placeholder="Search"
+                    value={batchDetailsFilterSearchTerm}
+                    onChange={(e) => setBatchDetailsFilterSearchTerm(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Box component="span" sx={{ fontSize: '18px' }}>
+                            🔍
+                          </Box>
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{ mb: 1 }}
+                  />
+                  <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                    {batchDetailsFilterAnchor.column &&
+                      (() => {
+                        // Get unique values only from currently selected batch
+                        const values = currentBatchDetails.map(
+                          (row) => row[batchDetailsFilterAnchor.column as keyof typeof row],
+                        )
+                        return Array.from(new Set(values))
+                          .filter((v) => v !== undefined && v !== '')
+                          .sort()
+                          .filter((value) =>
+                            String(value)
+                              .toLowerCase()
+                              .includes(batchDetailsFilterSearchTerm.toLowerCase()),
+                          )
+                          .map((value) => (
+                            <Box
+                              key={String(value)}
+                              sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                            >
+                              <Checkbox
+                                size="small"
+                                checked={
+                                  batchDetailsColumnFilters[
+                                    batchDetailsFilterAnchor.column
+                                  ]?.includes(String(value)) || false
+                                }
+                                onChange={() =>
+                                  handleBatchDetailsFilterChange(
+                                    batchDetailsFilterAnchor.column,
+                                    String(value),
+                                  )
+                                }
+                              />
+                              <Typography variant="body2">{String(value)}</Typography>
+                            </Box>
+                          ))
+                      })()}
+                  </Box>
+                </>
+              )}
             </Box>
           </Menu>
         </Box>

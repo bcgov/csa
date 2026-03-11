@@ -7,6 +7,7 @@ import { ContactsModule } from 'src/api/contacts/contacts.module'
 import { PrismaModule } from 'src/common/database/prisma.module'
 import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
+import { IcmSyncBackModule } from 'src/sync/icm/icm-sync-back.module'
 import { appConfig } from '../config/app.config'
 import { craConfig } from '../config/cra.config'
 import { PollCraResponseHandler } from './handlers/poll-cra-response.handler'
@@ -31,6 +32,7 @@ import { OutboundDataService } from './outbound/outbound-data.service'
     PrismaModule,
     BatchesModule,
     ContactsModule,
+    IcmSyncBackModule,
     HttpModule.register({
       timeout: 60000,
     }),

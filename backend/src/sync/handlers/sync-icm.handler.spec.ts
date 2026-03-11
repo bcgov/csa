@@ -14,10 +14,14 @@ const mockContext: JobContext = {
 
 describe('SyncIcmHandler', () => {
   let handler: SyncIcmHandler
-  let mockSyncBackService: { syncFlaggedContacts: ReturnType<typeof vi.fn> }
+  let mockSyncBackService: {
+    hasFlaggedContacts: ReturnType<typeof vi.fn>
+    syncFlaggedContacts: ReturnType<typeof vi.fn>
+  }
 
   beforeEach(async () => {
     mockSyncBackService = {
+      hasFlaggedContacts: vi.fn().mockResolvedValue(true),
       syncFlaggedContacts: vi.fn(),
     }
 
@@ -76,16 +80,13 @@ describe('SyncIcmHandler', () => {
     expect(result.message).toContain('all 10 contacts failed')
   })
 
-  it('should return success when no contacts flagged', async () => {
-    mockSyncBackService.syncFlaggedContacts.mockResolvedValue({
-      totalFlagged: 0,
-      synced: 0,
-      failed: 0,
-      chunks: 0,
-    })
+  it('should return success without calling syncFlaggedContacts when no contacts flagged', async () => {
+    mockSyncBackService.hasFlaggedContacts.mockResolvedValue(false)
 
     const result = await handler.execute(mockContext)
 
     expect(result.success).toBe(true)
+    expect(result.message).toBe('No contacts flagged for ICM sync')
+    expect(mockSyncBackService.syncFlaggedContacts).not.toHaveBeenCalled()
   })
 })

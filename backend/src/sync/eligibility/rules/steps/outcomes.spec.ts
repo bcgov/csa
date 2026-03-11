@@ -36,10 +36,10 @@ describe('step7_UpdateEligible', () => {
     })
   })
 
-  it('should return null newStatus when current status does not match', () => {
+  it('should keep existing status when no transition applies', () => {
     const result = step7_UpdateEligible(CSA_STATUS.ELIGIBLE)
     expect(result.step).toBe(7)
-    expect(result.newStatus).toBeNull()
+    expect(result.newStatus).toBe(CSA_STATUS.ELIGIBLE)
   })
 })
 
@@ -54,9 +54,9 @@ describe('step8_UpdateEligibleTbd', () => {
     expect(result.newStatus).toBe(CSA_STATUS.ELIGIBLE_TBD)
   })
 
-  it('should return null newStatus when current status does not match', () => {
+  it('should keep existing status when no transition applies', () => {
     const result = step8_UpdateEligibleTbd(CSA_STATUS.ELIGIBLE)
-    expect(result.newStatus).toBeNull()
+    expect(result.newStatus).toBe(CSA_STATUS.ELIGIBLE)
   })
 })
 
@@ -80,9 +80,9 @@ describe('step9_UpdateNotEligible', () => {
     expect(result.careEndDate).toEqual(careEnd)
   })
 
-  it('should return null newStatus when current status does not match', () => {
+  it('should keep existing status when no transition applies', () => {
     const result = step9_UpdateNotEligible(CSA_STATUS.ON_HOLD)
-    expect(result.newStatus).toBeNull()
+    expect(result.newStatus).toBe(CSA_STATUS.ON_HOLD)
   })
 })
 
@@ -102,8 +102,13 @@ describe('step10_UpdateOver18', () => {
     expect(result.newStatus).toBe(CSA_STATUS.OVER_18)
   })
 
-  it('should return null newStatus when current status does not match', () => {
+  it('should return over_18 when current status is blank (null)', () => {
+    const result = step10_UpdateOver18(null)
+    expect(result.newStatus).toBe(CSA_STATUS.OVER_18)
+  })
+
+  it('should keep existing status when no transition applies', () => {
     const result = step10_UpdateOver18(CSA_STATUS.ON_HOLD)
-    expect(result.newStatus).toBeNull()
+    expect(result.newStatus).toBe(CSA_STATUS.ON_HOLD)
   })
 })

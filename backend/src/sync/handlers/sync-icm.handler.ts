@@ -14,6 +14,15 @@ export class SyncIcmHandler extends BaseJob {
   }
 
   async execute(_context: JobContext): Promise<JobResult> {
+    const hasFlagged = await this.icmSyncBackService.hasFlaggedContacts()
+    if (!hasFlagged) {
+      return {
+        success: true,
+        message: 'No contacts flagged for ICM sync',
+        metadata: { totalFlagged: 0, synced: 0, failed: 0, chunks: 0 },
+      }
+    }
+
     const result = await this.icmSyncBackService.syncFlaggedContacts()
 
     if (result.failed > 0 && result.synced === 0) {

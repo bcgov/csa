@@ -27,6 +27,18 @@ import { step3_PlacementCheck } from './rules/steps/step3-placement-check'
 import { step4_FetchAgreementContract } from './rules/steps/step4-fetch-agreement-contract'
 import { step6_OrderPaymentCheck } from './rules/steps/step6-order-payment-check'
 
+const REQUIRED_STAGING_TABLES = [
+  'stg_icm_cases',
+  'stg_icm_placements',
+  'stg_icm_legal_authority_admin',
+  'stg_icm_legal_authority',
+  'stg_icm_agreement',
+  'stg_icm_orders',
+  'stg_mis_payments',
+  'stg_mis_contracts',
+  'stg_mis_placements',
+] as const
+
 const INELIGIBLE_CANCEL_CODES = new Set<string>([
   CANCEL_REASON.CHILD_DIED,
   CANCEL_REASON.CHILD_MISSING_AWOL,
@@ -304,8 +316,29 @@ export class EligibilityService {
     private readonly configService: ConfigService,
   ) {}
 
+  async validateStagingTables(): Promise<void> {
+    const sql = REQUIRED_STAGING_TABLES.map(
+      (table) => `SELECT '${table}' AS table_name, EXISTS(SELECT 1 FROM ${table}) AS has_data`,
+    ).join(' UNION ALL ')
+
+    const rows = await this.prisma.$queryRawUnsafe<{ table_name: string; has_data: boolean }[]>(sql)
+
+    const emptyTables = rows.filter((r) => !r.has_data).map((r) => r.table_name)
+
+    if (emptyTables.length > 0) {
+      throw new Error(`Staging validation failed: empty tables [${emptyTables.join(', ')}]`)
+    }
+
+    this.logger.log(
+      `Staging table validation passed: all ${REQUIRED_STAGING_TABLES.length} tables have data`,
+    )
+  }
+
   async run(): Promise<EligibilityRunResult> {
     const referenceDate = pacificToday()
+
+    await this.validateStagingTables()
+
     const threshold = await this.computeThreshold()
     this.logger.log(
       threshold
@@ -362,12 +395,12 @@ export class EligibilityService {
       const result = runEligibility(profile, RULES, referenceDate)
       if (!result) continue
 
-      if (result.newStatus) {
+      updates.push({ profile, result })
+
+      if (result.newStatus !== profile.csaStatus) {
         const stepKey = `step${result.step}` as keyof typeof stats.stepCounts
         stats.stepCounts[stepKey]++
-        updates.push({ profile, result })
         stats.statusChanges++
-
         if (!profile.existingContactId) {
           stats.newContacts++
         }

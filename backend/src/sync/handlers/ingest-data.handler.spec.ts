@@ -3,11 +3,13 @@ import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { JobRunner } from 'src/jobs/job-runner.service'
+import { IcmSyncBackService } from '../icm/icm-sync-back.service'
 import { IngestDataHandler } from './ingest-data.handler'
 
 describe('IngestDataHandler', () => {
   let handler: IngestDataHandler
   let jobRunner: JobRunner
+  let icmSyncBackService: { hasFlaggedContacts: ReturnType<typeof vi.fn> }
 
   const mockContext: JobContext = {
     jobRunId: 1,
@@ -17,6 +19,8 @@ describe('IngestDataHandler', () => {
   }
 
   beforeEach(async () => {
+    icmSyncBackService = { hasFlaggedContacts: vi.fn().mockResolvedValue(true) }
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         IngestDataHandler,
@@ -25,6 +29,10 @@ describe('IngestDataHandler', () => {
           useValue: {
             runJobType: vi.fn(),
           },
+        },
+        {
+          provide: IcmSyncBackService,
+          useValue: icmSyncBackService,
         },
       ],
     }).compile()
@@ -118,6 +126,21 @@ describe('IngestDataHandler', () => {
       })
 
       // Should not proceed to sync
+      expect(runJobTypeSpy).toHaveBeenCalledTimes(3)
+    })
+
+    it('should skip SYNC_ICM when no contacts are flagged', async () => {
+      icmSyncBackService.hasFlaggedContacts.mockResolvedValue(false)
+      const runJobTypeSpy = vi.mocked(jobRunner.runJobType)
+      runJobTypeSpy
+        .mockResolvedValueOnce({ success: true }) // ICM
+        .mockResolvedValueOnce({ success: true }) // MIS
+        .mockResolvedValueOnce({ success: true }) // Eligibility
+
+      const result = await handler.execute(mockContext)
+
+      expect(result.success).toBe(true)
+      expect(result.metadata).toEqual({ syncResult: null })
       expect(runJobTypeSpy).toHaveBeenCalledTimes(3)
     })
 

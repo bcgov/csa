@@ -11,10 +11,10 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment (dev/test/prod)"
+        description: "Target environment (dev/test/pre-prod, prod)"
         type: choice
         required: true
-        options: [dev, test, prod]
+        options: [dev, test, pre-prod, prod]
 
       service:
         description: "Which service(s) to promote"
@@ -153,7 +153,7 @@ jobs:
             TAG_IN="${{ inputs.tag }}"
             BUILD_IMAGES="${{ inputs.build_images }}"
 
-            [[ "$ENVNAME" =~ ^(dev|test|prod)$ ]] || { echo "Invalid environment: $ENVNAME"; exit 1; }
+            [[ "$ENVNAME" =~ ^(dev|test|pre-prod|prod)$ ]] || { echo "Invalid environment: $ENVNAME"; exit 1; }
             [[ "$SVC" =~ ^(frontend|backend|migrations|all)$ ]] || { echo "Invalid service: $SVC"; exit 1; }
 
             if [[ "$BUILD_IMAGES" != "true" && -z "$TAG_IN" ]]; then

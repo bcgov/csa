@@ -623,6 +623,8 @@ function App() {
       setContactsError(null)
       try {
         const numericColumns = ['age']
+        // Dropdown columns should use exact matching (eq), not partial matching (like)
+        const exactMatchColumns = ['csaStatus', 'caseStatus']
         const columnFilters: Array<{ key: string; op: string; value: string | number }> = []
 
         // Build filter conditions for all active column filters
@@ -634,7 +636,9 @@ function App() {
           }
 
           const isNumericColumn = numericColumns.includes(column)
-          const op = isNumericColumn ? 'eq' : 'like'
+          const isExactMatchColumn = exactMatchColumns.includes(column)
+          // Use 'eq' for numeric and dropdown columns, 'like' for text search columns
+          const op = isNumericColumn || isExactMatchColumn ? 'eq' : 'like'
 
           let value: string | number = query
           if (isNumericColumn) {

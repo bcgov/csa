@@ -36,24 +36,26 @@ export class InboundFileService {
   }
 
   async downloadNewResponseFiles(destinationId: string): Promise<DownloadedFile[]> {
-    if (!this.craEnabled) {
-      this.logger.log('[CRA Disabled] Response file download skipped — no remote files to poll')
-      return []
-    }
-
     const existingFiles = await this.prisma.transferFile.findMany({
       where: { direction: FILE_DIRECTION.INBOUND },
       select: { fileName: true },
     })
-
-    const remoteFiles = await this.listRemoteFiles(destinationId)
+    const mockResponseFile = [
+      { fileName: 'TST0016.VRSP0001', size: 4000, lastModifiedAt: new Date() },
+    ]
+    const remoteFiles = this.craEnabled
+      ? await this.listRemoteFiles(destinationId)
+      : mockResponseFile
     const newFiles = remoteFiles.filter(
       (remote) => !existingFiles.some((db) => db.fileName === remote.fileName),
     )
 
     const downloaded: DownloadedFile[] = []
     for (const file of newFiles) {
-      const localFilePath = await this.downloadFile(destinationId, file.fileName)
+      const mockFilePath = this.getLocalFilePath(destinationId, file.fileName)
+      const localFilePath = this.craEnabled
+        ? await this.downloadFile(destinationId, file.fileName)
+        : mockFilePath
       const valid = this.isValidResponseFile(file.fileName)
 
       if (!valid) {

@@ -3528,7 +3528,14 @@ function App() {
                                   >
                                     Case Type
                                   </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      textAlign: 'left',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
                                     {childData.caseType || '-'}
                                   </Typography>
                                 </Box>

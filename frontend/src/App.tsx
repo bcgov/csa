@@ -238,10 +238,8 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterSearchTerm, setFilterSearchTerm] = useState('')
   const [isColumnFilterActive, setIsColumnFilterActive] = useState(false)
-  const [activeColumnFilter, setActiveColumnFilter] = useState<{
-    column: string
-    query: string
-  } | null>(null)
+  // Store multiple active column filters: column name -> query value
+  const [activeColumnFilters, setActiveColumnFilters] = useState<Record<string, string>>({})
   const [selectedChild, setSelectedChild] = useState<number | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<number>(1) // Default to first batch
 
@@ -617,45 +615,52 @@ function App() {
   )
 
   // Function to perform column-specific filter search
-  const performColumnFilterSearch = useCallback(
-    async (column: string, query: string, page: number) => {
+  // Build filters from all active column filters and perform search
+  const performColumnFiltersSearch = useCallback(
+    async (filters: Record<string, string>, page: number) => {
       setIsColumnFilterActive(true)
       setLoadingContacts(true)
       setContactsError(null)
       try {
-        const backendField = columnToFieldMapping[column]
-        if (!backendField) {
-          console.error('Unknown column:', column)
+        const numericColumns = ['age']
+        const columnFilters: Array<{ key: string; op: string; value: string | number }> = []
+
+        // Build filter conditions for all active column filters
+        for (const [column, query] of Object.entries(filters)) {
+          const backendField = columnToFieldMapping[column]
+          if (!backendField) {
+            console.error('Unknown column:', column)
+            continue
+          }
+
+          const isNumericColumn = numericColumns.includes(column)
+          const op = isNumericColumn ? 'eq' : 'like'
+
+          let value: string | number = query
+          if (isNumericColumn) {
+            const parsedValue = parseInt(query, 10)
+            if (isNaN(parsedValue)) {
+              continue // Skip invalid numeric input
+            }
+            value = parsedValue
+          }
+
+          columnFilters.push({ key: backendField, op, value })
+        }
+
+        if (columnFilters.length === 0) {
+          setLoadingContacts(false)
           return
         }
 
-        // Build filter for column-specific search
-        // Use 'eq' for numeric fields, 'like' for text fields
-        const numericColumns = ['age']
-        const isNumericColumn = numericColumns.includes(column)
-        const op = isNumericColumn ? 'eq' : 'like'
-
-        // For numeric columns, parse as integer and validate
-        let value: string | number = query
-        if (isNumericColumn) {
-          const parsedValue = parseInt(query, 10)
-          if (isNaN(parsedValue)) {
-            setLoadingContacts(false)
-            return // Don't make API call for invalid numeric input
-          }
-          value = parsedValue
-        }
-
-        const columnFilter = [{ key: backendField, op, value }]
-
         // Combine with existing pre-defined filter if needed
-        let combinedFilter = columnFilter
+        let combinedFilter = columnFilters
 
         // If there's a pre-defined filter other than "All Records", combine them
         if (preDefinedFilter !== 'All Records') {
           const baseFilter = getPreDefinedFilterConfig(preDefinedFilter)
           if (baseFilter) {
-            combinedFilter = [...baseFilter, ...columnFilter]
+            combinedFilter = [...baseFilter, ...columnFilters]
           }
         }
 
@@ -665,7 +670,7 @@ function App() {
         setTotalRecords(response.total)
         console.log('Column filter search results:', response.data)
         console.log('Total column filter records:', response.total)
-        console.log('Column:', column, 'Query:', query)
+        console.log('Active filters:', filters)
         console.log('Applied filter:', combinedFilter)
       } catch (error) {
         console.error('Failed to search column:', error)
@@ -720,9 +725,9 @@ function App() {
       return
     }
 
-    // If column filter is active, re-apply the column filter on page change
-    if (isColumnFilterActive && activeColumnFilter) {
-      performColumnFilterSearch(activeColumnFilter.column, activeColumnFilter.query, currentPage)
+    // If column filter is active, re-apply all column filters on page change
+    if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+      performColumnFiltersSearch(activeColumnFilters, currentPage)
     } else if (!isSearchActive) {
       // Only fetch regular contacts when no column filter or search is active
       fetchContacts(currentPage)
@@ -733,9 +738,9 @@ function App() {
     isAuthenticated,
     isSearchActive,
     isColumnFilterActive,
-    activeColumnFilter,
+    activeColumnFilters,
     fetchContacts,
-    performColumnFilterSearch,
+    performColumnFiltersSearch,
   ])
 
   // Full-text search effect - triggers when searchTerm has 3+ characters
@@ -810,19 +815,24 @@ function App() {
     // Debounce column search - wait 500ms after user stops typing
     const columnSearchTimer = setTimeout(() => {
       if (filterSearchTerm.trim().length >= minChars) {
-        // Store the active column filter for pagination
-        setActiveColumnFilter({ column: column, query: filterSearchTerm.trim() })
-        performColumnFilterSearch(column, filterSearchTerm.trim(), currentPage)
-      } else if (
-        filterSearchTerm.trim().length === 0 &&
-        isColumnFilterActive &&
-        activeColumnFilter &&
-        activeColumnFilter.column === column
-      ) {
-        // Only clear filter if searching in the same column that has the active filter
-        setIsColumnFilterActive(false)
-        setActiveColumnFilter(null)
-        fetchContacts(currentPage)
+        // Add/update this column filter while preserving other active filters
+        const newFilters = { ...activeColumnFilters, [column]: filterSearchTerm.trim() }
+        setActiveColumnFilters(newFilters)
+        performColumnFiltersSearch(newFilters, currentPage)
+      } else if (filterSearchTerm.trim().length === 0 && activeColumnFilters[column]) {
+        // Remove this column filter when text is cleared
+        const newFilters = { ...activeColumnFilters }
+        delete newFilters[column]
+        setActiveColumnFilters(newFilters)
+
+        if (Object.keys(newFilters).length === 0) {
+          // No more active filters, fetch regular contacts
+          setIsColumnFilterActive(false)
+          fetchContacts(currentPage)
+        } else {
+          // Still have other filters active, re-apply them
+          performColumnFiltersSearch(newFilters, currentPage)
+        }
       }
     }, 500)
 
@@ -835,9 +845,9 @@ function App() {
     preDefinedFilter,
     isAuthenticated,
     isColumnFilterActive,
-    activeColumnFilter,
+    activeColumnFilters,
     fetchContacts,
-    performColumnFilterSearch,
+    performColumnFiltersSearch,
   ])
 
   // Fetch batches when component mounts
@@ -893,9 +903,9 @@ function App() {
     setCurrentPage(1) // Reset to first page when filter changes
     setSearchTerm('') // Clear search when changing filters
     setIsSearchActive(false) // Deactivate search mode
-    // Clear column filter when changing PDQ filter
+    // Clear all column filters when changing PDQ filter
     setIsColumnFilterActive(false)
-    setActiveColumnFilter(null)
+    setActiveColumnFilters({})
     setFilterSearchTerm('')
     // Clear selected records when changing PDQ filter
     setSelected([])
@@ -1418,12 +1428,8 @@ function App() {
 
       if (apiFilters.includes(preDefinedFilter)) {
         // Reload based on active filter/search
-        if (isColumnFilterActive && activeColumnFilter) {
-          await performColumnFilterSearch(
-            activeColumnFilter.column,
-            activeColumnFilter.query,
-            currentPage,
-          )
+        if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+          await performColumnFiltersSearch(activeColumnFilters, currentPage)
         } else if (isSearchActive && searchTerm.trim().length >= 3) {
           await performFullTextSearch(searchTerm.trim(), currentPage)
         } else {
@@ -1520,12 +1526,8 @@ function App() {
 
       if (apiFilters.includes(preDefinedFilter)) {
         // Reload based on active filter/search
-        if (isColumnFilterActive && activeColumnFilter) {
-          await performColumnFilterSearch(
-            activeColumnFilter.column,
-            activeColumnFilter.query,
-            currentPage,
-          )
+        if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+          await performColumnFiltersSearch(activeColumnFilters, currentPage)
         } else if (isSearchActive && searchTerm.trim().length >= 3) {
           await performFullTextSearch(searchTerm.trim(), currentPage)
         } else {
@@ -1564,11 +1566,11 @@ function App() {
   const handleFilterClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
     setFilterAnchor({ element: event.currentTarget, column })
     // For csaStatus and caseStatus, always start with empty search term since selected item is highlighted
-    // For other columns, preserve the search term if clicking on same column with active filter
+    // For other columns, preserve the search term if this column has an active filter
     if (column === 'csaStatus' || column === 'caseStatus') {
       setFilterSearchTerm('')
-    } else if (activeColumnFilter && activeColumnFilter.column === column) {
-      setFilterSearchTerm(activeColumnFilter.query)
+    } else if (activeColumnFilters[column]) {
+      setFilterSearchTerm(activeColumnFilters[column])
     } else {
       setFilterSearchTerm('')
     }
@@ -1582,11 +1584,20 @@ function App() {
 
   const clearColumnFilter = (column: string) => {
     setColumnFilters((prev) => ({ ...prev, [column]: [] }))
-    // Reset column filter active state and refetch data
-    setIsColumnFilterActive(false)
-    setActiveColumnFilter(null)
+    // Remove only this column from active filters
+    const newFilters = { ...activeColumnFilters }
+    delete newFilters[column]
+    setActiveColumnFilters(newFilters)
     setFilterSearchTerm('')
-    fetchContacts(currentPage)
+
+    if (Object.keys(newFilters).length === 0) {
+      // No more active filters, fetch regular contacts
+      setIsColumnFilterActive(false)
+      fetchContacts(currentPage)
+    } else {
+      // Still have other filters, re-apply them
+      performColumnFiltersSearch(newFilters, currentPage)
+    }
   }
 
   // Batch History filter handling functions
@@ -2489,7 +2500,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'lastName' ||
+                                  activeColumnFilters['lastName'] ||
                                   columnFilters.lastName?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2513,7 +2524,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'firstName' ||
+                                  activeColumnFilters['firstName'] ||
                                   columnFilters.firstName?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2537,7 +2548,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'middleName' ||
+                                  activeColumnFilters['middleName'] ||
                                   columnFilters.middleName?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2561,8 +2572,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'dob' ||
-                                  columnFilters.dob?.length > 0
+                                  activeColumnFilters['dob'] || columnFilters.dob?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
                               }}
@@ -2585,8 +2595,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'din' ||
-                                  columnFilters.din?.length > 0
+                                  activeColumnFilters['din'] || columnFilters.din?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
                               }}
@@ -2609,7 +2618,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'csaStatus' ||
+                                  activeColumnFilters['csaStatus'] ||
                                   columnFilters.csaStatus?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2633,7 +2642,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'statusEffective' ||
+                                  activeColumnFilters['statusEffective'] ||
                                   columnFilters.statusEffective?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2657,7 +2666,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'caseNumber' ||
+                                  activeColumnFilters['caseNumber'] ||
                                   columnFilters.caseNumber?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2681,7 +2690,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'caseStatus' ||
+                                  activeColumnFilters['caseStatus'] ||
                                   columnFilters.caseStatus?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2705,7 +2714,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'legacyFile' ||
+                                  activeColumnFilters['legacyFile'] ||
                                   columnFilters.legacyFile?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2729,7 +2738,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'cgwrks3' ||
+                                  activeColumnFilters['cgwrks3'] ||
                                   columnFilters.cgwrks3?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2753,7 +2762,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'lastUpdated' ||
+                                  activeColumnFilters['lastUpdated'] ||
                                   columnFilters.lastUpdated?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2777,7 +2786,7 @@ function App() {
                               sx={{
                                 padding: 0.5,
                                 color:
-                                  activeColumnFilter?.column === 'lastUpdatedBy' ||
+                                  activeColumnFilters['lastUpdatedBy'] ||
                                   columnFilters.lastUpdatedBy?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
@@ -2940,8 +2949,12 @@ function App() {
                             <MenuItem
                               key={option.value}
                               onClick={() => {
-                                setActiveColumnFilter({ column: 'csaStatus', query: option.value })
-                                performColumnFilterSearch('csaStatus', option.value, 1)
+                                const newFilters = {
+                                  ...activeColumnFilters,
+                                  csaStatus: option.value,
+                                }
+                                setActiveColumnFilters(newFilters)
+                                performColumnFiltersSearch(newFilters, 1)
                                 setCurrentPage(1)
                                 setIsColumnFilterActive(true)
                                 handleFilterClose()
@@ -2950,8 +2963,7 @@ function App() {
                                 fontSize: '0.875rem',
                                 py: 0.75,
                                 backgroundColor:
-                                  activeColumnFilter?.column === 'csaStatus' &&
-                                  activeColumnFilter?.query === option.value
+                                  activeColumnFilters['csaStatus'] === option.value
                                     ? 'rgba(25, 118, 210, 0.08)'
                                     : 'transparent',
                               }}
@@ -2987,8 +2999,12 @@ function App() {
                             <MenuItem
                               key={option.value}
                               onClick={() => {
-                                setActiveColumnFilter({ column: 'caseStatus', query: option.value })
-                                performColumnFilterSearch('caseStatus', option.value, 1)
+                                const newFilters = {
+                                  ...activeColumnFilters,
+                                  caseStatus: option.value,
+                                }
+                                setActiveColumnFilters(newFilters)
+                                performColumnFiltersSearch(newFilters, 1)
                                 setCurrentPage(1)
                                 setIsColumnFilterActive(true)
                                 handleFilterClose()
@@ -2997,8 +3013,7 @@ function App() {
                                 fontSize: '0.875rem',
                                 py: 0.75,
                                 backgroundColor:
-                                  activeColumnFilter?.column === 'caseStatus' &&
-                                  activeColumnFilter?.query === option.value
+                                  activeColumnFilters['caseStatus'] === option.value
                                     ? 'rgba(25, 118, 210, 0.08)'
                                     : 'transparent',
                               }}

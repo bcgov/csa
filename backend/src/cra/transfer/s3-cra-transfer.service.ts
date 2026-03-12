@@ -33,18 +33,18 @@ export class S3CraTransferService extends CraTransferService {
   }
 
   private getPrefix(): string {
-    return this.configService.get<string>('cra.s3Prefix')!
+    return this.configService.get<string>('cra.s3Prefix')!.replace(/\/+$/, '')
   }
 
   async sendFile(fileName: string, fileBuffer: Buffer): Promise<TransferResult> {
-    const key = `${this.getPrefix()}OUTBOUND/${fileName}`
+    const key = `${this.getPrefix()}/OUTBOUND/${fileName}`
     await this.getClient().putObject(this.getBucket(), key, fileBuffer)
     this.logger.log(`Uploaded ${key}`)
     return { success: true, fileName }
   }
 
   async listInboundFiles(): Promise<InboundFileInfo[]> {
-    const prefix = `${this.getPrefix()}INBOUND/`
+    const prefix = `${this.getPrefix()}/INBOUND/`
     const stream = this.getClient().listObjectsV2(this.getBucket(), prefix, true)
 
     return new Promise((resolve, reject) => {
@@ -67,7 +67,7 @@ export class S3CraTransferService extends CraTransferService {
   }
 
   async downloadInboundFile(fileName: string): Promise<Buffer> {
-    const key = `${this.getPrefix()}INBOUND/${fileName}`
+    const key = `${this.getPrefix()}/INBOUND/${fileName}`
     const stream = await this.getClient().getObject(this.getBucket(), key)
 
     return new Promise((resolve, reject) => {

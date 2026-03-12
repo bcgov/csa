@@ -18,7 +18,7 @@ vi.mock('minio', () => {
 })
 
 describe('S3CraTransferService', () => {
-  const PREFIX = 'NONPROD/CRA/DEV'
+  const PREFIX = 'NONPROD/CRA/DEV/'
   let service: S3CraTransferService
 
   beforeEach(async () => {

@@ -65,7 +65,4 @@ export class HttpCraTransferService extends CraTransferService {
     return Buffer.isBuffer(response.data) ? response.data : Buffer.from(response.data)
   }
 
-  async moveToProcessed(fileName: string): Promise<void> {
-    this.logger.log(`moveToProcessed is a no-op for HTTP transfer (${fileName})`)
-  }
 }

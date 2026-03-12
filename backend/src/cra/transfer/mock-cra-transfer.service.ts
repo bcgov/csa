@@ -47,7 +47,4 @@ export class MockCraTransferService extends CraTransferService {
     return fsp.readFile(filePath)
   }
 
-  async moveToProcessed(fileName: string): Promise<void> {
-    this.logger.log(`Mock: skipping move to processed for ${fileName}`)
-  }
 }

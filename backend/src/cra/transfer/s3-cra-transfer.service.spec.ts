@@ -5,8 +5,6 @@ import { S3CraTransferService } from './s3-cra-transfer.service'
 
 const mockPutObject = vi.fn()
 const mockGetObject = vi.fn()
-const mockCopyObject = vi.fn()
-const mockRemoveObject = vi.fn()
 const mockListObjectsV2 = vi.fn()
 
 vi.mock('minio', () => {
@@ -14,11 +12,8 @@ vi.mock('minio', () => {
     Client: class MockClient {
       putObject = mockPutObject
       getObject = mockGetObject
-      copyObject = mockCopyObject
-      removeObject = mockRemoveObject
       listObjectsV2 = mockListObjectsV2
     },
-    CopyConditions: class MockCopyConditions {},
   }
 })
 
@@ -100,21 +95,6 @@ describe('S3CraTransferService', () => {
       ])
     })
 
-    it('should filter out objects under PROCESSED/', async () => {
-      mockListObjectsV2.mockReturnValue(
-        createMockListStream([
-          { name: `${PREFIX}/INBOUND/response1.dat`, size: 1024 },
-          { name: `${PREFIX}/INBOUND/PROCESSED/old-response.dat`, size: 512 },
-          { name: `${PREFIX}/INBOUND/response2.dat`, size: 2048 },
-        ]),
-      )
-
-      const result = await service.listInboundFiles()
-
-      expect(result).toHaveLength(2)
-      expect(result.map((file) => file.fileName)).toEqual(['response1.dat', 'response2.dat'])
-    })
-
     it('should return empty array when no objects exist', async () => {
       mockListObjectsV2.mockReturnValue(createMockListStream([]))
 
@@ -171,29 +151,4 @@ describe('S3CraTransferService', () => {
     })
   })
 
-  describe('moveToProcessed', () => {
-    it('should copy to PROCESSED/ then remove the original', async () => {
-      mockCopyObject.mockResolvedValue({})
-      mockRemoveObject.mockResolvedValue(undefined)
-
-      await service.moveToProcessed('response1.dat')
-
-      expect(mockCopyObject).toHaveBeenCalledWith(
-        'test-bucket',
-        `${PREFIX}/INBOUND/PROCESSED/response1.dat`,
-        `/test-bucket/${PREFIX}/INBOUND/response1.dat`,
-        expect.any(Object),
-      )
-      expect(mockRemoveObject).toHaveBeenCalledWith(
-        'test-bucket',
-        `${PREFIX}/INBOUND/response1.dat`,
-      )
-    })
-
-    it('should throw when copy fails', async () => {
-      mockCopyObject.mockRejectedValue(new Error('copy failed'))
-
-      await expect(service.moveToProcessed('response1.dat')).rejects.toThrow('copy failed')
-    })
-  })
 })

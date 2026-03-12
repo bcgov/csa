@@ -115,16 +115,4 @@ describe('HttpCraTransferService', () => {
     })
   })
 
-  describe('moveToProcessed', () => {
-    it('should be a no-op', async () => {
-      await expect(service.moveToProcessed('response1.dat')).resolves.toBeUndefined()
-    })
-
-    it('should not make any HTTP calls', async () => {
-      await service.moveToProcessed('response1.dat')
-
-      expect(httpService.get).not.toHaveBeenCalled()
-      expect(httpService.post).not.toHaveBeenCalled()
-    })
-  })
 })

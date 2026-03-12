@@ -17,5 +17,4 @@ export abstract class CraTransferService {
   abstract sendFile(fileName: string, fileBuffer: Buffer): Promise<TransferResult>
   abstract listInboundFiles(): Promise<InboundFileInfo[]>
   abstract downloadInboundFile(fileName: string): Promise<Buffer>
-  abstract moveToProcessed(fileName: string): Promise<void>
 }

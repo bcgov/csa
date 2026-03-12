@@ -62,7 +62,6 @@ describe('PollCraResponseHandler', () => {
     mockCraTransferService = {
       listInboundFiles: vi.fn().mockResolvedValue([]),
       downloadInboundFile: vi.fn(),
-      moveToProcessed: vi.fn().mockResolvedValue(undefined),
     }
 
     mockInboundFileService = {

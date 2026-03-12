@@ -171,8 +171,6 @@ export class PollCraResponseHandler extends BaseJob {
       },
     })
 
-    await this.craTransferService.moveToProcessed(responseFile.fileName)
-
     return details.length
   }
 

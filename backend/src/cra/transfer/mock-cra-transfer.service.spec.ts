@@ -97,9 +97,4 @@ describe('MockCraTransferService', () => {
     })
   })
 
-  describe('moveToProcessed', () => {
-    it('should be a no-op', async () => {
-      await expect(service.moveToProcessed('response1.dat')).resolves.toBeUndefined()
-    })
-  })
 })

@@ -51,7 +51,7 @@ export class S3CraTransferService extends CraTransferService {
       const files: InboundFileInfo[] = []
 
       stream.on('data', (obj) => {
-        if (!obj.name || obj.name.includes('/PROCESSED/')) return
+        if (!obj.name) return
 
         const fileName = obj.name.substring(prefix.length)
         files.push({
@@ -78,14 +78,4 @@ export class S3CraTransferService extends CraTransferService {
     })
   }
 
-  async moveToProcessed(fileName: string): Promise<void> {
-    const bucket = this.getBucket()
-    const client = this.getClient()
-    const sourceKey = `${this.getPrefix()}/INBOUND/${fileName}`
-    const destKey = `${this.getPrefix()}/INBOUND/PROCESSED/${fileName}`
-
-    await client.copyObject(bucket, destKey, `/${bucket}/${sourceKey}`, new Minio.CopyConditions())
-    await client.removeObject(bucket, sourceKey)
-    this.logger.log(`Moved ${sourceKey} -> ${destKey}`)
-  }
 }

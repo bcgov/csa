@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { pacificTodayISO } from 'src/common/utils'
 import { ConfigService } from '@nestjs/config'
 import { from as copyFrom } from 'pg-copy-streams'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { pacificTodayISO } from 'src/common/utils'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import { FileStorageService } from './file-storage/file-storage.service'
@@ -30,7 +30,7 @@ export class MisService {
     }
     const prefix = this.configService.get<string>('sync.misS3Prefix') || ''
 
-    // Phase 1: All files must exist
+    // 1. Check file availability — all or none must be present
     const missingFiles: string[] = []
     for (const config of MIS_FILE_CONFIGS) {
       const key = `${prefix}${config.s3Key}`
@@ -38,11 +38,17 @@ export class MisService {
         missingFiles.push(config.s3Key)
       }
     }
+
+    if (missingFiles.length === MIS_FILE_CONFIGS.length) {
+      this.logger.log('No MIS files found — nothing to ingest')
+      return []
+    }
+
     if (missingFiles.length > 0) {
       throw new Error(`MIS ingestion aborted: missing files [${missingFiles.join(', ')}]`)
     }
 
-    // Phase 2: Ingest all files
+    // 2. Ingest all files
     const results: MisResult[] = []
     for (const config of MIS_FILE_CONFIGS) {
       const key = `${prefix}${config.s3Key}`
@@ -53,7 +59,7 @@ export class MisService {
       results.push({ name: config.name, rows })
     }
 
-    // Phase 3: Move all to PROCESSED (non-fatal)
+    // 3. Move all to PROCESSED
     for (const config of MIS_FILE_CONFIGS) {
       await this.moveToProcessed(`${prefix}${config.s3Key}`)
     }

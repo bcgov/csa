@@ -82,7 +82,7 @@ describe('MisService', () => {
   })
 
   describe('ingestAll', () => {
-    it('should throw when any MIS file is missing', async () => {
+    it('should throw when some but not all MIS files are missing', async () => {
       mockFileStorage.exists
         .mockResolvedValueOnce(true)
         .mockResolvedValueOnce(false)
@@ -94,12 +94,13 @@ describe('MisService', () => {
       expect(mockFileStorage.download).not.toHaveBeenCalled()
     })
 
-    it('should throw listing all missing files', async () => {
+    it('should return empty results when no files are present', async () => {
       mockFileStorage.exists.mockResolvedValue(false)
 
-      await expect(service.ingestAll()).rejects.toThrow(
-        'MIS ingestion aborted: missing files [rap_payments.csv, rap_contracts.csv, rap_placements.csv]',
-      )
+      const results = await service.ingestAll()
+
+      expect(results).toEqual([])
+      expect(mockFileStorage.download).not.toHaveBeenCalled()
     })
 
     it('should ingest all 3 MIS files when they exist', async () => {

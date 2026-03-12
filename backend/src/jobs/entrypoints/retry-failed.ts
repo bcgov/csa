@@ -4,7 +4,7 @@ import { NestFactory } from '@nestjs/core'
 import { JobTrigger } from '../enums/job-trigger.enum'
 import { JobType } from '../enums/job-type.enum'
 import { JobRunner } from '../job-runner.service'
-import { JobsModule } from '../jobs.module'
+import { RetryModule } from '../retry.module'
 
 // Marks stuck jobs as failed and retries all failed jobs
 async function bootstrap() {
@@ -14,7 +14,7 @@ async function bootstrap() {
     logger.log('Bootstrapping retry failed jobs...')
 
     // Create NestJS application context (no HTTP server)
-    const app = await NestFactory.createApplicationContext(JobsModule, {
+    const app = await NestFactory.createApplicationContext(RetryModule, {
       logger: ['log', 'error', 'warn'],
     })
 

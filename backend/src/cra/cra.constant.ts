@@ -1,5 +1,5 @@
 export const CRA_DATA_HANDLING_CONSTANT = {
-  DESTINATION_ID: 'cra-ftp',
+  DESTINATION_ID: 'cra',
   RESPONSE_FILE_TYPE: {
     RSP: 'RSP',
     WKL: 'WKL',

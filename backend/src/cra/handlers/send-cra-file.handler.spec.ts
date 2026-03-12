@@ -6,6 +6,10 @@ import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { BATCH_EVENT, CSA_EVENT } from 'src/common/state-machine/constants'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 
+vi.mock('fs/promises', () => ({
+  readFile: vi.fn().mockResolvedValue(Buffer.from('mock-file-content')),
+}))
+
 const DESTINATION_ID = CRA_DATA_HANDLING_CONSTANT.DESTINATION_ID
 
 const mockContext: JobContext = {
@@ -70,7 +74,7 @@ describe('SendCraFileHandler', () => {
   let mockContactsService: any
   let mockOutboundDataService: any
   let mockOutboundFileService: any
-  let mockOutboundTransferService: any
+  let mockCraTransferService: any
   let mockJobRunner: any
   let mockIcmSyncBackService: any
 
@@ -109,14 +113,14 @@ describe('SendCraFileHandler', () => {
 
     mockOutboundFileService = {
       createFile: vi.fn().mockReturnValue({
-        filePath: '/tmp/cra-ftp/testfile.txt',
+        filePath: '/tmp/cra/testfile.txt',
         fileName: 'testfile.txt',
         recordCount: 3,
       }),
     }
 
-    mockOutboundTransferService = {
-      sendFileToTransferService: vi.fn().mockResolvedValue({ statusCode: 226 }),
+    mockCraTransferService = {
+      sendFile: vi.fn().mockResolvedValue({ success: true, fileName: 'testfile.txt' }),
     }
 
     mockJobRunner = {
@@ -143,7 +147,7 @@ describe('SendCraFileHandler', () => {
       mockContactsService,
       mockOutboundDataService,
       mockOutboundFileService,
-      mockOutboundTransferService,
+      mockCraTransferService,
       mockJobRunner,
       mockIcmSyncBackService,
     )
@@ -285,10 +289,9 @@ describe('SendCraFileHandler', () => {
         1,
       )
 
-      expect(mockOutboundTransferService.sendFileToTransferService).toHaveBeenCalledWith(
-        '/tmp/cra-ftp/testfile.txt',
+      expect(mockCraTransferService.sendFile).toHaveBeenCalledWith(
         'testfile.txt',
-        DESTINATION_ID,
+        expect.any(Buffer),
       )
     })
 
@@ -315,7 +318,7 @@ describe('SendCraFileHandler', () => {
       expect(result.message).toContain('Batch 10')
       expect(result.metadata).toEqual({
         batch_id: 10,
-        file_path: '/tmp/cra-ftp/testfile.txt',
+        file_path: '/tmp/cra/testfile.txt',
         record_count: 3,
         contacts_count: 2,
       })
@@ -452,9 +455,7 @@ describe('SendCraFileHandler', () => {
       mockPrisma.batch.findFirst.mockResolvedValue(batch)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([detail])
 
-      mockOutboundTransferService.sendFileToTransferService.mockRejectedValue(
-        new Error('Connection refused'),
-      )
+      mockCraTransferService.sendFile.mockRejectedValue(new Error('Connection refused'))
 
       await handler.onStart(mockContext)
       await expect(handler.execute(mockContext)).rejects.toThrow('Connection refused')
@@ -467,9 +468,7 @@ describe('SendCraFileHandler', () => {
       mockPrisma.batch.findFirst.mockResolvedValue(batch)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([detail])
 
-      mockOutboundTransferService.sendFileToTransferService.mockRejectedValue(
-        new Error('Transfer failed'),
-      )
+      mockCraTransferService.sendFile.mockRejectedValue(new Error('Transfer failed'))
 
       await handler.onStart(mockContext)
       await expect(handler.execute(mockContext)).rejects.toThrow()
@@ -484,9 +483,7 @@ describe('SendCraFileHandler', () => {
       mockPrisma.batch.findFirst.mockResolvedValue(batch)
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([detail])
 
-      mockOutboundTransferService.sendFileToTransferService.mockRejectedValue(
-        new Error('Transfer failed'),
-      )
+      mockCraTransferService.sendFile.mockRejectedValue(new Error('Transfer failed'))
 
       await handler.onStart(mockContext)
       await expect(handler.execute(mockContext)).rejects.toThrow()

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
+import { parseS3Uri } from 'src/common/utils'
 import { S3Service } from './s3.service'
 
 describe('S3Service', () => {
@@ -56,7 +57,7 @@ describe('S3Service', () => {
 
   describe('parseS3Uri', () => {
     it('should parse a simple URI', () => {
-      const result = (service as any).parseS3Uri('http://minioadmin:minioadmin@localhost:9000')
+      const result = parseS3Uri('http://minioadmin:minioadmin@localhost:9000')
 
       expect(result).toEqual({
         endPoint: 'localhost',
@@ -68,7 +69,7 @@ describe('S3Service', () => {
     })
 
     it('should handle password with / and special chars', () => {
-      const result = (service as any).parseS3Uri('https://mykey:pass/word@host.objectstore.ca')
+      const result = parseS3Uri('https://mykey:pass/word@host.objectstore.ca')
 
       expect(result).toEqual({
         endPoint: 'host.objectstore.ca',
@@ -80,7 +81,7 @@ describe('S3Service', () => {
     })
 
     it('should handle password with multiple special chars (: / @)', () => {
-      const result = (service as any).parseS3Uri('https://key123:p@ss:w/rd@storage.example.ca')
+      const result = parseS3Uri('https://key123:p@ss:w/rd@storage.example.ca')
 
       expect(result).toEqual({
         endPoint: 'storage.example.ca',
@@ -92,9 +93,7 @@ describe('S3Service', () => {
     })
 
     it('should throw on missing scheme', () => {
-      expect(() => (service as any).parseS3Uri('localhost:9000')).toThrow(
-        'missing http(s):// scheme',
-      )
+      expect(() => parseS3Uri('localhost:9000')).toThrow('missing http(s):// scheme')
     })
   })
 

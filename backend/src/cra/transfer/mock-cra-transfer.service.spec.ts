@@ -96,5 +96,4 @@ describe('MockCraTransferService', () => {
       await expect(service.downloadInboundFile('missing.dat')).rejects.toThrow('ENOENT')
     })
   })
-
 })

@@ -46,5 +46,4 @@ export class MockCraTransferService extends CraTransferService {
     const filePath = path.join(this.mockBasePath, 'inbound', fileName)
     return fsp.readFile(filePath)
   }
-
 }

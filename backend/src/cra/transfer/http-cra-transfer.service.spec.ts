@@ -114,5 +114,4 @@ describe('HttpCraTransferService', () => {
       expect(result.toString()).toBe('Hello')
     })
   })
-
 })

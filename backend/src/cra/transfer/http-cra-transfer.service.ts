@@ -64,5 +64,4 @@ export class HttpCraTransferService extends CraTransferService {
     )
     return Buffer.isBuffer(response.data) ? response.data : Buffer.from(response.data)
   }
-
 }

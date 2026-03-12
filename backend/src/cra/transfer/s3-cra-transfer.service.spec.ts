@@ -150,5 +150,4 @@ describe('S3CraTransferService', () => {
       await expect(service.downloadInboundFile('bad.dat')).rejects.toThrow('stream error')
     })
   })
-
 })

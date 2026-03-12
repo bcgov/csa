@@ -102,14 +102,13 @@ const CASE_STATUS_FILTER_OPTIONS = [
 ]
 
 // Batch Status options for filter dropdown (used in Batch History and Batch Requests)
-// Note: values must match the statusLabel displayed in the table (not the raw status code)
 const BATCH_STATUS_FILTER_OPTIONS = [
-  { value: 'Pending', label: 'Pending' },
-  { value: 'In Progress', label: 'In Progress' },
-  { value: 'System Error', label: 'System Error' },
-  { value: 'Processed with Errors', label: 'Processed with Errors' },
-  { value: 'Processed', label: 'Processed' },
-  { value: 'Error', label: 'Error' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'system_error', label: 'System Error' },
+  { value: 'processed_with_errors', label: 'Processed with Errors' },
+  { value: 'processed', label: 'Processed' },
+  { value: 'error', label: 'Error' },
 ]
 
 // Batch Details Status options for filter dropdown
@@ -1683,7 +1682,7 @@ function App() {
       // Map API fields to display fields
       switch (column) {
         case 'batchId':
-          return String(batch.id)
+          return `1-${batch.id}`
         case 'batchDate':
           return batch.batchDate ? formatDateYMD(batch.batchDate) : ''
         case 'status':

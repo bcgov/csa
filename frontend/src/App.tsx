@@ -59,7 +59,7 @@ import {
 // Maps to backend CSA_STATUSES constants
 const VALID_CSA_STATUSES = [
   'eligible_tbd', // Eligible - TBD
-  'application_refused', // Application Refused - CRA (note: no _cra suffix in backend)
+  'application_refused_cra', // Application Refused - CRA
   'not_eligible_ip_tbd', // Not Eligible - IP - TBD
   'cancellation_refused_cra', // Cancellation Refused - CRA
   'on_hold', // On Hold
@@ -102,13 +102,14 @@ const CASE_STATUS_FILTER_OPTIONS = [
 ]
 
 // Batch Status options for filter dropdown (used in Batch History and Batch Requests)
+// Values must match statusLabel display values used in filteredBatchRequests/filteredBatchHistory
 const BATCH_STATUS_FILTER_OPTIONS = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'system_error', label: 'System Error' },
-  { value: 'processed_with_errors', label: 'Processed with Errors' },
-  { value: 'processed', label: 'Processed' },
-  { value: 'error', label: 'Error' },
+  { value: 'Pending', label: 'Pending' },
+  { value: 'In Progress', label: 'In Progress' },
+  { value: 'System Error', label: 'System Error' },
+  { value: 'Processed with Errors', label: 'Processed with Errors' },
+  { value: 'Processed', label: 'Processed' },
+  { value: 'Error', label: 'Error' },
 ]
 
 // Batch Details Status options for filter dropdown
@@ -1679,10 +1680,10 @@ function App() {
 
   const getBatchRequestsUniqueValues = (column: string) => {
     const values = batches.map((batch) => {
-      // Map API fields to display fields
+      // Map API fields to display fields - must match filteredBatchRequests transformation
       switch (column) {
         case 'batchId':
-          return `1-${batch.id}`
+          return String(batch.id)
         case 'batchDate':
           return batch.batchDate ? formatDateYMD(batch.batchDate) : ''
         case 'status':

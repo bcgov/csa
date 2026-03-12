@@ -62,7 +62,7 @@ const CHANGED_CONTACTS_CTE = `
       SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
-      WHERE mis_plc.last_updated_date::DATE >= $1
+      WHERE mis_plc.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
 
       UNION
 
@@ -71,7 +71,7 @@ const CHANGED_CONTACTS_CTE = `
       FROM stg_icm_cases cases
       INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
       INNER JOIN stg_mis_contracts mis_con ON mis_con.service_provider_id = mis_plc.service_provider_id
-      WHERE mis_con.last_updated_date::DATE >= $1
+      WHERE mis_con.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
 
       UNION
 
@@ -81,7 +81,7 @@ const CHANGED_CONTACTS_CTE = `
       INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
       INNER JOIN stg_mis_contracts mis_con ON mis_con.service_provider_id = mis_plc.service_provider_id
       INNER JOIN stg_mis_payments mis_pay ON mis_pay.contract_number = mis_con.contract_number
-      WHERE mis_pay.last_updated_date::DATE >= $1
+      WHERE mis_pay.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
     ),`
 
 /**

@@ -146,6 +146,20 @@ describe('JobRunner', () => {
       expect(mockHandler.execute).not.toHaveBeenCalled()
     })
 
+    it('should handle onSuccess hook error gracefully and still return success', async () => {
+      const successResult: JobResult = { success: true, message: 'Done' }
+      vi.mocked(mockHandler.execute).mockResolvedValue(successResult)
+      vi.mocked(mockHandler.onSuccess).mockRejectedValue(new Error('onSuccess boom'))
+
+      const result = await runner.executeJob(1)
+
+      expect(result.success).toBe(true)
+      expect(jobsService.markSuccess).toHaveBeenCalledWith(1, undefined)
+      // Should not retry or mark as failed
+      expect(mockHandler.execute).toHaveBeenCalledTimes(1)
+      expect(jobsService.markFailed).not.toHaveBeenCalled()
+    })
+
     it('should handle onFailure hook error without masking original error', async () => {
       vi.mocked(mockHandler.execute).mockRejectedValue(new Error('Original error'))
       vi.mocked(mockHandler.onFailure).mockRejectedValue(new Error('onFailure boom'))

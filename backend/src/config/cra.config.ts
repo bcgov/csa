@@ -15,6 +15,8 @@ export const craConfig = registerAs('cra', () => {
 
   return {
     enabled: process.env.CRA_INTEGRATION_ENABLED === 'true',
+    transferMode: process.env.CRA_TRANSFER_MODE || 's3',
+    s3Prefix: process.env.CRA_S3_PREFIX || '',
     environmentCode: isProduction ? 'PCSAIN' : 'ACSAIN',
     fileTypeCode: isProduction ? 'PAPL' : 'AAPL',
     fileNamePrefix: isProduction ? 'HT' : 'II',

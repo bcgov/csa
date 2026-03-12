@@ -7,7 +7,6 @@ import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { OutboundDataService } from './outbound-data.service'
 import { OutboundFileService } from './outbound-file.service'
 import { FILE_MOCK_DATA } from './outbound-mock-data'
-import { OutboundTransferService } from './outbound-transfer.service'
 
 const { header, details, trailer } = FILE_MOCK_DATA
 const { REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
@@ -51,7 +50,6 @@ const currentDate = (): string => formatDatePacificCompact(new Date())
 
 describe('OutboundFileService', () => {
   let service: OutboundFileService
-  let fileTransferClientService: OutboundTransferService
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -61,29 +59,18 @@ describe('OutboundFileService', () => {
           provide: ConfigService,
           useValue: mockConfigService,
         },
-        {
-          provide: OutboundTransferService,
-          useValue: {
-            sendFileToTransferService: vi.fn(),
-          },
-        },
       ],
     }).compile()
 
     service = module.get(OutboundFileService)
-    fileTransferClientService = module.get(OutboundTransferService)
   })
 
   afterEach(() => {
     vi.clearAllMocks()
   })
 
-  it('should create file and send it to transfer service successfully', async () => {
+  it('should create file successfully', () => {
     ;(existsSync as unknown as Mock).mockReturnValue(true)
-    ;(fileTransferClientService.sendFileToTransferService as Mock).mockResolvedValue({
-      statusCode: 226,
-      message: 'Success',
-    })
 
     service.createFile(header, details, trailer, 'test-destination', 1)
     expect(writeFileSync).toHaveBeenCalled()

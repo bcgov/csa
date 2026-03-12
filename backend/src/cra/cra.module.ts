@@ -9,6 +9,7 @@ import { PrismaModule } from 'src/common/database/prisma.module'
 import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
 import { IcmSyncBackModule } from 'src/sync/icm/icm-sync-back.module'
+import { SyncIcmHandler } from 'src/sync/handlers/sync-icm.handler'
 import { appConfig } from '../config/app.config'
 import { craConfig } from '../config/cra.config'
 import { syncConfig } from '../config/sync.config'
@@ -41,6 +42,7 @@ import { S3CraTransferService } from './transfer/s3-cra-transfer.service'
   providers: [
     SendCraFileHandler,
     PollCraResponseHandler,
+    SyncIcmHandler,
     OutboundFileService,
     InboundFileService,
     InboundResponseService,
@@ -73,10 +75,12 @@ export class CraModule implements OnModuleInit {
     private readonly registry: JobRegistry,
     private readonly sendCraFileHandler: SendCraFileHandler,
     private readonly pollCraResponseHandler: PollCraResponseHandler,
+    private readonly syncIcmHandler: SyncIcmHandler,
   ) {}
 
   onModuleInit() {
     this.registry.register(this.sendCraFileHandler.jobType, this.sendCraFileHandler)
     this.registry.register(this.pollCraResponseHandler.jobType, this.pollCraResponseHandler)
+    this.registry.register(this.syncIcmHandler.jobType, this.syncIcmHandler)
   }
 }

@@ -177,8 +177,9 @@ describe('EligibilityService', () => {
   it('should skip contacts with null required fields and log warning', async () => {
     const logSpy = vi.spyOn(service['logger'], 'warn')
 
-    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeOver18Contact({ personIdIcm: null })])
-
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+      makeOver18Contact({ personIdIcm: null, existingContactId: 99 }),
+    ])
     const result = await service.run()
 
     expect(result.statusChanges).toBe(1)
@@ -189,8 +190,8 @@ describe('EligibilityService', () => {
 
   it('should skip invalid contacts and upsert valid ones in same batch', async () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
-      makeOver18Contact({ personIdIcm: 'ICM-VALID' }),
-      makeOver18Contact({ personIdIcm: null }),
+      makeOver18Contact({ personIdIcm: 'ICM-VALID', existingContactId: 99 }),
+      makeOver18Contact({ personIdIcm: null, existingContactId: 99 }),
     ])
 
     const result = await service.run()
@@ -203,8 +204,9 @@ describe('EligibilityService', () => {
   it('should report caseRowId and null fields in the warning', async () => {
     const logSpy = vi.spyOn(service['logger'], 'warn')
 
-    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeOver18Contact({ personIdIcm: null })])
-
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+      makeOver18Contact({ personIdIcm: null, existingContactId: 99 }),
+    ])
     await service.run()
 
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('caseRowId=CASE-1'))
@@ -226,7 +228,7 @@ describe('EligibilityService', () => {
   it('should preserve protected status and run eligibility for others in same batch', async () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
       makeOver18Contact({ personIdIcm: 'ICM-HOLD', csaStatus: 'on_hold', existingContactId: 99 }),
-      makeOver18Contact({ personIdIcm: 'ICM-ELIG', csaStatus: 'eligible' }),
+      makeOver18Contact({ personIdIcm: 'ICM-ELIG', csaStatus: 'eligible', existingContactId: 88 }),
     ])
 
     const result = await service.run()

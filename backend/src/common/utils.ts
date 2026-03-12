@@ -137,3 +137,41 @@ export function getAgeCutoffDate(referenceDate: Date = pacificToday()): Date {
 export function isEligibleAge(dateOfBirth: Date, referenceDate: Date = pacificToday()): boolean {
   return dateOfBirth >= getAgeCutoffDate(referenceDate)
 }
+
+export interface S3ConnectionParams {
+  endPoint: string
+  port: number | undefined
+  useSSL: boolean
+  accessKey: string
+  secretKey: string
+}
+
+// Parses s3URI manually because `new URL()` breaks when credentials contain `/` or `@`
+export function parseS3Uri(uri: string): S3ConnectionParams {
+  const schemeMatch = uri.match(/^(https?):\/\/(.+)$/)
+  if (!schemeMatch) throw new Error('Invalid s3URI: missing http(s):// scheme')
+
+  const [, scheme, rest] = schemeMatch
+
+  const lastAt = rest.lastIndexOf('@')
+  if (lastAt === -1) throw new Error('Invalid s3URI: expected user:pass@host')
+
+  const credentials = rest.substring(0, lastAt)
+  const hostPart = rest.substring(lastAt + 1).split('/')[0]
+
+  const firstColon = credentials.indexOf(':')
+  if (firstColon === -1) throw new Error('Invalid s3URI: expected user:pass@host')
+
+  const accessKey = credentials.substring(0, firstColon)
+  const secretKey = credentials.substring(firstColon + 1)
+
+  const [host, portStr] = hostPart.split(':')
+
+  return {
+    endPoint: host,
+    port: portStr ? parseInt(portStr, 10) : undefined,
+    useSSL: scheme === 'https',
+    accessKey,
+    secretKey,
+  }
+}

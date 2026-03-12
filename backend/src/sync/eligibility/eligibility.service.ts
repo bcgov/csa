@@ -4,7 +4,7 @@ import { TRANSACTION_TYPES } from 'src/api/contacts/constants'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_STATUS } from 'src/common/state-machine/constants/batch-status.constants'
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
-import { getAgeCutoffDate, normalize, pacificToday } from 'src/common/utils'
+import { getAgeCutoffDate, isEligibleAge, normalize, pacificToday } from 'src/common/utils'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobsService } from 'src/jobs/jobs.service'
 import { CANCEL_REASON } from './cancellation/cancellation-reason.constants'
@@ -372,6 +372,12 @@ export class EligibilityService {
     for (const profile of profiles) {
       if (!profile.dateOfBirth) {
         this.logger.warn(`Skipping contact ${profile.personIdIcm}: missing date of birth`)
+        stats.skipped++
+        continue
+      }
+
+      // New contacts over 18 should not be inserted into the master table
+      if (!profile.existingContactId && !isEligibleAge(profile.dateOfBirth, referenceDate)) {
         stats.skipped++
         continue
       }

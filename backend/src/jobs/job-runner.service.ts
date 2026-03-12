@@ -63,7 +63,12 @@ export class JobRunner {
 
         if (result.success) {
           await this.jobsService.markSuccess(jobId, result.metadata)
-          await handler.onSuccess?.(context, result)
+          try {
+            await handler.onSuccess?.(context, result)
+          } catch (hookError) {
+            const err = hookError instanceof Error ? hookError : new Error(String(hookError))
+            this.logger.error(`Job ${jobId} onSuccess hook threw: ${err.message}`, err.stack)
+          }
           return result
         } else {
           lastError = new Error(result.message || 'Job execution returned unsuccessful result')
@@ -83,7 +88,8 @@ export class JobRunner {
     try {
       await handler.onFailure?.(context, lastError!)
     } catch (hookError) {
-      this.logger.error(`Job ${jobId} onFailure hook threw: ${hookError}`)
+      const err = hookError instanceof Error ? hookError : new Error(String(hookError))
+      this.logger.error(`Job ${jobId} onFailure hook threw: ${err.message}`, err.stack)
     }
 
     return {

@@ -3474,7 +3474,7 @@ function App() {
                                       wordBreak: 'break-word',
                                     }}
                                   >
-                                    {childData.age || '-'}
+                                    {childData.age ?? '-'}
                                   </Typography>
                                 </Box>
                               </Box>

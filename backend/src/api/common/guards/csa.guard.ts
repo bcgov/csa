@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { Request } from 'express'
-import * as jwt from 'jsonwebtoken'
+import { JwtVerificationService } from 'src/common/auth/jwt-verification.service'
 import { AdminService } from '../../admin/admin.service'
 
 interface JwtPayload {
@@ -38,6 +38,7 @@ export class CSAGuard implements CanActivate {
   constructor(
     private readonly adminService: AdminService,
     private readonly reflector: Reflector,
+    private readonly jwtVerificationService: JwtVerificationService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -60,9 +61,9 @@ export class CSAGuard implements CanActivate {
       throw new UnauthorizedException('Invalid token format. Expected: Bearer <token>')
     }
 
-    // Extract and decode token
+    // Extract and verify token signature using JWKS
     const token = authHeader.slice(7)
-    const decoded = this.decodeAndValidateToken(token)
+    const decoded = await this.verifyAndDecodeToken(token)
 
     // Attach decoded token and extracted username to request for use in route handlers
     const username = this.extractUsername(decoded)
@@ -106,29 +107,31 @@ export class CSAGuard implements CanActivate {
     return true
   }
 
-  private decodeAndValidateToken(token: string): JwtPayload {
+  /**
+   * Verify token signature using JWKS and return decoded payload
+   * This ensures the token was actually issued by our SSO Keycloak server
+   */
+  private async verifyAndDecodeToken(token: string): Promise<JwtPayload> {
     try {
-      const decoded = jwt.decode(token) as JwtPayload
+      // Verify signature and decode using JWKS
+      const payload = await this.jwtVerificationService.verifyToken(token)
 
-      if (!decoded) {
-        throw new UnauthorizedException('Invalid token: Unable to decode')
+      // Map jwt.JwtPayload to our JwtPayload interface
+      return {
+        exp: payload.exp,
+        iat: payload.iat,
+        sub: payload.sub,
+        idir_username: payload.idir_username as string,
+        preferred_username: payload.preferred_username as string,
+        email: payload.email as string,
+        ...payload,
       }
-
-      // Check if token has expiration claim
-      if (decoded.exp) {
-        const currentTime = Math.floor(Date.now() / 1000)
-
-        if (decoded.exp < currentTime) {
-          throw new UnauthorizedException('Token has expired. Please login again.')
-        }
-      }
-
-      return decoded
     } catch (error) {
       if (error instanceof UnauthorizedException) {
         throw error
       }
-      throw new UnauthorizedException('Invalid token: Failed to decode')
+      this.logger.error(`Token verification failed: ${error}`)
+      throw new UnauthorizedException('Invalid token: Verification failed')
     }
   }
 

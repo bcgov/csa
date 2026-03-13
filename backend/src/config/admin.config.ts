@@ -8,6 +8,14 @@ export const adminConfig = registerAs('admin', () => {
   const keycloakClientId = process.env.ICM_CLIENT_ID
   const keycloakClientSecret = process.env.ICM_CLIENT_SECRET
 
+  // SSO Keycloak JWKS URL for verifying frontend tokens
+  const ssoKeycloakUrl = process.env.SSO_KEYCLOAK_URL
+  const ssoKeycloakRealm = process.env.SSO_KEYCLOAK_REALM
+  const ssoKeycloakJwksUrl =
+    ssoKeycloakUrl && ssoKeycloakRealm
+      ? `${ssoKeycloakUrl.replace(/\/$/, '')}/realms/${ssoKeycloakRealm}/protocol/openid-connect/certs`
+      : undefined
+
   if (!icmApiUrl) {
     throw new Error('ICM_API_URL is required')
   }
@@ -26,6 +34,9 @@ export const adminConfig = registerAs('admin', () => {
   if (!keycloakClientSecret) {
     throw new Error('KEYCLOAK_CLIENT_SECRET is required')
   }
+  if (!ssoKeycloakJwksUrl) {
+    throw new Error('SSO_KEYCLOAK_URL and SSO_KEYCLOAK_REALM are required')
+  }
 
   return {
     icmApiUrl,
@@ -34,5 +45,6 @@ export const adminConfig = registerAs('admin', () => {
     keycloakTokenUrl,
     keycloakClientId,
     keycloakClientSecret,
+    ssoKeycloakJwksUrl,
   }
 })

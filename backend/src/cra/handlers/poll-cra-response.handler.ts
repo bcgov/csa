@@ -72,10 +72,19 @@ export class PollCraResponseHandler extends BaseJob {
       await this.batchesService.aggregateBatchStatus(batchId)
     }
 
+    let syncResult: JobResult | null = null
     if (await this.icmSyncBackService.hasFlaggedContacts()) {
-      this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM).catch((err) => {
+      this.logger.log('Syncing flagged contacts back to ICM...')
+      try {
+        syncResult = await this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM)
+        if (!syncResult.success) {
+          this.logger.warn(
+            `ICM sync-back failed: ${syncResult.message}. Retry will pick up flagged contacts.`,
+          )
+        }
+      } catch (err) {
         this.logger.warn(`Post-CRA ICM sync failed: ${(err as Error).message}`)
-      })
+      }
     }
 
     const totalUpdated = this.recordsAccepted + this.recordsRejected
@@ -88,6 +97,7 @@ export class PollCraResponseHandler extends BaseJob {
         records_accepted: this.recordsAccepted,
         records_rejected: this.recordsRejected,
         records_recycled: this.recordsRecycled,
+        syncResult,
       },
     }
   }

@@ -59,18 +59,20 @@ export class IngestDataHandler extends BaseJob {
       }
 
       let syncResult: JobResult | null = null
-      const hasFlagged = await this.icmSyncBackService.hasFlaggedContacts()
-
-      if (hasFlagged) {
+      if (await this.icmSyncBackService.hasFlaggedContacts()) {
         this.logger.log('Syncing flagged contacts back to ICM...')
-        syncResult = await this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM, {
-          parentJobId,
-        })
+        try {
+          syncResult = await this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM, {
+            parentJobId,
+          })
 
-        if (!syncResult.success) {
-          this.logger.warn(
-            `ICM sync-back failed: ${syncResult.message}. Retry will pick up flagged contacts.`,
-          )
+          if (!syncResult.success) {
+            this.logger.warn(
+              `ICM sync-back failed: ${syncResult.message}. Retry will pick up flagged contacts.`,
+            )
+          }
+        } catch (err) {
+          this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`)
         }
       } else {
         this.logger.log('No contacts flagged for ICM sync, skipping')

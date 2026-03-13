@@ -1,58 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { ContactProfile, PlacementRecord } from '../../eligibility.types'
+import { ContactProfile } from '../../eligibility.types'
+import { makeContact, makePlacement } from '../../test-helpers'
 import { EligibilityContext } from '../rule.interface'
 import { step3_PlacementCheck } from './step3-placement-check'
-
-const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile => ({
-  personIdIcm: 'ICM-1',
-  personIdMis: 'MIS-1',
-  firstName: 'John',
-  lastName: 'Doe',
-  middleName: '',
-  dateOfBirth: new Date('2010-01-15'),
-  age: 16,
-  gender: 'M',
-  caseNumber: 'CS-001',
-  caseType: 'Child Services',
-  caseStatus: 'Open',
-  caseLoad: 'CL-1',
-  legacyFileNumber: null,
-  serviceOffice: null,
-  assignedTo: null,
-  csaStatus: null,
-  existingContactId: null,
-  din: null,
-  csaSentDate: null,
-  misLegalAuthCode: null,
-  enrollForCsa: 'Yes',
-  legalExpiryDate: null,
-  effectiveLegalStatus: null,
-  legalAuthorityCode: null,
-  effectiveDate: null,
-  birthCity: null,
-  birthProvince: null,
-  birthCountry: null,
-  akaFirstName: null,
-  akaLastName: null,
-  isIneligible: false,
-  deceased: null,
-  placements: [],
-  orders: [],
-  agreements: [],
-  ...overrides,
-})
-
-const makePlacement = (overrides: Partial<PlacementRecord> = {}): PlacementRecord => ({
-  type: 'Placement',
-  status: 'Active',
-  startDate: new Date('2025-01-01'),
-  endDate: null,
-  contractNumber: 'C-100',
-  agreementRowId: 'A-1',
-  paidUnpaid: 'Paid',
-  source: 'ICM',
-  ...overrides,
-})
 
 const makeCtx = (overrides: Partial<ContactProfile> = {}): EligibilityContext => ({
   contact: makeContact(overrides),

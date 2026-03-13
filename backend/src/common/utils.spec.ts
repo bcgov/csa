@@ -9,6 +9,7 @@ import {
   isEligibleAge,
   parseCalendarDate,
   parseDateAsPacific,
+  parseISODatePacific,
 } from './utils'
 
 describe('firstDayOfPreviousMonthPacific', () => {
@@ -302,6 +303,47 @@ describe('parseDateAsPacific — DST edge cases', () => {
   })
 })
 
+describe('parseISODatePacific', () => {
+  it('should parse date-only string as Pacific midnight', () => {
+    // PST (UTC-8): 2026-01-09T00:00:00-08:00 = 2026-01-09T08:00:00Z
+    const result = parseISODatePacific('2026-01-09')
+    expect(result.toISOString()).toBe('2026-01-09T08:00:00.000Z')
+  })
+
+  it('should preserve the calendar date in Pacific time', () => {
+    // The whole point: this should NOT shift to Jan 8 in Pacific
+    const result = parseISODatePacific('2026-01-09')
+    expect(result.toISOString().split('T')[0]).toBe('2026-01-09')
+  })
+
+  it('should pass through full datetime strings unchanged', () => {
+    const result = parseISODatePacific('2026-01-09T14:30:00.000Z')
+    expect(result.toISOString()).toBe('2026-01-09T14:30:00.000Z')
+  })
+
+  it('should handle PDT (summer) date-only correctly', () => {
+    // PDT (UTC-7): 2026-07-15T00:00:00-07:00 = 2026-07-15T07:00:00Z
+    const result = parseISODatePacific('2026-07-15')
+    expect(result.toISOString()).toBe('2026-07-15T07:00:00.000Z')
+  })
+
+  it('should handle spring-forward date', () => {
+    const result = parseISODatePacific('2026-03-08')
+    expect(result.toISOString()).toBe('2026-03-08T08:00:00.000Z')
+  })
+
+  it('should handle fall-back date (PST after DST ends)', () => {
+    // Dec 1 2026 is in PST (UTC-8)
+    const result = parseISODatePacific('2026-12-01')
+    expect(result.toISOString()).toBe('2026-12-01T08:00:00.000Z')
+  })
+
+  it('should not reinterpret full datetime at midnight UTC as Pacific', () => {
+    const result = parseISODatePacific('2026-01-09T00:00:00.000Z')
+    expect(result.toISOString()).toBe('2026-01-09T00:00:00.000Z')
+  })
+})
+
 describe('isEligibleAge — timezone boundary cases', () => {
   it('should handle DOB as Prisma DATE (midnight UTC)', () => {
     const dob = new Date('2008-02-01T00:00:00.000Z')
@@ -362,10 +404,19 @@ describe('enrichLabels', () => {
 
   it('should not convert TIMESTAMPTZ fields', () => {
     const ts = new Date('2025-06-15T14:30:00.000Z')
-    const record = { csaStatusEffectiveDate: ts, actualStartDate: ts }
+    const record = { csaStatusEffectiveDate: ts, csaSentDate: ts }
     const result = enrichLabels(record)
     expect(result.csaStatusEffectiveDate).toBeInstanceOf(Date)
-    expect(result.actualStartDate).toBeInstanceOf(Date)
+    expect(result.csaSentDate).toBeInstanceOf(Date)
+  })
+
+  it('should convert placement/agreement date fields to date-only strings', () => {
+    const ts = new Date('2025-06-15T14:30:00.000Z')
+    const record = { actualStartDate: ts, agreementStartDate: ts, terminationDate: ts }
+    const result = enrichLabels(record)
+    expect(result.actualStartDate).toBe('2025-06-15')
+    expect(result.agreementStartDate).toBe('2025-06-15')
+    expect(result.terminationDate).toBe('2025-06-15')
   })
 
   it('should still add labels and flags alongside date conversion', () => {

@@ -47,15 +47,15 @@ export function determineCancellationReason(input: CancellationInput): Cancellat
 
   // Code 22: Child Missing / AWOL
   const hasIcmAwol = input.icmPlacements.some(
-    (p) =>
-      normalize(p.type) === ICM_PLACEMENT.TYPE_NON_PLACEMENT &&
-      normalize(p.serviceType) === ICM_PLACEMENT.SUBTYPE_AWOL &&
-      normalize(p.status) === ICM_PLACEMENT.STATUS_ACTIVE,
+    (placement) =>
+      normalize(placement.type) === ICM_PLACEMENT.TYPE_NON_PLACEMENT &&
+      normalize(placement.serviceType) === ICM_PLACEMENT.SUBTYPE_AWOL &&
+      normalize(placement.status) === ICM_PLACEMENT.STATUS_ACTIVE,
   )
   const hasMisAwol = input.misPlacements.some(
-    (p) =>
-      normalize(p.type) === MIS_PLACEMENT.TYPE_AWOL &&
-      normalize(p.status) === MIS_PLACEMENT.STATUS_ACTIVE,
+    (placement) =>
+      normalize(placement.type) === MIS_PLACEMENT.TYPE_AWOL &&
+      normalize(placement.status) === MIS_PLACEMENT.STATUS_ACTIVE,
   )
   if (hasIcmAwol || hasMisAwol) {
     return { isIneligible: true, cancelReasonCode: CANCEL_REASON.CHILD_MISSING_AWOL }
@@ -63,15 +63,15 @@ export function determineCancellationReason(input: CancellationInput): Cancellat
 
   // Code 29: Adoption
   const hasIcmAdoption = input.icmPlacements.some(
-    (p) =>
-      normalize(p.type) === ICM_PLACEMENT.TYPE_NON_PLACEMENT &&
-      normalize(p.serviceType) === ICM_PLACEMENT.SUBTYPE_ADOPTION &&
-      normalize(p.status) === ICM_PLACEMENT.STATUS_ACTIVE,
+    (placement) =>
+      normalize(placement.type) === ICM_PLACEMENT.TYPE_NON_PLACEMENT &&
+      normalize(placement.serviceType) === ICM_PLACEMENT.SUBTYPE_ADOPTION &&
+      normalize(placement.status) === ICM_PLACEMENT.STATUS_ACTIVE,
   )
   const hasMisAdoption = input.misPlacements.some(
-    (p) =>
-      normalize(p.type) === MIS_PLACEMENT.TYPE_ADOPTION &&
-      normalize(p.status) === MIS_PLACEMENT.STATUS_ACTIVE,
+    (placement) =>
+      normalize(placement.type) === MIS_PLACEMENT.TYPE_ADOPTION &&
+      normalize(placement.status) === MIS_PLACEMENT.STATUS_ACTIVE,
   )
   if (hasIcmAdoption || hasMisAdoption) {
     return { isIneligible: true, cancelReasonCode: CANCEL_REASON.ADOPTION }

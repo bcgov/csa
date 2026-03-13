@@ -2,54 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { step1B_CancellationCheck } from './step1b-cancellation-determination'
 import { EligibilityContext } from '../rule.interface'
 import { ContactProfile } from '../../eligibility.types'
+import { makeContact } from '../../test-helpers'
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
 import { CANCEL_REASON } from '../../cancellation/cancellation-reason.constants'
 
-const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile => ({
-  caseRowId: 'CASE-1',
-  personIdIcm: 'ICM-1',
-  personIdMis: 'MIS-1',
-  firstName: 'John',
-  lastName: 'Doe',
-  middleName: '',
-  akaFirstName: null,
-  akaLastName: null,
-  dateOfBirth: new Date('2010-01-15'),
-  age: 16,
-  gender: 'M',
-  caseNumber: 'CS-001',
-  caseType: 'Child Services',
-  caseStatus: 'Open',
-  caseLoad: 'CL-1',
-  legacyFileNumber: null,
-  serviceOffice: null,
-  assignedTo: null,
-  csaStatus: CSA_STATUS.IN_PAY,
-  csaStatusEffectiveDate: null,
-  existingContactId: 1,
-  din: null,
-  csaSentDate: null,
-  misLegalAuthCode: null,
-  enrollForCsa: null,
-  legalExpiryDate: null,
-  effectiveLegalStatus: null,
-  legalAuthorityCode: null,
-  effectiveDate: null,
-  birthCity: null,
-  birthProvince: null,
-  birthCountry: null,
-  isIneligible: false,
-  deceased: null,
-  cancelReasonCode: null,
-  careEndDate: null,
-  placements: [],
-  orders: [],
-  agreements: [],
-  ...overrides,
-})
-
 const makeCtx = (overrides: Partial<ContactProfile> = {}): EligibilityContext => ({
-  contact: makeContact(overrides),
+  contact: makeContact({ csaStatus: CSA_STATUS.IN_PAY, existingContactId: 1, ...overrides }),
   referenceDate: new Date('2026-02-10'),
 })
 

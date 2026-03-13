@@ -4,7 +4,13 @@ import { TRANSACTION_TYPES } from 'src/api/contacts/constants'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_STATUS } from 'src/common/state-machine/constants/batch-status.constants'
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
-import { getAgeCutoffDate, isEligibleAge, normalize, pacificToday } from 'src/common/utils'
+import {
+  getAgeCutoffDate,
+  isEligibleAge,
+  normalize,
+  pacificToday,
+  parseISODatePacific,
+} from 'src/common/utils'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobsService } from 'src/jobs/jobs.service'
 import { CANCEL_REASON } from './cancellation/cancellation-reason.constants'
@@ -53,6 +59,66 @@ const RULES: EligibilityRule[] = [
   step4_FetchAgreementContract,
   step6_OrderPaymentCheck,
 ]
+// Select one representative placement, order, and agreement to denormalize
+// into the master contacts table.
+// Priority: ICM placement > ICM non-placement > MIS placement > MIS non-placement
+export function selectPrimaryRecords(profile: ContactProfile): {
+  primaryPlacement: PlacementRecord | null
+  primaryOrder: OrderRecord | null
+  primaryAgreement: AgreementRecord | null
+} {
+  const activeRecords = profile.placements.filter((placement) =>
+    ['ACTIVE', 'INTERRUPTED'].includes(normalize(placement.status)),
+  )
+  const primaryPlacement =
+    activeRecords.find(
+      (placement) => placement.source === 'ICM' && normalize(placement.type) === 'PLACEMENT',
+    ) ??
+    activeRecords.find(
+      (placement) =>
+        placement.source === 'ICM' && normalize(placement.type) === 'NON-PLACEMENT LOCATION',
+    ) ??
+    activeRecords.find(
+      (placement) => placement.source === 'MIS' && normalize(placement.type) === 'PLACEMENT',
+    ) ??
+    activeRecords.find(
+      (placement) =>
+        placement.source === 'MIS' && normalize(placement.type) === 'NON-PLACEMENT LOCATION',
+    ) ??
+    null
+
+  // Primary Order: match via primary placement's link key
+  let primaryOrder: OrderRecord | null = null
+  if (primaryPlacement?.source === 'ICM' && primaryPlacement.agreementRowId) {
+    primaryOrder =
+      profile.orders.find((order) => order.agreementRowId === primaryPlacement.agreementRowId) ??
+      null
+  } else if (primaryPlacement?.source === 'MIS' && primaryPlacement.contractNumber) {
+    primaryOrder =
+      profile.orders.find(
+        (order) =>
+          order.source === 'MIS' && order.contractNumber === primaryPlacement.contractNumber,
+      ) ?? null
+  }
+
+  // Primary Agreement: match via primary placement's link key
+  let primaryAgreement: AgreementRecord | null = null
+  if (primaryPlacement?.source === 'ICM' && primaryPlacement.agreementRowId) {
+    primaryAgreement =
+      profile.agreements.find((agreement) => agreement.rowId === primaryPlacement.agreementRowId) ??
+      null
+  } else if (primaryPlacement?.source === 'MIS' && primaryPlacement.contractNumber) {
+    primaryAgreement =
+      profile.agreements.find(
+        (agreement) =>
+          agreement.source === 'MIS' &&
+          agreement.contractNumber === primaryPlacement.contractNumber,
+      ) ?? null
+  }
+
+  return { primaryPlacement, primaryOrder, primaryAgreement }
+}
+
 interface UpsertContext {
   profile: ContactProfile
   result: EligibilityResult
@@ -76,181 +142,215 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
   {
     dbColumn: 'person_id_icm',
     pgType: 'text',
-    extract: (c) => c.profile.personIdIcm,
+    extract: (row) => row.profile.personIdIcm,
     conflictMode: 'skip',
     required: true,
   },
-  { dbColumn: 'contact_id_icm', pgType: 'text', extract: (c) => c.profile.contactIdIcm },
-  { dbColumn: 'person_id_mis', pgType: 'text', extract: (c) => c.profile.personIdMis },
-  { dbColumn: 'first_name', pgType: 'text', extract: (c) => c.profile.firstName, required: true },
-  { dbColumn: 'last_name', pgType: 'text', extract: (c) => c.profile.lastName, required: true },
-  { dbColumn: 'middle_name', pgType: 'text', extract: (c) => c.profile.middleName },
-  { dbColumn: 'aka_first_name', pgType: 'text', extract: (c) => c.profile.akaFirstName ?? '' },
-  { dbColumn: 'aka_last_name', pgType: 'text', extract: (c) => c.profile.akaLastName ?? '' },
-  { dbColumn: 'date_of_birth', pgType: 'date', extract: (c) => c.profile.dateOfBirth },
-  { dbColumn: 'age', pgType: 'integer', extract: (c) => c.profile.age },
-  { dbColumn: 'gender', pgType: 'text', extract: (c) => c.profile.gender },
-  { dbColumn: 'case_number', pgType: 'text', extract: (c) => c.profile.caseNumber, required: true },
-  { dbColumn: 'case_type', pgType: 'text', extract: (c) => c.profile.caseType, required: true },
-  { dbColumn: 'case_status', pgType: 'text', extract: (c) => c.profile.caseStatus, required: true },
-  { dbColumn: 'case_load', pgType: 'text', extract: (c) => c.profile.caseLoad, required: true },
-  { dbColumn: 'legacy_file_number', pgType: 'text', extract: (c) => c.profile.legacyFileNumber },
-  { dbColumn: 'service_office', pgType: 'text', extract: (c) => c.profile.serviceOffice },
-  { dbColumn: 'assigned_to', pgType: 'text', extract: (c) => c.profile.assignedTo },
-  { dbColumn: 'csa_status', pgType: 'text', extract: (c) => c.result.newStatus },
+  { dbColumn: 'contact_id_icm', pgType: 'text', extract: (row) => row.profile.contactIdIcm },
+  { dbColumn: 'person_id_mis', pgType: 'text', extract: (row) => row.profile.personIdMis },
+  {
+    dbColumn: 'first_name',
+    pgType: 'text',
+    extract: (row) => row.profile.firstName,
+    required: true,
+  },
+  { dbColumn: 'last_name', pgType: 'text', extract: (row) => row.profile.lastName, required: true },
+  { dbColumn: 'middle_name', pgType: 'text', extract: (row) => row.profile.middleName },
+  { dbColumn: 'aka_first_name', pgType: 'text', extract: (row) => row.profile.akaFirstName ?? '' },
+  { dbColumn: 'aka_last_name', pgType: 'text', extract: (row) => row.profile.akaLastName ?? '' },
+  { dbColumn: 'date_of_birth', pgType: 'date', extract: (row) => row.profile.dateOfBirth },
+  { dbColumn: 'age', pgType: 'integer', extract: (row) => row.profile.age },
+  { dbColumn: 'gender', pgType: 'text', extract: (row) => row.profile.gender },
+  {
+    dbColumn: 'case_number',
+    pgType: 'text',
+    extract: (row) => row.profile.caseNumber,
+    required: true,
+  },
+  { dbColumn: 'case_type', pgType: 'text', extract: (row) => row.profile.caseType, required: true },
+  {
+    dbColumn: 'case_status',
+    pgType: 'text',
+    extract: (row) => row.profile.caseStatus,
+    required: true,
+  },
+  { dbColumn: 'case_load', pgType: 'text', extract: (row) => row.profile.caseLoad, required: true },
+  {
+    dbColumn: 'legacy_file_number',
+    pgType: 'text',
+    extract: (row) => row.profile.legacyFileNumber,
+  },
+  { dbColumn: 'service_office', pgType: 'text', extract: (row) => row.profile.serviceOffice },
+  { dbColumn: 'assigned_to', pgType: 'text', extract: (row) => row.profile.assignedTo },
+  { dbColumn: 'csa_status', pgType: 'text', extract: (row) => row.result.newStatus },
   {
     dbColumn: 'csa_status_effective_date',
     pgType: 'timestamptz',
-    extract: (c) => c.profile.csaStatusEffectiveDate ?? new Date(),
+    extract: (row) => row.profile.csaStatusEffectiveDate ?? new Date(),
     conflictMode: 'skip',
   },
-  { dbColumn: 'din', pgType: 'text', extract: (c) => c.profile.din, conflictMode: 'skip' },
+  { dbColumn: 'din', pgType: 'text', extract: (row) => row.profile.din, conflictMode: 'skip' },
   {
     dbColumn: 'csa_sent_date',
     pgType: 'timestamptz',
-    extract: (c) => c.profile.csaSentDate,
+    extract: (row) => row.profile.csaSentDate,
     conflictMode: 'skip',
   },
-  { dbColumn: 'enroll_for_csa', pgType: 'text', extract: (c) => c.profile.enrollForCsa },
+  { dbColumn: 'enroll_for_csa', pgType: 'text', extract: (row) => row.profile.enrollForCsa },
   {
     dbColumn: 'mis_legal_authority_code',
     pgType: 'text',
-    extract: (c) => c.profile.misLegalAuthCode,
+    extract: (row) => row.profile.misLegalAuthCode,
   },
   {
     dbColumn: 'legal_authority_code',
     pgType: 'text',
-    extract: (c) => c.profile.legalAuthorityCode,
+    extract: (row) => row.profile.legalAuthorityCode,
   },
   {
     dbColumn: 'effective_legal_status',
     pgType: 'text',
-    extract: (c) => c.profile.effectiveLegalStatus,
+    extract: (row) => row.profile.effectiveLegalStatus,
   },
-  { dbColumn: 'effective_date', pgType: 'date', extract: (c) => c.profile.effectiveDate },
-  { dbColumn: 'expiry_date', pgType: 'date', extract: (c) => c.profile.legalExpiryDate },
-  { dbColumn: 'birth_city', pgType: 'text', extract: (c) => c.profile.birthCity },
-  { dbColumn: 'birth_province', pgType: 'text', extract: (c) => c.profile.birthProvince },
-  { dbColumn: 'birth_country', pgType: 'text', extract: (c) => c.profile.birthCountry },
+  { dbColumn: 'effective_date', pgType: 'date', extract: (row) => row.profile.effectiveDate },
+  { dbColumn: 'expiry_date', pgType: 'date', extract: (row) => row.profile.legalExpiryDate },
+  { dbColumn: 'birth_city', pgType: 'text', extract: (row) => row.profile.birthCity },
+  { dbColumn: 'birth_province', pgType: 'text', extract: (row) => row.profile.birthProvince },
+  { dbColumn: 'birth_country', pgType: 'text', extract: (row) => row.profile.birthCountry },
   {
     dbColumn: 'placement_location',
     pgType: 'text',
-    extract: (c) => c.primaryPlacement?.placementNumber ?? null,
+    extract: (row) => row.primaryPlacement?.placementNumber ?? null,
   },
-  { dbColumn: 'location_type', pgType: 'text', extract: (c) => c.primaryPlacement?.type ?? null },
+  {
+    dbColumn: 'location_type',
+    pgType: 'text',
+    extract: (row) => row.primaryPlacement?.type ?? null,
+  },
   {
     dbColumn: 'location_sub_type',
     pgType: 'text',
-    extract: (c) => c.primaryPlacement?.serviceType ?? null,
+    extract: (row) => row.primaryPlacement?.serviceType ?? null,
   },
   {
     dbColumn: 'placement_status',
     pgType: 'text',
-    extract: (c) => c.primaryPlacement?.status ?? null,
+    extract: (row) => row.primaryPlacement?.status ?? null,
   },
   {
     dbColumn: 'actual_start_date',
     pgType: 'timestamptz',
-    extract: (c) => c.primaryPlacement?.startDate ?? null,
+    extract: (row) => row.primaryPlacement?.startDate ?? null,
   },
   {
     dbColumn: 'actual_end_date',
     pgType: 'timestamptz',
-    extract: (c) => c.primaryPlacement?.endDate ?? null,
+    extract: (row) => row.primaryPlacement?.endDate ?? null,
   },
   {
     dbColumn: 'paid_unpaid',
     pgType: 'text',
-    extract: (c) => c.primaryPlacement?.paidUnpaid ?? null,
+    extract: (row) => row.primaryPlacement?.paidUnpaid ?? null,
   },
   {
     dbColumn: 'interrupted_placement',
     pgType: 'text',
-    extract: (c) => c.primaryPlacement?.interruptedPlacementId ?? null,
+    extract: (row) => row.primaryPlacement?.interruptedPlacementId ?? null,
   },
   {
     dbColumn: 'source_placement',
     pgType: 'text',
-    extract: (c) => c.primaryPlacement?.source ?? null,
+    extract: (row) => row.primaryPlacement?.source ?? null,
   },
   {
     dbColumn: 'service_provider_name',
     pgType: 'text',
-    extract: (c) =>
-      c.primaryPlacement?.serviceProviderName ?? c.primaryAgreement?.serviceProviderName ?? null,
+    extract: (row) =>
+      row.primaryPlacement?.serviceProviderName ??
+      row.primaryAgreement?.serviceProviderName ??
+      null,
   },
   {
     dbColumn: 'provider_id',
     pgType: 'text',
-    extract: (c) => c.primaryPlacement?.providerId ?? c.primaryAgreement?.providerId ?? null,
+    extract: (row) => row.primaryPlacement?.providerId ?? row.primaryAgreement?.providerId ?? null,
   },
   {
     dbColumn: 'place_of_service_name',
     pgType: 'text',
-    extract: (c) => c.primaryPlacement?.placeOfServiceName ?? null,
+    extract: (row) => row.primaryPlacement?.placeOfServiceName ?? null,
   },
   {
     dbColumn: 'agreement_type',
     pgType: 'text',
-    extract: (c) => c.primaryAgreement?.agreementType ?? null,
+    extract: (row) => row.primaryAgreement?.agreementType ?? null,
   },
   {
     dbColumn: 'agreement_status',
     pgType: 'text',
-    extract: (c) => c.primaryAgreement?.agreementStatus ?? null,
+    extract: (row) => row.primaryAgreement?.agreementStatus ?? null,
   },
   {
     dbColumn: 'agreement_start_date',
     pgType: 'timestamptz',
-    extract: (c) => c.primaryAgreement?.agreementStartDate ?? null,
+    extract: (row) => row.primaryAgreement?.agreementStartDate ?? null,
   },
   {
     dbColumn: 'agreement_end_date',
     pgType: 'timestamptz',
-    extract: (c) => c.primaryAgreement?.agreementEndDate ?? null,
+    extract: (row) => row.primaryAgreement?.agreementEndDate ?? null,
   },
   {
     dbColumn: 'termination_date',
     pgType: 'timestamptz',
-    extract: (c) => c.primaryAgreement?.terminationDate ?? null,
+    extract: (row) => row.primaryAgreement?.terminationDate ?? null,
   },
   {
     dbColumn: 'mcfd_contract',
     pgType: 'text',
-    extract: (c) => c.primaryAgreement?.mcfdContract ?? c.primaryPlacement?.contractNumber ?? null,
+    extract: (row) =>
+      row.primaryAgreement?.mcfdContract ?? row.primaryPlacement?.contractNumber ?? null,
   },
-  { dbColumn: 'order_number', pgType: 'text', extract: (c) => c.primaryOrder?.orderNumber ?? null },
-  { dbColumn: 'order_type', pgType: 'text', extract: (c) => c.primaryOrder?.orderType ?? null },
-  { dbColumn: 'order_status', pgType: 'text', extract: (c) => c.primaryOrder?.orderStatus ?? null },
+  {
+    dbColumn: 'order_number',
+    pgType: 'text',
+    extract: (row) => row.primaryOrder?.orderNumber ?? null,
+  },
+  { dbColumn: 'order_type', pgType: 'text', extract: (row) => row.primaryOrder?.orderType ?? null },
+  {
+    dbColumn: 'order_status',
+    pgType: 'text',
+    extract: (row) => row.primaryOrder?.orderStatus ?? null,
+  },
   {
     dbColumn: 'order_amount',
     pgType: 'text',
-    extract: (c) => (c.primaryOrder?.amount != null ? String(c.primaryOrder.amount) : null),
+    extract: (row) => (row.primaryOrder?.amount != null ? String(row.primaryOrder.amount) : null),
   },
   {
     dbColumn: 'order_effective_start_date',
     pgType: 'date',
-    extract: (c) => c.primaryOrder?.effectiveStartDate ?? null,
+    extract: (row) => row.primaryOrder?.effectiveStartDate ?? null,
   },
   {
     dbColumn: 'order_effective_end_date',
     pgType: 'date',
-    extract: (c) => c.primaryOrder?.effectiveEndDate ?? null,
+    extract: (row) => row.primaryOrder?.effectiveEndDate ?? null,
   },
-  { dbColumn: 'product', pgType: 'text', extract: (c) => c.primaryOrder?.product ?? null },
-  { dbColumn: 'source_order', pgType: 'text', extract: (c) => c.primaryOrder?.source ?? 'ICM' },
-  { dbColumn: 'cancel_reason_code', pgType: 'text', extract: (c) => c.result.cancelReasonCode },
-  { dbColumn: 'care_end_date', pgType: 'date', extract: (c) => c.result.careEndDate },
+  { dbColumn: 'product', pgType: 'text', extract: (row) => row.primaryOrder?.product ?? null },
+  { dbColumn: 'source_order', pgType: 'text', extract: (row) => row.primaryOrder?.source ?? 'ICM' },
+  { dbColumn: 'cancel_reason_code', pgType: 'text', extract: (row) => row.result.cancelReasonCode },
+  { dbColumn: 'care_end_date', pgType: 'date', extract: (row) => row.result.careEndDate },
   {
     dbColumn: 'is_ineligible',
     pgType: 'boolean',
-    extract: (c) => INELIGIBLE_CANCEL_CODES.has(c.result.cancelReasonCode ?? ''),
+    extract: (row) => INELIGIBLE_CANCEL_CODES.has(row.result.cancelReasonCode ?? ''),
   },
-  { dbColumn: 'is_deceased', pgType: 'text', extract: (c) => c.profile.deceased },
+  { dbColumn: 'is_deceased', pgType: 'text', extract: (row) => row.profile.deceased },
 ]
 
 // Pre-computed list of required columns for validation
-const REQUIRED_COLUMNS = CONTACT_COLUMNS.filter((c) => c.required)
+const REQUIRED_COLUMNS = CONTACT_COLUMNS.filter((col) => col.required)
 
 function getInvalidRequiredFields(row: UpsertContext): string[] {
   const invalidFields: string[] = []
@@ -264,14 +364,14 @@ function getInvalidRequiredFields(row: UpsertContext): string[] {
 }
 
 // Pre-build SQL from column definitions (computed once at module load)
-const COL_LIST = CONTACT_COLUMNS.map((c) => c.dbColumn).join(', ')
-const SELECT_LIST = CONTACT_COLUMNS.map((c) => `t.${c.dbColumn}`).join(', ')
-const UNNEST_PARAMS = CONTACT_COLUMNS.map((c, i) => `$${i + 1}::${c.pgType}[]`).join(', ')
-const UPDATE_SET = CONTACT_COLUMNS.filter((c) => c.conflictMode !== 'skip')
-  .map((c) =>
-    c.conflictMode === 'coalesce'
-      ? `${c.dbColumn} = COALESCE(EXCLUDED.${c.dbColumn}, contacts.${c.dbColumn})`
-      : `${c.dbColumn} = EXCLUDED.${c.dbColumn}`,
+const COL_LIST = CONTACT_COLUMNS.map((col) => col.dbColumn).join(', ')
+const SELECT_LIST = CONTACT_COLUMNS.map((col) => `t.${col.dbColumn}`).join(', ')
+const UNNEST_PARAMS = CONTACT_COLUMNS.map((col, i) => `$${i + 1}::${col.pgType}[]`).join(', ')
+const UPDATE_SET = CONTACT_COLUMNS.filter((col) => col.conflictMode !== 'skip')
+  .map((col) =>
+    col.conflictMode === 'coalesce'
+      ? `${col.dbColumn} = COALESCE(EXCLUDED.${col.dbColumn}, contacts.${col.dbColumn})`
+      : `${col.dbColumn} = EXCLUDED.${col.dbColumn}`,
   )
   .join(',\n        ')
 
@@ -323,7 +423,7 @@ export class EligibilityService {
 
     const rows = await this.prisma.$queryRawUnsafe<{ table_name: string; has_data: boolean }[]>(sql)
 
-    const emptyTables = rows.filter((r) => !r.has_data).map((r) => r.table_name)
+    const emptyTables = rows.filter((row) => !row.has_data).map((row) => row.table_name)
 
     if (emptyTables.length > 0) {
       throw new Error(`Staging validation failed: empty tables [${emptyTables.join(', ')}]`)
@@ -448,7 +548,7 @@ export class EligibilityService {
     const cutoff = getAgeCutoffDate(referenceDate)
     const { sql, params } = buildFindAgedOutContactIdsSql(cutoff)
     const rows = await this.prisma.$queryRawUnsafe<{ person_id_icm: string }[]>(sql, ...params)
-    return rows.map((r) => r.person_id_icm)
+    return rows.map((row) => row.person_id_icm)
   }
 
   private async loadContactProfiles(
@@ -465,8 +565,8 @@ export class EligibilityService {
           type: placement.type,
           rawType: null,
           status: placement.status,
-          startDate: placement.startDate ? new Date(placement.startDate) : null,
-          endDate: placement.endDate ? new Date(placement.endDate) : null,
+          startDate: placement.startDate ? parseISODatePacific(placement.startDate) : null,
+          endDate: placement.endDate ? parseISODatePacific(placement.endDate) : null,
           contractNumber: placement.contractNumber,
           agreementRowId: placement.agreementRowId,
           paidUnpaid: placement.paidUnpaid,
@@ -486,8 +586,8 @@ export class EligibilityService {
           type: placement.type?.startsWith('PL ') ? 'Placement' : 'Non-Placement Location',
           rawType: placement.type ?? null,
           status: placement.status,
-          startDate: placement.startDate ? new Date(placement.startDate) : null,
-          endDate: placement.endDate ? new Date(placement.endDate) : null,
+          startDate: placement.startDate ? parseISODatePacific(placement.startDate) : null,
+          endDate: placement.endDate ? parseISODatePacific(placement.endDate) : null,
           contractNumber: placement.contractNumber,
           agreementRowId: null,
           paidUnpaid: null,
@@ -541,12 +641,14 @@ export class EligibilityService {
           agreementType: agreement.agreementType ?? null,
           agreementStatus: agreement.agreementStatus ?? null,
           agreementStartDate: agreement.agreementStartDate
-            ? new Date(agreement.agreementStartDate)
+            ? parseISODatePacific(agreement.agreementStartDate)
             : null,
           agreementEndDate: agreement.agreementEndDate
-            ? new Date(agreement.agreementEndDate)
+            ? parseISODatePacific(agreement.agreementEndDate)
             : null,
-          terminationDate: agreement.terminationDate ? new Date(agreement.terminationDate) : null,
+          terminationDate: agreement.terminationDate
+            ? parseISODatePacific(agreement.terminationDate)
+            : null,
           mcfdContract: agreement.mcfdContract ?? null,
           source: 'ICM',
         }),
@@ -559,9 +661,11 @@ export class EligibilityService {
           contractNumber: contract.contractNumber ?? null,
           agreementType: contract.type ?? null,
           agreementStatus: contract.status ?? null,
-          agreementStartDate: contract.startDate ? new Date(contract.startDate) : null,
-          agreementEndDate: contract.endDate ? new Date(contract.endDate) : null,
-          terminationDate: contract.terminationDate ? new Date(contract.terminationDate) : null,
+          agreementStartDate: contract.startDate ? parseISODatePacific(contract.startDate) : null,
+          agreementEndDate: contract.endDate ? parseISODatePacific(contract.endDate) : null,
+          terminationDate: contract.terminationDate
+            ? parseISODatePacific(contract.terminationDate)
+            : null,
           mcfdContract: contract.contractNumber ?? null,
           serviceProviderName: contract.serviceProviderName ?? null,
           providerId: contract.providerId ?? null,
@@ -616,55 +720,6 @@ export class EligibilityService {
     })
   }
 
-  // Select one representative placement, order, and agreement to add
-  // into the master contacts table.
-  private selectPrimaryRecords(profile: ContactProfile): {
-    primaryPlacement: PlacementRecord | null
-    primaryOrder: OrderRecord | null
-    primaryAgreement: AgreementRecord | null
-  } {
-    // Primary Placement: first active Placement-type record, preferring ICM source
-    const activePlacements = profile.placements.filter(
-      (placement) =>
-        normalize(placement.type) === 'PLACEMENT' &&
-        ['ACTIVE', 'INTERRUPTED'].includes(normalize(placement.status)),
-    )
-    const icmPlacements = activePlacements.filter((placement) => placement.source === 'ICM')
-    const primaryPlacement = icmPlacements[0] ?? activePlacements[0] ?? null
-
-    // Primary Order: match via primary placement's link key
-    let primaryOrder: OrderRecord | null = null
-    if (primaryPlacement?.source === 'ICM' && primaryPlacement.agreementRowId) {
-      primaryOrder =
-        profile.orders.find((order) => order.agreementRowId === primaryPlacement.agreementRowId) ??
-        null
-    } else if (primaryPlacement?.source === 'MIS' && primaryPlacement.contractNumber) {
-      primaryOrder =
-        profile.orders.find(
-          (order) =>
-            order.source === 'MIS' && order.contractNumber === primaryPlacement.contractNumber,
-        ) ?? null
-    }
-
-    // Primary Agreement: match via primary placement's link key
-    let primaryAgreement: AgreementRecord | null = null
-    if (primaryPlacement?.source === 'ICM' && primaryPlacement.agreementRowId) {
-      primaryAgreement =
-        profile.agreements.find(
-          (agreement) => agreement.rowId === primaryPlacement.agreementRowId,
-        ) ?? null
-    } else if (primaryPlacement?.source === 'MIS' && primaryPlacement.contractNumber) {
-      primaryAgreement =
-        profile.agreements.find(
-          (agreement) =>
-            agreement.source === 'MIS' &&
-            agreement.contractNumber === primaryPlacement.contractNumber,
-        ) ?? null
-    }
-
-    return { primaryPlacement, primaryOrder, primaryAgreement }
-  }
-
   private async upsertContacts(
     updates: Array<{ profile: ContactProfile; result: EligibilityResult }>,
   ): Promise<{ skipped: number; validRows: UpsertContext[] }> {
@@ -676,7 +731,7 @@ export class EligibilityService {
       const row: UpsertContext = {
         profile,
         result,
-        ...this.selectPrimaryRecords(profile),
+        ...selectPrimaryRecords(profile),
       }
       const invalidFields = getInvalidRequiredFields(row)
       if (invalidFields.length > 0) {
@@ -702,12 +757,12 @@ export class EligibilityService {
     validRows: UpsertContext[],
   ): Promise<{ application: number; cancellation: number }> {
     const applicationPersonIds = validRows
-      .filter((r) => r.result.newStatus === CSA_STATUS.ELIGIBLE)
-      .map((r) => r.profile.personIdIcm)
+      .filter((row) => row.result.newStatus === CSA_STATUS.ELIGIBLE)
+      .map((row) => row.profile.personIdIcm)
 
     const cancellationPersonIds = validRows
-      .filter((r) => r.result.newStatus === CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
-      .map((r) => r.profile.personIdIcm)
+      .filter((row) => row.result.newStatus === CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
+      .map((row) => row.profile.personIdIcm)
 
     this.logger.log(
       `Auto-batch candidates: ${applicationPersonIds.length} application, ${cancellationPersonIds.length} cancellation (from ${validRows.length} validRows)`,
@@ -723,7 +778,7 @@ export class EligibilityService {
       `SELECT id, person_id_icm FROM contacts WHERE person_id_icm = ANY($1)`,
       allPersonIds,
     )
-    const idMap = new Map(contactRows.map((c) => [c.person_id_icm, c.id]))
+    const idMap = new Map(contactRows.map((row) => [row.person_id_icm, row.id]))
 
     const [existingBatch] = await this.prisma.$queryRawUnsafe<{ id: number }[]>(
       `SELECT id FROM batches WHERE status = $1 LIMIT 1`,
@@ -750,7 +805,7 @@ export class EligibilityService {
       batchId,
       allDbIds,
     )
-    const alreadyInBatchIds = new Set(alreadyInBatch.map((r) => r.contact_id))
+    const alreadyInBatchIds = new Set(alreadyInBatch.map((row) => row.contact_id))
 
     const contactIds: number[] = []
     const batchIds: number[] = []

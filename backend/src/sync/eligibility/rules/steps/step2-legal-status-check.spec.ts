@@ -1,50 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { ContactProfile } from '../../eligibility.types'
+import { makeContact as makeBaseContact } from '../../test-helpers'
 import { EligibilityContext } from '../rule.interface'
 import { step2_LegalStatusCheck } from './step2-legal-status-check'
 
-const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile => ({
-  caseRowId: 'CASE-1',
-  personIdIcm: 'ICM-1',
-  personIdMis: 'MIS-1',
-  firstName: 'John',
-  lastName: 'Doe',
-  middleName: '',
-  dateOfBirth: new Date('2010-01-15'),
-  age: 16,
-  gender: 'M',
-  caseNumber: 'CS-001',
-  caseType: 'Child Services',
-  caseStatus: 'Open',
-  caseLoad: 'CL-1',
-  legacyFileNumber: null,
-  serviceOffice: null,
-  assignedTo: null,
-  csaStatus: null,
-  csaStatusEffectiveDate: null,
-  existingContactId: null,
-  din: null,
-  csaSentDate: null,
-  misLegalAuthCode: null,
-  enrollForCsa: 'Yes',
-  legalExpiryDate: null,
-  effectiveLegalStatus: 'Active',
-  legalAuthorityCode: null,
-  effectiveDate: null,
-  birthCity: null,
-  birthProvince: null,
-  birthCountry: null,
-  akaFirstName: null,
-  akaLastName: null,
-  isIneligible: false,
-  deceased: null,
-  cancelReasonCode: null,
-  careEndDate: null,
-  placements: [],
-  orders: [],
-  agreements: [],
-  ...overrides,
-})
+const makeContact = (overrides: Partial<ContactProfile> = {}) =>
+  makeBaseContact({ enrollForCsa: 'Yes', effectiveLegalStatus: 'Active', ...overrides })
 
 const REF_DATE = new Date('2026-02-10')
 

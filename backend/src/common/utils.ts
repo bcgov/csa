@@ -17,6 +17,16 @@ export function firstDayOfPreviousMonthPacific(referenceDate: Date = new Date())
 
 const PACIFIC_ZONE = 'America/Vancouver'
 
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+// Date-only strings ('2026-01-09') are interpreted as UTC midnight by new Date(),
+// which shifts to the previous day in Pacific time. Parse as Pacific midnight instead.
+export function parseISODatePacific(value: string): Date {
+  if (DATE_ONLY_PATTERN.test(value)) {
+    return DateTime.fromISO(value, { zone: PACIFIC_ZONE }).toJSDate()
+  }
+  return new Date(value)
+}
+
 export function formatDatePacific(date: Date): string {
   return DateTime.fromJSDate(date).setZone(PACIFIC_ZONE).toFormat('MM/dd/yyyy')
 }
@@ -66,6 +76,11 @@ const DATE_ONLY_FIELDS = new Set([
   'orderEffectiveEndDate',
   'careEndDate',
   'batchDate',
+  'actualStartDate',
+  'actualEndDate',
+  'agreementStartDate',
+  'agreementEndDate',
+  'terminationDate',
 ])
 
 export function enrichLabels<T extends Record<string, any>>(record: T): T {

@@ -27,11 +27,15 @@ export const step1B_CancellationCheck: EligibilityRule = {
     const result = determineCancellationReason({
       deceased: contact.deceased,
       icmPlacements: contact.placements
-        .filter((p) => p.source === 'ICM')
-        .map((p) => ({ type: p.type, serviceType: p.serviceType ?? null, status: p.status })),
+        .filter((placement) => placement.source === 'ICM')
+        .map((placement) => ({
+          type: placement.type,
+          serviceType: placement.serviceType ?? null,
+          status: placement.status,
+        })),
       misPlacements: contact.placements
-        .filter((p) => p.source === 'MIS')
-        .map((p) => ({ type: p.rawType, status: p.status })),
+        .filter((placement) => placement.source === 'MIS')
+        .map((placement) => ({ type: placement.rawType, status: placement.status })),
     })
 
     if (result.isIneligible) {

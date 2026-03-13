@@ -21,19 +21,19 @@ export function determineCareEndDate(
   // latest order/payment end date
   const orderDates = orders
     .filter(
-      (o) =>
-        o.effectiveEndDate != null &&
-        ((o.source === 'ICM' && normalize(o.orderStatus) === 'CLOSED') ||
-          (o.source === 'MIS' && normalize(o.orderStatus) === 'PROCESSED')),
+      (order) =>
+        order.effectiveEndDate != null &&
+        ((order.source === 'ICM' && normalize(order.orderStatus) === 'CLOSED') ||
+          (order.source === 'MIS' && normalize(order.orderStatus) === 'PROCESSED')),
     )
-    .map((o) => o.effectiveEndDate!.getTime())
+    .map((order) => order.effectiveEndDate!.getTime())
 
   const calculatedOrderDate = orderDates.length > 0 ? new Date(Math.max(...orderDates)) : null
 
   // latest placement end date
   const placementDates = placements
-    .filter((p) => p.endDate != null)
-    .map((p) => p.endDate!.getTime())
+    .filter((placement) => placement.endDate != null)
+    .map((placement) => placement.endDate!.getTime())
 
   const calculatedPlacementDate =
     placementDates.length > 0 ? new Date(Math.max(...placementDates)) : null

@@ -20,11 +20,15 @@ export const step3_PlacementCheck: EligibilityRule = {
   evaluate(ctx: EligibilityContext): EligibilityResult | null {
     const { placements } = ctx.contact
 
-    const activePlacements = placements.filter((p) => ACTIVE_STATUSES.includes(normalize(p.status)))
+    const activePlacements = placements.filter((placement) =>
+      ACTIVE_STATUSES.includes(normalize(placement.status)),
+    )
 
-    const placementRecords = activePlacements.filter((p) => normalize(p.type) === 'PLACEMENT')
+    const placementRecords = activePlacements.filter(
+      (placement) => normalize(placement.type) === 'PLACEMENT',
+    )
     const nonPlacementRecords = activePlacements.filter(
-      (p) => normalize(p.type) === 'NON-PLACEMENT LOCATION',
+      (placement) => normalize(placement.type) === 'NON-PLACEMENT LOCATION',
     )
 
     const hasPlacement = placementRecords.length > 0

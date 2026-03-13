@@ -1,29 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { OrderRecord, PlacementRecord } from '../eligibility.types'
+import { makeOrder, makePlacement } from '../test-helpers'
 import { determineCareEndDate } from './determine-care-end-date'
-
-const makeOrder = (overrides: Partial<OrderRecord> = {}): OrderRecord => ({
-  orderType: 'Variable',
-  orderStatus: 'Closed',
-  effectiveStartDate: new Date('2025-01-01'),
-  effectiveEndDate: null,
-  amount: 100,
-  contractNumber: null,
-  source: 'ICM',
-  ...overrides,
-})
-
-const makePlacement = (overrides: Partial<PlacementRecord> = {}): PlacementRecord => ({
-  type: 'Placement',
-  status: 'Active',
-  startDate: new Date('2025-01-01'),
-  endDate: null,
-  contractNumber: null,
-  agreementRowId: null,
-  paidUnpaid: null,
-  source: 'ICM',
-  ...overrides,
-})
 
 describe('determineCareEndDate', () => {
   describe('Order/Payment end dates', () => {

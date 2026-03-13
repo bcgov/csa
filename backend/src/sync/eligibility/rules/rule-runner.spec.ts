@@ -1,46 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { runEligibility } from './rule-runner'
 import { EligibilityRule, EligibilityContext } from './rule.interface'
-import { ContactProfile, EligibilityResult } from '../eligibility.types'
-
-const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile => ({
-  personIdIcm: 'ICM-1',
-  personIdMis: 'MIS-1',
-  firstName: 'John',
-  lastName: 'Doe',
-  middleName: '',
-  dateOfBirth: new Date('2010-01-15'),
-  age: 16,
-  gender: 'M',
-  caseNumber: 'CS-001',
-  caseType: 'Child Services',
-  caseStatus: 'Open',
-  caseLoad: 'CL-1',
-  legacyFileNumber: null,
-  serviceOffice: null,
-  assignedTo: null,
-  csaStatus: null,
-  existingContactId: null,
-  din: null,
-  csaSentDate: null,
-  misLegalAuthCode: null,
-  enrollForCsa: null,
-  legalExpiryDate: null,
-  effectiveLegalStatus: null,
-  legalAuthorityCode: null,
-  effectiveDate: null,
-  birthCity: null,
-  birthProvince: null,
-  birthCountry: null,
-  akaFirstName: null,
-  akaLastName: null,
-  isIneligible: false,
-  deceased: null,
-  placements: [],
-  orders: [],
-  agreements: [],
-  ...overrides,
-})
+import { EligibilityResult } from '../eligibility.types'
+import { makeContact, makePlacement, makeOrder } from '../test-helpers'
+import { step3_PlacementCheck } from './steps/step3-placement-check'
+import { step4_FetchAgreementContract } from './steps/step4-fetch-agreement-contract'
+import { step6_OrderPaymentCheck } from './steps/step6-order-payment-check'
 
 const REF_DATE = new Date('2026-02-10')
 
@@ -96,5 +61,98 @@ describe('runEligibility', () => {
     }
 
     runEligibility(makeContact(), [enricher, reader], REF_DATE)
+  })
+})
+
+describe('runEligibility integration: step3 → step4 → step6', () => {
+  const RULES = [step3_PlacementCheck, step4_FetchAgreementContract, step6_OrderPaymentCheck]
+
+  it('MIS-to-ICM migration: ended MIS placement + active ICM placement → eligible (step 7)', () => {
+    // Reference date: April 15. March payment should match previous month.
+    const refDate = new Date('2026-04-15')
+
+    const contact = makeContact({
+      csaStatus: 'in_pay',
+      placements: [
+        makePlacement({
+          source: 'ICM',
+          status: 'Active',
+          type: 'Placement',
+          startDate: new Date('2026-04-01'),
+          agreementRowId: 'A-ICM-NEW',
+        }),
+        makePlacement({
+          source: 'MIS',
+          status: 'Ended',
+          type: 'Placement',
+          startDate: new Date('2025-01-01'),
+          endDate: new Date('2026-03-31'),
+          contractNumber: 'C-MIS-OLD',
+        }),
+      ],
+      orders: [
+        makeOrder({
+          source: 'MIS',
+          contractNumber: 'C-MIS-OLD',
+          effectiveStartDate: new Date('2026-03-01'),
+          amount: 2000,
+        }),
+      ],
+    })
+
+    const result = runEligibility(contact, RULES, refDate)
+
+    expect(result).toEqual({
+      step: 7,
+      newStatus: 'in_pay',
+      cancelReasonCode: null,
+      careEndDate: null,
+    })
+  })
+
+  it('no active placement → step 8 (eligible_tbd), skips step 4 and 6', () => {
+    const contact = makeContact({
+      csaStatus: null,
+      placements: [makePlacement({ status: 'Ended', type: 'Placement' })],
+    })
+
+    const result = runEligibility(contact, RULES, new Date('2026-04-15'))
+
+    expect(result).toEqual({
+      step: 8,
+      newStatus: 'eligible_tbd',
+      cancelReasonCode: null,
+      careEndDate: null,
+    })
+  })
+
+  it('active placement with matching previous-month order → eligible (step 7)', () => {
+    const refDate = new Date('2026-04-15')
+
+    const contact = makeContact({
+      csaStatus: null,
+      placements: [
+        makePlacement({
+          status: 'Active',
+          contractNumber: 'C-100',
+        }),
+      ],
+      orders: [
+        makeOrder({
+          contractNumber: 'C-100',
+          effectiveStartDate: new Date('2026-03-15'),
+          amount: 2000,
+        }),
+      ],
+    })
+
+    const result = runEligibility(contact, RULES, refDate)
+
+    expect(result).toEqual({
+      step: 7,
+      newStatus: 'eligible',
+      cancelReasonCode: null,
+      careEndDate: null,
+    })
   })
 })

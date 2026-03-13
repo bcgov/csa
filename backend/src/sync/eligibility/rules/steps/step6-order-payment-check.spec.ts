@@ -1,61 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { ContactProfile, OrderRecord } from '../../eligibility.types'
+import { makeContact, makeOrder as makeBaseOrder } from '../../test-helpers'
 import { EligibilityContext } from '../rule.interface'
 import { step6_OrderPaymentCheck } from './step6-order-payment-check'
 
-const makeContact = (overrides: Partial<ContactProfile> = {}): ContactProfile => ({
-  caseRowId: 'CASE-1',
-  personIdIcm: 'ICM-1',
-  personIdMis: 'MIS-1',
-  firstName: 'John',
-  lastName: 'Doe',
-  middleName: '',
-  dateOfBirth: new Date('2010-01-15'),
-  age: 16,
-  gender: 'M',
-  caseNumber: 'CS-001',
-  caseType: 'Child Services',
-  caseStatus: 'Open',
-  caseLoad: 'CL-1',
-  legacyFileNumber: null,
-  serviceOffice: null,
-  assignedTo: null,
-  csaStatus: null,
-  csaStatusEffectiveDate: null,
-  existingContactId: null,
-  din: null,
-  csaSentDate: null,
-  misLegalAuthCode: null,
-  enrollForCsa: 'Yes',
-  legalExpiryDate: null,
-  effectiveLegalStatus: null,
-  legalAuthorityCode: null,
-  effectiveDate: null,
-  birthCity: null,
-  birthProvince: null,
-  birthCountry: null,
-  akaFirstName: null,
-  akaLastName: null,
-  isIneligible: false,
-  deceased: null,
-  cancelReasonCode: null,
-  careEndDate: null,
-  placements: [],
-  orders: [],
-  agreements: [],
-  ...overrides,
-})
-
-const makeOrder = (overrides: Partial<OrderRecord> = {}): OrderRecord => ({
-  orderType: 'Monthly Family Care Rate',
-  orderStatus: 'Closed',
-  effectiveStartDate: new Date('2026-01-15'), // previous month
-  effectiveEndDate: null,
-  amount: 1600.0,
-  contractNumber: 'C-100',
-  source: 'ICM',
-  ...overrides,
-})
+const makeOrder = (overrides: Partial<OrderRecord> = {}) =>
+  makeBaseOrder({
+    effectiveStartDate: new Date('2026-01-15'),
+    amount: 1600.0,
+    contractNumber: 'C-100',
+    source: 'ICM',
+    ...overrides,
+  })
 
 const REF_DATE = new Date('2026-02-10')
 
@@ -212,5 +168,41 @@ describe('step6_OrderPaymentCheck', () => {
     )
     const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(8)
+  })
+
+  it('should match MIS orders by source without needing contract number in context', () => {
+    const ctx = makeCtx(
+      {
+        orders: [makeOrder({ source: 'MIS', contractNumber: 'C-MIS-OLD' })],
+      },
+      { contractNumbers: [], agreementRowIds: [] },
+    )
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
+    expect(result!.step).toBe(7)
+  })
+
+  it('MIS-to-ICM migration: MIS payment matched by source despite ended MIS placement', () => {
+    const refDate = new Date('2026-04-15')
+    const ctx: EligibilityContext = {
+      contact: makeContact({
+        csaStatus: 'in_pay',
+        orders: [
+          makeOrder({
+            source: 'MIS',
+            contractNumber: 'C-MIS-OLD',
+            effectiveStartDate: new Date('2026-03-01'),
+            amount: 2000,
+          }),
+        ],
+      }),
+      referenceDate: refDate,
+      hasPlacement: true,
+      hasNonPlacement: false,
+      contractNumbers: [],
+      agreementRowIds: ['A-ICM-NEW'],
+    }
+    const result = step6_OrderPaymentCheck.evaluate(ctx)
+    expect(result!.step).toBe(7)
+    expect(result!.newStatus).toBe('in_pay')
   })
 })

@@ -1,6 +1,17 @@
-import { Body, Controller, Get, HttpException, Param, Post, Query, UseGuards } from '@nestjs/common'
-import { ApiBody, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
+import {
+  Body,
+  Controller,
+  Get,
+  HttpException,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common'
+import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
+import { ContactIdsDto, ContactIdsWithActionDto } from '../common/dto/contact-ids.dto'
 import { CurrentUser } from '../common/decorators'
 import { CSAGuard } from '../common/guards/csa.guard'
 import { ContactsService } from './contacts.service'
@@ -12,6 +23,16 @@ import { BulkOperationResponse } from './interfaces'
 @UseGuards(CSAGuard)
 export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
+
+  private parsePage(page?: string): number {
+    const parsed = page ? parseInt(page, 10) : 1
+    return Number.isFinite(parsed) && parsed >= 1 ? parsed : 1
+  }
+
+  private parseLimit(limit?: string): number {
+    const parsed = limit ? parseInt(limit, 10) : 10
+    return Number.isFinite(parsed) && parsed >= 1 ? Math.min(parsed, 200) : 10
+  }
 
   @Get()
   @ApiQuery({
@@ -47,9 +68,7 @@ export class ContactsController {
     @Query('sort') sort?: string,
     @Query('filter') filter?: string,
   ): Promise<PaginatedResponse<ContactDto>> {
-    const pageNum = page ? parseInt(page, 10) : 1
-    const limitNum = limit ? parseInt(limit, 10) : 10
-    return this.contactsService.findAll(pageNum, limitNum, sort, filter)
+    return this.contactsService.findAll(this.parsePage(page), this.parseLimit(limit), sort, filter)
   }
 
   @Get('search') // must be ahead of Get(":id") to avoid conflict
@@ -84,14 +103,12 @@ export class ContactsController {
     if (q.trim().length < 2) {
       throw new HttpException('Search query must be at least 2 characters', 400)
     }
-    const pageNum = page ? parseInt(page, 10) : 1
-    const limitNum = limit ? parseInt(limit, 10) : 10
-    return this.contactsService.fullTextSearch(q, pageNum, limitNum)
+    return this.contactsService.fullTextSearch(q, this.parsePage(page), this.parseLimit(limit))
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    const user = await this.contactsService.findOne(+id)
+  async findOne(@Param('id', ParseIntPipe) id: number) {
+    const user = await this.contactsService.findOne(id)
     if (!user) {
       throw new HttpException('User not found.', 404)
     }
@@ -99,105 +116,63 @@ export class ContactsController {
   }
 
   @Post('hold')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: { contactIds: { type: 'array', items: { type: 'number' } } },
-    },
-  })
   @ApiResponse({ status: 200, description: 'Bulk hold result with success and failed arrays' })
   async holdContacts(
-    @Body() body: { contactIds: number[] },
+    @Body() dto: ContactIdsDto,
     @CurrentUser() userId: string,
   ): Promise<BulkOperationResponse> {
-    return this.contactsService.holdContacts(body.contactIds, userId)
+    return this.contactsService.holdContacts(dto.contactIds, userId)
   }
 
   @Post('resume')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: { contactIds: { type: 'array', items: { type: 'number' } } },
-    },
-  })
   @ApiResponse({ status: 200, description: 'Bulk resume result with success and failed arrays' })
   async resumeContacts(
-    @Body() body: { contactIds: number[] },
+    @Body() dto: ContactIdsDto,
     @CurrentUser() userId: string,
   ): Promise<BulkOperationResponse> {
-    return this.contactsService.resumeContacts(body.contactIds, userId)
+    return this.contactsService.resumeContacts(dto.contactIds, userId)
   }
 
   @Post('set-eligible')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        contactIds: { type: 'array', items: { type: 'number' } },
-        action: { type: 'string', enum: ['ELIGIBLE'] },
-      },
-      required: ['contactIds', 'action'],
-    },
-  })
   @ApiResponse({
     status: 200,
     description: 'Bulk eligibility status update result with success and failed arrays',
   })
   async updateEligibilityStatus(
-    @Body() body: { contactIds: number[]; action: string },
+    @Body() dto: ContactIdsWithActionDto,
     @CurrentUser() userId: string,
   ): Promise<BulkOperationResponse> {
-    return this.contactsService.updateEligibilityStatus(body.contactIds, body.action, userId)
+    return this.contactsService.updateEligibilityStatus(dto.contactIds, dto.action, userId)
   }
 
   @Post('set-not-eligible')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        contactIds: { type: 'array', items: { type: 'number' } },
-        action: { type: 'string', enum: ['SET_NOT_ELIGIBLE'] },
-      },
-      required: ['contactIds', 'action'],
-    },
-  })
   @ApiResponse({
     status: 200,
     description: 'Bulk not eligible status update result with success and failed arrays',
   })
   async updateNotEligibleStatus(
-    @Body() body: { contactIds: number[]; action: string },
+    @Body() dto: ContactIdsWithActionDto,
     @CurrentUser() userId: string,
   ): Promise<BulkOperationResponse> {
-    return this.contactsService.updateNotEligibleStatus(body.contactIds, body.action, userId)
+    return this.contactsService.updateNotEligibleStatus(dto.contactIds, dto.action, userId)
   }
 
   @Post('age-out')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        contactIds: { type: 'array', items: { type: 'number' } },
-        action: { type: 'string', enum: ['AGE_OUT'] },
-      },
-      required: ['contactIds', 'action'],
-    },
-  })
   @ApiResponse({
     status: 200,
     description: 'Bulk child over 18 status update result with success and failed arrays',
   })
   async updateChildOver18(
-    @Body() body: { contactIds: number[]; action: string },
+    @Body() dto: ContactIdsWithActionDto,
     @CurrentUser() userId: string,
   ): Promise<BulkOperationResponse> {
-    return this.contactsService.updateChildOver18(body.contactIds, body.action, userId)
+    return this.contactsService.updateChildOver18(dto.contactIds, dto.action, userId)
   }
 
   @Get(':id/batches')
   @ApiResponse({ status: 200, description: 'List of batch details for this contact' })
   @ApiResponse({ status: 404, description: 'Contact not found' })
-  async findContactBatches(@Param('id') id: string) {
-    return this.contactsService.findContactBatches(+id)
+  async findContactBatches(@Param('id', ParseIntPipe) id: number) {
+    return this.contactsService.findContactBatches(id)
   }
 }

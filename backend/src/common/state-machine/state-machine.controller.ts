@@ -1,11 +1,15 @@
-import { Controller, Get } from '@nestjs/common'
+import { Controller, Get, UseGuards } from '@nestjs/common'
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { SkipCSACheck } from 'src/api/common/decorators/skip-csa-check.decorator'
+import { CSAGuard } from 'src/api/common/guards/csa.guard'
 import { CSA_STATUS, CSA_STATUS_LABELS, USER_CSA_EVENTS } from './constants'
 import type { StateConfig, Transition } from './interfaces'
 import { canTransitionCsa, getNextCsaState } from './machines/csa-status.machine'
 
 @ApiTags('state-machines')
 @Controller('state-machines')
+@UseGuards(CSAGuard)
+@SkipCSACheck()
 export class StateMachineController {
   @Get('csa')
   @ApiOperation({ summary: 'Get CSA status configuration for frontend' })

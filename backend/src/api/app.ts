@@ -1,3 +1,4 @@
+import { ValidationPipe } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
@@ -11,9 +12,13 @@ export async function bootstrap() {
     logger: customLogger,
   })
   app.use(helmet())
-  app.enableCors()
+  const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS?.split(',')
+  app.enableCors(allowedOrigins ? { origin: allowedOrigins } : {})
   app.set('trust proxy', 1)
   app.use(metricsMiddleware)
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+  )
   app.enableShutdownHooks()
   app.setGlobalPrefix('api', {
     exclude: ['health', 'health/live', 'health/ready'],

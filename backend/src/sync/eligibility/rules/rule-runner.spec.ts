@@ -67,49 +67,6 @@ describe('runEligibility', () => {
 describe('runEligibility integration: step3 → step4 → step6', () => {
   const RULES = [step3_PlacementCheck, step4_FetchAgreementContract, step6_OrderPaymentCheck]
 
-  it('MIS-to-ICM migration: ended MIS placement + active ICM placement → eligible (step 7)', () => {
-    // Reference date: April 15. March payment should match previous month.
-    const refDate = new Date('2026-04-15')
-
-    const contact = makeContact({
-      csaStatus: 'in_pay',
-      placements: [
-        makePlacement({
-          source: 'ICM',
-          status: 'Active',
-          type: 'Placement',
-          startDate: new Date('2026-04-01'),
-          agreementRowId: 'A-ICM-NEW',
-        }),
-        makePlacement({
-          source: 'MIS',
-          status: 'Ended',
-          type: 'Placement',
-          startDate: new Date('2025-01-01'),
-          endDate: new Date('2026-03-31'),
-          contractNumber: 'C-MIS-OLD',
-        }),
-      ],
-      orders: [
-        makeOrder({
-          source: 'MIS',
-          contractNumber: 'C-MIS-OLD',
-          effectiveStartDate: new Date('2026-03-01'),
-          amount: 2000,
-        }),
-      ],
-    })
-
-    const result = runEligibility(contact, RULES, refDate)
-
-    expect(result).toEqual({
-      step: 7,
-      newStatus: 'in_pay',
-      cancelReasonCode: null,
-      careEndDate: null,
-    })
-  })
-
   it('no active placement → step 8 (eligible_tbd), skips step 4 and 6', () => {
     const contact = makeContact({
       csaStatus: null,

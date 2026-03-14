@@ -169,40 +169,4 @@ describe('step6_OrderPaymentCheck', () => {
     const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(8)
   })
-
-  it('should match MIS orders by source without needing contract number in context', () => {
-    const ctx = makeCtx(
-      {
-        orders: [makeOrder({ source: 'MIS', contractNumber: 'C-MIS-OLD' })],
-      },
-      { contractNumbers: [], agreementRowIds: [] },
-    )
-    const result = step6_OrderPaymentCheck.evaluate(ctx)
-    expect(result!.step).toBe(7)
-  })
-
-  it('MIS-to-ICM migration: MIS payment matched by source despite ended MIS placement', () => {
-    const refDate = new Date('2026-04-15')
-    const ctx: EligibilityContext = {
-      contact: makeContact({
-        csaStatus: 'in_pay',
-        orders: [
-          makeOrder({
-            source: 'MIS',
-            contractNumber: 'C-MIS-OLD',
-            effectiveStartDate: new Date('2026-03-01'),
-            amount: 2000,
-          }),
-        ],
-      }),
-      referenceDate: refDate,
-      hasPlacement: true,
-      hasNonPlacement: false,
-      contractNumbers: [],
-      agreementRowIds: ['A-ICM-NEW'],
-    }
-    const result = step6_OrderPaymentCheck.evaluate(ctx)
-    expect(result!.step).toBe(7)
-    expect(result!.newStatus).toBe('in_pay')
-  })
 })

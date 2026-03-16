@@ -85,7 +85,7 @@ export class AdminService {
         this.logger.warn('ICM_API_USERNAME is set but ignored in prod — using actual username')
       }
 
-      const trustedUser = deployEnv === 'prod' ? username : icmTrustedUsername
+      const trustedUser = deployEnv === 'prod' ? icmApiUsername : icmTrustedUsername
 
       this.logger.log('Requesting ICM API with username:', icmApiUsername)
 

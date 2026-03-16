@@ -8,6 +8,7 @@ import {
 import { Reflector } from '@nestjs/core'
 import { Request } from 'express'
 import { JwtVerificationService } from 'src/common/auth/jwt-verification.service'
+import { extractUsernameFromPayload } from 'src/common/auth/token-utils'
 import { AdminService } from '../../admin/admin.service'
 
 interface JwtPayload {
@@ -66,7 +67,7 @@ export class CSAGuard implements CanActivate {
     const decoded = await this.verifyAndDecodeToken(token)
 
     // Attach decoded token and extracted username to request for use in route handlers
-    const username = this.extractUsername(decoded)
+    const username = extractUsernameFromPayload(decoded as Record<string, unknown>)
     ;(request as any).user = decoded
     ;(request as any).username = username
 
@@ -87,17 +88,13 @@ export class CSAGuard implements CanActivate {
 
     // Verify CSA access via admin service
     this.logger.debug(`Verifying CSA access for user: ${username}`)
-    const csaAccessResult = await this.adminService.verifyCSAAccess(authHeader)
+    const csaAccessResult = await this.adminService.verifyCSAAccess(username)
 
     // Cache the result
     csaAccessCache.set(username, {
       hasAccess: csaAccessResult.hasAccess,
       expiresAt: Date.now() + CACHE_TTL_MS,
     })
-
-    if (csaAccessResult.tokenExpired) {
-      throw new UnauthorizedException('Token has expired. Please login again.')
-    }
 
     if (!csaAccessResult.hasAccess) {
       this.logger.warn(`CSA access denied for user: ${username} - ${csaAccessResult.message}`)
@@ -133,16 +130,6 @@ export class CSAGuard implements CanActivate {
       this.logger.error(`Token verification failed: ${error}`)
       throw new UnauthorizedException('Invalid token: Verification failed')
     }
-  }
-
-  private extractUsername(decoded: JwtPayload): string {
-    let username = decoded.idir_username as string
-    if (!username && decoded.preferred_username) {
-      username = (decoded.preferred_username as string).split('@')[0]
-    }
-    username =
-      username || (decoded.email as string)?.split('@')[0] || (decoded.sub as string) || 'unknown'
-    return username.toUpperCase()
   }
 }
 

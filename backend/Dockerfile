@@ -26,6 +26,8 @@ COPY --from=build /app/dist ./dist
 # Install curl for debugging
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
+HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:3000/health/live || exit 1
+
 # Nonroot user, limit heap size to 50 MB
 RUN chown -R 1001:0 /app && chmod -R g=u /app
 USER 1001

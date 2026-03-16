@@ -197,7 +197,6 @@ function App() {
 
   // Log Keycloak authentication token (for testing in deployed version)
   console.log('=== KEYCLOAK AUTH TOKEN ===')
-  console.log('Auth Token from localStorage:', localStorage.getItem('authToken'))
   console.log('Keycloak Authenticated:', keycloakAuthenticated)
   console.log('Has CSA Access:', hasCSAAccess)
   console.log('User Info:', user)

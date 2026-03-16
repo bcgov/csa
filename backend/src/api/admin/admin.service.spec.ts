@@ -1,8 +1,6 @@
 import { HttpService } from '@nestjs/axios'
-import { UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
-import * as jwt from 'jsonwebtoken'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { AdminService } from './admin.service'
 
@@ -48,86 +46,6 @@ describe('AdminService', () => {
     expect(service).toBeDefined()
   })
 
-  describe('decodeToken', () => {
-    it('should decode a valid JWT token', () => {
-      const mockPayload = {
-        sub: 'user123',
-        preferred_username: 'john.doe',
-        email: 'john.doe@example.com',
-        given_name: 'John',
-        family_name: 'Doe',
-        exp: Math.floor(Date.now() / 1000) + 3600,
-      }
-
-      const token = jwt.sign(mockPayload, 'secret')
-      const result = service.decodeToken(token)
-
-      expect(result).toBeDefined()
-      expect(result.username).toBe('JOHN.DOE')
-      expect(result.email).toBe('john.doe@example.com')
-      expect(result.firstName).toBe('John')
-      expect(result.lastName).toBe('Doe')
-      expect(result.sub).toBe('user123')
-    })
-
-    it('should handle Bearer prefix in token', () => {
-      const mockPayload = {
-        preferred_username: 'jane.doe',
-        email: 'jane.doe@example.com',
-      }
-
-      const token = jwt.sign(mockPayload, 'secret')
-      const bearerToken = `Bearer ${token}`
-      const result = service.decodeToken(bearerToken)
-
-      expect(result.username).toBe('JANE.DOE')
-    })
-
-    it('should throw UnauthorizedException for invalid token', () => {
-      expect(() => service.decodeToken('invalid-token')).toThrow(UnauthorizedException)
-    })
-
-    it('should throw UnauthorizedException for empty token', () => {
-      expect(() => service.decodeToken('')).toThrow(UnauthorizedException)
-    })
-
-    it('should use email as username if preferred_username is not present', () => {
-      const mockPayload = {
-        email: 'user@example.com',
-        sub: 'user456',
-      }
-
-      const token = jwt.sign(mockPayload, 'secret')
-      const result = service.decodeToken(token)
-
-      expect(result.username).toBe('USER')
-    })
-
-    it('should use sub as username if both preferred_username and email are not present', () => {
-      const mockPayload = {
-        sub: 'user789',
-      }
-
-      const token = jwt.sign(mockPayload, 'secret')
-      const result = service.decodeToken(token)
-
-      expect(result.username).toBe('USER789')
-    })
-  })
-
-  describe('extractUsername', () => {
-    it('should extract username from token', () => {
-      const mockPayload = {
-        preferred_username: 'test.user',
-      }
-
-      const token = jwt.sign(mockPayload, 'secret')
-      const username = service.extractUsername(token)
-
-      expect(username).toBe('TEST.USER')
-    })
-  })
-
   describe('getUserPermissions', () => {
     it('should return admin permissions for admin users', async () => {
       const result = await service.getUserPermissions('admin.user')
@@ -154,21 +72,6 @@ describe('AdminService', () => {
       expect(result.username).toBe('regular.user')
       expect(result.responsibilities).toContain('user')
       expect(result.permissions.length).toBe(2) // base permissions only
-    })
-  })
-
-  describe('getPermissionsFromToken', () => {
-    it('should get permissions directly from token', async () => {
-      const mockPayload = {
-        preferred_username: 'admin.user',
-      }
-
-      const token = jwt.sign(mockPayload, 'secret')
-      const result = await service.getPermissionsFromToken(token)
-
-      expect(result).toBeDefined()
-      expect(result.username).toBe('ADMIN.USER')
-      expect(result.responsibilities).toContain('admin')
     })
   })
 

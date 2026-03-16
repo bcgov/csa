@@ -22,7 +22,6 @@ export class IcmApiDataSource extends IcmDataSource {
   }
 
   async fetchAll(config: IcmApiConfig, lastUpdated?: Date): Promise<IcmApiRecord[]> {
-    const bearerToken = await this.keycloakAuthService.getBearerToken()
     const icmApiUrl = this.configService.get<string>('admin.icmApiUrl')!
     const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
 
@@ -33,6 +32,7 @@ export class IcmApiDataSource extends IcmDataSource {
 
     let hasMore = true
     while (hasMore) {
+      const bearerToken = await this.keycloakAuthService.getBearerToken()
       const pageUrl = `${baseUrl}&PageSize=${PAGE_SIZE}&StartRowNum=${startRow}`
 
       this.logger.log(`Fetching ${config.name}: startRow=${startRow}`)

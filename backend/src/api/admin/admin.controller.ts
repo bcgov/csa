@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  Headers,
   HttpException,
   Param,
   Query,
@@ -9,6 +8,9 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { toUserInfoDto } from 'src/common/auth/token-utils'
+import { CurrentUser } from '../common/decorators/current-user.decorator'
+import { DecodedToken } from '../common/decorators/decoded-token.decorator'
 import { SkipCSACheck } from '../common/decorators/skip-csa-check.decorator'
 import { CSAGuard } from '../common/guards/csa.guard'
 import { AdminService } from './admin.service'
@@ -25,7 +27,7 @@ export class AdminController {
   @ApiOperation({
     summary: 'Get user information from token',
     description:
-      'Decodes the JWT token and returns user information including username, email, and other profile data',
+      'Returns user information including username, email, and other profile data from the authenticated token',
   })
   @ApiHeader({
     name: 'Authorization',
@@ -41,19 +43,17 @@ export class AdminController {
     status: 401,
     description: 'Unauthorized - Invalid or missing token',
   })
-  getUserInfo(@Headers('authorization') authHeader: string): UserInfoDto {
-    if (!authHeader) {
-      throw new UnauthorizedException('Authorization header is required')
-    }
-
-    return this.adminService.decodeToken(authHeader)
+  getUserInfo(
+    @CurrentUser() username: string,
+    @DecodedToken() decoded: Record<string, unknown>,
+  ): UserInfoDto {
+    return toUserInfoDto(decoded, username)
   }
 
   @Get('user/permissions')
   @ApiOperation({
     summary: 'Get user permissions from token',
-    description:
-      'Decodes the JWT token, extracts username, and returns all permissions and responsibilities for the user',
+    description: 'Returns all permissions and responsibilities for the authenticated user',
   })
   @ApiHeader({
     name: 'Authorization',
@@ -69,14 +69,8 @@ export class AdminController {
     status: 401,
     description: 'Unauthorized - Invalid or missing token',
   })
-  async getPermissionsFromToken(
-    @Headers('authorization') authHeader: string,
-  ): Promise<UserPermissionsDto> {
-    if (!authHeader) {
-      throw new UnauthorizedException('Authorization header is required')
-    }
-
-    return this.adminService.getPermissionsFromToken(authHeader)
+  async getPermissionsFromToken(@CurrentUser() username: string): Promise<UserPermissionsDto> {
+    return this.adminService.getUserPermissions(username)
   }
 
   @Get('permissions/:username')
@@ -100,22 +94,16 @@ export class AdminController {
     description: 'Unauthorized - Invalid or missing token',
   })
   async getPermissionsByUsername(
-    @Headers('authorization') authHeader: string,
-    @Param('username') username: string,
+    @CurrentUser() username: string,
+    @Param('username') targetUsername: string,
   ): Promise<UserPermissionsDto> {
-    if (!authHeader) {
-      throw new UnauthorizedException('Authorization header is required')
-    }
-
-    // Verify the requesting user has admin access
-    const requestingUser = this.adminService.extractUsername(authHeader)
-    const hasAdminAccess = await this.adminService.hasResponsibility(requestingUser, 'admin')
+    const hasAdminAccess = await this.adminService.hasResponsibility(username, 'admin')
 
     if (!hasAdminAccess) {
       throw new UnauthorizedException('Admin access required to view other user permissions')
     }
 
-    return this.adminService.getUserPermissions(username)
+    return this.adminService.getUserPermissions(targetUsername)
   }
 
   @Get('check/permission')
@@ -144,18 +132,13 @@ export class AdminController {
     description: 'Unauthorized - Invalid or missing token',
   })
   async checkPermission(
-    @Headers('authorization') authHeader: string,
+    @CurrentUser() username: string,
     @Query('permissionId') permissionId: string,
   ): Promise<{ hasPermission: boolean; username: string; permissionId: string }> {
-    if (!authHeader) {
-      throw new UnauthorizedException('Authorization header is required')
-    }
-
     if (!permissionId) {
       throw new HttpException('permissionId query parameter is required', 400)
     }
 
-    const username = this.adminService.extractUsername(authHeader)
     const hasPermission = await this.adminService.hasPermission(username, permissionId)
 
     return {
@@ -191,22 +174,17 @@ export class AdminController {
     description: 'Unauthorized - Invalid or missing token',
   })
   async checkResponsibility(
-    @Headers('authorization') authHeader: string,
+    @CurrentUser() username: string,
     @Query('responsibility') responsibility: string,
   ): Promise<{
     hasResponsibility: boolean
     username: string
     responsibility: string
   }> {
-    if (!authHeader) {
-      throw new UnauthorizedException('Authorization header is required')
-    }
-
     if (!responsibility) {
       throw new HttpException('responsibility query parameter is required', 400)
     }
 
-    const username = this.adminService.extractUsername(authHeader)
     const hasResponsibility = await this.adminService.hasResponsibility(username, responsibility)
 
     return {
@@ -221,7 +199,7 @@ export class AdminController {
   @ApiOperation({
     summary: 'Verify user has CSA access',
     description:
-      'Validates the auth token (including expiration), extracts username, and queries ICM to verify user has CSA Application responsibility',
+      'Verifies the authenticated user has CSA Application responsibility by querying ICM',
   })
   @ApiHeader({
     name: 'Authorization',
@@ -238,7 +216,6 @@ export class AdminController {
         userInfo: { type: 'object' },
         message: { type: 'string' },
         icmResponsibility: { type: 'string' },
-        tokenExpired: { type: 'boolean' },
       },
     },
   })
@@ -246,21 +223,28 @@ export class AdminController {
     status: 401,
     description: 'Unauthorized - Invalid, expired, or missing token',
   })
-  async verifyCSAAccess(@Headers('authorization') authHeader: string): Promise<{
+  async verifyCSAAccess(
+    @CurrentUser() username: string,
+    @DecodedToken() decoded: Record<string, unknown>,
+  ): Promise<{
     hasAccess: boolean
     username: string
     userInfo: UserInfoDto
     message: string
     icmResponsibility?: string
-    tokenExpired?: boolean
   }> {
-    return this.adminService.verifyCSAAccess(authHeader)
+    const result = await this.adminService.verifyCSAAccess(username)
+    return {
+      ...result,
+      username,
+      userInfo: toUserInfoDto(decoded, username),
+    }
   }
 
   @Get('user/icm-data')
   @ApiOperation({
     summary: 'Get user data from ICM system',
-    description: 'Decodes the JWT token, extracts username, and fetches user data from ICM API',
+    description: 'Fetches user data from ICM API for the authenticated user',
   })
   @ApiHeader({
     name: 'Authorization',
@@ -287,13 +271,8 @@ export class AdminController {
     description: 'Internal Server Error - Failed to fetch ICM data',
   })
   async getUserICMData(
-    @Headers('authorization') authHeader: string,
+    @CurrentUser() username: string,
   ): Promise<{ username: string; icmData: any; retrievedAt: string }> {
-    if (!authHeader) {
-      throw new UnauthorizedException('Authorization header is required')
-    }
-
-    const username = this.adminService.extractUsername(authHeader)
     const icmData = await this.adminService.fetchUserFromICM(username)
 
     return {

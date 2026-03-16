@@ -10,10 +10,8 @@ import { AdminService } from './admin.service'
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      load: [adminConfig, icmConfig],
-    }),
+    ConfigModule.forFeature(adminConfig),
+    ConfigModule.forFeature(icmConfig),
     HttpModule,
     KeycloakAuthModule,
     JwtVerificationModule,

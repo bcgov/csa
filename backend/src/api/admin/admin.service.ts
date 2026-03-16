@@ -75,17 +75,18 @@ export class AdminService {
       const deployEnv = this.configService.get<string>('app.deployEnv')
       const configUsername = this.configService.get<string>('admin.icmUsername')
 
-      let icmApiUsername = username
+      const icmApiUsername = username
       if (configUsername && deployEnv !== 'prod') {
         this.logger.warn(
           `ICM username override active: using '${configUsername}' instead of '${username}'`,
         )
-        icmApiUsername = configUsername
+        // icmApiUsername = configUsername
       } else if (configUsername && deployEnv === 'prod') {
         this.logger.warn('ICM_API_USERNAME is set but ignored in prod — using actual username')
       }
 
-      const trustedUser = deployEnv === 'prod' ? icmApiUsername : icmTrustedUsername
+      // const trustedUser = deployEnv === 'prod' ? username : icmTrustedUsername
+      const trustedUser = username
 
       this.logger.log('Requesting ICM API with username:', icmApiUsername)
 

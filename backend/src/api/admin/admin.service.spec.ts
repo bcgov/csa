@@ -1,44 +1,49 @@
 import { HttpService } from '@nestjs/axios'
 import { ConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
+import { of, throwError } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { AdminService } from './admin.service'
-import { ICMEmployeeResponse } from './interfaces/icm-api.interface'
 
 describe('AdminService', () => {
   let service: AdminService
-
-  const mockHttpService = {
-    post: vi.fn(),
-    get: vi.fn(),
-  }
+  let mockHttpService: { get: ReturnType<typeof vi.fn> }
 
   const mockConfigService = {
-    get: vi.fn(),
+    get: vi.fn((key: string) => {
+      const config: Record<string, string> = {
+        'admin.icmApiUrl': 'https://icm.example.com',
+        'admin.icmTrustedUsername': 'trusted-user',
+        'app.deployEnv': 'dev',
+      }
+      return config[key]
+    }),
   }
 
   const mockKeycloakAuthService = {
     getBearerToken: vi.fn().mockResolvedValue('mock-bearer-token'),
   }
 
-  // ICM response mocks
-  const createICMResponse = (responsibilities: { Name: string }[]): ICMEmployeeResponse => ({
-    lastpage: 'true',
-    items: {
-      Id: '1',
-      'Party Name': 'Test User',
-      'Login Name': 'testuser',
-      Responsibility: responsibilities.map((r) => ({ ...r, Id: '1', Link: [] })),
-      Link: [],
+  // ICM API response mocks
+  const createICMApiResponse = (responsibilities: { Name: string }[]) => ({
+    data: {
+      lastpage: 'true',
+      items: {
+        Id: '1',
+        'Party Name': 'Test User',
+        'Login Name': 'testuser',
+        Responsibility: responsibilities.map((r) => ({ ...r, Id: '1', Link: [] })),
+        Link: [],
+      },
+      Link: { rel: '', href: '', name: '' },
     },
-    Link: { rel: '', href: '', name: '' },
   })
 
-  const icmRWResponse = createICMResponse([{ Name: 'ICM CSA Application - RW' }])
-  const icmROResponse = createICMResponse([{ Name: 'ICM CSA Application - RO' }])
-  const icmNoAccessResponse = createICMResponse([])
-
   beforeEach(async () => {
+    mockHttpService = {
+      get: vi.fn(),
+    }
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminService,
@@ -65,90 +70,63 @@ describe('AdminService', () => {
     expect(service).toBeDefined()
   })
 
-  describe('getUserPermissions', () => {
-    it('should return admin permissions for users with RW access', async () => {
-      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmRWResponse)
+  describe('verifyCSAAccess', () => {
+    it('should return hasAccess true for users with RW responsibility', async () => {
+      mockHttpService.get.mockReturnValue(
+        of(createICMApiResponse([{ Name: 'ICM CSA Application - RW' }])),
+      )
 
-      const result = await service.getUserPermissions('admin.user')
+      const result = await service.verifyCSAAccess('admin.user')
 
-      expect(result).toBeDefined()
-      expect(result.username).toBe('admin.user')
-      expect(result.permissions.length).toBeGreaterThan(2)
-      expect(result.responsibilities).toContain('admin')
-      expect(result.retrievedAt).toBeDefined()
+      expect(result.hasAccess).toBe(true)
+      expect(result.message).toBe('User has CSA access')
+      expect(result.icmResponsibility).toBe('ICM CSA Application - RW')
     })
 
-    it('should return reviewer permissions for users with RO access', async () => {
-      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmROResponse)
+    it('should return hasAccess true for users with RO responsibility', async () => {
+      mockHttpService.get.mockReturnValue(
+        of(createICMApiResponse([{ Name: 'ICM CSA Application - RO' }])),
+      )
 
-      const result = await service.getUserPermissions('reviewer.user')
+      const result = await service.verifyCSAAccess('reviewer.user')
 
-      expect(result).toBeDefined()
-      expect(result.username).toBe('reviewer.user')
-      expect(result.responsibilities).toContain('reviewer')
+      expect(result.hasAccess).toBe(true)
+      expect(result.message).toBe('User has CSA access')
+      expect(result.icmResponsibility).toBe('ICM CSA Application - RO')
     })
 
-    it('should return basic permissions for users without CSA access', async () => {
-      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmNoAccessResponse)
+    it('should return hasAccess false for users without CSA responsibility', async () => {
+      mockHttpService.get.mockReturnValue(of(createICMApiResponse([])))
 
-      const result = await service.getUserPermissions('regular.user')
+      const result = await service.verifyCSAAccess('regular.user')
 
-      expect(result).toBeDefined()
-      expect(result.username).toBe('regular.user')
-      expect(result.responsibilities).toContain('user')
-      expect(result.permissions.length).toBe(2) // base permissions only
-    })
-  })
-
-  describe('hasPermission', () => {
-    it('should return true for user with RW access checking admin permissions', async () => {
-      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmRWResponse)
-
-      const result = await service.hasPermission('admin.user', 'admin.access')
-
-      expect(result).toBe(true)
+      expect(result.hasAccess).toBe(false)
+      expect(result.message).toBe('User does not have ICM CSA Application responsibility')
     })
 
-    it('should return false for user without CSA access checking admin permissions', async () => {
-      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmNoAccessResponse)
+    it('should return hasAccess false when ICM API fails', async () => {
+      mockHttpService.get.mockReturnValue(throwError(() => new Error('ICM API error')))
 
-      const result = await service.hasPermission('regular.user', 'admin.access')
+      const result = await service.verifyCSAAccess('any.user')
 
-      expect(result).toBe(false)
+      expect(result.hasAccess).toBe(false)
+      expect(result.message).toBe('Failed to verify user access from ICM system')
     })
 
-    it('should return true for all users with read permissions', async () => {
-      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmNoAccessResponse)
+    it('should prefer RW over RO when user has both responsibilities', async () => {
+      mockHttpService.get.mockReturnValue(
+        of(
+          createICMApiResponse([
+            { Name: 'ICM CSA Application - RW' },
+            { Name: 'ICM CSA Application - RO' },
+          ]),
+        ),
+      )
 
-      const result = await service.hasPermission('regular.user', 'applicants.read')
+      const result = await service.verifyCSAAccess('admin.user')
 
-      expect(result).toBe(true)
-    })
-  })
-
-  describe('hasResponsibility', () => {
-    it('should return true for user with RW access checking admin responsibility', async () => {
-      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmRWResponse)
-
-      const result = await service.hasResponsibility('admin.user', 'admin')
-
-      expect(result).toBe(true)
-    })
-
-    it('should return false for user without CSA access checking admin responsibility', async () => {
-      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmNoAccessResponse)
-
-      const result = await service.hasResponsibility('regular.user', 'admin')
-
-      expect(result).toBe(false)
-    })
-
-    it('should return true for user with RO access checking reviewer responsibility', async () => {
-      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmROResponse)
-
-      const result = await service.hasResponsibility('reviewer.user', 'reviewer')
-
-      expect(result).toBe(true)
+      expect(result.hasAccess).toBe(true)
+      expect(result.icmResponsibility).toBe('ICM CSA Application - RW')
     })
   })
 })

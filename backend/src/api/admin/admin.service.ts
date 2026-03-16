@@ -192,7 +192,7 @@ export class AdminService {
         message: 'User does not have ICM CSA Application responsibility',
       }
     } catch (error) {
-      console.error('Failed to verify CSA access from ICM:', error)
+      this.logger.error('Failed to verify CSA access from ICM:', error)
       // Return unauthorized if ICM check fails
       return {
         hasAccess: false,
@@ -406,7 +406,7 @@ export class AdminService {
 
       return response.data
     } catch (error) {
-      console.error('ICM API request failed:', error)
+      this.logger.error('ICM API request failed:', error)
       throw new HttpException(
         'Failed to fetch user data from ICM',
         HttpStatus.INTERNAL_SERVER_ERROR,

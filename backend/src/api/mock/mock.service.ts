@@ -11,6 +11,11 @@ export class MockService {
   private readonly dataDir = join(__dirname, 'data')
 
   getFile(filename: string): unknown {
+    if (/[^a-zA-Z0-9_-]/.test(filename)) {
+      this.logger.warn(`Invalid mock filename rejected: ${filename}`)
+      return null
+    }
+
     const filePath = join(this.dataDir, `${filename}.json`)
 
     if (!existsSync(filePath)) {

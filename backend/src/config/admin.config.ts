@@ -22,9 +22,6 @@ export const adminConfig = registerAs('admin', () => {
   if (!icmTrustedUsername) {
     throw new Error('ICM_TRUSTED_USERNAME is required')
   }
-  if (!icmUsername) {
-    throw new Error('ICM_API_USERNAME is required')
-  }
   if (!keycloakTokenUrl) {
     throw new Error('KEYCLOAK_TOKEN_URL is required')
   }

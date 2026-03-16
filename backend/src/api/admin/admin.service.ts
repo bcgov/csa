@@ -71,22 +71,21 @@ export class AdminService {
       const bearerToken = await this.keycloakAuthService.getBearerToken()
 
       const icmApiUrl = this.configService.get<string>('admin.icmApiUrl')!
-      // const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
+      const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
       const deployEnv = this.configService.get<string>('app.deployEnv')
       const configUsername = this.configService.get<string>('admin.icmUsername')
 
-      const icmApiUsername = username
+      let icmApiUsername = username
       if (configUsername && deployEnv !== 'prod') {
         this.logger.warn(
           `ICM username override active: using '${configUsername}' instead of '${username}'`,
         )
-        // icmApiUsername = configUsername
+        icmApiUsername = configUsername
       } else if (configUsername && deployEnv === 'prod') {
         this.logger.warn('ICM_API_USERNAME is set but ignored in prod — using actual username')
       }
 
-      // const trustedUser = deployEnv === 'prod' ? username : icmTrustedUsername
-      const trustedUser = username
+      const trustedUser = deployEnv === 'prod' ? username : icmTrustedUsername
 
       this.logger.log('Requesting ICM API with username:', icmApiUsername)
 

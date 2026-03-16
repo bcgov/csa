@@ -71,7 +71,7 @@ export class AdminService {
       const bearerToken = await this.keycloakAuthService.getBearerToken()
 
       const icmApiUrl = this.configService.get<string>('admin.icmApiUrl')!
-      const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
+      // const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
       const deployEnv = this.configService.get<string>('app.deployEnv')
       const configUsername = this.configService.get<string>('admin.icmUsername')
 

@@ -30,14 +30,8 @@ export class AdminService {
         retrievedAt: new Date().toISOString(),
       }
     } catch (error) {
-      this.logger.warn('Failed to fetch user permissions from ICM, using fallback', error)
-      const mockPermissions = this.getMockPermissions(username)
-      return {
-        username,
-        permissions: mockPermissions.permissions,
-        responsibilities: mockPermissions.responsibilities,
-        retrievedAt: new Date().toISOString(),
-      }
+      this.logger.error('Failed to fetch user permissions from ICM', error)
+      throw error
     }
   }
 
@@ -87,104 +81,6 @@ export class AdminService {
         hasAccess: false,
         message: 'Failed to verify user access from ICM system',
       }
-    }
-  }
-
-  // TODO: Replace with ICM integration
-  private getMockPermissions(username: string): {
-    permissions: PermissionDto[]
-    responsibilities: string[]
-  } {
-    const isAdmin = username.toLowerCase().includes('admin')
-    const isReviewer = username.toLowerCase().includes('reviewer')
-
-    const basePermissions: PermissionDto[] = [
-      {
-        id: 'applicants.read',
-        name: 'Read Applicants',
-        description: 'View applicant information',
-        resource: 'applicants',
-        action: 'read',
-      },
-      {
-        id: 'batches.read',
-        name: 'Read Batches',
-        description: 'View batch information',
-        resource: 'batches',
-        action: 'read',
-      },
-    ]
-
-    if (isAdmin) {
-      return {
-        permissions: [
-          ...basePermissions,
-          {
-            id: 'applicants.write',
-            name: 'Write Applicants',
-            description: 'Create and update applicant information',
-            resource: 'applicants',
-            action: 'write',
-          },
-          {
-            id: 'applicants.delete',
-            name: 'Delete Applicants',
-            description: 'Delete applicant records',
-            resource: 'applicants',
-            action: 'delete',
-          },
-          {
-            id: 'batches.write',
-            name: 'Write Batches',
-            description: 'Create and update batches',
-            resource: 'batches',
-            action: 'write',
-          },
-          {
-            id: 'batches.delete',
-            name: 'Delete Batches',
-            description: 'Delete batch records',
-            resource: 'batches',
-            action: 'delete',
-          },
-          {
-            id: 'admin.access',
-            name: 'Admin Access',
-            description: 'Full administrative access',
-            resource: 'admin',
-            action: 'all',
-          },
-        ],
-        responsibilities: ['admin', 'approver', 'reviewer'],
-      }
-    }
-
-    if (isReviewer) {
-      return {
-        permissions: [
-          ...basePermissions,
-          {
-            id: 'applicants.review',
-            name: 'Review Applicants',
-            description: 'Review and comment on applications',
-            resource: 'applicants',
-            action: 'review',
-          },
-          {
-            id: 'batches.review',
-            name: 'Review Batches',
-            description: 'Review batch submissions',
-            resource: 'batches',
-            action: 'review',
-          },
-        ],
-        responsibilities: ['reviewer'],
-      }
-    }
-
-    return {
-      permissions: basePermissions,
-      responsibilities: ['user'],
     }
   }
 

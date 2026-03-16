@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { AdminService } from './admin.service'
+import { ICMEmployeeResponse } from './interfaces/icm-api.interface'
 
 describe('AdminService', () => {
   let service: AdminService
@@ -19,6 +20,23 @@ describe('AdminService', () => {
   const mockKeycloakAuthService = {
     getBearerToken: vi.fn().mockResolvedValue('mock-bearer-token'),
   }
+
+  // ICM response mocks
+  const createICMResponse = (responsibilities: { Name: string }[]): ICMEmployeeResponse => ({
+    lastpage: 'true',
+    items: {
+      Id: '1',
+      'Party Name': 'Test User',
+      'Login Name': 'testuser',
+      Responsibility: responsibilities.map((r) => ({ ...r, Id: '1', Link: [] })),
+      Link: [],
+    },
+    Link: { rel: '', href: '', name: '' },
+  })
+
+  const icmRWResponse = createICMResponse([{ Name: 'ICM CSA Application - RW' }])
+  const icmROResponse = createICMResponse([{ Name: 'ICM CSA Application - RO' }])
+  const icmNoAccessResponse = createICMResponse([])
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -40,6 +58,7 @@ describe('AdminService', () => {
     }).compile()
 
     service = module.get<AdminService>(AdminService)
+    vi.clearAllMocks()
   })
 
   it('should be defined', () => {
@@ -47,7 +66,9 @@ describe('AdminService', () => {
   })
 
   describe('getUserPermissions', () => {
-    it('should return admin permissions for admin users', async () => {
+    it('should return admin permissions for users with RW access', async () => {
+      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmRWResponse)
+
       const result = await service.getUserPermissions('admin.user')
 
       expect(result).toBeDefined()
@@ -57,7 +78,9 @@ describe('AdminService', () => {
       expect(result.retrievedAt).toBeDefined()
     })
 
-    it('should return reviewer permissions for reviewer users', async () => {
+    it('should return reviewer permissions for users with RO access', async () => {
+      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmROResponse)
+
       const result = await service.getUserPermissions('reviewer.user')
 
       expect(result).toBeDefined()
@@ -65,7 +88,9 @@ describe('AdminService', () => {
       expect(result.responsibilities).toContain('reviewer')
     })
 
-    it('should return basic permissions for regular users', async () => {
+    it('should return basic permissions for users without CSA access', async () => {
+      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmNoAccessResponse)
+
       const result = await service.getUserPermissions('regular.user')
 
       expect(result).toBeDefined()
@@ -76,19 +101,25 @@ describe('AdminService', () => {
   })
 
   describe('hasPermission', () => {
-    it('should return true for admin user with admin permissions', async () => {
+    it('should return true for user with RW access checking admin permissions', async () => {
+      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmRWResponse)
+
       const result = await service.hasPermission('admin.user', 'admin.access')
 
       expect(result).toBe(true)
     })
 
-    it('should return false for regular user with admin permissions', async () => {
+    it('should return false for user without CSA access checking admin permissions', async () => {
+      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmNoAccessResponse)
+
       const result = await service.hasPermission('regular.user', 'admin.access')
 
       expect(result).toBe(false)
     })
 
     it('should return true for all users with read permissions', async () => {
+      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmNoAccessResponse)
+
       const result = await service.hasPermission('regular.user', 'applicants.read')
 
       expect(result).toBe(true)
@@ -96,19 +127,25 @@ describe('AdminService', () => {
   })
 
   describe('hasResponsibility', () => {
-    it('should return true for admin user with admin responsibility', async () => {
+    it('should return true for user with RW access checking admin responsibility', async () => {
+      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmRWResponse)
+
       const result = await service.hasResponsibility('admin.user', 'admin')
 
       expect(result).toBe(true)
     })
 
-    it('should return false for regular user with admin responsibility', async () => {
+    it('should return false for user without CSA access checking admin responsibility', async () => {
+      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmNoAccessResponse)
+
       const result = await service.hasResponsibility('regular.user', 'admin')
 
       expect(result).toBe(false)
     })
 
-    it('should return true for reviewer user with reviewer responsibility', async () => {
+    it('should return true for user with RO access checking reviewer responsibility', async () => {
+      vi.spyOn(service, 'fetchUserFromICM').mockResolvedValue(icmROResponse)
+
       const result = await service.hasResponsibility('reviewer.user', 'reviewer')
 
       expect(result).toBe(true)

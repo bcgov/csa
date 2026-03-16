@@ -3,13 +3,13 @@ const buildDataSourceUrl = (): string => {
     return process.env.DATABASE_URL
   }
 
-  const host = process.env.POSTGRES_HOST || 'localhost'
-  const user = process.env.POSTGRES_USER || 'postgres'
-  const password = encodeURIComponent(process.env.POSTGRES_PASSWORD || 'default')
+  const host = process.env.POSTGRES_HOST
+  const user = process.env.POSTGRES_USER
+  const password = process.env.POSTGRES_PASSWORD
   const port = process.env.POSTGRES_PORT || 5432
-  const database = process.env.POSTGRES_DATABASE || 'postgres'
+  const database = process.env.POSTGRES_DATABASE
 
-  return `postgresql://${user}:${password}@${host}:${port}/${database}`
+  return `postgresql://${user}:${encodeURIComponent(password)}@${host}:${port}/${database}`
 }
 
 export const databaseConfig = {

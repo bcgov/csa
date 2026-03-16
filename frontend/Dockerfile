@@ -1,5 +1,5 @@
 # ---------- Build static assets ----------
-FROM node:24.13-slim AS build
+FROM node:24.14-slim AS build
 WORKDIR /app
 
 # Install deps (requires package-lock.json to be in sync)

@@ -161,9 +161,17 @@ export class SendCraFileHandler extends BaseJob {
     })
 
     if (await this.icmSyncBackService.hasFlaggedContacts()) {
-      this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM).catch((err) => {
+      this.logger.log('Syncing flagged contacts back to ICM...')
+      try {
+        const syncResult = await this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM)
+        if (!syncResult.success) {
+          this.logger.warn(
+            `ICM sync-back failed: ${syncResult.message}. Retry will pick up flagged contacts.`,
+          )
+        }
+      } catch (err) {
         this.logger.warn(`Post-CRA ICM sync failed: ${(err as Error).message}`)
-      })
+      }
     }
   }
 

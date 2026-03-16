@@ -12,6 +12,8 @@ process.env.ICM_TRUSTED_USERNAME = 'test-user'
 process.env.ICM_TOKEN_URL = 'http://mock-keycloak/token'
 process.env.ICM_CLIENT_ID = 'test-client'
 process.env.ICM_CLIENT_SECRET = 'test-secret'
+process.env.SSO_KEYCLOAK_URL = 'http://mock-sso-keycloak'
+process.env.SSO_KEYCLOAK_REALM = 'test-realm'
 
 // Silence all NestJS logger output in tests
 ConsoleLogger.prototype.log = function () {}

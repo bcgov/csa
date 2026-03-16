@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseIntPipe,
+  Post,
+  UseGuards,
+} from '@nestjs/common'
 import { ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { AddContactsDto } from '../batches/dto/add-contact.dto'
 import { CurrentUser } from '../common/decorators'
@@ -36,23 +46,23 @@ export class BatchesController {
   @ApiResponse({ status: 204, description: 'Contact removed from pending batch' })
   @ApiResponse({ status: 404, description: 'Contact not found in pending batch' })
   async removeContactFromPending(
-    @Param('contactId') contactId: string,
+    @Param('contactId', ParseIntPipe) contactId: number,
     @CurrentUser() userId: string,
   ) {
-    await this.batchesService.removeContactFromPendingBatch(+contactId, userId)
+    await this.batchesService.removeContactFromPendingBatch(contactId, userId)
   }
 
   @Get(':id')
   @ApiResponse({ status: 200, description: 'Batch details' })
   @ApiResponse({ status: 404, description: 'Batch not found' })
-  findOne(@Param('id') id: string) {
-    return this.batchesService.findOne(+id)
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.batchesService.findOne(id)
   }
 
   @Get(':id/contacts')
   @ApiResponse({ status: 200, description: 'List of contacts in this batch' })
   @ApiResponse({ status: 404, description: 'Batch not found' })
-  findBatchContacts(@Param('id') id: string) {
-    return this.batchesService.findBatchContacts(+id)
+  findBatchContacts(@Param('id', ParseIntPipe) id: number) {
+    return this.batchesService.findBatchContacts(id)
   }
 }

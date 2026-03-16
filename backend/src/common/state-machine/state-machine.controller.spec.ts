@@ -1,6 +1,8 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { AdminService } from 'src/api/admin/admin.service'
+import { JwtVerificationService } from 'src/common/auth/jwt-verification.service'
 import { CSA_STATUS } from './constants'
 import { StateMachineController } from './state-machine.controller'
 
@@ -10,6 +12,10 @@ describe('StateMachineController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [StateMachineController],
+      providers: [
+        { provide: AdminService, useValue: {} },
+        { provide: JwtVerificationService, useValue: {} },
+      ],
     }).compile()
 
     controller = module.get<StateMachineController>(StateMachineController)

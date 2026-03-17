@@ -237,6 +237,8 @@ function App() {
 
   const [selectedTab, setSelectedTab] = useState(0)
   const [selected, setSelected] = useState<number[]>([])
+  // Cache of selected records' csaStatusRaw values for cross-page validation
+  const [selectedRecordsCache, setSelectedRecordsCache] = useState<Map<number, string>>(new Map())
   const [selectedBatchDetails, setSelectedBatchDetails] = useState<number[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterSearchTerm, setFilterSearchTerm] = useState('')
@@ -906,6 +908,7 @@ function App() {
     setFilterSearchTerm('')
     // Clear selected records when changing PDQ filter
     setSelected([])
+    setSelectedRecordsCache(new Map())
   }
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -1056,6 +1059,7 @@ function App() {
 
       // Clear selection
       setSelected([])
+      setSelectedRecordsCache(new Map())
 
       // Reload contacts to reflect the changes if at least one record was updated
       if (totalSuccess > 0) {
@@ -1120,6 +1124,7 @@ function App() {
 
       // Clear selection
       setSelected([])
+      setSelectedRecordsCache(new Map())
 
       // Reload contacts to reflect the changes
       if (response.success.length > 0) {
@@ -1184,6 +1189,7 @@ function App() {
 
       // Clear selection
       setSelected([])
+      setSelectedRecordsCache(new Map())
 
       // Reload contacts to reflect the changes
       if (response.success.length > 0) {
@@ -1250,6 +1256,7 @@ function App() {
 
       // Clear selection
       setSelected([])
+      setSelectedRecordsCache(new Map())
 
       // Reload contacts to reflect the changes
       if (response.success.length > 0) {
@@ -1321,6 +1328,7 @@ function App() {
 
       // Clear selection after successful operation
       setSelected([])
+      setSelectedRecordsCache(new Map())
 
       // Reload contacts to reflect the updated CSA status
       if (successCount > 0) {
@@ -1783,20 +1791,20 @@ function App() {
     if (selected.length === 0) return false
 
     return selected.every((id) => {
-      const record = filteredData.find((row) => row.id === id)
-      return record && VALID_CSA_STATUSES.includes(record.csaStatusRaw)
+      const cachedStatus = selectedRecordsCache.get(id)
+      return cachedStatus && VALID_CSA_STATUSES.includes(cachedStatus)
     })
-  }, [selected, filteredData])
+  }, [selected, selectedRecordsCache])
 
   // Check if all selected records have valid CSA status for Add to Batch
   const canAddToBatch = useMemo(() => {
     if (selected.length === 0) return false
 
     return selected.every((id) => {
-      const record = filteredData.find((row) => row.id === id)
-      return record && VALID_BATCH_STATUSES.includes(record.csaStatusRaw)
+      const cachedStatus = selectedRecordsCache.get(id)
+      return cachedStatus && VALID_BATCH_STATUSES.includes(cachedStatus)
     })
-  }, [selected, filteredData])
+  }, [selected, selectedRecordsCache])
 
   // Check if Remove from Batch button should be enabled
   const canRemoveFromBatch = useMemo(() => {
@@ -2491,11 +2499,27 @@ function App() {
                                   })
                                   return newSelected
                                 })
+                                // Update cache with current page records
+                                setSelectedRecordsCache((prev) => {
+                                  const newCache = new Map(prev)
+                                  filteredData.forEach((row) => {
+                                    newCache.set(row.id, row.csaStatusRaw)
+                                  })
+                                  return newCache
+                                })
                               } else {
                                 // Deselect all rows on current page
                                 setSelected((prev) => {
                                   const currentPageIds = filteredData.map((row) => row.id)
                                   return prev.filter((id) => !currentPageIds.includes(id))
+                                })
+                                // Remove current page records from cache
+                                setSelectedRecordsCache((prev) => {
+                                  const newCache = new Map(prev)
+                                  filteredData.forEach((row) => {
+                                    newCache.delete(row.id)
+                                  })
+                                  return newCache
                                 })
                               }
                             }}
@@ -2789,11 +2813,21 @@ function App() {
                               checked={selected.includes(row.id)}
                               onChange={(e) => {
                                 e.stopPropagation()
-                                setSelected((prev) =>
-                                  prev.includes(row.id)
-                                    ? prev.filter((id) => id !== row.id)
-                                    : [...prev, row.id],
-                                )
+                                if (selected.includes(row.id)) {
+                                  setSelected((prev) => prev.filter((id) => id !== row.id))
+                                  setSelectedRecordsCache((prev) => {
+                                    const newCache = new Map(prev)
+                                    newCache.delete(row.id)
+                                    return newCache
+                                  })
+                                } else {
+                                  setSelected((prev) => [...prev, row.id])
+                                  setSelectedRecordsCache((prev) => {
+                                    const newCache = new Map(prev)
+                                    newCache.set(row.id, row.csaStatusRaw)
+                                    return newCache
+                                  })
+                                }
                               }}
                             />
                           </TableCell>

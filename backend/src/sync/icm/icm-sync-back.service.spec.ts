@@ -154,6 +154,70 @@ describe('IcmSyncBackService', () => {
     })
   })
 
+  describe('syncFlaggedWithRetry', () => {
+    it('should return null when no contacts are flagged', async () => {
+      const result = await service.syncFlaggedWithRetry()
+
+      expect(result).toBeNull()
+      expect(prisma.contact.findMany).not.toHaveBeenCalled()
+    })
+
+    it('should sync once when no failures', async () => {
+      prisma.contact.findFirst.mockResolvedValue({ id: 1 })
+      const contacts = [makeContact(1)]
+      prisma.contact.findMany.mockResolvedValue(contacts)
+
+      const result = await service.syncFlaggedWithRetry()
+
+      expect(result).toEqual({ totalFlagged: 1, synced: 1, failed: 0, chunks: 1 })
+      expect(prisma.contact.findMany).toHaveBeenCalledTimes(1)
+    })
+
+    it('should retry once on partial failure', async () => {
+      prisma.contact.findFirst.mockResolvedValue({ id: 1 })
+      prisma.contact.findMany
+        .mockResolvedValueOnce([makeContact(1), makeContact(2)])
+        .mockResolvedValueOnce([makeContact(2)])
+      icmDataSource.updateContacts
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('ICM chunk fail'))
+        .mockResolvedValueOnce(undefined)
+
+      // First call: 2 contacts, chunk1 ok (contact 1), chunk2 fail (contact 2) -> but batch size is 100 so it's 1 chunk
+      // Let's simplify: make updateContacts fail on first call's chunk
+      prisma.contact.findMany.mockReset()
+      icmDataSource.updateContacts.mockReset()
+
+      prisma.contact.findFirst.mockResolvedValue({ id: 1 })
+      prisma.contact.findMany
+        .mockResolvedValueOnce([makeContact(1)])
+        .mockResolvedValueOnce([makeContact(1)])
+      icmDataSource.updateContacts
+        .mockRejectedValueOnce(new Error('ICM down'))
+        .mockResolvedValueOnce(undefined)
+
+      const result = await service.syncFlaggedWithRetry()
+
+      expect(result).toEqual({ totalFlagged: 1, synced: 1, failed: 0, chunks: 1 })
+      expect(prisma.contact.findMany).toHaveBeenCalledTimes(2)
+    })
+
+    it('should report failures after retry still fails', async () => {
+      prisma.contact.findFirst.mockResolvedValue({ id: 1 })
+      prisma.contact.findMany
+        .mockResolvedValueOnce([makeContact(1)])
+        .mockResolvedValueOnce([makeContact(1)])
+      icmDataSource.updateContacts
+        .mockRejectedValueOnce(new Error('ICM down'))
+        .mockRejectedValueOnce(new Error('ICM still down'))
+
+      const result = await service.syncFlaggedWithRetry()
+
+      expect(result).toEqual({ totalFlagged: 1, synced: 0, failed: 1, chunks: 1 })
+      expect(prisma.contact.findMany).toHaveBeenCalledTimes(2)
+    })
+  })
+
   describe('syncSingleContact', () => {
     it('should sync contact and clear flag on success', async () => {
       prisma.contact.findUnique.mockResolvedValue(makeContact(1))

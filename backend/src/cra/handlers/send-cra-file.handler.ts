@@ -13,11 +13,9 @@ import {
   CSA_EVENT,
 } from 'src/common/state-machine/constants'
 import { BaseJob } from 'src/jobs/base-job'
-import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
-import { JobRunner } from 'src/jobs/job-runner.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { OutboundDataService } from '../outbound/outbound-data.service'
@@ -42,7 +40,6 @@ export class SendCraFileHandler extends BaseJob {
     private readonly outboundDataService: OutboundDataService,
     private readonly outboundFileService: OutboundFileService,
     private readonly craTransferService: CraTransferService,
-    private readonly jobRunner: JobRunner,
     private readonly icmSyncBackService: IcmSyncBackService,
   ) {
     super()
@@ -160,18 +157,10 @@ export class SendCraFileHandler extends BaseJob {
       data: { batchDate: pacificToday() },
     })
 
-    if (await this.icmSyncBackService.hasFlaggedContacts()) {
-      this.logger.log('Syncing flagged contacts back to ICM...')
-      try {
-        const syncResult = await this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM)
-        if (!syncResult.success) {
-          this.logger.warn(
-            `ICM sync-back failed: ${syncResult.message}. Retry will pick up flagged contacts.`,
-          )
-        }
-      } catch (err) {
-        this.logger.warn(`Post-CRA ICM sync failed: ${(err as Error).message}`)
-      }
+    try {
+      await this.icmSyncBackService.syncFlaggedWithRetry()
+    } catch (err) {
+      this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`)
     }
   }
 

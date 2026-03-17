@@ -11,7 +11,7 @@ export function extractUsernameFromPayload(decoded: Record<string, unknown>): st
   return username.toUpperCase()
 }
 
-// TODO: frontend only uses username, email, firstName, lastName — consider removing sub and exp
+// TODO: frontend only uses username, email, firstName, lastName. consider removing sub and exp
 export function toUserInfoDto(decoded: Record<string, unknown>, username: string): UserInfoDto {
   return {
     username,

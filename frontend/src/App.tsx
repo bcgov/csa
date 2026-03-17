@@ -1791,7 +1791,6 @@ function App() {
       serviceProviderName: contact.serviceProviderName || '',
       providerId: contact.providerId || '',
       placeOfServiceName: contact.placeOfServiceName || '',
-      sourceAgreement: '', // Placeholder - backend field not yet available
       agreementType: contact.agreementType || '',
       agreementStatus: contact.agreementStatus || '',
       agreementStartDate: contact.agreementStartDate
@@ -4134,7 +4133,23 @@ function App() {
                                       wordBreak: 'break-word',
                                     }}
                                   >
-                                    {childData.sourceAgreement || '-'}
+                                    {childData.sourcePlacement ? (
+                                      <Typography
+                                        component="span"
+                                        sx={{
+                                          backgroundColor: '#e3f2fd',
+                                          color: '#1976d2',
+                                          px: 1,
+                                          py: 0.5,
+                                          borderRadius: 1,
+                                          fontSize: '0.75rem',
+                                        }}
+                                      >
+                                        {childData.sourcePlacement}
+                                      </Typography>
+                                    ) : (
+                                      '-'
+                                    )}
                                   </Typography>
                                 </Box>
 

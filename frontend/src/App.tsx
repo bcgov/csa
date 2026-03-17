@@ -195,12 +195,6 @@ function App() {
     clearCsaAccessAlert,
   } = useAuth()
 
-  // Log Keycloak authentication token (for testing in deployed version)
-  console.log('=== KEYCLOAK AUTH TOKEN ===')
-  console.log('Keycloak Authenticated:', keycloakAuthenticated)
-  console.log('Has CSA Access:', hasCSAAccess)
-  console.log('==========================')
-
   // Local authentication state for IDIR mock login
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     const saved = localStorage.getItem('isLoggedIn')
@@ -295,8 +289,6 @@ function App() {
       // Only verify if there's an existing login session with a token (IDIR login - not Keycloak SSO)
       // Keycloak SSO is handled by AuthContext
       if (savedLoginState === 'true' && savedToken) {
-        console.log('Re-verifying CSA access for existing login session...')
-
         try {
           const csaAccessResponse = await verifyCSAAccess()
 
@@ -331,8 +323,6 @@ function App() {
               message: 'User not authorised to access CSA',
               severity: 'error',
             })
-          } else {
-            console.log('CSA access verified successfully')
           }
         } catch (error) {
           console.error('Failed to re-verify CSA access:', error)
@@ -613,10 +603,6 @@ function App() {
         setContacts(response.data)
         setTotalPages(response.totalPages)
         setTotalRecords(response.total)
-        console.log('Fetched contacts:', response.data)
-        console.log('Total records:', response.total)
-        console.log('Applied filter:', filter)
-        console.log('Applied sort:', sort)
       } catch (error) {
         console.error('Failed to fetch contacts:', error)
         setContactsError('Failed to load contacts. Please try again.')
@@ -686,10 +672,6 @@ function App() {
         setContacts(response.data)
         setTotalPages(response.totalPages)
         setTotalRecords(response.total)
-        console.log('Column filter search results:', response.data)
-        console.log('Total column filter records:', response.total)
-        console.log('Active filters:', filters)
-        console.log('Applied filter:', combinedFilter)
       } catch (error) {
         console.error('Failed to search column:', error)
         setContactsError('Failed to search. Please try again.')
@@ -712,9 +694,6 @@ function App() {
         setContacts(response.data)
         setTotalPages(response.totalPages)
         setTotalRecords(response.total)
-        console.log('Search results:', response.data)
-        console.log('Total search records:', response.total)
-        console.log('Search query:', query)
       } catch (error) {
         console.error('Failed to search contacts:', error)
         setContactsError('Failed to search contacts. Please try again.')
@@ -935,14 +914,9 @@ function App() {
 
   // Mock IDIR login handler
   const handleIdirLogin = async () => {
-    // Simple validation - just check if fields are not empty
-    // if (username.trim() && password.trim()) {
     const mockToken = `mock-token-${Date.now()}`
     localStorage.setItem('authToken', mockToken)
     localStorage.setItem('username', username)
-    console.log('=== MOCK LOGIN - AUTH TOKEN SET ===')
-    console.log('Mock Token:', mockToken)
-    console.log('===================================')
 
     // Verify CSA access before granting login
     try {
@@ -996,15 +970,10 @@ function App() {
       })
       setShowIdirLogin(false)
     }
-    // }
   }
 
   // Mock logout handler
   const handleLogout = () => {
-    console.log('=== LOGOUT - CLEARING AUTH TOKEN ===')
-    console.log('Token before logout:', localStorage.getItem('authToken'))
-    console.log('====================================')
-
     if (keycloakAuthenticated) {
       // Logout from Keycloak
       logout()

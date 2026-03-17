@@ -2,16 +2,16 @@ import { Injectable } from '@nestjs/common'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
-import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
+import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobRunner } from 'src/jobs/job-runner.service'
-import { IcmSyncBackService } from '../icm/icm-sync-back.service'
+import { IcmSyncBackService, SyncBackResult } from '../icm/icm-sync-back.service'
 
 /*
  * Orchestrates the complete data sync flow:
  * 1. INGEST_ICM + INGEST_MIS
  * 2. RUN_ELIGIBILITY (after ingestion complete)
- * 3. SYNC_ICM (after eligibility)
+ * 3. Sync flagged contacts back to ICM (after eligibility)
  */
 @Injectable()
 export class IngestDataHandler extends BaseJob {
@@ -58,24 +58,11 @@ export class IngestDataHandler extends BaseJob {
         }
       }
 
-      let syncResult: JobResult | null = null
-      if (await this.icmSyncBackService.hasFlaggedContacts()) {
-        this.logger.log('Syncing flagged contacts back to ICM...')
-        try {
-          syncResult = await this.jobRunner.runJobType(JobType.SYNC_ICM, JobTrigger.SYSTEM, {
-            parentJobId,
-          })
-
-          if (!syncResult.success) {
-            this.logger.warn(
-              `ICM sync-back failed: ${syncResult.message}. Retry will pick up flagged contacts.`,
-            )
-          }
-        } catch (err) {
-          this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`)
-        }
-      } else {
-        this.logger.log('No contacts flagged for ICM sync, skipping')
+      let syncResult: SyncBackResult | null = null
+      try {
+        syncResult = await this.icmSyncBackService.syncFlaggedWithRetry()
+      } catch (err) {
+        this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`)
       }
 
       return {

@@ -75,7 +75,6 @@ describe('SendCraFileHandler', () => {
   let mockOutboundDataService: any
   let mockOutboundFileService: any
   let mockCraTransferService: any
-  let mockJobRunner: any
   let mockIcmSyncBackService: any
 
   beforeEach(() => {
@@ -123,12 +122,10 @@ describe('SendCraFileHandler', () => {
       sendFile: vi.fn().mockResolvedValue({ success: true, fileName: 'testfile.txt' }),
     }
 
-    mockJobRunner = {
-      runJobType: vi.fn().mockResolvedValue({ success: true }),
-    }
-
     mockIcmSyncBackService = {
-      hasFlaggedContacts: vi.fn().mockResolvedValue(true),
+      syncFlaggedWithRetry: vi
+        .fn()
+        .mockResolvedValue({ totalFlagged: 0, synced: 0, failed: 0, chunks: 0 }),
     }
 
     const mockConfigService = {
@@ -148,7 +145,6 @@ describe('SendCraFileHandler', () => {
       mockOutboundDataService,
       mockOutboundFileService,
       mockCraTransferService,
-      mockJobRunner,
       mockIcmSyncBackService,
     )
   })
@@ -385,19 +381,18 @@ describe('SendCraFileHandler', () => {
       )
     })
 
-    it('should trigger standalone SYNC_ICM job', async () => {
+    it('should call syncFlaggedWithRetry', async () => {
       const result = { success: true, message: 'Batch 10 sent to CRA' }
       await handler.onSuccess(mockContext, result)
 
-      expect(mockJobRunner.runJobType).toHaveBeenCalledWith(JobType.SYNC_ICM, JobTrigger.SYSTEM)
+      expect(mockIcmSyncBackService.syncFlaggedWithRetry).toHaveBeenCalled()
     })
 
-    it('should not trigger SYNC_ICM when no contacts are flagged for sync-back', async () => {
-      mockIcmSyncBackService.hasFlaggedContacts.mockResolvedValue(false)
+    it('should succeed even if sync-back throws', async () => {
+      mockIcmSyncBackService.syncFlaggedWithRetry.mockRejectedValue(new Error('ICM API down'))
       const result = { success: true, message: 'Batch 10 sent to CRA' }
-      await handler.onSuccess(mockContext, result)
 
-      expect(mockJobRunner.runJobType).not.toHaveBeenCalled()
+      await expect(handler.onSuccess(mockContext, result)).resolves.not.toThrow()
     })
 
     it('should set batchDate on the batch', async () => {

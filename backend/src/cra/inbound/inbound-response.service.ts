@@ -131,7 +131,7 @@ export class InboundResponseService {
     const rejectCodes: string[] = []
     const keys = ['rejectCd1', 'rejectCd2', 'rejectCd3', 'rejectCd4', 'rejectCd5'] as const
     for (const key of keys) {
-      if (detail[key]) {
+      if (detail[key] && detail[key] !== '000') {
         rejectCodes.push(detail[key])
       }
     }
@@ -143,6 +143,8 @@ export class InboundResponseService {
     for (const rejectCode of rejectCodes) {
       if (REJECT_CODE[rejectCode]) {
         errorMessages.push(REJECT_CODE[rejectCode])
+      } else {
+        errorMessages.push(`Unknown reject code: ${rejectCode}`)
       }
     }
     return errorMessages.join('; ')

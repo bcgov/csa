@@ -9,7 +9,9 @@ import { IngestDataHandler } from './ingest-data.handler'
 describe('IngestDataHandler', () => {
   let handler: IngestDataHandler
   let jobRunner: JobRunner
-  let icmSyncBackService: { hasFlaggedContacts: ReturnType<typeof vi.fn> }
+  let icmSyncBackService: {
+    syncFlaggedWithRetry: ReturnType<typeof vi.fn>
+  }
 
   const mockContext: JobContext = {
     jobRunId: 1,
@@ -19,7 +21,11 @@ describe('IngestDataHandler', () => {
   }
 
   beforeEach(async () => {
-    icmSyncBackService = { hasFlaggedContacts: vi.fn().mockResolvedValue(true) }
+    icmSyncBackService = {
+      syncFlaggedWithRetry: vi
+        .fn()
+        .mockResolvedValue({ totalFlagged: 0, synced: 0, failed: 0, chunks: 0 }),
+    }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -66,11 +72,10 @@ describe('IngestDataHandler', () => {
       expect(runJobTypeSpy).toHaveBeenNthCalledWith(3, JobType.RUN_ELIGIBILITY, JobTrigger.CRON, {
         parentJobId: 1,
       })
+      expect(runJobTypeSpy).toHaveBeenCalledTimes(3)
 
-      expect(runJobTypeSpy).toHaveBeenNthCalledWith(4, JobType.SYNC_ICM, JobTrigger.SYSTEM, {
-        parentJobId: 1,
-      })
-      expect(runJobTypeSpy).toHaveBeenCalledTimes(4)
+      // Verify inline sync was called
+      expect(icmSyncBackService.syncFlaggedWithRetry).toHaveBeenCalled()
     })
   })
 
@@ -129,8 +134,8 @@ describe('IngestDataHandler', () => {
       expect(runJobTypeSpy).toHaveBeenCalledTimes(3)
     })
 
-    it('should skip SYNC_ICM when no contacts are flagged', async () => {
-      icmSyncBackService.hasFlaggedContacts.mockResolvedValue(false)
+    it('should skip sync when no contacts are flagged', async () => {
+      icmSyncBackService.syncFlaggedWithRetry.mockResolvedValue(null)
       const runJobTypeSpy = vi.mocked(jobRunner.runJobType)
       runJobTypeSpy
         .mockResolvedValueOnce({ success: true }) // ICM
@@ -144,21 +149,18 @@ describe('IngestDataHandler', () => {
       expect(runJobTypeSpy).toHaveBeenCalledTimes(3)
     })
 
-    it('should succeed even if SYNC_ICM returns failure', async () => {
+    it('should succeed even if sync-back throws', async () => {
+      icmSyncBackService.syncFlaggedWithRetry.mockRejectedValue(new Error('ICM API down'))
       const runJobTypeSpy = vi.mocked(jobRunner.runJobType)
       runJobTypeSpy
         .mockResolvedValueOnce({ success: true }) // ICM
         .mockResolvedValueOnce({ success: true }) // MIS
         .mockResolvedValueOnce({ success: true }) // Eligibility
-        .mockResolvedValueOnce({ success: false, message: 'all 10 contacts failed' }) // Sync
 
       const result = await handler.execute(mockContext)
 
       expect(result.success).toBe(true)
       expect(result.message).toBe('Data ingestion and eligibility completed successfully')
-      expect(result.metadata).toEqual({
-        syncResult: { success: false, message: 'all 10 contacts failed' },
-      })
     })
 
     it('should handle unexpected errors with stack trace', async () => {

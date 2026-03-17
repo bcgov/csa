@@ -199,7 +199,6 @@ function App() {
   console.log('=== KEYCLOAK AUTH TOKEN ===')
   console.log('Keycloak Authenticated:', keycloakAuthenticated)
   console.log('Has CSA Access:', hasCSAAccess)
-  console.log('User Info:', user)
   console.log('==========================')
 
   // Local authentication state for IDIR mock login
@@ -462,6 +461,11 @@ function App() {
     column: '',
   })
   const [batchDetailsFilterSearchTerm, setBatchDetailsFilterSearchTerm] = useState('')
+
+  // Pagination states for batch tables
+  const [batchRequestsPage, setBatchRequestsPage] = useState(1)
+  const [batchDetailsPage, setBatchDetailsPage] = useState(1)
+  const BATCH_PAGE_SIZE = 10
 
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({
     firstName: [],
@@ -2016,6 +2020,35 @@ function App() {
     return data
   }, [currentBatchDetails, batchDetailsSearchTerm, batchDetailsColumnFilters])
 
+  // Paginated batch requests
+  const paginatedBatchRequests = useMemo(() => {
+    const startIndex = (batchRequestsPage - 1) * BATCH_PAGE_SIZE
+    return filteredBatchRequests.slice(startIndex, startIndex + BATCH_PAGE_SIZE)
+  }, [filteredBatchRequests, batchRequestsPage])
+
+  const batchRequestsTotalPages = useMemo(() => {
+    return Math.ceil(filteredBatchRequests.length / BATCH_PAGE_SIZE)
+  }, [filteredBatchRequests.length])
+
+  // Paginated batch details
+  const paginatedBatchDetails = useMemo(() => {
+    const startIndex = (batchDetailsPage - 1) * BATCH_PAGE_SIZE
+    return filteredBatchDetails.slice(startIndex, startIndex + BATCH_PAGE_SIZE)
+  }, [filteredBatchDetails, batchDetailsPage])
+
+  const batchDetailsTotalPages = useMemo(() => {
+    return Math.ceil(filteredBatchDetails.length / BATCH_PAGE_SIZE)
+  }, [filteredBatchDetails.length])
+
+  // Reset pagination when filters/search change
+  useEffect(() => {
+    setBatchRequestsPage(1)
+  }, [batchRequestsSearchTerm, batchRequestsColumnFilters])
+
+  useEffect(() => {
+    setBatchDetailsPage(1)
+  }, [batchDetailsSearchTerm, batchDetailsColumnFilters, selectedBatch])
+
   return (
     <Box
       sx={{
@@ -2530,7 +2563,7 @@ function App() {
                               onClick={(e) => handleSortClick(e, 'firstName')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              First Name
+                              Given Name
                             </span>
                             <IconButton
                               size="small"
@@ -2554,7 +2587,7 @@ function App() {
                               onClick={(e) => handleSortClick(e, 'middleName')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              Middle Name
+                              Middle Name(s)
                             </span>
                             <IconButton
                               size="small"
@@ -4664,7 +4697,7 @@ function App() {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        filteredBatchRequests.map((row) => (
+                        paginatedBatchRequests.map((row) => (
                           <TableRow
                             key={row.id}
                             hover
@@ -4689,6 +4722,32 @@ function App() {
                     </TableBody>
                   </Table>
                 </TableContainer>
+
+                {/* Batch Requests Pagination */}
+                {filteredBatchRequests.length > 0 && (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      mt: 2,
+                      px: 2,
+                    }}
+                  >
+                    <Typography variant="body2" color="text.secondary">
+                      Showing {paginatedBatchRequests.length} of {filteredBatchRequests.length}{' '}
+                      records
+                    </Typography>
+                    <Pagination
+                      count={batchRequestsTotalPages}
+                      page={batchRequestsPage}
+                      onChange={(_, page) => setBatchRequestsPage(page)}
+                      color="primary"
+                      showFirstButton
+                      showLastButton
+                    />
+                  </Box>
+                )}
 
                 {/* Batch Details Section */}
                 <Box sx={{ mt: 4 }}>
@@ -4795,7 +4854,7 @@ function App() {
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              Middle Name
+                              Middle Name(s)
                               <IconButton
                                 size="small"
                                 onClick={(e) => handleBatchDetailsFilterClick(e, 'middleName')}
@@ -4905,7 +4964,7 @@ function App() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          filteredBatchDetails.map((row) => (
+                          paginatedBatchDetails.map((row) => (
                             <TableRow
                               key={row.id}
                               hover
@@ -4935,6 +4994,32 @@ function App() {
                       </TableBody>
                     </Table>
                   </TableContainer>
+
+                  {/* Batch Details Pagination */}
+                  {filteredBatchDetails.length > 0 && (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mt: 2,
+                        px: 2,
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        Showing {paginatedBatchDetails.length} of {filteredBatchDetails.length}{' '}
+                        records
+                      </Typography>
+                      <Pagination
+                        count={batchDetailsTotalPages}
+                        page={batchDetailsPage}
+                        onChange={(_, page) => setBatchDetailsPage(page)}
+                        color="primary"
+                        showFirstButton
+                        showLastButton
+                      />
+                    </Box>
+                  )}
                 </Box>
               </Box>
             )}

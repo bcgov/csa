@@ -82,6 +82,28 @@ export class IcmSyncBackService {
     return { totalFlagged: flagged.length, synced, failed, chunks }
   }
 
+  async syncFlaggedWithRetry(): Promise<SyncBackResult | null> {
+    if (!(await this.hasFlaggedContacts())) return null
+
+    this.logger.log('Syncing flagged contacts back to ICM...')
+    let result = await this.syncFlaggedContacts()
+
+    if (result.failed > 0) {
+      this.logger.warn(
+        `ICM sync-back partial failure: ${result.synced} synced, ${result.failed} failed. Retrying...`,
+      )
+      result = await this.syncFlaggedContacts()
+
+      if (result.failed > 0) {
+        this.logger.warn(
+          `ICM sync-back retry still has failures: ${result.synced} synced, ${result.failed} failed`,
+        )
+      }
+    }
+
+    return result
+  }
+
   async syncSingleContact(contactId: number): Promise<boolean> {
     const contact = await this.prisma.contact.findUnique({
       where: { id: contactId },

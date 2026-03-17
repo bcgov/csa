@@ -5,6 +5,11 @@ import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { IcmSyncBackService } from '../icm/icm-sync-back.service'
 
+/*
+ * Standalone sync handler — not invoked by other handlers.
+ * All workflows use inline syncFlaggedWithRetry() instead.
+ * Kept for manual/END_USER-triggered sync if needed.
+ */
 @Injectable()
 export class SyncIcmHandler extends BaseJob {
   readonly jobType = JobType.SYNC_ICM

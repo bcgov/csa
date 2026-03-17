@@ -55,7 +55,6 @@ describe('PollCraResponseHandler', () => {
   let mockPrisma: any
   let mockBatchesService: any
   let mockContactsService: any
-  let mockJobRunner: any
   let mockIcmSyncBackService: any
 
   beforeEach(() => {
@@ -122,12 +121,10 @@ describe('PollCraResponseHandler', () => {
       updateCsaStatus: vi.fn().mockResolvedValue({ success: true }),
     }
 
-    mockJobRunner = {
-      runJobType: vi.fn().mockResolvedValue({ success: true }),
-    }
-
     mockIcmSyncBackService = {
-      hasFlaggedContacts: vi.fn().mockResolvedValue(true),
+      syncFlaggedWithRetry: vi
+        .fn()
+        .mockResolvedValue({ totalFlagged: 0, synced: 0, failed: 0, chunks: 0 }),
     }
 
     handler = new PollCraResponseHandler(
@@ -137,7 +134,6 @@ describe('PollCraResponseHandler', () => {
       mockPrisma,
       mockBatchesService,
       mockContactsService,
-      mockJobRunner,
       mockIcmSyncBackService as any,
     )
   })
@@ -658,7 +654,7 @@ describe('PollCraResponseHandler', () => {
   })
 
   describe('ICM sync-back trigger', () => {
-    it('should trigger standalone SYNC_ICM job when records were updated', async () => {
+    it('should call syncFlaggedWithRetry after processing', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
       setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
@@ -667,19 +663,43 @@ describe('PollCraResponseHandler', () => {
 
       await handler.execute(mockContext)
 
-      expect(mockJobRunner.runJobType).toHaveBeenCalledWith(JobType.SYNC_ICM, JobTrigger.SYSTEM)
+      expect(mockIcmSyncBackService.syncFlaggedWithRetry).toHaveBeenCalled()
     })
 
-    it('should not trigger SYNC_ICM when no contacts are flagged for sync-back', async () => {
-      mockIcmSyncBackService.hasFlaggedContacts.mockResolvedValue(false)
-      const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_RECYCLED })
+    it('should succeed even if sync-back throws', async () => {
+      mockIcmSyncBackService.syncFlaggedWithRetry.mockRejectedValue(new Error('ICM API down'))
+      const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
       setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
+      mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
 
-      await handler.execute(mockContext)
+      const result = await handler.execute(mockContext)
 
-      expect(mockJobRunner.runJobType).not.toHaveBeenCalled()
+      expect(result.success).toBe(true)
+    })
+
+    it('should include syncResult in metadata', async () => {
+      mockIcmSyncBackService.syncFlaggedWithRetry.mockResolvedValue({
+        totalFlagged: 5,
+        synced: 5,
+        failed: 0,
+        chunks: 1,
+      })
+      const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
+      setupUnprocessedFile(VALID_FILE_NAME)
+      setupParseFile([detail])
+      setupBatchDetail(100, 1, 10)
+      mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
+
+      const result = await handler.execute(mockContext)
+
+      expect(result.metadata.syncResult).toEqual({
+        totalFlagged: 5,
+        synced: 5,
+        failed: 0,
+        chunks: 1,
+      })
     })
   })
 

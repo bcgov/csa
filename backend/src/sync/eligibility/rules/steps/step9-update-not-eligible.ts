@@ -13,7 +13,12 @@ export function step9_UpdateNotEligible(
   let reasonCode: string | null = null
   let endDate: Date | null = null
 
-  if (currentStatus === CSA_STATUS.ELIGIBLE || currentStatus === null) {
+  if (
+    currentStatus === CSA_STATUS.ELIGIBLE ||
+    currentStatus === CSA_STATUS.ELIGIBLE_TBD ||
+    currentStatus === CSA_STATUS.NOT_ELIGIBLE_IP_TBD ||
+    currentStatus === null
+  ) {
     newStatus = CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY
   } else if (currentStatus === CSA_STATUS.IN_PAY) {
     newStatus = CSA_STATUS.NOT_ELIGIBLE_IN_PAY

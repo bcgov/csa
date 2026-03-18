@@ -2,7 +2,7 @@ import { EligibilityResult } from '../../eligibility.types'
 import { EligibilityContext, EligibilityRule } from '../rule.interface'
 
 /**
- * STEP 4: Fetch Agreement/Contract# from Active and/or Interrupted Placement
+ * STEP 4: Fetch Agreement/Contract# from Active/Interrupted/Ended Placement
  * Extracts contract numbers and enriches context for Step 6.
  * Always continues to the next rule (Step 6).
  */

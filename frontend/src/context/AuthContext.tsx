@@ -62,9 +62,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
               // Store token in localStorage
               if (keycloakInstance.token) {
-                localStorage.setItem('authToken', keycloakInstance.token)
-
-                console.log('Token stored in localStorage:', keycloakInstance.token)
                 console.log('Calling admin api to verify CSA access...')
 
                 // Verify CSA access via admin API

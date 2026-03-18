@@ -92,6 +92,7 @@ describe('runEligibility integration: step3 → step4 → step6', () => {
         makePlacement({
           status: 'Active',
           contractNumber: 'C-100',
+          startDate: new Date('2026-03-01'),
         }),
       ],
       orders: [

@@ -36,6 +36,16 @@ describe('step7_UpdateEligible', () => {
     })
   })
 
+  it('should return eligible when current status is eligible_tbd', () => {
+    const result = step7_UpdateEligible(CSA_STATUS.ELIGIBLE_TBD)
+    expect(result.newStatus).toBe(CSA_STATUS.ELIGIBLE)
+  })
+
+  it('should return in_pay when current status is not_eligible_ip_tbd', () => {
+    const result = step7_UpdateEligible(CSA_STATUS.NOT_ELIGIBLE_IP_TBD)
+    expect(result.newStatus).toBe(CSA_STATUS.IN_PAY)
+  })
+
   it('should keep existing status when no transition applies', () => {
     const result = step7_UpdateEligible(CSA_STATUS.ELIGIBLE)
     expect(result.step).toBe(7)
@@ -80,6 +90,16 @@ describe('step9_UpdateNotEligible', () => {
     expect(result.careEndDate).toEqual(careEnd)
   })
 
+  it('should return not_eligible_out_of_pay when current status is eligible_tbd', () => {
+    const result = step9_UpdateNotEligible(CSA_STATUS.ELIGIBLE_TBD)
+    expect(result.newStatus).toBe(CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY)
+  })
+
+  it('should return not_eligible_out_of_pay when current status is not_eligible_ip_tbd', () => {
+    const result = step9_UpdateNotEligible(CSA_STATUS.NOT_ELIGIBLE_IP_TBD)
+    expect(result.newStatus).toBe(CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY)
+  })
+
   it('should keep existing status when no transition applies', () => {
     const result = step9_UpdateNotEligible(CSA_STATUS.ON_HOLD)
     expect(result.newStatus).toBe(CSA_STATUS.ON_HOLD)
@@ -104,6 +124,21 @@ describe('step10_UpdateOver18', () => {
 
   it('should return over_18 when current status is blank (null)', () => {
     const result = step10_UpdateOver18(null)
+    expect(result.newStatus).toBe(CSA_STATUS.OVER_18)
+  })
+
+  it('should return over_18 when current status is eligible_tbd', () => {
+    const result = step10_UpdateOver18(CSA_STATUS.ELIGIBLE_TBD)
+    expect(result.newStatus).toBe(CSA_STATUS.OVER_18)
+  })
+
+  it('should return over_18 when current status is not_eligible_in_pay', () => {
+    const result = step10_UpdateOver18(CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
+    expect(result.newStatus).toBe(CSA_STATUS.OVER_18)
+  })
+
+  it('should return over_18 when current status is not_eligible_ip_tbd', () => {
+    const result = step10_UpdateOver18(CSA_STATUS.NOT_ELIGIBLE_IP_TBD)
     expect(result.newStatus).toBe(CSA_STATUS.OVER_18)
   })
 

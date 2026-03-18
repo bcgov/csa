@@ -2142,7 +2142,7 @@ function App() {
                 >
                   Login via SSO
                 </Button>
-                <Button
+                {/* <Button
                   variant="contained"
                   color="primary"
                   onClick={() => setShowIdirLogin(true)}
@@ -2156,7 +2156,7 @@ function App() {
                   }}
                 >
                   Login with IDIR
-                </Button>
+                </Button> */}
               </Box>
             ) : (
               <Box

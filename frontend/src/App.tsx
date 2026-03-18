@@ -2568,7 +2568,7 @@ function App() {
                               onClick={(e) => handleSortClick(e, 'firstName')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              Given Name
+                              First Name
                             </span>
                             <IconButton
                               size="small"

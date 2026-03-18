@@ -237,8 +237,10 @@ function App() {
 
   const [selectedTab, setSelectedTab] = useState(0)
   const [selected, setSelected] = useState<number[]>([])
-  // Cache of selected records' csaStatusRaw values for cross-page validation
-  const [selectedRecordsCache, setSelectedRecordsCache] = useState<Map<number, string>>(new Map())
+  // Cache of selected records' csaStatusRaw and isOver18 values for cross-page validation
+  const [selectedRecordsCache, setSelectedRecordsCache] = useState<
+    Map<number, { csaStatusRaw: string; isOver18: boolean }>
+  >(new Map())
   const [selectedBatchDetails, setSelectedBatchDetails] = useState<number[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterSearchTerm, setFilterSearchTerm] = useState('')
@@ -1799,8 +1801,8 @@ function App() {
     if (selected.length === 0) return false
 
     return selected.every((id) => {
-      const cachedStatus = selectedRecordsCache.get(id)
-      return cachedStatus && VALID_CSA_STATUSES.includes(cachedStatus)
+      const cached = selectedRecordsCache.get(id)
+      return cached && VALID_CSA_STATUSES.includes(cached.csaStatusRaw)
     })
   }, [selected, selectedRecordsCache])
 
@@ -1809,8 +1811,8 @@ function App() {
     if (selected.length === 0) return false
 
     return selected.every((id) => {
-      const cachedStatus = selectedRecordsCache.get(id)
-      return cachedStatus && VALID_BATCH_STATUSES.includes(cachedStatus)
+      const cached = selectedRecordsCache.get(id)
+      return cached && VALID_BATCH_STATUSES.includes(cached.csaStatusRaw)
     })
   }, [selected, selectedRecordsCache])
 
@@ -1836,14 +1838,14 @@ function App() {
 
     // Only enable if all selected records have eligible statuses
     return selected.every((id) => {
-      const record = filteredData.find((row) => row.id === id)
+      const cached = selectedRecordsCache.get(id)
       return (
-        record &&
-        (record.csaStatusRaw === 'not_eligible_out_of_pay' ||
-          record.csaStatusRaw === 'not_eligible_ip_tbd')
+        cached &&
+        (cached.csaStatusRaw === 'not_eligible_out_of_pay' ||
+          cached.csaStatusRaw === 'not_eligible_ip_tbd')
       )
     })
-  }, [selected, filteredData])
+  }, [selected, selectedRecordsCache])
 
   // Check if CSA Not Eligible button should be enabled
   const canUpdateNotEligible = useMemo(() => {
@@ -1851,15 +1853,15 @@ function App() {
 
     // Only enable if all selected records have eligible statuses
     return selected.every((id) => {
-      const record = filteredData.find((row) => row.id === id)
+      const cached = selectedRecordsCache.get(id)
       return (
-        record &&
-        (record.csaStatusRaw === 'eligible_tbd' ||
-          record.csaStatusRaw === 'in_pay' ||
-          record.csaStatusRaw === 'on_hold')
+        cached &&
+        (cached.csaStatusRaw === 'eligible_tbd' ||
+          cached.csaStatusRaw === 'in_pay' ||
+          cached.csaStatusRaw === 'on_hold')
       )
     })
-  }, [selected, filteredData])
+  }, [selected, selectedRecordsCache])
 
   // Check if Child Over 18 button should be enabled
   const canUpdateOver18 = useMemo(() => {
@@ -1868,14 +1870,14 @@ function App() {
     // Only enable if all selected records have isOver18 flag set to true
     // AND have eligible_tbd or not_eligible_ip_tbd status
     return selected.every((id) => {
-      const record = filteredData.find((row) => row.id === id)
+      const cached = selectedRecordsCache.get(id)
       return (
-        record &&
-        record.isOver18 === true &&
-        (record.csaStatusRaw === 'eligible_tbd' || record.csaStatusRaw === 'not_eligible_ip_tbd')
+        cached &&
+        cached.isOver18 === true &&
+        (cached.csaStatusRaw === 'eligible_tbd' || cached.csaStatusRaw === 'not_eligible_ip_tbd')
       )
     })
-  }, [selected, filteredData])
+  }, [selected, selectedRecordsCache])
 
   // Filter batch history data (frontend-only filtering)
   const filteredBatchHistory = useMemo(() => {
@@ -2381,7 +2383,7 @@ function App() {
                         onChange={(e) => handlePreDefinedFilterChange(e.target.value)}
                         displayEmpty
                       >
-                        <MenuItem value="All Records">All Children in CSA Master Table</MenuItem>
+                        <MenuItem value="All Records">All Children in CSA Master</MenuItem>
                         <MenuItem value="Pending User review/action">
                           Pending User review/action
                         </MenuItem>
@@ -2511,7 +2513,10 @@ function App() {
                                 setSelectedRecordsCache((prev) => {
                                   const newCache = new Map(prev)
                                   filteredData.forEach((row) => {
-                                    newCache.set(row.id, row.csaStatusRaw)
+                                    newCache.set(row.id, {
+                                      csaStatusRaw: row.csaStatusRaw,
+                                      isOver18: row.isOver18,
+                                    })
                                   })
                                   return newCache
                                 })
@@ -2832,7 +2837,10 @@ function App() {
                                   setSelected((prev) => [...prev, row.id])
                                   setSelectedRecordsCache((prev) => {
                                     const newCache = new Map(prev)
-                                    newCache.set(row.id, row.csaStatusRaw)
+                                    newCache.set(row.id, {
+                                      csaStatusRaw: row.csaStatusRaw,
+                                      isOver18: row.isOver18,
+                                    })
                                     return newCache
                                   })
                                 }

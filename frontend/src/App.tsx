@@ -816,6 +816,10 @@ function App() {
     // Debounce column search - wait 500ms after user stops typing
     const columnSearchTimer = setTimeout(() => {
       if (filterSearchTerm.trim().length >= minChars) {
+        // Skip if the filter value is the same as the already active filter for this column
+        if (activeColumnFilters[column] === filterSearchTerm.trim()) {
+          return
+        }
         // Add/update this column filter while preserving other active filters
         const newFilters = { ...activeColumnFilters, [column]: filterSearchTerm.trim() }
         setActiveColumnFilters(newFilters)

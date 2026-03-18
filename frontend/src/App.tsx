@@ -150,7 +150,7 @@ const COLUMN_LABELS: Record<string, string> = {
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
 
 const toYMD = (date: Date, timeZone: string): string => {
-  const parts = new Intl.DateTimeFormat('en-CA', { ...DATE_FORMAT, timeZone }).formatToParts(date)
+  const parts = new Intl.DateTimeFormat('en-US', { ...DATE_FORMAT, timeZone }).formatToParts(date)
   const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
   return `${get('year')}-${get('month')}-${get('day')}`
 }
@@ -165,7 +165,7 @@ const formatDateTimeYMD = (dateString: string): string => {
 
 const formatDateTimeYMDHMS = (dateString: string): string => {
   const date = new Date(dateString)
-  const parts = new Intl.DateTimeFormat('en-CA', {
+  const parts = new Intl.DateTimeFormat('en-US', {
     ...DATE_FORMAT,
     timeZone: 'America/Vancouver',
     hour: '2-digit',

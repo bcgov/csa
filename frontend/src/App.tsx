@@ -246,7 +246,7 @@ function App() {
   // Store multiple active column filters: column name -> query value
   const [activeColumnFilters, setActiveColumnFilters] = useState<Record<string, string>>({})
   const [selectedChild, setSelectedChild] = useState<number | null>(null)
-  const [selectedBatch, setSelectedBatch] = useState<number>(1) // Default to first batch
+  const [selectedBatch, setSelectedBatch] = useState<number | null>(null) // No batch selected initially
 
   // Pre-defined filter state
   const [preDefinedFilter, setPreDefinedFilter] = useState('Pending User review/action')
@@ -1652,10 +1652,18 @@ function App() {
         : [...currentFilters, value]
       return { ...prev, [column]: newFilters }
     })
+    // Clear batch selection and details when column filters are applied
+    setSelectedBatch(null)
+    setBatchDetails([])
+    setSelectedBatchDetails([])
   }
 
   const clearBatchRequestsColumnFilter = (column: string) => {
     setBatchRequestsColumnFilters((prev) => ({ ...prev, [column]: [] }))
+    // Clear batch selection and details when column filter is cleared
+    setSelectedBatch(null)
+    setBatchDetails([])
+    setSelectedBatchDetails([])
   }
 
   const getBatchRequestsUniqueValues = (column: string) => {

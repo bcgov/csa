@@ -195,13 +195,6 @@ function App() {
     clearCsaAccessAlert,
   } = useAuth()
 
-  // Log Keycloak authentication token (for testing in deployed version)
-  console.log('=== KEYCLOAK AUTH TOKEN ===')
-  console.log('Keycloak Authenticated:', keycloakAuthenticated)
-  console.log('Has CSA Access:', hasCSAAccess)
-  console.log('User Info:', user)
-  console.log('==========================')
-
   // Local authentication state for IDIR mock login
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     const saved = localStorage.getItem('isLoggedIn')
@@ -244,6 +237,8 @@ function App() {
 
   const [selectedTab, setSelectedTab] = useState(0)
   const [selected, setSelected] = useState<number[]>([])
+  // Cache of selected records' csaStatusRaw values for cross-page validation
+  const [selectedRecordsCache, setSelectedRecordsCache] = useState<Map<number, string>>(new Map())
   const [selectedBatchDetails, setSelectedBatchDetails] = useState<number[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterSearchTerm, setFilterSearchTerm] = useState('')
@@ -296,8 +291,6 @@ function App() {
       // Only verify if there's an existing login session with a token (IDIR login - not Keycloak SSO)
       // Keycloak SSO is handled by AuthContext
       if (savedLoginState === 'true' && savedToken) {
-        console.log('Re-verifying CSA access for existing login session...')
-
         try {
           const csaAccessResponse = await verifyCSAAccess()
 
@@ -332,8 +325,6 @@ function App() {
               message: 'User not authorised to access CSA',
               severity: 'error',
             })
-          } else {
-            console.log('CSA access verified successfully')
           }
         } catch (error) {
           console.error('Failed to re-verify CSA access:', error)
@@ -462,6 +453,11 @@ function App() {
     column: '',
   })
   const [batchDetailsFilterSearchTerm, setBatchDetailsFilterSearchTerm] = useState('')
+
+  // Pagination states for batch tables
+  const [batchRequestsPage, setBatchRequestsPage] = useState(1)
+  const [batchDetailsPage, setBatchDetailsPage] = useState(1)
+  const BATCH_PAGE_SIZE = 10
 
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({
     firstName: [],
@@ -609,10 +605,6 @@ function App() {
         setContacts(response.data)
         setTotalPages(response.totalPages)
         setTotalRecords(response.total)
-        console.log('Fetched contacts:', response.data)
-        console.log('Total records:', response.total)
-        console.log('Applied filter:', filter)
-        console.log('Applied sort:', sort)
       } catch (error) {
         console.error('Failed to fetch contacts:', error)
         setContactsError('Failed to load contacts. Please try again.')
@@ -682,10 +674,6 @@ function App() {
         setContacts(response.data)
         setTotalPages(response.totalPages)
         setTotalRecords(response.total)
-        console.log('Column filter search results:', response.data)
-        console.log('Total column filter records:', response.total)
-        console.log('Active filters:', filters)
-        console.log('Applied filter:', combinedFilter)
       } catch (error) {
         console.error('Failed to search column:', error)
         setContactsError('Failed to search. Please try again.')
@@ -708,9 +696,6 @@ function App() {
         setContacts(response.data)
         setTotalPages(response.totalPages)
         setTotalRecords(response.total)
-        console.log('Search results:', response.data)
-        console.log('Total search records:', response.total)
-        console.log('Search query:', query)
       } catch (error) {
         console.error('Failed to search contacts:', error)
         setContactsError('Failed to search contacts. Please try again.')
@@ -923,6 +908,7 @@ function App() {
     setFilterSearchTerm('')
     // Clear selected records when changing PDQ filter
     setSelected([])
+    setSelectedRecordsCache(new Map())
   }
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -931,14 +917,9 @@ function App() {
 
   // Mock IDIR login handler
   const handleIdirLogin = async () => {
-    // Simple validation - just check if fields are not empty
-    // if (username.trim() && password.trim()) {
     const mockToken = `mock-token-${Date.now()}`
     localStorage.setItem('authToken', mockToken)
     localStorage.setItem('username', username)
-    console.log('=== MOCK LOGIN - AUTH TOKEN SET ===')
-    console.log('Mock Token:', mockToken)
-    console.log('===================================')
 
     // Verify CSA access before granting login
     try {
@@ -992,15 +973,10 @@ function App() {
       })
       setShowIdirLogin(false)
     }
-    // }
   }
 
   // Mock logout handler
   const handleLogout = () => {
-    console.log('=== LOGOUT - CLEARING AUTH TOKEN ===')
-    console.log('Token before logout:', localStorage.getItem('authToken'))
-    console.log('====================================')
-
     if (keycloakAuthenticated) {
       // Logout from Keycloak
       logout()
@@ -1083,6 +1059,7 @@ function App() {
 
       // Clear selection
       setSelected([])
+      setSelectedRecordsCache(new Map())
 
       // Reload contacts to reflect the changes if at least one record was updated
       if (totalSuccess > 0) {
@@ -1147,6 +1124,7 @@ function App() {
 
       // Clear selection
       setSelected([])
+      setSelectedRecordsCache(new Map())
 
       // Reload contacts to reflect the changes
       if (response.success.length > 0) {
@@ -1211,6 +1189,7 @@ function App() {
 
       // Clear selection
       setSelected([])
+      setSelectedRecordsCache(new Map())
 
       // Reload contacts to reflect the changes
       if (response.success.length > 0) {
@@ -1277,6 +1256,7 @@ function App() {
 
       // Clear selection
       setSelected([])
+      setSelectedRecordsCache(new Map())
 
       // Reload contacts to reflect the changes
       if (response.success.length > 0) {
@@ -1348,6 +1328,7 @@ function App() {
 
       // Clear selection after successful operation
       setSelected([])
+      setSelectedRecordsCache(new Map())
 
       // Reload contacts to reflect the updated CSA status
       if (successCount > 0) {
@@ -1787,7 +1768,6 @@ function App() {
       serviceProviderName: contact.serviceProviderName || '',
       providerId: contact.providerId || '',
       placeOfServiceName: contact.placeOfServiceName || '',
-      sourceAgreement: '', // Placeholder - backend field not yet available
       agreementType: contact.agreementType || '',
       agreementStatus: contact.agreementStatus || '',
       agreementStartDate: contact.agreementStartDate
@@ -1811,20 +1791,20 @@ function App() {
     if (selected.length === 0) return false
 
     return selected.every((id) => {
-      const record = filteredData.find((row) => row.id === id)
-      return record && VALID_CSA_STATUSES.includes(record.csaStatusRaw)
+      const cachedStatus = selectedRecordsCache.get(id)
+      return cachedStatus && VALID_CSA_STATUSES.includes(cachedStatus)
     })
-  }, [selected, filteredData])
+  }, [selected, selectedRecordsCache])
 
   // Check if all selected records have valid CSA status for Add to Batch
   const canAddToBatch = useMemo(() => {
     if (selected.length === 0) return false
 
     return selected.every((id) => {
-      const record = filteredData.find((row) => row.id === id)
-      return record && VALID_BATCH_STATUSES.includes(record.csaStatusRaw)
+      const cachedStatus = selectedRecordsCache.get(id)
+      return cachedStatus && VALID_BATCH_STATUSES.includes(cachedStatus)
     })
-  }, [selected, filteredData])
+  }, [selected, selectedRecordsCache])
 
   // Check if Remove from Batch button should be enabled
   const canRemoveFromBatch = useMemo(() => {
@@ -2015,6 +1995,35 @@ function App() {
 
     return data
   }, [currentBatchDetails, batchDetailsSearchTerm, batchDetailsColumnFilters])
+
+  // Paginated batch requests
+  const paginatedBatchRequests = useMemo(() => {
+    const startIndex = (batchRequestsPage - 1) * BATCH_PAGE_SIZE
+    return filteredBatchRequests.slice(startIndex, startIndex + BATCH_PAGE_SIZE)
+  }, [filteredBatchRequests, batchRequestsPage])
+
+  const batchRequestsTotalPages = useMemo(() => {
+    return Math.ceil(filteredBatchRequests.length / BATCH_PAGE_SIZE)
+  }, [filteredBatchRequests.length])
+
+  // Paginated batch details
+  const paginatedBatchDetails = useMemo(() => {
+    const startIndex = (batchDetailsPage - 1) * BATCH_PAGE_SIZE
+    return filteredBatchDetails.slice(startIndex, startIndex + BATCH_PAGE_SIZE)
+  }, [filteredBatchDetails, batchDetailsPage])
+
+  const batchDetailsTotalPages = useMemo(() => {
+    return Math.ceil(filteredBatchDetails.length / BATCH_PAGE_SIZE)
+  }, [filteredBatchDetails.length])
+
+  // Reset pagination when filters/search change
+  useEffect(() => {
+    setBatchRequestsPage(1)
+  }, [batchRequestsSearchTerm, batchRequestsColumnFilters])
+
+  useEffect(() => {
+    setBatchDetailsPage(1)
+  }, [batchDetailsSearchTerm, batchDetailsColumnFilters, selectedBatch])
 
   return (
     <Box
@@ -2364,7 +2373,7 @@ function App() {
                         onChange={(e) => handlePreDefinedFilterChange(e.target.value)}
                         displayEmpty
                       >
-                        <MenuItem value="All Records">All Records</MenuItem>
+                        <MenuItem value="All Records">All Children in CSA Master Table</MenuItem>
                         <MenuItem value="Pending User review/action">
                           Pending User review/action
                         </MenuItem>
@@ -2490,11 +2499,27 @@ function App() {
                                   })
                                   return newSelected
                                 })
+                                // Update cache with current page records
+                                setSelectedRecordsCache((prev) => {
+                                  const newCache = new Map(prev)
+                                  filteredData.forEach((row) => {
+                                    newCache.set(row.id, row.csaStatusRaw)
+                                  })
+                                  return newCache
+                                })
                               } else {
                                 // Deselect all rows on current page
                                 setSelected((prev) => {
                                   const currentPageIds = filteredData.map((row) => row.id)
                                   return prev.filter((id) => !currentPageIds.includes(id))
+                                })
+                                // Remove current page records from cache
+                                setSelectedRecordsCache((prev) => {
+                                  const newCache = new Map(prev)
+                                  filteredData.forEach((row) => {
+                                    newCache.delete(row.id)
+                                  })
+                                  return newCache
                                 })
                               }
                             }}
@@ -2530,7 +2555,7 @@ function App() {
                               onClick={(e) => handleSortClick(e, 'firstName')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              First Name
+                              Given Name
                             </span>
                             <IconButton
                               size="small"
@@ -2554,7 +2579,7 @@ function App() {
                               onClick={(e) => handleSortClick(e, 'middleName')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              Middle Name
+                              Middle Name(s)
                             </span>
                             <IconButton
                               size="small"
@@ -2788,11 +2813,21 @@ function App() {
                               checked={selected.includes(row.id)}
                               onChange={(e) => {
                                 e.stopPropagation()
-                                setSelected((prev) =>
-                                  prev.includes(row.id)
-                                    ? prev.filter((id) => id !== row.id)
-                                    : [...prev, row.id],
-                                )
+                                if (selected.includes(row.id)) {
+                                  setSelected((prev) => prev.filter((id) => id !== row.id))
+                                  setSelectedRecordsCache((prev) => {
+                                    const newCache = new Map(prev)
+                                    newCache.delete(row.id)
+                                    return newCache
+                                  })
+                                } else {
+                                  setSelected((prev) => [...prev, row.id])
+                                  setSelectedRecordsCache((prev) => {
+                                    const newCache = new Map(prev)
+                                    newCache.set(row.id, row.csaStatusRaw)
+                                    return newCache
+                                  })
+                                }
                               }}
                             />
                           </TableCell>
@@ -4101,7 +4136,23 @@ function App() {
                                       wordBreak: 'break-word',
                                     }}
                                   >
-                                    {childData.sourceAgreement || '-'}
+                                    {childData.sourcePlacement ? (
+                                      <Typography
+                                        component="span"
+                                        sx={{
+                                          backgroundColor: '#e3f2fd',
+                                          color: '#1976d2',
+                                          px: 1,
+                                          py: 0.5,
+                                          borderRadius: 1,
+                                          fontSize: '0.75rem',
+                                        }}
+                                      >
+                                        {childData.sourcePlacement}
+                                      </Typography>
+                                    ) : (
+                                      '-'
+                                    )}
                                   </Typography>
                                 </Box>
 
@@ -4664,7 +4715,7 @@ function App() {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        filteredBatchRequests.map((row) => (
+                        paginatedBatchRequests.map((row) => (
                           <TableRow
                             key={row.id}
                             hover
@@ -4689,6 +4740,32 @@ function App() {
                     </TableBody>
                   </Table>
                 </TableContainer>
+
+                {/* Batch Requests Pagination */}
+                {filteredBatchRequests.length > 0 && (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      mt: 2,
+                      px: 2,
+                    }}
+                  >
+                    <Typography variant="body2" color="text.secondary">
+                      Showing {paginatedBatchRequests.length} of {filteredBatchRequests.length}{' '}
+                      records
+                    </Typography>
+                    <Pagination
+                      count={batchRequestsTotalPages}
+                      page={batchRequestsPage}
+                      onChange={(_, page) => setBatchRequestsPage(page)}
+                      color="primary"
+                      showFirstButton
+                      showLastButton
+                    />
+                  </Box>
+                )}
 
                 {/* Batch Details Section */}
                 <Box sx={{ mt: 4 }}>
@@ -4795,7 +4872,7 @@ function App() {
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              Middle Name
+                              Middle Name(s)
                               <IconButton
                                 size="small"
                                 onClick={(e) => handleBatchDetailsFilterClick(e, 'middleName')}
@@ -4905,7 +4982,7 @@ function App() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          filteredBatchDetails.map((row) => (
+                          paginatedBatchDetails.map((row) => (
                             <TableRow
                               key={row.id}
                               hover
@@ -4935,6 +5012,32 @@ function App() {
                       </TableBody>
                     </Table>
                   </TableContainer>
+
+                  {/* Batch Details Pagination */}
+                  {filteredBatchDetails.length > 0 && (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mt: 2,
+                        px: 2,
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        Showing {paginatedBatchDetails.length} of {filteredBatchDetails.length}{' '}
+                        records
+                      </Typography>
+                      <Pagination
+                        count={batchDetailsTotalPages}
+                        page={batchDetailsPage}
+                        onChange={(_, page) => setBatchDetailsPage(page)}
+                        color="primary"
+                        showFirstButton
+                        showLastButton
+                      />
+                    </Box>
+                  )}
                 </Box>
               </Box>
             )}

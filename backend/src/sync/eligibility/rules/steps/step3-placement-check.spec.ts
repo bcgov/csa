@@ -185,8 +185,8 @@ describe('step3_PlacementCheck', () => {
     })
   })
 
-  describe('Ended/Closed Non-Placement fallback → Step 4', () => {
-    it('should continue to step 4 when Ended Non-Placement found with endDate in prev month', () => {
+  describe('Ended/Closed Non-Placement fallback → Step 8', () => {
+    it('should route to step 8 when Ended Non-Placement found with endDate in prev month', () => {
       const ctx = makeCtx({
         placements: [
           makePlacement({
@@ -197,9 +197,9 @@ describe('step3_PlacementCheck', () => {
         ],
       })
       const result = step3_PlacementCheck.evaluate(ctx)
-      expect(result).toBeNull()
+      expect(result!.step).toBe(8)
       expect(ctx.hasNonPlacement).toBe(true)
-      expect(ctx.eligiblePlacements).toHaveLength(1)
+      expect(ctx.eligiblePlacements).toHaveLength(0)
     })
 
     it('should ignore Ended Non-Placement with endDate not in previous month', () => {

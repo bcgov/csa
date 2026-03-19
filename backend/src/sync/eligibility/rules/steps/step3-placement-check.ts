@@ -1,10 +1,7 @@
 import { normalize } from 'src/common/utils'
-import { EligibilityResult } from '../../eligibility.types'
+import { ACTIVE_STATUSES, ENDED_STATUSES, EligibilityResult } from '../../eligibility.types'
 import { EligibilityContext, EligibilityRule } from '../rule.interface'
 import { step8_UpdateEligibleTbd } from './step8-update-eligible-tbd'
-
-const ACTIVE_STATUSES = ['ACTIVE', 'INTERRUPTED']
-const ENDED_STATUSES = ['ENDED', 'CLOSED']
 
 /**
  * STEP 3: Check Placement / Non-Placement Location details
@@ -14,7 +11,7 @@ const ENDED_STATUSES = ['ENDED', 'CLOSED']
  * 1. Active/Interrupted Placement (startDate prior to current month) -> Step 4
  * 2. Fallback: Ended/Closed Placement (endDate in previous month) -> Step 4
  * 3. Active/Interrupted Non-Placement (startDate prior to current month) -> Step 8
- * 4. Fallback: Ended/Closed Non-Placement (endDate in previous month) -> Step 4
+ * 4. Fallback: Ended/Closed Non-Placement (endDate in previous month) -> Step 8
  * 5. Both Placement + Non-Placement -> Step 4 (placement precedence)
  * 6. Nothing found -> Step 8
  */
@@ -44,9 +41,9 @@ export const step3_PlacementCheck: EligibilityRule = {
     const activeNonPlacements = activeRecords.filter(
       (placement) => normalize(placement.type) === 'NON-PLACEMENT LOCATION',
     )
-    const endedPlacements = endedRecords.filter((p) => normalize(p.type) === 'PLACEMENT')
+    const endedPlacements = endedRecords.filter((record) => normalize(record.type) === 'PLACEMENT')
     const endedNonPlacements = endedRecords.filter(
-      (p) => normalize(p.type) === 'NON-PLACEMENT LOCATION',
+      (record) => normalize(record.type) === 'NON-PLACEMENT LOCATION',
     )
 
     const hasActivePlacement = activePlacements.length > 0
@@ -78,8 +75,8 @@ export const step3_PlacementCheck: EligibilityRule = {
     if (hasEndedNonPlacement) {
       ctx.hasPlacement = false
       ctx.hasNonPlacement = true
-      ctx.eligiblePlacements = endedNonPlacements
-      return null
+      ctx.eligiblePlacements = []
+      return step8_UpdateEligibleTbd(ctx.contact.csaStatus)
     }
 
     ctx.hasPlacement = false

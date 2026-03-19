@@ -19,6 +19,7 @@ import { buildFindAgedOutContactIdsSql, buildLoadContactProfilesSql } from './el
 import {
   AgreementRecord,
   ContactProfile,
+  ENDED_STATUSES,
   EligibilityResult,
   EligibilityRunResult,
   OrderRecord,
@@ -61,31 +62,14 @@ const RULES: EligibilityRule[] = [
 ]
 // Select one representative placement, order, and agreement to denormalize
 // into the master contacts table.
-// Priority: ICM placement > ICM non-placement > MIS placement > MIS non-placement
+// Status priority: Active > Interrupted > Ended/Closed (latest by endDate)
+// Within each status tier: ICM Placement > ICM Non-Placement > MIS Placement > MIS Non-Placement
 export function selectPrimaryRecords(profile: ContactProfile): {
   primaryPlacement: PlacementRecord | null
   primaryOrder: OrderRecord | null
   primaryAgreement: AgreementRecord | null
 } {
-  const activeRecords = profile.placements.filter((placement) =>
-    ['ACTIVE', 'INTERRUPTED'].includes(normalize(placement.status)),
-  )
-  const primaryPlacement =
-    activeRecords.find(
-      (placement) => placement.source === 'ICM' && normalize(placement.type) === 'PLACEMENT',
-    ) ??
-    activeRecords.find(
-      (placement) =>
-        placement.source === 'ICM' && normalize(placement.type) === 'NON-PLACEMENT LOCATION',
-    ) ??
-    activeRecords.find(
-      (placement) => placement.source === 'MIS' && normalize(placement.type) === 'PLACEMENT',
-    ) ??
-    activeRecords.find(
-      (placement) =>
-        placement.source === 'MIS' && normalize(placement.type) === 'NON-PLACEMENT LOCATION',
-    ) ??
-    null
+  const primaryPlacement = selectPrimaryPlacement(profile.placements)
 
   // Primary Order: match via primary placement's link key
   let primaryOrder: OrderRecord | null = null
@@ -117,6 +101,48 @@ export function selectPrimaryRecords(profile: ContactProfile): {
   }
 
   return { primaryPlacement, primaryOrder, primaryAgreement }
+}
+
+const SOURCE_TYPE_PRIORITY: Array<{ source: 'ICM' | 'MIS'; type: string }> = [
+  { source: 'ICM', type: 'PLACEMENT' },
+  { source: 'ICM', type: 'NON-PLACEMENT LOCATION' },
+  { source: 'MIS', type: 'PLACEMENT' },
+  { source: 'MIS', type: 'NON-PLACEMENT LOCATION' },
+]
+
+function findBySourceType(records: PlacementRecord[]): PlacementRecord | undefined {
+  for (const { source, type } of SOURCE_TYPE_PRIORITY) {
+    const match = records.find(
+      (placement) => placement.source === source && normalize(placement.type) === type,
+    )
+    if (match) return match
+  }
+  return undefined
+}
+
+function selectPrimaryPlacement(placements: PlacementRecord[]): PlacementRecord | null {
+  const active = placements.filter((placement) => normalize(placement.status) === 'ACTIVE')
+  const found = findBySourceType(active)
+  if (found) return found
+
+  const interrupted = placements.filter(
+    (placement) => normalize(placement.status) === 'INTERRUPTED',
+  )
+  const foundInterrupted = findBySourceType(interrupted)
+  if (foundInterrupted) return foundInterrupted
+
+  const ended = placements.filter((placement) =>
+    ENDED_STATUSES.includes(normalize(placement.status)),
+  )
+  if (ended.length === 0) return null
+
+  const latest = ended.reduce((a, b) =>
+    b.endDate && (!a.endDate || b.endDate > a.endDate) ? b : a,
+  )
+  const latestEnded = ended.filter(
+    (placement) => placement.endDate?.getTime() === latest.endDate?.getTime(),
+  )
+  return findBySourceType(latestEnded) ?? latest
 }
 
 interface UpsertContext {

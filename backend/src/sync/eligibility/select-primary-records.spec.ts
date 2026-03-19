@@ -91,7 +91,7 @@ describe('selectPrimaryRecords', () => {
       expect(result.primaryPlacement!.placementNumber).toBe('MIS-NPL')
     })
 
-    it('ignores placements with non-active statuses', () => {
+    it('prefers Active over Ended placement', () => {
       const ended = makePlacement({
         source: 'ICM',
         type: 'Placement',
@@ -109,6 +109,42 @@ describe('selectPrimaryRecords', () => {
       expect(result.primaryPlacement!.placementNumber).toBe('ACTIVE')
     })
 
+    it('prefers Active over Interrupted', () => {
+      const interrupted = makePlacement({
+        source: 'ICM',
+        type: 'Placement',
+        status: 'Interrupted',
+        placementNumber: 'INT',
+      })
+      const active = makePlacement({
+        source: 'MIS',
+        type: 'Non-Placement Location',
+        status: 'Active',
+        placementNumber: 'ACTIVE',
+      })
+
+      const result = selectPrimaryRecords(makeProfile({ placements: [interrupted, active] }))
+      expect(result.primaryPlacement!.placementNumber).toBe('ACTIVE')
+    })
+
+    it('prefers Interrupted over Ended', () => {
+      const ended = makePlacement({
+        source: 'ICM',
+        type: 'Placement',
+        status: 'Ended',
+        placementNumber: 'ENDED',
+      })
+      const interrupted = makePlacement({
+        source: 'MIS',
+        type: 'Non-Placement Location',
+        status: 'Interrupted',
+        placementNumber: 'INT',
+      })
+
+      const result = selectPrimaryRecords(makeProfile({ placements: [ended, interrupted] }))
+      expect(result.primaryPlacement!.placementNumber).toBe('INT')
+    })
+
     it('includes Interrupted status placements', () => {
       const interrupted = makePlacement({
         source: 'ICM',
@@ -119,6 +155,46 @@ describe('selectPrimaryRecords', () => {
 
       const result = selectPrimaryRecords(makeProfile({ placements: [interrupted] }))
       expect(result.primaryPlacement!.placementNumber).toBe('INT')
+    })
+
+    it('falls back to Ended/Closed and picks latest by endDate', () => {
+      const older = makePlacement({
+        source: 'ICM',
+        type: 'Placement',
+        status: 'Ended',
+        endDate: new Date('2026-01-10'),
+        placementNumber: 'OLDER',
+      })
+      const newer = makePlacement({
+        source: 'MIS',
+        type: 'Placement',
+        status: 'Closed',
+        endDate: new Date('2026-01-20'),
+        placementNumber: 'NEWER',
+      })
+
+      const result = selectPrimaryRecords(makeProfile({ placements: [older, newer] }))
+      expect(result.primaryPlacement!.placementNumber).toBe('NEWER')
+    })
+
+    it('prefers ICM over MIS when Ended/Closed placements have same endDate', () => {
+      const misPlacement = makePlacement({
+        source: 'MIS',
+        type: 'Placement',
+        status: 'Closed',
+        endDate: new Date('2026-01-20'),
+        placementNumber: 'MIS-ENDED',
+      })
+      const icmPlacement = makePlacement({
+        source: 'ICM',
+        type: 'Placement',
+        status: 'Ended',
+        endDate: new Date('2026-01-20'),
+        placementNumber: 'ICM-ENDED',
+      })
+
+      const result = selectPrimaryRecords(makeProfile({ placements: [misPlacement, icmPlacement] }))
+      expect(result.primaryPlacement!.placementNumber).toBe('ICM-ENDED')
     })
 
     it('handles case-insensitive type and status matching', () => {

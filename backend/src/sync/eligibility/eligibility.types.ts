@@ -51,6 +51,9 @@ export interface ContactProfile {
   agreements: AgreementRecord[]
 }
 
+export const ACTIVE_STATUSES = ['ACTIVE', 'INTERRUPTED']
+export const ENDED_STATUSES = ['ENDED', 'CLOSED']
+
 /** Placement from ICM or MIS staging */
 export interface PlacementRecord {
   type: string // 'Placement' | 'Non-Placement Location'

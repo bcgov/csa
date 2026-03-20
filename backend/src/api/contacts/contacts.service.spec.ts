@@ -1174,8 +1174,8 @@ describe('ContactsService', () => {
       })
     })
 
-    describe('cancelReasonCode on SET_NOT_ELIGIBLE', () => {
-      it('should default cancelReasonCode to 21 when IN_PAY and not already set', async () => {
+    describe('cancellation fields on SET_NOT_ELIGIBLE', () => {
+      it('should set cancelReasonCode and careEndDate from in_pay', async () => {
         const contact = { id: 1, csaStatus: 'in_pay', cancelReasonCode: null, resumeStatus: null }
         vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
         const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -1186,31 +1186,12 @@ describe('ContactsService', () => {
 
         expect(result.success).toBe(true)
         expect(result.to).toBe('not_eligible_ip_tbd')
-        expect(updateSpy).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({
-              cancelReasonCode: '21',
-            }),
-          }),
-        )
-      })
-
-      it('should NOT overwrite cancelReasonCode when already set', async () => {
-        const contact = { id: 1, csaStatus: 'in_pay', cancelReasonCode: '14', resumeStatus: null }
-        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
-        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
-
-        const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
-          userId: 'user1',
-        })
-
-        expect(result.success).toBe(true)
-        expect(result.to).toBe('not_eligible_ip_tbd')
         const updateCall = updateSpy.mock.calls[0][0] as any
-        expect(updateCall.data).not.toHaveProperty('cancelReasonCode')
+        expect(updateCall.data.cancelReasonCode).toBe('21')
+        expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
       })
 
-      it('should NOT set cancelReasonCode for SET_NOT_ELIGIBLE from non-IN_PAY state', async () => {
+      it('should set cancelReasonCode and careEndDate from eligible_tbd', async () => {
         const contact = {
           id: 1,
           csaStatus: 'eligible_tbd',
@@ -1227,7 +1208,45 @@ describe('ContactsService', () => {
         expect(result.success).toBe(true)
         expect(result.to).toBe('not_eligible_out_of_pay')
         const updateCall = updateSpy.mock.calls[0][0] as any
+        expect(updateCall.data.cancelReasonCode).toBe('21')
+        expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
+      })
+
+      it('should set cancelReasonCode and careEndDate from on_hold', async () => {
+        const contact = {
+          id: 1,
+          csaStatus: 'on_hold',
+          cancelReasonCode: null,
+          resumeStatus: 'eligible_tbd',
+        }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
+          userId: 'user1',
+        })
+
+        expect(result.success).toBe(true)
+        expect(result.to).toBe('not_eligible_out_of_pay')
+        const updateCall = updateSpy.mock.calls[0][0] as any
+        expect(updateCall.data.cancelReasonCode).toBe('21')
+        expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
+      })
+
+      it('should NOT overwrite cancelReasonCode when already set but still set careEndDate', async () => {
+        const contact = { id: 1, csaStatus: 'in_pay', cancelReasonCode: '14', resumeStatus: null }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
+          userId: 'user1',
+        })
+
+        expect(result.success).toBe(true)
+        expect(result.to).toBe('not_eligible_ip_tbd')
+        const updateCall = updateSpy.mock.calls[0][0] as any
         expect(updateCall.data).not.toHaveProperty('cancelReasonCode')
+        expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
       })
     })
 

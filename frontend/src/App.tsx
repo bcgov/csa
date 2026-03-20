@@ -2480,7 +2480,7 @@ function App() {
                               onClick={(e) => handleSortClick(e, 'lastUpdated')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              Last Updated
+                              Last Updated Date
                             </span>
                           </Box>
                         </TableCell>
@@ -3285,7 +3285,7 @@ function App() {
                                     variant="caption"
                                     sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
                                   >
-                                    Case No.
+                                    Case Number
                                   </Typography>
                                   <Typography
                                     variant="body2"

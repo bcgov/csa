@@ -358,6 +358,7 @@ function App() {
   // Pagination states for batch tables
   const [batchRequestsPage, setBatchRequestsPage] = useState(1)
   const [batchDetailsPage, setBatchDetailsPage] = useState(1)
+  const [batchHistoryPage, setBatchHistoryPage] = useState(1)
   const BATCH_PAGE_SIZE = 10
 
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({
@@ -1750,6 +1751,16 @@ function App() {
     return data
   }, [contactBatchHistory, batchHistorySearchTerm, batchHistoryColumnFilters])
 
+  // Paginated batch history
+  const paginatedBatchHistory = useMemo(() => {
+    const startIndex = (batchHistoryPage - 1) * BATCH_PAGE_SIZE
+    return filteredBatchHistory.slice(startIndex, startIndex + BATCH_PAGE_SIZE)
+  }, [filteredBatchHistory, batchHistoryPage])
+
+  const batchHistoryTotalPages = useMemo(() => {
+    return Math.ceil(filteredBatchHistory.length / BATCH_PAGE_SIZE)
+  }, [filteredBatchHistory.length])
+
   // Filter batch requests data
   const filteredBatchRequests = useMemo(() => {
     // Transform API data to match table structure
@@ -1866,6 +1877,10 @@ function App() {
   useEffect(() => {
     setBatchDetailsPage(1)
   }, [batchDetailsSearchTerm, batchDetailsColumnFilters, selectedBatch])
+
+  useEffect(() => {
+    setBatchHistoryPage(1)
+  }, [batchHistorySearchTerm, batchHistoryColumnFilters, selectedChild])
 
   return (
     <Box
@@ -4226,7 +4241,7 @@ function App() {
                                 </TableCell>
                               </TableRow>
                             ) : (
-                              filteredBatchHistory.map((row) => (
+                              paginatedBatchHistory.map((row) => (
                                 <TableRow
                                   key={row.id}
                                   hover
@@ -4277,6 +4292,32 @@ function App() {
                           </TableBody>
                         </Table>
                       </TableContainer>
+                      {/* Batch History Pagination */}
+                      {filteredBatchHistory.length > 0 && (
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            mt: 2,
+                            px: 2,
+                            pb: 2,
+                          }}
+                        >
+                          <Typography variant="body2" color="text.secondary">
+                            Showing {paginatedBatchHistory.length} of {filteredBatchHistory.length}{' '}
+                            records
+                          </Typography>
+                          <Pagination
+                            count={batchHistoryTotalPages}
+                            page={batchHistoryPage}
+                            onChange={(_, page) => setBatchHistoryPage(page)}
+                            color="primary"
+                            showFirstButton
+                            showLastButton
+                          />
+                        </Box>
+                      )}
                     </Paper>
                   </Box>
                 )}

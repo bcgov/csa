@@ -10,7 +10,7 @@ import {
 } from 'src/common/state-machine/constants'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
-import { enrichLabels, isEligibleAge } from 'src/common/utils'
+import { enrichLabels, isEligibleAge, pacificToday } from 'src/common/utils'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { ALLOWED_FILTER_SORT_FIELDS, BULK_OPERATION_SKIP_REASONS } from './constants'
 import { ContactDto } from './dto/contact.dto'
@@ -300,13 +300,12 @@ export class ContactsService {
       updateData.preBatchStatus = null
     }
 
-    // default cancel reason code when user sets not eligible from in-pay
-    if (
-      event === CSA_EVENT.SET_NOT_ELIGIBLE &&
-      currentState === CSA_STATUS.IN_PAY &&
-      !contact.cancelReasonCode
-    ) {
-      updateData.cancelReasonCode = '21'
+    // set cancellation fields when user sets not eligible
+    if (event === CSA_EVENT.SET_NOT_ELIGIBLE) {
+      if (!contact.cancelReasonCode) {
+        updateData.cancelReasonCode = '21'
+      }
+      updateData.careEndDate = pacificToday()
     }
 
     await this.prisma.contact.update({

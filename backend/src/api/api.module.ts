@@ -14,7 +14,6 @@ import { ContactsModule } from './contacts/contacts.module'
 import { HealthController } from './health/health.controller'
 import { MetricsController } from './metrics/metrics.controller'
 import { MockModule } from './mock/mock.module'
-import { StatusUpdateModule } from './status_update/status-update.module'
 
 const enableMockApi = process.env.USE_MOCK_DATA === 'true'
 @Module({
@@ -25,7 +24,6 @@ const enableMockApi = process.env.USE_MOCK_DATA === 'true'
     }),
     TerminusModule,
     ContactsModule,
-    StatusUpdateModule,
     BatchesModule,
     StateMachineModule,
     AdminModule,

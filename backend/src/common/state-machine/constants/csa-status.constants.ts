@@ -106,6 +106,7 @@ export const STATE_ACTOR_PERMISSIONS: Record<string, Record<string, ('USER' | 'S
     [CSA_EVENT.AGE_OUT]: ['SYSTEM'],
   },
   [CSA_STATUS.ELIGIBLE_TBD]: {
+    [CSA_EVENT.BECOME_ELIGIBLE]: ['SYSTEM'],
     [CSA_EVENT.AGE_OUT]: ['USER'],
   },
   [CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY]: {

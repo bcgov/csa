@@ -1603,8 +1603,8 @@ function App() {
       locationType: contact.locationType || '',
       locationSubType: contact.locationSubType || '',
       placementStatus: contact.placementStatus || '',
-      actualStartDate: contact.actualStartDate ? formatDateTimeYMD(contact.actualStartDate) : '',
-      actualEndDate: contact.actualEndDate ? formatDateTimeYMD(contact.actualEndDate) : '',
+      actualStartDate: contact.actualStartDate ? formatDateYMD(contact.actualStartDate) : '',
+      actualEndDate: contact.actualEndDate ? formatDateYMD(contact.actualEndDate) : '',
       paidUnpaid: contact.paidUnpaid || '',
       sourcePlacement: contact.sourcePlacement || '',
       // Service provider and agreement fields

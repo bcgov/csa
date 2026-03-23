@@ -156,11 +156,14 @@ describe('JobsService', () => {
   })
 
   describe('getFailedJobs', () => {
-    it('should return all failed jobs', async () => {
+    it('should return only top-level failed jobs (no child jobs)', async () => {
       await service.getFailedJobs()
 
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
-        where: { status: JobStatus.FAILED },
+        where: {
+          status: JobStatus.FAILED,
+          parentJobId: null,
+        },
         select: {
           id: true,
           jobType: true,

@@ -300,12 +300,16 @@ export class ContactsService {
       updateData.preBatchStatus = null
     }
 
-    // set cancellation fields when user sets not eligible
-    if (event === CSA_EVENT.SET_NOT_ELIGIBLE) {
+    if (event === CSA_EVENT.SET_NOT_ELIGIBLE && contact.csaStatus === CSA_STATUS.IN_PAY) {
       if (!contact.cancelReasonCode) {
         updateData.cancelReasonCode = '21'
       }
       updateData.careEndDate = pacificToday()
+    }
+
+    if (event === CSA_EVENT.SET_ELIGIBLE_TBD || event === CSA_EVENT.BECOME_ELIGIBLE) {
+      updateData.cancelReasonCode = null
+      updateData.careEndDate = null
     }
 
     await this.prisma.contact.update({

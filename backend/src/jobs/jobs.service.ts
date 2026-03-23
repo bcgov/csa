@@ -77,6 +77,7 @@ export class JobsService {
     return this.prisma.jobRun.findMany({
       where: {
         status: JobStatus.FAILED,
+        parentJobId: null, // skip child jobs, parent will recreate them
       },
       select: {
         id: true,

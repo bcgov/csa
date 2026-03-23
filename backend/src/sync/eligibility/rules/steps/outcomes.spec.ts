@@ -95,9 +95,11 @@ describe('step9_UpdateNotEligible', () => {
     expect(result.newStatus).toBe(CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY)
   })
 
-  it('should return not_eligible_out_of_pay when current status is not_eligible_ip_tbd', () => {
+  it('should return not_eligible_in_pay when current status is not_eligible_ip_tbd', () => {
     const result = step9_UpdateNotEligible(CSA_STATUS.NOT_ELIGIBLE_IP_TBD)
-    expect(result.newStatus).toBe(CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY)
+    expect(result.newStatus).toBe(CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
+    expect(result.cancelReasonCode).toBe('21')
+    expect(result.careEndDate).toBeInstanceOf(Date)
   })
 
   it('should keep existing status when no transition applies', () => {

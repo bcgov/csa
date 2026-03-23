@@ -1191,7 +1191,7 @@ describe('ContactsService', () => {
         expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
       })
 
-      it('should set cancelReasonCode and careEndDate from eligible_tbd', async () => {
+      it('should NOT set cancellation fields from eligible_tbd', async () => {
         const contact = {
           id: 1,
           csaStatus: 'eligible_tbd',
@@ -1208,16 +1208,16 @@ describe('ContactsService', () => {
         expect(result.success).toBe(true)
         expect(result.to).toBe('not_eligible_out_of_pay')
         const updateCall = updateSpy.mock.calls[0][0] as any
-        expect(updateCall.data.cancelReasonCode).toBe('21')
-        expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
+        expect(updateCall.data).not.toHaveProperty('cancelReasonCode')
+        expect(updateCall.data).not.toHaveProperty('careEndDate')
       })
 
-      it('should set cancelReasonCode and careEndDate from on_hold', async () => {
+      it('should NOT set cancellation fields from on_hold', async () => {
         const contact = {
           id: 1,
           csaStatus: 'on_hold',
           cancelReasonCode: null,
-          resumeStatus: 'eligible_tbd',
+          resumeStatus: null,
         }
         vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
         const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -1229,8 +1229,8 @@ describe('ContactsService', () => {
         expect(result.success).toBe(true)
         expect(result.to).toBe('not_eligible_out_of_pay')
         const updateCall = updateSpy.mock.calls[0][0] as any
-        expect(updateCall.data.cancelReasonCode).toBe('21')
-        expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
+        expect(updateCall.data).not.toHaveProperty('cancelReasonCode')
+        expect(updateCall.data).not.toHaveProperty('careEndDate')
       })
 
       it('should NOT overwrite cancelReasonCode when already set but still set careEndDate', async () => {
@@ -1247,6 +1247,50 @@ describe('ContactsService', () => {
         const updateCall = updateSpy.mock.calls[0][0] as any
         expect(updateCall.data).not.toHaveProperty('cancelReasonCode')
         expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
+      })
+    })
+
+    describe('clear cancellation fields on eligible transitions', () => {
+      it('should clear cancelReasonCode and careEndDate on SET_ELIGIBLE_TBD', async () => {
+        const contact = {
+          id: 1,
+          csaStatus: 'not_eligible_out_of_pay',
+          cancelReasonCode: '21',
+          careEndDate: new Date(),
+          resumeStatus: null,
+        }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'SET_ELIGIBLE_TBD', 'USER', {
+          userId: 'user1',
+        })
+
+        expect(result.success).toBe(true)
+        expect(result.to).toBe('eligible_tbd')
+        const updateCall = updateSpy.mock.calls[0][0] as any
+        expect(updateCall.data.cancelReasonCode).toBeNull()
+        expect(updateCall.data.careEndDate).toBeNull()
+      })
+
+      it('should clear cancelReasonCode and careEndDate on BECOME_ELIGIBLE', async () => {
+        const contact = {
+          id: 1,
+          csaStatus: 'not_eligible_out_of_pay',
+          cancelReasonCode: '14',
+          careEndDate: new Date(),
+          resumeStatus: null,
+        }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'BECOME_ELIGIBLE', 'SYSTEM')
+
+        expect(result.success).toBe(true)
+        expect(result.to).toBe('eligible')
+        const updateCall = updateSpy.mock.calls[0][0] as any
+        expect(updateCall.data.cancelReasonCode).toBeNull()
+        expect(updateCall.data.careEndDate).toBeNull()
       })
     })
 

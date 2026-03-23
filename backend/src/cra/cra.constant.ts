@@ -118,6 +118,7 @@ export const CRA_DATA_HANDLING_CONSTANT = {
       '040':
         'The payments for this child automatically cease in the month after the child turns 18.',
       '041': 'A cancellation form cannot be submitted for a newborn child.',
+      '043': 'Child found on the database, but the current Caregiver is not the Applicant.',
       '998': 'The transaction is being recycled. It will be processed in the next scheduled run.',
       '999': 'Transaction has been recycled too many times. Please call support.',
     },

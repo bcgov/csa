@@ -16,11 +16,13 @@ export function step9_UpdateNotEligible(
   if (
     currentStatus === CSA_STATUS.ELIGIBLE ||
     currentStatus === CSA_STATUS.ELIGIBLE_TBD ||
-    currentStatus === CSA_STATUS.NOT_ELIGIBLE_IP_TBD ||
     currentStatus === null
   ) {
     newStatus = CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY
-  } else if (currentStatus === CSA_STATUS.IN_PAY) {
+  } else if (
+    currentStatus === CSA_STATUS.IN_PAY ||
+    currentStatus === CSA_STATUS.NOT_ELIGIBLE_IP_TBD
+  ) {
     newStatus = CSA_STATUS.NOT_ELIGIBLE_IN_PAY
     reasonCode = cancelReasonCode ?? ELIGIBILITY_CONFIG.DEFAULT_CANCEL_REASON_CODE
     endDate = careEndDate ?? referenceDate ?? pacificToday()

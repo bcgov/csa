@@ -57,8 +57,8 @@ model Contact {
   locationType               String?   @map("location_type")
   locationSubType            String?   @map("location_sub_type")
   placementStatus            String?   @map("placement_status")
-  actualStartDate            DateTime? @map("actual_start_date") @db.Timestamptz()
-  actualEndDate              DateTime? @map("actual_end_date") @db.Timestamptz()
+  actualStartDate            DateTime? @map("actual_start_date") @db.Date
+  actualEndDate              DateTime? @map("actual_end_date") @db.Date
   paidUnpaid                 String?   @map("paid_unpaid")
   interruptedPlacement       String?   @map("interrupted_placement")
   sourcePlacement            String?   @map("source_placement")
@@ -67,9 +67,9 @@ model Contact {
   placeOfServiceName         String?   @map("place_of_service_name")
   agreementType              String?   @map("agreement_type")
   agreementStatus            String?   @map("agreement_status")
-  agreementStartDate         DateTime? @map("agreement_start_date") @db.Timestamptz()
-  agreementEndDate           DateTime? @map("agreement_end_date") @db.Timestamptz()
-  terminationDate            DateTime? @map("termination_date") @db.Timestamptz()
+  agreementStartDate         DateTime? @map("agreement_start_date") @db.Date
+  agreementEndDate           DateTime? @map("agreement_end_date") @db.Date
+  terminationDate            DateTime? @map("termination_date") @db.Date
   mcfdContract               String?   @map("mcfd_contract")
   orderNumber                String?   @map("order_number")
   orderType                  String?   @map("order_type")

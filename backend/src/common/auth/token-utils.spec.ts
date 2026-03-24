@@ -48,8 +48,6 @@ describe('token-utils', () => {
         email: 'john@example.com',
         firstName: 'John',
         lastName: 'Doe',
-        sub: 'sub123',
-        exp: 1234567890,
       })
     })
 
@@ -60,8 +58,6 @@ describe('token-utils', () => {
         email: undefined,
         firstName: undefined,
         lastName: undefined,
-        sub: undefined,
-        exp: undefined,
       })
     })
   })

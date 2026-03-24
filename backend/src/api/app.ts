@@ -12,8 +12,7 @@ export async function bootstrap() {
     logger: customLogger,
   })
   app.use(helmet())
-  const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS?.split(',')
-  app.enableCors(allowedOrigins ? { origin: allowedOrigins } : {})
+  app.enableCors({ origin: false })
   app.set('trust proxy', 1)
   app.use(metricsMiddleware)
   app.useGlobalPipes(

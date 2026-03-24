@@ -147,7 +147,7 @@ export class IcmSyncBackService {
     din: string | null
     csaSentDate: Date | null
   }): IcmContactUpdatePayload {
-    return {
+    const payload: IcmContactUpdatePayload = {
       Id: contact.contactIdIcm ?? '',
       'CSA Status': contact.csaStatus
         ? (CSA_STATUS_LABELS[contact.csaStatus] ?? contact.csaStatus)
@@ -155,8 +155,13 @@ export class IcmSyncBackService {
       'CSA Status Effective Date': contact.csaStatusEffectiveDate
         ? formatDateTimePacific(contact.csaStatusEffectiveDate)
         : '',
-      'CSA DIN': contact.din ?? null,
-      'CSA Sent Date': contact.csaSentDate ? formatDateTimePacific(contact.csaSentDate) : null,
     }
+    if (contact.din) {
+      payload['CSA DIN'] = contact.din
+    }
+    if (contact.csaSentDate) {
+      payload['CSA Sent Date'] = formatDateTimePacific(contact.csaSentDate)
+    }
+    return payload
   }
 }

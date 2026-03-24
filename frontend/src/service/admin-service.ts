@@ -5,8 +5,6 @@ export interface UserInfo {
   email?: string
   firstName?: string
   lastName?: string
-  sub?: string
-  exp?: number
 }
 
 export interface CSAAccessResponse {

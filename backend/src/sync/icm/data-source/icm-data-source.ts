@@ -8,8 +8,8 @@ export interface IcmContactUpdatePayload {
   Id: string
   'CSA Status': string
   'CSA Status Effective Date': string
-  'CSA DIN': string | null
-  'CSA Sent Date': string | null
+  'CSA DIN'?: string
+  'CSA Sent Date'?: string
 }
 
 export abstract class IcmDataSource {

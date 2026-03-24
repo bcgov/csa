@@ -27,18 +27,4 @@ export class UserInfoDto {
     required: false,
   })
   lastName?: string
-
-  @ApiProperty({
-    description: 'User subject identifier',
-    example: 'a1b2c3d4-e5f6-7g8h-9i0j-k1l2m3n4o5p6',
-    required: false,
-  })
-  sub?: string
-
-  @ApiProperty({
-    description: 'Token expiration timestamp',
-    example: 1674567890,
-    required: false,
-  })
-  exp?: number
 }

@@ -22,7 +22,7 @@ class APIService {
     // Request interceptor to attach auth token
     this.client.interceptors.request.use(
       (config) => {
-        const token = localStorage.getItem('authToken')
+        const token = sessionStorage.getItem('authToken')
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
         }
@@ -46,8 +46,7 @@ class APIService {
           error?.response?.data?.message === 'Token has expired. Please login again.'
         ) {
           console.warn('Token expired, clearing auth and redirecting to login...')
-          localStorage.removeItem('authToken')
-          localStorage.removeItem('isLoggedIn')
+          sessionStorage.removeItem('authToken')
           // Redirect to landing page
           window.location.href = '/'
         }

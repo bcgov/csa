@@ -265,12 +265,12 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
   },
   {
     dbColumn: 'actual_start_date',
-    pgType: 'timestamptz',
+    pgType: 'date',
     extract: (row) => row.primaryPlacement?.startDate ?? null,
   },
   {
     dbColumn: 'actual_end_date',
-    pgType: 'timestamptz',
+    pgType: 'date',
     extract: (row) => row.primaryPlacement?.endDate ?? null,
   },
   {
@@ -318,17 +318,17 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
   },
   {
     dbColumn: 'agreement_start_date',
-    pgType: 'timestamptz',
+    pgType: 'date',
     extract: (row) => row.primaryAgreement?.agreementStartDate ?? null,
   },
   {
     dbColumn: 'agreement_end_date',
-    pgType: 'timestamptz',
+    pgType: 'date',
     extract: (row) => row.primaryAgreement?.agreementEndDate ?? null,
   },
   {
     dbColumn: 'termination_date',
-    pgType: 'timestamptz',
+    pgType: 'date',
     extract: (row) => row.primaryAgreement?.terminationDate ?? null,
   },
   {

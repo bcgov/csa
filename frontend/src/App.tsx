@@ -1614,10 +1614,10 @@ function App() {
       agreementType: contact.agreementType || '',
       agreementStatus: contact.agreementStatus || '',
       agreementStartDate: contact.agreementStartDate
-        ? formatDateTimeYMD(contact.agreementStartDate)
+        ? formatDateYMD(contact.agreementStartDate)
         : '',
-      agreementEndDate: contact.agreementEndDate ? formatDateTimeYMD(contact.agreementEndDate) : '',
-      terminationDate: contact.terminationDate ? formatDateTimeYMD(contact.terminationDate) : '',
+      agreementEndDate: contact.agreementEndDate ? formatDateYMD(contact.agreementEndDate) : '',
+      terminationDate: contact.terminationDate ? formatDateYMD(contact.terminationDate) : '',
       mcfdContract: contact.mcfdContract || '',
       product: contact.product || '',
       isOver18: contact.isOver18 || false,

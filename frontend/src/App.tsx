@@ -35,7 +35,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { useAuth } from './context/AuthContext'
 import logo from './icons/image.png'
-import { verifyCSAAccess } from './service/admin-service'
 import {
   addContactsToBatch,
   fullTextSearchContacts,
@@ -195,45 +194,8 @@ function App() {
     clearCsaAccessAlert,
   } = useAuth()
 
-  // Local authentication state for IDIR mock login
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    const saved = localStorage.getItem('isLoggedIn')
-    return saved === 'true'
-  })
-  const [showIdirLogin, setShowIdirLogin] = useState(false)
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-
-  // Sync isLoggedIn state with localStorage (for when AuthContext clears it)
-  useEffect(() => {
-    const checkLoginState = () => {
-      const saved = localStorage.getItem('isLoggedIn')
-      const shouldBeLoggedIn = saved === 'true'
-      if (isLoggedIn !== shouldBeLoggedIn) {
-        setIsLoggedIn(shouldBeLoggedIn)
-      }
-    }
-
-    // Check immediately when loading state changes (Keycloak auth completed)
-    if (!isLoading) {
-      checkLoginState()
-    }
-
-    // Also listen for storage changes
-    window.addEventListener('storage', checkLoginState)
-    return () => window.removeEventListener('storage', checkLoginState)
-  }, [isLoading, isLoggedIn])
-
-  // User is authenticated only if:
-  // 1. Loading is complete (isLoading is false) AND
-  // 2. Either:
-  //    a. Keycloak is authenticated AND has CSA access (hasCSAAccess === true), OR
-  //    b. Mock login is active (isLoggedIn is true - mock login already verifies CSA access)
-  // Note: hasCSAAccess is null during loading, false when denied, true when granted
-  // IMPORTANT: We must wait for isLoading to be false before trusting isLoggedIn,
-  // because AuthContext may clear isLoggedIn during Keycloak SSO flow
-  const isAuthenticated =
-    !isLoading && ((keycloakAuthenticated && hasCSAAccess === true) || isLoggedIn)
+  // User is authenticated when Keycloak auth is complete and has CSA access
+  const isAuthenticated = !isLoading && keycloakAuthenticated && hasCSAAccess === true
 
   const [selectedTab, setSelectedTab] = useState(0)
   const [selected, setSelected] = useState<number[]>([])
@@ -283,69 +245,6 @@ function App() {
       clearCsaAccessAlert()
     }
   }, [csaAccessAlert, clearCsaAccessAlert])
-
-  // Effect to re-verify CSA access on page load/refresh for IDIR login sessions
-  useEffect(() => {
-    const verifyExistingLogin = async () => {
-      const savedLoginState = localStorage.getItem('isLoggedIn')
-      const savedToken = localStorage.getItem('authToken')
-
-      // Only verify if there's an existing login session with a token (IDIR login - not Keycloak SSO)
-      // Keycloak SSO is handled by AuthContext
-      if (savedLoginState === 'true' && savedToken) {
-        try {
-          const csaAccessResponse = await verifyCSAAccess()
-
-          // Check if token is expired
-          if (csaAccessResponse.tokenExpired) {
-            console.warn('Token expired during re-verification')
-            localStorage.removeItem('authToken')
-            localStorage.removeItem('isLoggedIn')
-            localStorage.removeItem('username')
-            setIsLoggedIn(false)
-            setSnackbar({
-              open: true,
-              message: 'Your session has expired. Please login again.',
-              severity: 'error',
-            })
-            return
-          }
-
-          // Only keep access if BOTH hasAccess is true AND message is exactly 'User has CSA access'
-          const hasValidAccess =
-            csaAccessResponse.hasAccess === true &&
-            csaAccessResponse.message === 'User has CSA access'
-
-          if (!hasValidAccess) {
-            console.warn('CSA access denied during re-verification:', csaAccessResponse)
-            localStorage.removeItem('authToken')
-            localStorage.removeItem('isLoggedIn')
-            localStorage.removeItem('username')
-            setIsLoggedIn(false)
-            setSnackbar({
-              open: true,
-              message: 'User not authorised to access CSA',
-              severity: 'error',
-            })
-          }
-        } catch (error) {
-          console.error('Failed to re-verify CSA access:', error)
-          localStorage.removeItem('authToken')
-          localStorage.removeItem('isLoggedIn')
-          localStorage.removeItem('username')
-          setIsLoggedIn(false)
-          setSnackbar({
-            open: true,
-            message: 'User not authorised to access CSA',
-            severity: 'error',
-          })
-        }
-      }
-    }
-
-    // Run verification on component mount (page load/refresh)
-    verifyExistingLogin()
-  }, []) // Empty dependency array - runs only once on mount
 
   // Batch history state for selected contact
   const [contactBatchHistory, setContactBatchHistory] = useState<ContactBatchDetail[]>([])
@@ -459,6 +358,7 @@ function App() {
   // Pagination states for batch tables
   const [batchRequestsPage, setBatchRequestsPage] = useState(1)
   const [batchDetailsPage, setBatchDetailsPage] = useState(1)
+  const [batchHistoryPage, setBatchHistoryPage] = useState(1)
   const BATCH_PAGE_SIZE = 10
 
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({
@@ -921,80 +821,9 @@ function App() {
     setSelectedTab(newValue)
   }
 
-  // Mock IDIR login handler
-  const handleIdirLogin = async () => {
-    const mockToken = `mock-token-${Date.now()}`
-    localStorage.setItem('authToken', mockToken)
-    localStorage.setItem('username', username)
-
-    // Verify CSA access before granting login
-    try {
-      const csaAccessResponse = await verifyCSAAccess()
-
-      // Check if token is expired
-      if (csaAccessResponse.tokenExpired) {
-        console.warn('Token expired')
-        localStorage.removeItem('authToken')
-        localStorage.removeItem('isLoggedIn')
-        localStorage.removeItem('username')
-        setSnackbar({
-          open: true,
-          message: 'Your session has expired. Please login again.',
-          severity: 'error',
-        })
-        setShowIdirLogin(false)
-        return
-      }
-
-      // Only grant access if BOTH hasAccess is true AND message is exactly 'User has CSA access'
-      const hasValidAccess =
-        csaAccessResponse.hasAccess === true && csaAccessResponse.message === 'User has CSA access'
-
-      if (hasValidAccess) {
-        setIsLoggedIn(true)
-        localStorage.setItem('isLoggedIn', 'true')
-        setShowIdirLogin(false)
-      } else {
-        // User is not authorized to access CSA
-        console.warn('CSA access denied:', csaAccessResponse)
-        localStorage.removeItem('authToken')
-        localStorage.removeItem('isLoggedIn')
-        localStorage.removeItem('username')
-        setSnackbar({
-          open: true,
-          message: 'User not authorised to access CSA',
-          severity: 'error',
-        })
-        setShowIdirLogin(false)
-      }
-    } catch (error) {
-      console.error('Failed to verify CSA access:', error)
-      localStorage.removeItem('authToken')
-      localStorage.removeItem('isLoggedIn')
-      localStorage.removeItem('username')
-      setSnackbar({
-        open: true,
-        message: 'User not authorised to access CSA',
-        severity: 'error',
-      })
-      setShowIdirLogin(false)
-    }
-  }
-
-  // Mock logout handler
+  // Logout handler
   const handleLogout = () => {
-    if (keycloakAuthenticated) {
-      // Logout from Keycloak
-      logout()
-    } else {
-      // Logout from mock session
-      setIsLoggedIn(false)
-      localStorage.removeItem('isLoggedIn')
-      localStorage.removeItem('authToken')
-      localStorage.removeItem('username')
-      setUsername('')
-      setPassword('')
-    }
+    logout()
   }
 
   // Hold/Resume handler
@@ -1774,8 +1603,8 @@ function App() {
       locationType: contact.locationType || '',
       locationSubType: contact.locationSubType || '',
       placementStatus: contact.placementStatus || '',
-      actualStartDate: contact.actualStartDate ? formatDateTimeYMD(contact.actualStartDate) : '',
-      actualEndDate: contact.actualEndDate ? formatDateTimeYMD(contact.actualEndDate) : '',
+      actualStartDate: contact.actualStartDate ? formatDateYMD(contact.actualStartDate) : '',
+      actualEndDate: contact.actualEndDate ? formatDateYMD(contact.actualEndDate) : '',
       paidUnpaid: contact.paidUnpaid || '',
       sourcePlacement: contact.sourcePlacement || '',
       // Service provider and agreement fields
@@ -1922,6 +1751,16 @@ function App() {
     return data
   }, [contactBatchHistory, batchHistorySearchTerm, batchHistoryColumnFilters])
 
+  // Paginated batch history
+  const paginatedBatchHistory = useMemo(() => {
+    const startIndex = (batchHistoryPage - 1) * BATCH_PAGE_SIZE
+    return filteredBatchHistory.slice(startIndex, startIndex + BATCH_PAGE_SIZE)
+  }, [filteredBatchHistory, batchHistoryPage])
+
+  const batchHistoryTotalPages = useMemo(() => {
+    return Math.ceil(filteredBatchHistory.length / BATCH_PAGE_SIZE)
+  }, [filteredBatchHistory.length])
+
   // Filter batch requests data
   const filteredBatchRequests = useMemo(() => {
     // Transform API data to match table structure
@@ -2039,6 +1878,10 @@ function App() {
     setBatchDetailsPage(1)
   }, [batchDetailsSearchTerm, batchDetailsColumnFilters, selectedBatch])
 
+  useEffect(() => {
+    setBatchHistoryPage(1)
+  }, [batchHistorySearchTerm, batchHistoryColumnFilters, selectedChild])
+
   return (
     <Box
       sx={{
@@ -2079,7 +1922,7 @@ function App() {
               }}
             >
               <Typography variant="body2" sx={{ color: '#666' }}>
-                {user?.idirUsername || user?.email || user?.name || username || 'User'}
+                {user?.idirUsername || user?.email || user?.name || 'User'}
               </Typography>
               <Button
                 variant="outlined"
@@ -2129,154 +1972,23 @@ function App() {
           }}
         >
           <Box sx={{ width: '100%', maxWidth: '800px' }}>
-            {!showIdirLogin ? (
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', marginTop: '20px' }}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={login}
-                  size="large"
-                  sx={{
-                    textTransform: 'uppercase',
-                    backgroundColor: '#1976d2',
-                    '&:hover': {
-                      backgroundColor: '#1565c0',
-                    },
-                  }}
-                >
-                  Login via SSO
-                </Button>
-                {/* <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={() => setShowIdirLogin(true)}
-                  size="large"
-                  sx={{
-                    textTransform: 'uppercase',
-                    backgroundColor: '#1976d2',
-                    '&:hover': {
-                      backgroundColor: '#1565c0',
-                    },
-                  }}
-                >
-                  Login with IDIR
-                </Button> */}
-              </Box>
-            ) : (
-              <Box
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', marginTop: '20px' }}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={login}
+                size="large"
                 sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  maxWidth: '400px',
-                  margin: '0 auto',
-                  marginTop: '40px',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '4px',
-                  overflow: 'hidden',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  textTransform: 'uppercase',
+                  backgroundColor: '#1976d2',
+                  '&:hover': {
+                    backgroundColor: '#1565c0',
+                  },
                 }}
               >
-                {/* Header */}
-                <Box
-                  sx={{
-                    backgroundColor: '#5b7f95',
-                    color: '#ffffff',
-                    padding: '16px',
-                    textAlign: 'center',
-                  }}
-                >
-                  <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                    Log in with IDIR
-                  </Typography>
-                </Box>
-
-                {/* Form Content */}
-                <Box sx={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                  <Box>
-                    <Typography
-                      variant="body2"
-                      sx={{ mb: 1, color: '#333', fontWeight: 500, textAlign: 'center' }}
-                    >
-                      Username
-                    </Typography>
-                    <TextField
-                      placeholder="Example@bc..."
-                      variant="outlined"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      fullWidth
-                      size="small"
-                    />
-                  </Box>
-
-                  <Box>
-                    <Typography
-                      variant="body2"
-                      sx={{ mb: 1, color: '#333', fontWeight: 500, textAlign: 'center' }}
-                    >
-                      Password
-                    </Typography>
-                    <TextField
-                      placeholder="************"
-                      type="password"
-                      variant="outlined"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      fullWidth
-                      size="small"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          handleIdirLogin()
-                        }
-                      }}
-                    />
-                  </Box>
-
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      gap: 2,
-                      justifyContent: 'flex-end',
-                      marginTop: '10px',
-                    }}
-                  >
-                    <Button
-                      variant="outlined"
-                      onClick={() => {
-                        setShowIdirLogin(false)
-                        setUsername('')
-                        setPassword('')
-                      }}
-                      sx={{
-                        textTransform: 'none',
-                        borderColor: '#1976d2',
-                        color: '#1976d2',
-                        '&:hover': {
-                          borderColor: '#1565c0',
-                          backgroundColor: '#f0f4f8',
-                        },
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={handleIdirLogin}
-                      sx={{
-                        textTransform: 'none',
-                        backgroundColor: '#1976d2',
-                        '&:hover': {
-                          backgroundColor: '#1565c0',
-                        },
-                      }}
-                    >
-                      Continue
-                    </Button>
-                  </Box>
-                </Box>
-              </Box>
-            )}
+                Login via SSO
+              </Button>
+            </Box>
           </Box>
         </Box>
       ) : (
@@ -2783,7 +2495,7 @@ function App() {
                               onClick={(e) => handleSortClick(e, 'lastUpdated')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              Last Updated
+                              Last Updated Date
                             </span>
                           </Box>
                         </TableCell>
@@ -3588,7 +3300,7 @@ function App() {
                                     variant="caption"
                                     sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
                                   >
-                                    Case No.
+                                    Case Number
                                   </Typography>
                                   <Typography
                                     variant="body2"
@@ -4529,7 +4241,7 @@ function App() {
                                 </TableCell>
                               </TableRow>
                             ) : (
-                              filteredBatchHistory.map((row) => (
+                              paginatedBatchHistory.map((row) => (
                                 <TableRow
                                   key={row.id}
                                   hover
@@ -4580,6 +4292,32 @@ function App() {
                           </TableBody>
                         </Table>
                       </TableContainer>
+                      {/* Batch History Pagination */}
+                      {filteredBatchHistory.length > 0 && (
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            mt: 2,
+                            px: 2,
+                            pb: 2,
+                          }}
+                        >
+                          <Typography variant="body2" color="text.secondary">
+                            Showing {paginatedBatchHistory.length} of {filteredBatchHistory.length}{' '}
+                            records
+                          </Typography>
+                          <Pagination
+                            count={batchHistoryTotalPages}
+                            page={batchHistoryPage}
+                            onChange={(_, page) => setBatchHistoryPage(page)}
+                            color="primary"
+                            showFirstButton
+                            showLastButton
+                          />
+                        </Box>
+                      )}
                     </Paper>
                   </Box>
                 )}
@@ -4910,7 +4648,7 @@ function App() {
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              Given Name
+                              First Name
                               <IconButton
                                 size="small"
                                 onClick={(e) => handleBatchDetailsFilterClick(e, 'givenName')}

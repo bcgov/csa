@@ -20,7 +20,7 @@ export const craConfig = registerAs('cra', () => {
     environmentCode: isProduction ? 'PCSAIN' : 'ACSAIN',
     fileTypeCode: isProduction ? 'PAPL' : 'AAPL',
     fileNamePrefix: isProduction ? 'HT' : 'II',
-    responseEnvFlag: isProduction ? 'P' : 'V',
+    responseEnvFlag: isProduction ? 'P' : 'A',
     userId: craUserId,
     lastSequenceNumber: isProduction ? null : 0,
   }

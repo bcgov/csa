@@ -57,12 +57,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           })
           .then(async (authenticated) => {
             if (authenticated && keycloakInstance.tokenParsed) {
-              // Clear any mock login state when using Keycloak SSO
-              localStorage.removeItem('isLoggedIn')
-
-              // Store token in localStorage
               if (keycloakInstance.token) {
-                localStorage.setItem('authToken', keycloakInstance.token)
+                sessionStorage.setItem('authToken', keycloakInstance.token)
                 console.log('Calling admin api to verify CSA access...')
 
                 // Verify CSA access via admin API
@@ -76,8 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     setIsAuthenticated(false)
                     setHasCSAAccess(false)
                     setCsaAccessAlert('Your session has expired. Please login again.')
-                    localStorage.removeItem('authToken')
-                    localStorage.removeItem('isLoggedIn') // Clear mock login state as well
+                    sessionStorage.removeItem('authToken')
                     setIsLoading(false)
                     keycloakInstance.logout({ redirectUri: window.location.origin })
                     return
@@ -110,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         .updateToken(70)
                         .then((refreshed) => {
                           if (refreshed && keycloakInstance.token) {
-                            localStorage.setItem('authToken', keycloakInstance.token)
+                            sessionStorage.setItem('authToken', keycloakInstance.token)
                             console.log('Token refreshed')
                           }
                         })
@@ -127,8 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                       csaAccessResponse.message || 'You do not have access to CSA application',
                     )
                     setCsaAccessAlert('User not authorised to access CSA')
-                    localStorage.removeItem('authToken')
-                    localStorage.removeItem('isLoggedIn') // Clear mock login state as well
+                    sessionStorage.removeItem('authToken')
                     // Set flag to prevent SSO loop on redirect
                     sessionStorage.setItem('csaAccessDenied', 'true')
                     // Clear Keycloak token locally without triggering IdP logout
@@ -143,8 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   setHasCSAAccess(false)
                   setCsaAccessError('Failed to verify CSA access. Please try again.')
                   setCsaAccessAlert('User not authorised to access CSA')
-                  localStorage.removeItem('authToken')
-                  localStorage.removeItem('isLoggedIn') // Clear mock login state as well
+                  sessionStorage.removeItem('authToken')
                   // Set flag to prevent SSO loop on redirect
                   sessionStorage.setItem('csaAccessDenied', 'true')
                   // Clear Keycloak token locally without triggering IdP logout
@@ -182,7 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const logout = () => {
-    localStorage.removeItem('authToken')
+    sessionStorage.removeItem('authToken')
     keycloak?.logout({
       redirectUri: window.location.origin,
     })

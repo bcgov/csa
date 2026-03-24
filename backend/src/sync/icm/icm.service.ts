@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { parseCalendarDate, parseDateAsPacific } from 'src/common/utils'
+import { formatIcmTimestamp, parseCalendarDate } from 'src/common/utils'
 import { IcmApiRecord, IcmDataSource } from './data-source/icm-data-source'
 import { IcmApiConfig } from './icm.config'
 
@@ -57,7 +57,7 @@ export class IcmService {
           return parseCalendarDate(String(raw))
         }
         if (entry.dbType === 'timestamp') {
-          return parseDateAsPacific(String(raw))?.toISOString() ?? null
+          return formatIcmTimestamp(String(raw))
         }
         return raw
       }),

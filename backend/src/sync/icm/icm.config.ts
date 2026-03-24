@@ -63,7 +63,7 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     primaryKey: 'ROW_ID',
     cursorLabel: 'Updated',
     searchSpec: () =>
-      `([Legal Authority Code] = 'OPC-Perm Cust Trans-Cons-54.01' OR [Legal Authority Code] = 'OPO-Perm Custody Trans-54.01' OR [Legal Authority Code] = 'OPT-Perm Custody Trans-54.1') OR ([Expiry Date] IS NULL OR [Expiry Date] >= "${formatDatePacific(daysAgoPacific(30))}")`,
+      `([Legal Authority Code] = 'OPC-Perm Cust Trans-Cons-54.01' OR [Legal Authority Code] = 'OPO-Perm Custody Trans-54.01' OR [Legal Authority Code] = 'OPT-Perm Custody Trans-54.1') OR ([Expiry Date] IS NULL OR [Expiry Date] >= "${formatDatePacific(daysAgoPacific(60))}")`,
     fieldMap: STG_LEGAL_AUTHORITY_MAP,
   },
   {

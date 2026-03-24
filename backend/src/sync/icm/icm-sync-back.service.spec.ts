@@ -134,6 +134,40 @@ describe('IcmSyncBackService', () => {
       expect(prisma.contact.updateMany).toHaveBeenCalledTimes(1)
     })
 
+    it('should omit CSA DIN and CSA Sent Date when not set', async () => {
+      const contacts = [makeContact(1, { din: null, csaSentDate: null })]
+      prisma.contact.findMany.mockResolvedValue(contacts)
+
+      await service.syncFlaggedContacts()
+
+      const payload = icmDataSource.updateContacts.mock.calls[0][0][0]
+      expect(payload).not.toHaveProperty('CSA DIN')
+      expect(payload).not.toHaveProperty('CSA Sent Date')
+    })
+
+    it('should omit CSA DIN when set to empty string', async () => {
+      const contacts = [makeContact(1, { din: '', csaSentDate: null })]
+      prisma.contact.findMany.mockResolvedValue(contacts)
+
+      await service.syncFlaggedContacts()
+
+      const payload = icmDataSource.updateContacts.mock.calls[0][0][0]
+      expect(payload).not.toHaveProperty('CSA DIN')
+    })
+
+    it('should include CSA DIN and CSA Sent Date when set', async () => {
+      const contacts = [
+        makeContact(1, { din: 'DIN-1', csaSentDate: new Date('2026-03-10T21:15:00Z') }),
+      ]
+      prisma.contact.findMany.mockResolvedValue(contacts)
+
+      await service.syncFlaggedContacts()
+
+      const payload = icmDataSource.updateContacts.mock.calls[0][0][0]
+      expect(payload).toHaveProperty('CSA DIN', 'DIN-1')
+      expect(payload).toHaveProperty('CSA Sent Date')
+    })
+
     it('should format effective date and sent date as MM/DD/YYYY HH:MM:SS Pacific', async () => {
       const contacts = [
         makeContact(1, {

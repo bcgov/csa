@@ -133,7 +133,7 @@ describe('IcmService', () => {
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(2)
     })
 
-    it('should convert timestamp fields to UTC and keep date fields as ISO dates', async () => {
+    it('should store timestamp fields as naive PT ISO strings and date fields as ISO date strings', async () => {
       const dateFieldMap: FieldMapEntry[] = [
         { sourceField: 'ROW_ID', sourceLabel: 'Row Id', masterField: 'case_row_id' },
         {
@@ -167,8 +167,8 @@ describe('IcmService', () => {
       const args = mockPrisma.$executeRawUnsafe.mock.calls[0]
       // args[0] = SQL, args[1] = ROW_ID array, args[2] = LAST_UPD array, args[3] = BIRTH_DT array
       expect(args[1]).toEqual(['1-ABC'])
-      // Timestamp: 01/13/2026 10:51:03 PT = 2026-01-13T18:51:03.000Z
-      expect(args[2]).toEqual(['2026-01-13T18:51:03.000Z'])
+      // Timestamp: stored as naive ISO (no UTC conversion) — faithful PT value
+      expect(args[2]).toEqual(['2026-01-13T10:51:03'])
       // Date: calendar date stored as-is, no timezone conversion
       expect(args[3]).toEqual(['2012-01-01'])
     })

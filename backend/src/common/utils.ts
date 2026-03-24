@@ -18,11 +18,17 @@ export function firstDayOfPreviousMonthPacific(referenceDate: Date = new Date())
 const PACIFIC_ZONE = 'America/Vancouver'
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+const SPACE_DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/
+
 // Date-only strings ('2026-01-09') are interpreted as UTC midnight by new Date(),
 // which shifts to the previous day in Pacific time. Parse as Pacific midnight instead.
 export function parseISODatePacific(value: string): Date {
   if (DATE_ONLY_PATTERN.test(value)) {
     return DateTime.fromISO(value, { zone: PACIFIC_ZONE }).toJSDate()
+  }
+  if (SPACE_DATETIME_PATTERN.test(value)) {
+    const dt = DateTime.fromFormat(value.trim(), 'yyyy-MM-dd HH:mm:ss', { zone: PACIFIC_ZONE })
+    if (dt.isValid) return new Date(dt.toISODate()!)
   }
   return new Date(value)
 }
@@ -50,6 +56,15 @@ export function parseDateAsPacific(dateStr: string | null | undefined): Date | n
   if (!dt.isValid) return null
 
   return dt.toJSDate()
+}
+
+export function formatIcmTimestamp(raw: string | null | undefined): string | null {
+  if (!raw || raw.trim() === '') return null
+  const trimmed = raw.trim()
+  const hasTime = trimmed.includes(':')
+  const fmt = hasTime ? 'MM/dd/yyyy HH:mm:ss' : 'MM/dd/yyyy'
+  const dt = DateTime.fromFormat(trimmed, fmt)
+  return dt.isValid ? dt.toISO({ includeOffset: false, suppressMilliseconds: true }) : null
 }
 
 export function formatCalendarDate(date: Date): string {

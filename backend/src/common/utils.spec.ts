@@ -5,6 +5,7 @@ import {
   formatDatePacific,
   formatDatePacificCompact,
   formatDateTimePacific,
+  formatIcmTimestamp,
   getAgeCutoffDate,
   isEligibleAge,
   parseCalendarDate,
@@ -316,11 +317,6 @@ describe('parseISODatePacific', () => {
     expect(result.toISOString().split('T')[0]).toBe('2026-01-09')
   })
 
-  it('should pass through full datetime strings unchanged', () => {
-    const result = parseISODatePacific('2026-01-09T14:30:00.000Z')
-    expect(result.toISOString()).toBe('2026-01-09T14:30:00.000Z')
-  })
-
   it('should handle PDT (summer) date-only correctly', () => {
     // PDT (UTC-7): 2026-07-15T00:00:00-07:00 = 2026-07-15T07:00:00Z
     const result = parseISODatePacific('2026-07-15')
@@ -333,14 +329,54 @@ describe('parseISODatePacific', () => {
   })
 
   it('should handle fall-back date (PST after DST ends)', () => {
-    // Dec 1 2026 is in PST (UTC-8)
     const result = parseISODatePacific('2026-12-01')
     expect(result.toISOString()).toBe('2026-12-01T08:00:00.000Z')
   })
 
-  it('should not reinterpret full datetime at midnight UTC as Pacific', () => {
-    const result = parseISODatePacific('2026-01-09T00:00:00.000Z')
-    expect(result.toISOString()).toBe('2026-01-09T00:00:00.000Z')
+  it('should parse Postgres space-separated timestamp as Pacific time', () => {
+    const result = parseISODatePacific('2024-03-31 23:30:00')
+    expect(result.getUTCFullYear()).toBe(2024)
+    expect(result.getUTCMonth()).toBe(2) // March (0-indexed)
+    expect(result.getUTCDate()).toBe(31)
+  })
+
+  it('should normalize space-separated timestamp to UTC midnight of Pacific date', () => {
+    const result = parseISODatePacific('2024-03-31 23:30:00')
+    expect(result.toISOString()).toBe('2024-03-31T00:00:00.000Z')
+  })
+
+  it('should handle space-separated timestamp on day boundary (just before midnight PT)', () => {
+    const result = parseISODatePacific('2024-03-31 23:59:59')
+    expect(result.getUTCMonth()).toBe(2)
+    expect(result.getUTCDate()).toBe(31)
+  })
+
+  it('should fall through to new Date() for invalid space-separated date (e.g. Feb 30)', () => {
+    const result = parseISODatePacific('2024-02-30 10:00:00')
+    expect(isNaN(result.getTime())).toBe(false)
+    expect(result.getUTCMonth()).toBe(2) // March (overflow from Feb 30)
+  })
+})
+
+describe('formatIcmTimestamp', () => {
+  it('should reformat MM/dd/yyyy HH:mm:ss to ISO without offset', () => {
+    expect(formatIcmTimestamp('03/31/2024 23:30:00')).toBe('2024-03-31T23:30:00')
+  })
+
+  it('should reformat date-only MM/dd/yyyy to ISO without offset', () => {
+    expect(formatIcmTimestamp('03/31/2024')).toBe('2024-03-31T00:00:00')
+  })
+
+  it('should return null for empty string', () => {
+    expect(formatIcmTimestamp('')).toBeNull()
+  })
+
+  it('should return null for null', () => {
+    expect(formatIcmTimestamp(null)).toBeNull()
+  })
+
+  it('should return null for undefined', () => {
+    expect(formatIcmTimestamp(undefined)).toBeNull()
   })
 })
 

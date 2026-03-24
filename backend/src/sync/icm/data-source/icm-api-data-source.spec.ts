@@ -245,7 +245,6 @@ describe('IcmApiDataSource', () => {
       'CSA Status': 'eligible',
       'CSA Status Effective Date': '01/15/2026',
       'CSA DIN': '12345',
-      'CSA Sent Date': null,
     }
 
     it('should send PUT to /ICMContact/ICMContact with query params and auth headers', async () => {

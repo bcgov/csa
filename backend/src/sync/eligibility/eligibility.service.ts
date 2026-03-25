@@ -193,14 +193,9 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
     extract: (row) => row.profile.caseNumber,
     required: true,
   },
-  { dbColumn: 'case_type', pgType: 'text', extract: (row) => row.profile.caseType, required: true },
-  {
-    dbColumn: 'case_status',
-    pgType: 'text',
-    extract: (row) => row.profile.caseStatus,
-    required: true,
-  },
-  { dbColumn: 'case_load', pgType: 'text', extract: (row) => row.profile.caseLoad, required: true },
+  { dbColumn: 'case_type', pgType: 'text', extract: (row) => row.profile.caseType },
+  { dbColumn: 'case_status', pgType: 'text', extract: (row) => row.profile.caseStatus },
+  { dbColumn: 'case_load', pgType: 'text', extract: (row) => row.profile.caseLoad },
   {
     dbColumn: 'legacy_file_number',
     pgType: 'text',

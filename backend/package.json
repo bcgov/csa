@@ -101,6 +101,7 @@
     "@angular-devkit/core": {
       "ajv": "8.18.0"
     },
-    "lodash": "4.17.23"
+    "lodash": "4.17.23",
+    "effect": "^3.20.0"
   }
 }

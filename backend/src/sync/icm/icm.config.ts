@@ -45,7 +45,7 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     primaryKey: 'ROW_ID',
     cursorLabel: 'Updated',
     searchSpec: () =>
-      `[Status] = "Active" OR [Status] = "Interrupted" OR ([Status] = "Ended" AND [End Date] >= "${formatDatePacific(daysAgoPacific(30))}")`,
+      `[Status] = "Active" OR [Status] = "Interrupted" OR ([Status] = "Ended" AND [End Date] >= "${formatDatePacific(firstDayOfPreviousMonthPacific())}")`,
     fieldMap: STG_ICM_PLACEMENTS_MAP,
   },
   {

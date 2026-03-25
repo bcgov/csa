@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ContactProfile, OrderRecord } from '../../eligibility.types'
-import { makeContact, makeOrder as makeBaseOrder } from '../../test-helpers'
+import { makeOrder as makeBaseOrder, makeContact } from '../../test-helpers'
 import { EligibilityContext } from '../rule.interface'
 import { step6_OrderPaymentCheck } from './step6-order-payment-check'
 
@@ -90,12 +90,16 @@ describe('step6_OrderPaymentCheck', () => {
     expect(result!.step).toBe(7)
   })
 
-  it('should accept MIS order types (Fixed Rate, Variable Rate)', () => {
-    const ctx = makeCtx({
+  it('should accept MIS order types (Fixed Rate, Variable Rate, Var Rate)', () => {
+    const fixedRate = makeCtx({
       orders: [makeOrder({ orderType: 'Fixed Rate', source: 'MIS' })],
     })
-    const result = step6_OrderPaymentCheck.evaluate(ctx)
-    expect(result!.step).toBe(7)
+    expect(step6_OrderPaymentCheck.evaluate(fixedRate)!.step).toBe(7)
+
+    const varRate = makeCtx({
+      orders: [makeOrder({ orderType: 'Var Rate', source: 'MIS' })],
+    })
+    expect(step6_OrderPaymentCheck.evaluate(varRate)!.step).toBe(7)
   })
 
   it('should handle variant casing and whitespace in order type and status', () => {

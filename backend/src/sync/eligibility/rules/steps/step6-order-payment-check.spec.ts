@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ContactProfile, OrderRecord } from '../../eligibility.types'
-import { makeContact, makeOrder as makeBaseOrder } from '../../test-helpers'
+import { makeOrder as makeBaseOrder, makeContact } from '../../test-helpers'
 import { EligibilityContext } from '../rule.interface'
 import { step6_OrderPaymentCheck } from './step6-order-payment-check'
 
@@ -90,12 +90,16 @@ describe('step6_OrderPaymentCheck', () => {
     expect(result!.step).toBe(7)
   })
 
-  it('should accept MIS order types (Fixed Rate, Variable Rate)', () => {
-    const ctx = makeCtx({
+  it('should accept MIS order types (Fixed Rate, Variable Rate, Var Rate)', () => {
+    const fixedRate = makeCtx({
       orders: [makeOrder({ orderType: 'Fixed Rate', source: 'MIS' })],
     })
-    const result = step6_OrderPaymentCheck.evaluate(ctx)
-    expect(result!.step).toBe(7)
+    expect(step6_OrderPaymentCheck.evaluate(fixedRate)!.step).toBe(7)
+
+    const varRate = makeCtx({
+      orders: [makeOrder({ orderType: 'Var Rate', source: 'MIS' })],
+    })
+    expect(step6_OrderPaymentCheck.evaluate(varRate)!.step).toBe(7)
   })
 
   it('should handle variant casing and whitespace in order type and status', () => {
@@ -115,7 +119,6 @@ describe('step6_OrderPaymentCheck', () => {
   })
 
   it('should check order effective start date is in previous month', () => {
-    // REF_DATE is Feb 2026, so previous month is Jan 2026
     const ctx = makeCtx({
       orders: [makeOrder({ effectiveStartDate: new Date('2025-12-15') })],
     })
@@ -168,5 +171,63 @@ describe('step6_OrderPaymentCheck', () => {
     )
     const result = step6_OrderPaymentCheck.evaluate(ctx)
     expect(result!.step).toBe(8)
+  })
+
+  describe('ICM precedence over MIS', () => {
+    it('should use ICM orders when ICM has prev-month orders, ignoring MIS', () => {
+      const ctx = makeCtx({
+        orders: [
+          makeOrder({ source: 'ICM', amount: 1000 }),
+          makeOrder({ source: 'MIS', amount: 1600 }),
+        ],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(8)
+    })
+
+    it('should fall back to MIS when no ICM orders in previous month', () => {
+      const ctx = makeCtx({
+        orders: [
+          makeOrder({ source: 'ICM', effectiveStartDate: new Date('2025-12-15') }),
+          makeOrder({ source: 'MIS', amount: 1600 }),
+        ],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(7)
+    })
+
+    it('should fall back to MIS when no ICM orders exist at all', () => {
+      const ctx = makeCtx({
+        orders: [makeOrder({ source: 'MIS', amount: 1600 })],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(7)
+    })
+
+    it('should only use prev-month ICM orders when mixed with non-prev-month ICM orders', () => {
+      const ctx = makeCtx({
+        orders: [
+          makeOrder({ source: 'ICM', effectiveStartDate: new Date('2025-12-15'), amount: 2000 }),
+          makeOrder({ source: 'ICM', amount: 1000 }),
+          makeOrder({ source: 'MIS', amount: 1600 }),
+        ],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(8)
+    })
+
+    it('should use ICM even when ICM fails and MIS would succeed', () => {
+      const ctx = makeCtx(
+        {
+          orders: [
+            makeOrder({ source: 'ICM', orderType: 'Invalid Type' }),
+            makeOrder({ source: 'MIS', amount: 2000 }),
+          ],
+        },
+        { hasNonPlacement: false },
+      )
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(9)
+    })
   })
 })

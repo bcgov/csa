@@ -28,6 +28,7 @@ export const ELIGIBILITY_CONFIG = {
     'MAINTENANCE PAYMENT',
     'FIXED RATE',
     'VARIABLE RATE',
+    'VAR RATE',
   ] as readonly string[],
   ELIGIBLE_ORDER_STATUSES: ['CLOSED', 'PROCESSED'] as readonly string[],
   MIN_ORDER_AMOUNT: 1549.2,

@@ -604,7 +604,7 @@ export class EligibilityService {
       // Parse MIS placements from pre-aggregated JSON
       const misPlacements: PlacementRecord[] = (raw.misPlacements ?? []).map(
         (placement: any): PlacementRecord => ({
-          type: placement.type?.startsWith('PL ') ? 'Placement' : 'Non-Placement Location',
+          type: normalize(placement.type) === 'PL ' ? 'Placement' : 'Non-Placement Location',
           rawType: placement.type ?? null,
           status: placement.status,
           startDate: placement.startDate ? parseISODatePacific(placement.startDate) : null,

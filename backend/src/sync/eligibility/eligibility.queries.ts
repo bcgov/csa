@@ -108,12 +108,12 @@ const CHANGED_CONTACTS_CTE = `
  *  - changed_contacts (incremental only): contacts with recently changed data
  *  - eligible_cases: all case rows from staging (filtered by change detection in incremental mode)
  *  - latest_legal_auth: most recent legal authority per person (DISTINCT ON X_CONTACT_NUM)
- *  - icm_placements_agg: active/interrupted ICM placements grouped by contact
+ *  - icm_placements_agg: active/interrupted/ended/closed ICM placements grouped by contact
  *  - icm_orders_agg: ICM orders grouped by contact (via placement -> agreement)
  *  - icm_agreements_agg: ICM agreements grouped by contact (via placement)
  *  - mis_payments_agg: MIS payments grouped by contact (via contract -> placement -> PERSON_ID_MIS)
  *  - mis_contracts_agg: MIS contracts grouped by contact (via placement -> PERSON_ID_MIS)
- *  - mis_placements_agg: active/interrupted/ended MIS placements grouped by contact (via PERSON_ID_MIS)
+ *  - mis_placements_agg: active/interrupted/ended/closed MIS placements grouped by contact (via PERSON_ID_MIS)
  *
  * Join keys:
  *  - ICM data joins on CONTACT_ROW_ID (table-to-table), aggregated by X_CONTACT_NUM (person)
@@ -190,7 +190,7 @@ export function buildLoadContactProfilesSql(
         )) AS data
       FROM stg_icm_placements icm_plc
       INNER JOIN eligible_cases ON eligible_cases.ROW_ID = icm_plc.CASE_ROW_ID
-      WHERE UPPER(TRIM(icm_plc.X_STATUS)) IN ('ACTIVE', 'INTERRUPTED')
+      WHERE UPPER(TRIM(icm_plc.X_STATUS)) IN ('ACTIVE', 'INTERRUPTED', 'ENDED', 'CLOSED')
       GROUP BY eligible_cases.X_CONTACT_NUM
     ),
 
@@ -339,7 +339,7 @@ export function buildLoadContactProfilesSql(
       FROM stg_mis_placements mis_plc
       INNER JOIN eligible_cases
         ON mis_plc.person_id_mis = eligible_cases.PERSON_ID_MIS
-      WHERE UPPER(TRIM(mis_plc.status)) IN ('ACTIVE', 'INTERRUPTED', 'ENDED')
+      WHERE UPPER(TRIM(mis_plc.status)) IN ('ACTIVE', 'INTERRUPTED', 'ENDED', 'CLOSED')
       GROUP BY eligible_cases.X_CONTACT_NUM
     )
 

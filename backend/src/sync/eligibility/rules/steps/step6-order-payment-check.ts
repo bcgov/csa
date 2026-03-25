@@ -9,12 +9,14 @@ import { step9_UpdateNotEligible } from './step9-update-not-eligible'
 /**
  * STEP 6: Order (ICM) / Payment (MIS) check
  *
- * From orders linked to valid placements via contractNumber (MIS) or agreementRowId (ICM):
- * 1. Filter to previous month orders only
- * 2. Check ALL orders against the 4 criteria (type, status, date, amount)
+ * ICM takes precedence over MIS (per FDD):
+ * 1. Link orders to eligible placements via contractNumber or agreementRowId
+ * 2. Check ICM orders for previous month first
+ * 3. Only fall back to MIS payments if no ICM orders found in previous month
+ * 4. Evaluate against 4 criteria (type, status, date, amount)
  *
  * Any order matches all 4 -> Step 7 (eligible)
- * Best match only fails on amount (or no order found) -> Step 8 (eligible_tbd)
+ * Best match only fails on amount -> Step 8 (eligible_tbd)
  * More than one criterion fails -> Step 8 if hasNonPlacement, Step 9 otherwise
  * No matching orders at all -> Step 8 (eligible_tbd)
  */
@@ -38,9 +40,18 @@ export const step6_OrderPaymentCheck: EligibilityRule = {
     }
 
     const prevMonth = getPreviousMonth(ctx.referenceDate)
-    const previousMonthOrders = matchingOrders.filter((order) =>
-      isInMonth(order.effectiveStartDate, prevMonth),
-    )
+
+    // ICM first: check ICM orders in previous month
+    const icmOrders = matchingOrders.filter((order) => order.source === 'ICM')
+    const icmPrevMonth = icmOrders.filter((order) => isInMonth(order.effectiveStartDate, prevMonth))
+
+    // Fall back to MIS only if no ICM orders in previous month
+    const previousMonthOrders =
+      icmPrevMonth.length > 0
+        ? icmPrevMonth
+        : matchingOrders
+            .filter((order) => order.source === 'MIS')
+            .filter((order) => isInMonth(order.effectiveStartDate, prevMonth))
 
     if (previousMonthOrders.length === 0) {
       return hasNonPlacement

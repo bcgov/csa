@@ -1,4 +1,5 @@
 import { ConsoleLogger } from '@nestjs/common'
+import { winstonInstance } from 'src/common/logger/logger.config'
 
 process.env.FILE_TRANSFER_SERVICE_URL = 'http://localhost:4000'
 process.env.FILE_STORAGE_PATH = '/tmp'
@@ -23,3 +24,6 @@ ConsoleLogger.prototype.warn = function () {}
 ConsoleLogger.prototype.error = function () {}
 ConsoleLogger.prototype.debug = function () {}
 ConsoleLogger.prototype.verbose = function () {}
+
+// Silence direct Winston calls (alert/crit) in tests
+winstonInstance.silent = true

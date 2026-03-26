@@ -175,7 +175,7 @@ describe('EligibilityService', () => {
   }
 
   it('should skip contacts with null required fields and log warning', async () => {
-    const logSpy = vi.spyOn(service['logger'], 'warn')
+    const logSpy = vi.spyOn(service['logger'], 'crit')
 
     mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
       makeOver18Contact({ personIdIcm: null, existingContactId: 99 }),
@@ -185,7 +185,10 @@ describe('EligibilityService', () => {
     expect(result.statusChanges).toBe(1)
     expect(result.skipped).toBe(1)
     expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled()
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('empty/null in required fields'))
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('empty/null in required fields'),
+      expect.objectContaining({ category: 'DATA_QUALITY' }),
+    )
   })
 
   it('should skip invalid contacts and upsert valid ones in same batch', async () => {
@@ -202,15 +205,20 @@ describe('EligibilityService', () => {
   })
 
   it('should report caseRowId and null fields in the warning', async () => {
-    const logSpy = vi.spyOn(service['logger'], 'warn')
+    const logSpy = vi.spyOn(service['logger'], 'crit')
 
     mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
       makeOver18Contact({ personIdIcm: null, existingContactId: 99 }),
     ])
     await service.run()
 
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('caseRowId=CASE-1'))
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('person_id_icm'))
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('person_id_icm'),
+      expect.objectContaining({
+        caseRowId: 'CASE-1',
+        invalidFields: expect.arrayContaining(['person_id_icm']),
+      }),
+    )
   })
 
   it('should upsert protected contacts with existing csa_status preserved', async () => {

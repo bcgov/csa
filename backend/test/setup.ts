@@ -1,10 +1,13 @@
 import { ConsoleLogger } from '@nestjs/common'
+import { winstonInstance } from 'src/common/logger/logger.config'
 
 process.env.FILE_TRANSFER_SERVICE_URL = 'http://localhost:4000'
 process.env.FILE_STORAGE_PATH = '/tmp'
 process.env.USE_MOCK_DATA = 'true'
 process.env.CRA_ENVIRONMENT = 'test'
 process.env.CRA_USER_ID = 'TST0016'
+process.env.CRA_BUSINESS_NUM = 'TESTBN000000001'
+process.env.CRA_LAST_SEQUENCE_NUMBER = '0'
 process.env.CRA_INTEGRATION_ENABLED = 'false'
 process.env.ICM_API_URL = 'http://mock-icm-api'
 process.env.ICM_API_USERNAME = 'test-user'
@@ -21,3 +24,6 @@ ConsoleLogger.prototype.warn = function () {}
 ConsoleLogger.prototype.error = function () {}
 ConsoleLogger.prototype.debug = function () {}
 ConsoleLogger.prototype.verbose = function () {}
+
+// Silence direct Winston calls (alert/crit) in tests
+winstonInstance.silent = true

@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
+import { AppLogger } from 'src/common/logger/app-logger'
 import { ConfigService } from '@nestjs/config'
 import { TRANSACTION_TYPES } from 'src/api/contacts/constants'
 import { PrismaService } from 'src/common/database/prisma.service'
@@ -246,7 +247,7 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
   {
     dbColumn: 'location_type',
     pgType: 'text',
-    extract: (row) => row.primaryPlacement?.type ?? null,
+    extract: (row) => row.primaryPlacement?.rawType ?? null,
   },
   {
     dbColumn: 'location_sub_type',
@@ -429,7 +430,7 @@ const UPSERT_SQL = `
 
 @Injectable()
 export class EligibilityService {
-  private readonly logger = new Logger(EligibilityService.name)
+  private readonly logger = new AppLogger(EligibilityService.name)
 
   constructor(
     private readonly prisma: PrismaService,
@@ -584,7 +585,7 @@ export class EligibilityService {
       const icmPlacements: PlacementRecord[] = (raw.icmPlacements ?? []).map(
         (placement: any): PlacementRecord => ({
           type: placement.type,
-          rawType: null,
+          rawType: placement.type ?? null,
           status: placement.status,
           startDate: placement.startDate ? parseISODatePacific(placement.startDate) : null,
           endDate: placement.endDate ? parseISODatePacific(placement.endDate) : null,
@@ -604,7 +605,7 @@ export class EligibilityService {
       // Parse MIS placements from pre-aggregated JSON
       const misPlacements: PlacementRecord[] = (raw.misPlacements ?? []).map(
         (placement: any): PlacementRecord => ({
-          type: placement.type?.startsWith('PL ') ? 'Placement' : 'Non-Placement Location',
+          type: normalize(placement.type) === 'PL' ? 'Placement' : 'Non-Placement Location',
           rawType: placement.type ?? null,
           status: placement.status,
           startDate: placement.startDate ? parseISODatePacific(placement.startDate) : null,
@@ -756,8 +757,9 @@ export class EligibilityService {
       }
       const invalidFields = getInvalidRequiredFields(row)
       if (invalidFields.length > 0) {
-        this.logger.warn(
-          `[ALERT:DATA_QUALITY] Skipping contact (caseRowId=${profile.caseRowId}): empty/null in required fields [${invalidFields.join(', ')}]`,
+        this.logger.crit(
+          `Skipping contact: empty/null in required fields [${invalidFields.join(', ')}]`,
+          { category: 'DATA_QUALITY', caseRowId: profile.caseRowId, invalidFields },
         )
         skipped++
         continue

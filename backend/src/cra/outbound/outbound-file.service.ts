@@ -8,14 +8,8 @@ import { CraDetail, CraHeader, CraTrailer } from './outbound.interface'
 
 const { REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
 
-const {
-  HEADER_TRAN_CODE,
-  DETAIL_TRAN_CODE,
-  TRAILER_TRAN_CODE,
-  BUSINESS_NUM,
-  VERSION_NUM,
-  HEADER_RECORD_CONT,
-} = REQUEST_FILE
+const { HEADER_TRAN_CODE, DETAIL_TRAN_CODE, TRAILER_TRAN_CODE, VERSION_NUM, HEADER_RECORD_CONT } =
+  REQUEST_FILE
 
 @Injectable()
 export class OutboundFileService {
@@ -24,9 +18,11 @@ export class OutboundFileService {
   private readonly environmentCode: string
   private readonly fileTypeCode: string
   private readonly fileNamePrefix: string
+  private readonly businessNum: string
   private readonly craUserId: string
 
   constructor(private readonly configService: ConfigService) {
+    this.businessNum = this.configService.get<string>('cra.businessNum')!
     this.fileStoragePath = this.configService.get<string>('app.fileStoragePath')!
     this.environmentCode = this.configService.get<string>('cra.environmentCode')!
     this.fileTypeCode = this.configService.get<string>('cra.fileTypeCode')!
@@ -72,7 +68,7 @@ export class OutboundFileService {
       this.padRight(String(HEADER_TRAN_CODE), 4) +
       this.padRight(VERSION_NUM, 5) +
       this.padRight(header.processDate, 8) +
-      this.padRight(BUSINESS_NUM, 15) +
+      this.padRight(this.businessNum, 15) +
       this.padLeftZero(parseInt(HEADER_RECORD_CONT), 8) +
       this.padRight(header.filler || '', 25)
     )
@@ -83,7 +79,7 @@ export class OutboundFileService {
     return (
       this.padRight(DETAIL_TRAN_CODE, 4) +
       this.padRight(detail.referenceNum, 20) +
-      this.padRight(BUSINESS_NUM, 15) +
+      this.padRight(this.businessNum, 15) +
       this.padRight(detail.tranType, 1) +
       this.padRight(detail.childGivenName, 30) +
       this.padRight(detail.childInitial, 1) +
@@ -111,7 +107,7 @@ export class OutboundFileService {
     return (
       this.padRight(DETAIL_TRAN_CODE, 4) +
       this.padRight(detail.referenceNum, 20) +
-      this.padRight(BUSINESS_NUM, 15) +
+      this.padRight(this.businessNum, 15) +
       this.padRight(detail.tranType, 1) +
       this.padRight(detail.childGivenName, 30) +
       this.padRight(detail.childInitial, 1) +
@@ -138,7 +134,7 @@ export class OutboundFileService {
       this.padRight(TRAILER_TRAN_CODE, 4) +
       this.padRight(VERSION_NUM, 5) +
       this.padRight(trailer.processDate, 8) +
-      this.padRight(BUSINESS_NUM, 15) +
+      this.padRight(this.businessNum, 15) +
       this.padLeftZero(trailer.recordCount + 2, 8) +
       this.padRight(trailer.filler, 25)
     )

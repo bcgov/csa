@@ -121,7 +121,7 @@ describe('IcmApiDataSource', () => {
       expect(callUrl).toContain('excludeEmptyFieldsInResponse=False')
       expect(callUrl).toContain('GetChildren=false')
       expect(callUrl).toContain('childlinks=None')
-      expect(callUrl).toContain('recordcountneeded=true')
+      expect(callUrl).toContain('ExecutionMode=ForwardOnly')
     })
 
     it('should include workspace param when configured', async () => {
@@ -255,7 +255,7 @@ describe('IcmApiDataSource', () => {
       const callUrl = httpService.put.mock.calls[0][0]
       expect(callUrl).toContain('http://icm-api/ICMContact/ICMContact?')
       expect(callUrl).toContain('ViewMode=Catalog')
-      expect(callUrl).toContain('recordcountneeded=true')
+      expect(callUrl).toContain('ExecutionMode=ForwardOnly')
 
       expect(httpService.put).toHaveBeenCalledWith(
         callUrl,

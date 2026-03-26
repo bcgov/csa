@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
+import { AppLogger } from 'src/common/logger/app-logger'
 import { ConfigService } from '@nestjs/config'
 import { TRANSACTION_TYPES } from 'src/api/contacts/constants'
 import { PrismaService } from 'src/common/database/prisma.service'
@@ -429,7 +430,7 @@ const UPSERT_SQL = `
 
 @Injectable()
 export class EligibilityService {
-  private readonly logger = new Logger(EligibilityService.name)
+  private readonly logger = new AppLogger(EligibilityService.name)
 
   constructor(
     private readonly prisma: PrismaService,
@@ -756,8 +757,9 @@ export class EligibilityService {
       }
       const invalidFields = getInvalidRequiredFields(row)
       if (invalidFields.length > 0) {
-        this.logger.warn(
-          `[ALERT:DATA_QUALITY] Skipping contact (caseRowId=${profile.caseRowId}): empty/null in required fields [${invalidFields.join(', ')}]`,
+        this.logger.crit(
+          `Skipping contact: empty/null in required fields [${invalidFields.join(', ')}]`,
+          { category: 'DATA_QUALITY', caseRowId: profile.caseRowId, invalidFields },
         )
         skipped++
         continue

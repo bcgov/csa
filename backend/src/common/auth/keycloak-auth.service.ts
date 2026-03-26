@@ -1,5 +1,6 @@
 import { HttpService } from '@nestjs/axios'
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common'
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common'
+import { AppLogger } from 'src/common/logger/app-logger'
 import { ConfigService } from '@nestjs/config'
 import { firstValueFrom } from 'rxjs'
 
@@ -11,7 +12,7 @@ interface TokenCache {
 
 @Injectable()
 export class KeycloakAuthService {
-  private readonly logger = new Logger(KeycloakAuthService.name)
+  private readonly logger = new AppLogger(KeycloakAuthService.name)
   private tokenCache: TokenCache | null = null
   // Refresh token 60 seconds before expiry to avoid race conditions
   private readonly TOKEN_EXPIRY_BUFFER_MS = 60 * 1000
@@ -74,7 +75,9 @@ export class KeycloakAuthService {
 
       return response.data.access_token
     } catch (error) {
-      this.logger.error('Failed to obtain Keycloak bearer token:', error)
+      this.logger.alert('Failed to obtain Keycloak bearer token', {
+        error: error instanceof Error ? error.message : String(error),
+      })
       throw new HttpException(
         'Failed to authenticate with ICM service',
         HttpStatus.INTERNAL_SERVER_ERROR,

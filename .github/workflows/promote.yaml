@@ -284,9 +284,9 @@ jobs:
         with:
           repository: ${{ env.GITOPS_REPO }}
           ref: ${{ env.GITOPS_BASE_BRANCH }}
-          token: ${{ secrets.GITOPS_PUSH_TOKEN }}
+          ssh-key: ${{ secrets.MANIFEST_REPO_DEPLOY_KEY }}
           path: gitops
-          persist-credentials: false
+          persist-credentials: true
 
       - name: Install yq
         shell: bash
@@ -365,7 +365,7 @@ jobs:
             git add .
             git commit -m "Promote to dev: ${{ github.repository }} ${TAG}"
 
-            git remote set-url origin "https://x-access-token:${{ secrets.GITOPS_PUSH_TOKEN }}@github.com/${{ env.GITOPS_REPO }}.git"
+            git remote set-url origin "git@github.com:${{ env.GITOPS_REPO }}.git"
             git push origin "${{ env.GITOPS_BASE_BRANCH }}"
 
             echo "Pushed dev promotion directly to GitOps main."
@@ -376,7 +376,7 @@ jobs:
           git add .
           git commit -m "Promote to ${ENV}: ${{ github.repository }} ${TAG}"
 
-          git remote set-url origin "https://x-access-token:${{ secrets.GITOPS_PUSH_TOKEN }}@github.com/${{ env.GITOPS_REPO }}.git"
+          git remote set-url origin "git@github.com:${{ env.GITOPS_REPO }}.git"
           git push -u origin "$BR"
 
           echo "Created branch $BR in GitOps repo. Open a PR to ${GITOPS_BASE_BRANCH}."

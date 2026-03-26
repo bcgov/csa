@@ -286,7 +286,7 @@ jobs:
           ref: ${{ env.GITOPS_BASE_BRANCH }}
           ssh-key: ${{ secrets.MANIFEST_REPO_DEPLOY_KEY }}
           path: gitops
-          persist-credentials: false
+          persist-credentials: true
 
       - name: Install yq
         shell: bash

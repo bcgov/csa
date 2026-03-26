@@ -1,21 +1,22 @@
 #!/usr/bin/env node
-import { Logger } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { CraModule } from 'src/cra/cra.module'
+import { AppLogger } from 'src/common/logger/app-logger'
+import { customLogger } from 'src/common/logger/logger.config'
 import { JobTrigger } from '../enums/job-trigger.enum'
 import { JobType } from '../enums/job-type.enum'
 import { JobRunner } from '../job-runner.service'
 
 // Generates and sends CRA file
 async function bootstrap() {
-  const logger = new Logger('CRAFileTransferJob')
+  const logger = new AppLogger('CRAFileTransferJob')
 
   try {
     logger.log('Bootstrapping CRA file transfer job...')
 
     // Create NestJS application context (no HTTP server)
     const app = await NestFactory.createApplicationContext(CraModule, {
-      logger: ['log', 'error', 'warn'],
+      logger: customLogger,
     })
 
     // Get JobRunner from DI container
@@ -34,7 +35,7 @@ async function bootstrap() {
       process.exit(1)
     }
   } catch (error) {
-    logger.error(`Fatal error: ${error.message}`, error.stack)
+    logger.alert(`Fatal bootstrap error: ${error.message}`, { stack: error.stack })
     process.exit(1)
   }
 }

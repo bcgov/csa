@@ -49,7 +49,7 @@ export function makeContact(overrides: Partial<ContactProfile> = {}): ContactPro
 export function makePlacement(overrides: Partial<PlacementRecord> = {}): PlacementRecord {
   return {
     type: 'Placement',
-    rawType: null,
+    rawType: 'Placement',
     status: 'Active',
     startDate: null,
     endDate: null,

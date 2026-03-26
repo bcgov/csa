@@ -246,7 +246,7 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
   {
     dbColumn: 'location_type',
     pgType: 'text',
-    extract: (row) => row.primaryPlacement?.type ?? null,
+    extract: (row) => row.primaryPlacement?.rawType ?? null,
   },
   {
     dbColumn: 'location_sub_type',
@@ -584,7 +584,7 @@ export class EligibilityService {
       const icmPlacements: PlacementRecord[] = (raw.icmPlacements ?? []).map(
         (placement: any): PlacementRecord => ({
           type: placement.type,
-          rawType: null,
+          rawType: placement.type ?? null,
           status: placement.status,
           startDate: placement.startDate ? parseISODatePacific(placement.startDate) : null,
           endDate: placement.endDate ? parseISODatePacific(placement.endDate) : null,
@@ -604,7 +604,7 @@ export class EligibilityService {
       // Parse MIS placements from pre-aggregated JSON
       const misPlacements: PlacementRecord[] = (raw.misPlacements ?? []).map(
         (placement: any): PlacementRecord => ({
-          type: normalize(placement.type) === 'PL ' ? 'Placement' : 'Non-Placement Location',
+          type: normalize(placement.type) === 'PL' ? 'Placement' : 'Non-Placement Location',
           rawType: placement.type ?? null,
           status: placement.status,
           startDate: placement.startDate ? parseISODatePacific(placement.startDate) : null,

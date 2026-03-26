@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config'
 import { firstValueFrom } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { formatDatePacific } from 'src/common/utils'
-import { IcmApiConfig, ICM_UPDATE_BATCH_LIMIT } from '../icm.config'
+import { ICM_UPDATE_BATCH_LIMIT, IcmApiConfig } from '../icm.config'
 import { IcmApiRecord, IcmContactUpdatePayload, IcmDataSource } from './icm-data-source'
 
 const PAGE_SIZE = 100
@@ -87,7 +87,7 @@ export class IcmApiDataSource extends IcmDataSource {
 
     const params = new URLSearchParams({
       ViewMode: 'Catalog',
-      recordcountneeded: 'true',
+      ExecutionMode: 'ForwardOnly',
     })
 
     const workspace = this.configService.get<string>('icm.workspace')
@@ -121,7 +121,7 @@ export class IcmApiDataSource extends IcmDataSource {
     const params = new URLSearchParams({
       ViewMode: 'Catalog',
       excludeEmptyFieldsInResponse: 'False',
-      recordcountneeded: 'true',
+      ExecutionMode: 'ForwardOnly',
       GetChildren: 'false',
       childlinks: 'None',
     })

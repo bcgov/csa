@@ -1,10 +1,19 @@
-import { describe, expect, it } from 'vitest'
+import { ConfigService } from '@nestjs/config'
+import { describe, expect, it, vi } from 'vitest'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { OutboundDataService } from './outbound-data.service'
 
 const { REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
-const { HEADER_TRAN_CODE, DETAIL_TRAN_CODE, TRAILER_TRAN_CODE, BUSINESS_NUM, VERSION_NUM } =
-  REQUEST_FILE
+const { HEADER_TRAN_CODE, DETAIL_TRAN_CODE, TRAILER_TRAN_CODE, VERSION_NUM } = REQUEST_FILE
+
+const TEST_BUSINESS_NUM = process.env.CRA_BUSINESS_NUM!
+
+const mockConfigService = {
+  get: vi.fn((key: string) => {
+    if (key === 'cra.businessNum') return TEST_BUSINESS_NUM
+    return undefined
+  }),
+} as unknown as ConfigService
 
 const makeContact = (overrides = {}) => ({
   id: 1,
@@ -45,7 +54,7 @@ describe('OutboundDataService', () => {
   let service: OutboundDataService
 
   beforeEach(() => {
-    service = new OutboundDataService()
+    service = new OutboundDataService(mockConfigService)
   })
 
   describe('buildCraFileData', () => {
@@ -95,9 +104,9 @@ describe('OutboundDataService', () => {
       const result = service.buildCraFileData([makeDetail()])
 
       expect(result.header.versionNum).toBe(VERSION_NUM)
-      expect(result.header.businessNum).toBe(BUSINESS_NUM)
+      expect(result.header.businessNum).toBe(TEST_BUSINESS_NUM)
       expect(result.trailer.versionNum).toBe(VERSION_NUM)
-      expect(result.trailer.businessNum).toBe(BUSINESS_NUM)
+      expect(result.trailer.businessNum).toBe(TEST_BUSINESS_NUM)
     })
 
     it('should set processDate on header and trailer as YYYYMMDD format', () => {
@@ -153,7 +162,7 @@ describe('OutboundDataService', () => {
       expect(detail.childBirthProv).toBe('ON')
       expect(detail.childBirthCountry).toBe('CA')
       expect(detail.ccraDinNum).toBe('987654321')
-      expect(detail.businessNum).toBe(BUSINESS_NUM)
+      expect(detail.businessNum).toBe(TEST_BUSINESS_NUM)
     })
 
     it('should map "Canada" to CA', () => {

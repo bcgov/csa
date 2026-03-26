@@ -10,19 +10,16 @@ import { FILE_MOCK_DATA } from './outbound-mock-data'
 
 const { header, details, trailer } = FILE_MOCK_DATA
 const { REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
-const {
-  BUSINESS_NUM,
-  VERSION_NUM,
-  HEADER_TRAN_CODE,
-  DETAIL_TRAN_CODE,
-  TRAILER_TRAN_CODE,
-  HEADER_RECORD_CONT,
-} = REQUEST_FILE
+const { VERSION_NUM, HEADER_TRAN_CODE, DETAIL_TRAN_CODE, TRAILER_TRAN_CODE, HEADER_RECORD_CONT } =
+  REQUEST_FILE
+
+const TEST_BUSINESS_NUM = process.env.CRA_BUSINESS_NUM!
 
 const mockConfigService = {
   get: vi.fn((key: string) => {
     const config: Record<string, string> = {
       'app.fileStoragePath': './temp/',
+      'cra.businessNum': TEST_BUSINESS_NUM,
       'cra.environmentCode': 'ACSAIN',
       'cra.fileTypeCode': 'AAPL',
       'cra.fileNamePrefix': 'II',
@@ -92,7 +89,7 @@ describe('CRA Header format', () => {
     expect(result.substring(0, 4)).toBe(String(HEADER_TRAN_CODE))
     expect(result.substring(4, 9).trim()).toBe(VERSION_NUM)
     expect(result.substring(9, 17)).toBe(currentDate())
-    expect(result.substring(17, 32).trim()).toBe(BUSINESS_NUM)
+    expect(result.substring(17, 32).trim()).toBe(TEST_BUSINESS_NUM)
     expect(result.substring(32, 40)).toBe(HEADER_RECORD_CONT)
   })
 })
@@ -109,7 +106,7 @@ describe('CRA Detail format', () => {
 
     expect(result.startsWith(String(DETAIL_TRAN_CODE))).toBe(true)
     expect(result.substring(4, 24).startsWith('REF')).toBe(true)
-    expect(result.substring(24, 39).trim()).toBe(BUSINESS_NUM)
+    expect(result.substring(24, 39).trim()).toBe(TEST_BUSINESS_NUM)
 
     expect(result.length).toBe(
       4 +
@@ -142,7 +139,7 @@ describe('CRA Detail format', () => {
 
     expect(result.startsWith(String(DETAIL_TRAN_CODE))).toBe(true)
     expect(result.substring(4, 24).startsWith('REF')).toBe(true)
-    expect(result.substring(24, 39).trim()).toBe(BUSINESS_NUM)
+    expect(result.substring(24, 39).trim()).toBe(TEST_BUSINESS_NUM)
 
     expect(result.length).toBe(
       4 + 20 + 15 + 1 + 30 + 1 + 30 + 30 + 30 + 8 + 1 + 28 + 2 + 2 + 75 + 8 + 1 + 8 + 2 + 9,
@@ -156,7 +153,7 @@ describe('OutboundDataService->OutboundFileService integration', () => {
 
   beforeEach(() => {
     fileCreateService = new OutboundFileService(mockConfigService as unknown as ConfigService)
-    craDataService = new OutboundDataService()
+    craDataService = new OutboundDataService(mockConfigService as unknown as ConfigService)
   })
 
   const makeContact = (overrides = {}) => ({
@@ -201,7 +198,7 @@ describe('OutboundDataService->OutboundFileService integration', () => {
     // Field positions (cumulative offsets)
     expect(line.substring(0, 4)).toBe('6134') // tranCode
     expect(line.substring(4, 24).trim()).toBe('LFN001-100') // referenceNum
-    expect(line.substring(24, 39).trim()).toBe('885633354RA0001') // businessNum
+    expect(line.substring(24, 39).trim()).toBe(TEST_BUSINESS_NUM) // businessNum
     expect(line.substring(39, 40)).toBe('2') // tranType = application
     expect(line.substring(40, 70).trim()).toBe('EMILY') // childGivenName
     expect(line.substring(70, 71)).toBe('A') // childInitial (first char of middleName)

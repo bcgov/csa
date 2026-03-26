@@ -4,13 +4,14 @@ import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 const { HEADER_TRAN_CODE, DETAIL_TRAN_CODE, TRAILER_TRAN_CODE } =
   CRA_DATA_HANDLING_CONSTANT.REQUEST_FILE
 
+const MOCK_BUSINESS_NUM = process.env.CRA_BUSINESS_NUM!
 const currentDate = (): string => formatDatePacificCompact(new Date())
 
 const details = [
   {
     tranCode: DETAIL_TRAN_CODE,
     referenceNum: 'REF00000000000001',
-    businessNum: '885633354RA0001',
+    businessNum: MOCK_BUSINESS_NUM,
     tranType: 2, // 2 = Application
 
     childGivenName: 'JOHN',
@@ -44,7 +45,7 @@ const details = [
   {
     tranCode: DETAIL_TRAN_CODE,
     referenceNum: 'REF00000000000002',
-    businessNum: '885633354RA0001',
+    businessNum: MOCK_BUSINESS_NUM,
     tranType: 1, // 2 = Application
 
     childGivenName: 'JOHN',
@@ -83,18 +84,18 @@ export const FILE_MOCK_DATA = {
     tranCode: HEADER_TRAN_CODE,
     versionNum: 'V00.0',
     processDate: currentDate(), // YYYYMMDD
-    businessNum: '885633354RA0001', // 15 chars
+    businessNum: MOCK_BUSINESS_NUM, // 15 chars
     recordCount: 0, // must match detail records
     filler: '                         ',
   },
-  // 6133V00.020260110885633354RA000100000002
+  // 6133V00.0YYYYMMDDXXXXXXXXXXXXXXX00000002
   details: details,
 
   trailer: {
     tranCode: TRAILER_TRAN_CODE,
     versionNum: 'V00.0',
     processDate: currentDate(),
-    businessNum: '885633354RA0001',
+    businessNum: MOCK_BUSINESS_NUM,
     recordCount: details.length,
     filler: '',
   },

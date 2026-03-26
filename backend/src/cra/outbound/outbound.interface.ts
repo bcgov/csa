@@ -4,7 +4,7 @@
 // }
 
 export interface CraHeader {
-  // header = 6133V00.020260110885633354RA000100000002
+  // header = 6133V00.0YYYYMMDDXXXXXXXXXXXXXXX00000002
   tranCode: number | string // 9(04) 6133
   versionNum: string // V00.0
   processDate: string // X(8) YYYYMMDD

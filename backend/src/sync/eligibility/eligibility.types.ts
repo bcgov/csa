@@ -57,7 +57,7 @@ export const ENDED_STATUSES = ['ENDED', 'CLOSED']
 /** Placement from ICM or MIS staging */
 export interface PlacementRecord {
   type: string // 'Placement' | 'Non-Placement Location'
-  rawType: string | null // original MIS type code ('AW', 'AD', 'PL ...') before remapping
+  rawType: string | null // original source value: ICM X_TYPE or MIS code ('PL', 'AW', 'AD', 'MI', ...)
   status: string // 'Active' | 'Interrupted' | ...
   startDate: Date | null
   endDate: Date | null

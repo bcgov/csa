@@ -1,5 +1,5 @@
 export interface CraResHeader {
-  // header = 6118V00.020260110885633354RA000100000002
+  // header = 6118V00.0YYYYMMDDXXXXXXXXXXXXXXX00000002
   tranCode: number | string // 9(04) 6118
   versionNum: string // V00.0
   processDate: string // X(8) YYYYMMDD

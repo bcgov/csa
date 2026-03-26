@@ -1,16 +1,16 @@
-import { Logger } from '@nestjs/common'
+import { AppLogger } from 'src/common/logger/app-logger'
 import { JobType } from './enums/job-type.enum'
 import { JobResult } from './interfaces/job-result.interface'
 import { Job, JobContext } from './interfaces/job.interface'
 
 export abstract class BaseJob implements Job {
-  protected readonly logger: Logger
+  protected readonly logger: AppLogger
 
   abstract readonly jobType: JobType
   readonly inlineRetryAttempts: number = 2
 
   constructor() {
-    this.logger = new Logger(this.constructor.name)
+    this.logger = new AppLogger(this.constructor.name)
   }
 
   abstract execute(context: JobContext): Promise<JobResult>
@@ -24,8 +24,9 @@ export abstract class BaseJob implements Job {
   }
 
   async onFailure(context: JobContext, error: Error): Promise<void> {
-    this.logger.warn(
-      `Job ${context.jobRunId} failed (attempt ${context.retryCount + 1}): ${error.message}`,
+    this.logger.crit(
+      `Job ${context.jobRunId} failed after ${context.retryCount + 1} attempt(s): ${error.message}`,
+      { jobRunId: context.jobRunId, jobType: this.jobType },
     )
   }
 }

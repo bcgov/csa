@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { normalize, formatDatePacificCompact } from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { CraDetail, CraHeader, CraTrailer } from './outbound.interface'
 
 const { REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
-const { HEADER_TRAN_CODE, DETAIL_TRAN_CODE, TRAILER_TRAN_CODE, BUSINESS_NUM, VERSION_NUM } =
-  REQUEST_FILE
+const { HEADER_TRAN_CODE, DETAIL_TRAN_CODE, TRAILER_TRAN_CODE, VERSION_NUM } = REQUEST_FILE
 
 const TRAN_TYPE = { APPLICATION: 2, CANCELLATION: 1 } as const
 
@@ -44,6 +44,12 @@ export interface BatchDetailWithContact {
 
 @Injectable()
 export class OutboundDataService {
+  private readonly businessNum: string
+
+  constructor(private readonly configService: ConfigService) {
+    this.businessNum = this.configService.get<string>('cra.businessNum')!
+  }
+
   buildCraFileData(batchDetails: BatchDetailWithContact[]): CraFileData {
     const processDate = formatDatePacificCompact(new Date())
     const details = batchDetails.map((batchDetail) => this.mapToDetail(batchDetail))
@@ -53,7 +59,7 @@ export class OutboundDataService {
         tranCode: HEADER_TRAN_CODE,
         versionNum: VERSION_NUM,
         processDate,
-        businessNum: BUSINESS_NUM,
+        businessNum: this.businessNum,
         recordCount: 0,
         filler: '',
       },
@@ -62,7 +68,7 @@ export class OutboundDataService {
         tranCode: TRAILER_TRAN_CODE,
         versionNum: VERSION_NUM,
         processDate,
-        businessNum: BUSINESS_NUM,
+        businessNum: this.businessNum,
         recordCount: details.length,
         filler: '',
       },
@@ -76,7 +82,7 @@ export class OutboundDataService {
     return {
       tranCode: DETAIL_TRAN_CODE,
       referenceNum: batchDetail.referenceNumber ?? '',
-      businessNum: BUSINESS_NUM,
+      businessNum: this.businessNum,
       tranType: isApplication ? TRAN_TYPE.APPLICATION : TRAN_TYPE.CANCELLATION,
 
       childGivenName: contact.firstName ?? '',

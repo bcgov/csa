@@ -627,8 +627,9 @@ describe('buildLoadContactProfilesSql', () => {
     // MIS placements join directly through PERSON_ID_MIS on eligible_cases
     expect(sql).toContain('mis_plc.person_id_mis = eligible_cases.PERSON_ID_MIS')
 
-    // MIS contracts join via service_provider_id through placements
+    // MIS contracts join via service_provider_id and contract_number through placements
     expect(sql).toContain('mis_con.service_provider_id = mis_plc.service_provider_id')
+    expect(sql).toContain('mis_con.contract_number = mis_plc.contract_number')
 
     // MIS payments join via contract_number through contracts
     expect(sql).toContain('mis_pay.contract_number = mis_con.contract_number')

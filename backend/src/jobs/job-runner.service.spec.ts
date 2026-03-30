@@ -255,7 +255,7 @@ describe('JobRunner', () => {
 
       await runner.processFailedJobs()
 
-      expect(jobsService.markStuckJobsAsFailed).toHaveBeenCalledWith(60)
+      expect(jobsService.markStuckJobsAsFailed).toHaveBeenCalledWith(40)
       expect(jobsService.getFailedJobs).toHaveBeenCalled()
       // Should reset existing job to RUNNING (not create a new one)
       expect(jobsService.resetToRunning).toHaveBeenCalledWith(2)

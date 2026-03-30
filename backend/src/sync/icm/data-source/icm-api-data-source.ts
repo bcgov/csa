@@ -24,6 +24,7 @@ export class IcmApiDataSource extends IcmDataSource {
   async fetchAll(config: IcmApiConfig, lastUpdated?: Date): Promise<IcmApiRecord[]> {
     const icmApiUrl = this.configService.get<string>('admin.icmApiUrl')!
     const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
+    const timeout = this.configService.get<number>('sync.icmRequestTimeoutMs')!
 
     const allRecords: IcmApiRecord[] = []
     let startRow = 0
@@ -45,6 +46,7 @@ export class IcmApiDataSource extends IcmDataSource {
             'X-ICM-TrustedUsername': icmTrustedUsername,
             'Content-Type': 'application/json',
           },
+          timeout,
           validateStatus: () => true,
         }),
       )
@@ -84,6 +86,7 @@ export class IcmApiDataSource extends IcmDataSource {
     const bearerToken = await this.keycloakAuthService.getBearerToken()
     const icmApiUrl = this.configService.get<string>('admin.icmApiUrl')!
     const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
+    const timeout = this.configService.get<number>('sync.icmRequestTimeoutMs')!
 
     const params = new URLSearchParams({
       ViewMode: 'Catalog',
@@ -104,6 +107,7 @@ export class IcmApiDataSource extends IcmDataSource {
           'X-ICM-TrustedUsername': icmTrustedUsername,
           'Content-Type': 'application/json',
         },
+        timeout,
         validateStatus: () => true,
       }),
     )

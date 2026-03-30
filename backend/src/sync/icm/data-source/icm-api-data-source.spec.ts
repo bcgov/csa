@@ -35,6 +35,7 @@ describe('IcmApiDataSource', () => {
           'admin.icmApiUrl': 'http://icm-api',
           'admin.icmTrustedUsername': 'trusted-user',
           'icm.workspace': '',
+          'sync.icmRequestTimeoutMs': 30_000,
         }
         return values[key]
       }),
@@ -230,6 +231,21 @@ describe('IcmApiDataSource', () => {
       expect(decoded).not.toContain('14:30:45')
     })
 
+    it('should use timeout from config', async () => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === 'sync.icmRequestTimeoutMs') return 60_000
+        if (key === 'admin.icmApiUrl') return 'http://icm-api'
+        if (key === 'admin.icmTrustedUsername') return 'trusted-user'
+        return undefined
+      })
+      httpService.get.mockReturnValue(of({ status: 200, headers: {}, data: { items: [] } }))
+
+      await service.fetchAll(mockConfig)
+
+      const requestConfig = httpService.get.mock.calls[0][1]
+      expect(requestConfig.timeout).toBe(60_000)
+    })
+
     it('should use KeycloakAuthService for bearer token', async () => {
       httpService.get.mockReturnValue(of({ status: 200, headers: {}, data: { items: [] } }))
 
@@ -284,6 +300,21 @@ describe('IcmApiDataSource', () => {
 
       const callUrl = httpService.put.mock.calls[0][0]
       expect(callUrl).toContain('workspace=int_release_5.4')
+    })
+
+    it('should use timeout from config', async () => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === 'sync.icmRequestTimeoutMs') return 60_000
+        if (key === 'admin.icmApiUrl') return 'http://icm-api'
+        if (key === 'admin.icmTrustedUsername') return 'trusted-user'
+        return undefined
+      })
+      httpService.put.mockReturnValue(of({ status: 200, data: {} }))
+
+      await service.updateContacts([payload])
+
+      const requestConfig = httpService.put.mock.calls[0][2]
+      expect(requestConfig.timeout).toBe(60_000)
     })
 
     it('should throw on non-2xx response', async () => {

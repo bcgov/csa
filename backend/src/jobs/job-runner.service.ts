@@ -135,7 +135,7 @@ export class JobRunner {
 
   // Process failed jobs and stuck running jobs
   async processFailedJobs(): Promise<void> {
-    const stuckResult = await this.jobsService.markStuckJobsAsFailed(60) // 1 hour threshold
+    const stuckResult = await this.jobsService.markStuckJobsAsFailed(40)
     if (stuckResult.count > 0) {
       this.logger.log(`Marked ${stuckResult.count} stuck jobs as FAILED`)
     }

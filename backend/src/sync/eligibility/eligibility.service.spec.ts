@@ -331,8 +331,8 @@ describe('EligibilityService', () => {
 
   //contact that reaches step 7->eligible (under 18, valid placement + order)
   function makeEligibleContact(overrides: Record<string, unknown> = {}) {
-    const prevMonth = new Date()
-    prevMonth.setMonth(prevMonth.getMonth() - 1)
+    const now = new Date()
+    const prevMonth = new Date(Date.UTC(now.getFullYear(), now.getUTCMonth() - 1, 15))
     return {
       caseRowId: 'CASE-E',
       personIdIcm: 'ICM-ELIG',

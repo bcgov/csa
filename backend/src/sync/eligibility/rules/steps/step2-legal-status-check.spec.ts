@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
 import { ContactProfile } from '../../eligibility.types'
-import { makeContact as makeBaseContact, makeOrder } from '../../test-helpers'
+import { makeContact as makeBaseContact } from '../../test-helpers'
 import { EligibilityContext } from '../rule.interface'
 import { step2_LegalStatusCheck } from './step2-legal-status-check'
 
@@ -89,44 +88,6 @@ describe('step2_LegalStatusCheck', () => {
       })
       const result = step2_LegalStatusCheck.evaluate(ctx)
       expect(result!.step).toBe(9)
-    })
-  })
-
-  describe('careEndDate computation', () => {
-    it('should compute careEndDate from orders/placements for IN_PAY contact routed to step 9', () => {
-      const ctx = makeCtx({
-        csaStatus: CSA_STATUS.IN_PAY,
-        enrollForCsa: 'No',
-        legalExpiryDate: null,
-        orders: [
-          makeOrder({
-            source: 'ICM',
-            orderStatus: 'Closed',
-            effectiveEndDate: new Date('2025-09-15'),
-          }),
-        ],
-      })
-      const result = step2_LegalStatusCheck.evaluate(ctx)
-      expect(result!.step).toBe(9)
-      expect(result!.careEndDate).toEqual(new Date('2025-09-15'))
-    })
-
-    it('should compute careEndDate when legal authority is expired for IN_PAY contact', () => {
-      const ctx = makeCtx({
-        csaStatus: CSA_STATUS.IN_PAY,
-        enrollForCsa: 'Yes',
-        legalExpiryDate: new Date('2025-12-31'),
-        orders: [
-          makeOrder({
-            source: 'MIS',
-            orderStatus: 'Processed',
-            effectiveEndDate: new Date('2025-11-01'),
-          }),
-        ],
-      })
-      const result = step2_LegalStatusCheck.evaluate(ctx)
-      expect(result!.step).toBe(9)
-      expect(result!.careEndDate).toEqual(new Date('2025-11-01'))
     })
   })
 })

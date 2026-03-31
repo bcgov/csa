@@ -41,6 +41,9 @@ export interface ContactProfile {
   birthProvince: string | null
   birthCountry: string | null
 
+  prevRecipientFirstName: string | null
+  prevRecipientLastName: string | null
+
   isIneligible: boolean
   deceased: string | null
   cancelReasonCode: string | null

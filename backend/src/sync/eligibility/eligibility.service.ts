@@ -369,6 +369,16 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
     extract: (row) => INELIGIBLE_CANCEL_CODES.has(row.result.cancelReasonCode ?? ''),
   },
   { dbColumn: 'is_deceased', pgType: 'text', extract: (row) => row.profile.deceased },
+  {
+    dbColumn: 'prev_recipient_first_name',
+    pgType: 'text',
+    extract: (row) => row.profile.prevRecipientFirstName,
+  },
+  {
+    dbColumn: 'prev_recipient_last_name',
+    pgType: 'text',
+    extract: (row) => row.profile.prevRecipientLastName,
+  },
 ]
 
 // Pre-computed list of required columns for validation
@@ -731,6 +741,8 @@ export class EligibilityService {
         birthCity: raw.birthCity ?? null,
         birthProvince: raw.birthProvince ?? null,
         birthCountry: raw.birthCountry ?? null,
+        prevRecipientFirstName: raw.prevRecipientFirstName ?? null,
+        prevRecipientLastName: raw.prevRecipientLastName ?? null,
         isIneligible: raw.isIneligible ?? false,
         deceased: raw.deceased ?? null,
         cancelReasonCode: raw.cancelReasonCode ?? null,

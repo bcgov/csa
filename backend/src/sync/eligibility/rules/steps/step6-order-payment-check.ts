@@ -1,5 +1,4 @@
 import { normalize } from 'src/common/utils'
-import { determineCareEndDate } from '../../cancellation/determine-care-end-date'
 import { ELIGIBILITY_CONFIG } from '../../eligibility.config'
 import { EligibilityResult } from '../../eligibility.types'
 import { EligibilityContext, EligibilityRule } from '../rule.interface'
@@ -55,11 +54,9 @@ export const step6_OrderPaymentCheck: EligibilityRule = {
             .filter((order) => isInMonth(order.effectiveStartDate, prevMonth))
 
     if (previousMonthOrders.length === 0) {
-      if (hasNonPlacement) {
-        return step8_UpdateEligibleTbd(csaStatus)
-      }
-      const careEndDate = determineCareEndDate(ctx.contact.orders, ctx.contact.placements)
-      return step9_UpdateNotEligible(csaStatus, null, careEndDate, ctx.referenceDate)
+      return hasNonPlacement
+        ? step8_UpdateEligibleTbd(csaStatus)
+        : step9_UpdateNotEligible(csaStatus, null, null, ctx.referenceDate)
     }
 
     let hasTypeStatusMatch = false
@@ -83,11 +80,9 @@ export const step6_OrderPaymentCheck: EligibilityRule = {
       return step8_UpdateEligibleTbd(csaStatus)
     }
 
-    if (hasNonPlacement) {
-      return step8_UpdateEligibleTbd(csaStatus)
-    }
-    const careEndDate = determineCareEndDate(ctx.contact.orders, ctx.contact.placements)
-    return step9_UpdateNotEligible(csaStatus, null, careEndDate, ctx.referenceDate)
+    return hasNonPlacement
+      ? step8_UpdateEligibleTbd(csaStatus)
+      : step9_UpdateNotEligible(csaStatus, null, null, ctx.referenceDate)
   },
 }
 

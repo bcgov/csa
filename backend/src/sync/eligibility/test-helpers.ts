@@ -35,6 +35,8 @@ export function makeContact(overrides: Partial<ContactProfile> = {}): ContactPro
     birthCountry: null,
     akaFirstName: null,
     akaLastName: null,
+    prevRecipientFirstName: null,
+    prevRecipientLastName: null,
     isIneligible: false,
     deceased: null,
     cancelReasonCode: null,

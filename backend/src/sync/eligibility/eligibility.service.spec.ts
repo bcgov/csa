@@ -331,8 +331,8 @@ describe('EligibilityService', () => {
 
   //contact that reaches step 7->eligible (under 18, valid placement + order)
   function makeEligibleContact(overrides: Record<string, unknown> = {}) {
-    const prevMonth = new Date()
-    prevMonth.setMonth(prevMonth.getMonth() - 1)
+    const now = new Date()
+    const prevMonth = new Date(Date.UTC(now.getFullYear(), now.getUTCMonth() - 1, 15))
     return {
       caseRowId: 'CASE-E',
       personIdIcm: 'ICM-ELIG',
@@ -627,8 +627,9 @@ describe('buildLoadContactProfilesSql', () => {
     // MIS placements join directly through PERSON_ID_MIS on eligible_cases
     expect(sql).toContain('mis_plc.person_id_mis = eligible_cases.PERSON_ID_MIS')
 
-    // MIS contracts join via service_provider_id through placements
+    // MIS contracts join via service_provider_id and contract_number through placements
     expect(sql).toContain('mis_con.service_provider_id = mis_plc.service_provider_id')
+    expect(sql).toContain('mis_con.contract_number = mis_plc.contract_number')
 
     // MIS payments join via contract_number through contracts
     expect(sql).toContain('mis_pay.contract_number = mis_con.contract_number')

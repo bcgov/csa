@@ -66,11 +66,13 @@ const CHANGED_CONTACTS_CTE = `
 
       UNION
 
-      -- MIS: contracts with recent last_updated_date (via service_provider_id on placements)
+      -- MIS: contracts with recent last_updated_date (via contract_number on contracts, service_provider_id on placements)
       SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
-      INNER JOIN stg_mis_contracts mis_con ON mis_con.service_provider_id = mis_plc.service_provider_id
+      INNER JOIN stg_mis_contracts mis_con
+        ON mis_con.service_provider_id = mis_plc.service_provider_id
+        AND mis_con.contract_number = mis_plc.contract_number
       WHERE mis_con.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
 
       UNION
@@ -79,7 +81,9 @@ const CHANGED_CONTACTS_CTE = `
       SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
-      INNER JOIN stg_mis_contracts mis_con ON mis_con.service_provider_id = mis_plc.service_provider_id
+      INNER JOIN stg_mis_contracts mis_con
+        ON mis_con.service_provider_id = mis_plc.service_provider_id
+        AND mis_con.contract_number = mis_plc.contract_number
       INNER JOIN stg_mis_payments mis_pay ON mis_pay.contract_number = mis_con.contract_number
       WHERE mis_pay.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
     ),`
@@ -102,7 +106,7 @@ const CHANGED_CONTACTS_CTE = `
  * Join topology (matches ICM/MIS data model):
  *  ICM: Cases -[CaseId]-> N Placements -[AgreementID]-> 1 Agreement -[AgreementID]-> N Orders
  *       Cases -[PersonIcmId]-> N LegalAuthority -[code]-> 1 LegalAuthorityAdmin
- *  MIS: Cases -[PERSON_ID_MIS]-> N Placements -[service_provider_id]-> 1 Contract -[contract_number]-> N Payments
+ *  MIS: Cases -[PERSON_ID_MIS]-> N Placements -[service_provider_id + contract_number]-> 1 Contract -[contract_number]-> N Payments
  *
  * CTEs:
  *  - changed_contacts (incremental only): contacts with recently changed data
@@ -118,7 +122,7 @@ const CHANGED_CONTACTS_CTE = `
  * Join keys:
  *  - ICM data joins on CONTACT_ROW_ID (table-to-table), aggregated by X_CONTACT_NUM (person)
  *  - MIS placements join on PERSON_ID_MIS (via eligible_cases CTE)
- *  - MIS contracts join via service_provider_id on placements
+ *  - MIS contracts join via service_provider_id + contract_number on placements
  *  - MIS payments join via contract_number on contracts
  */
 export function buildLoadContactProfilesSql(
@@ -282,7 +286,9 @@ export function buildLoadContactProfilesSql(
           mis_pay.payment_number
         FROM stg_mis_payments mis_pay
         INNER JOIN stg_mis_contracts mis_con ON mis_pay.contract_number = mis_con.contract_number
-        INNER JOIN stg_mis_placements mis_plc ON mis_con.service_provider_id = mis_plc.service_provider_id
+        INNER JOIN stg_mis_placements mis_plc
+          ON mis_con.service_provider_id = mis_plc.service_provider_id
+          AND mis_con.contract_number = mis_plc.contract_number
         INNER JOIN eligible_cases
           ON mis_plc.person_id_mis = eligible_cases.PERSON_ID_MIS
       ) unique_payments
@@ -314,7 +320,9 @@ export function buildLoadContactProfilesSql(
           mis_con.contract_end_date,
           mis_con.termination_date
         FROM stg_mis_contracts mis_con
-        INNER JOIN stg_mis_placements mis_plc ON mis_con.service_provider_id = mis_plc.service_provider_id
+        INNER JOIN stg_mis_placements mis_plc
+          ON mis_con.service_provider_id = mis_plc.service_provider_id
+          AND mis_con.contract_number = mis_plc.contract_number
         INNER JOIN eligible_cases
           ON mis_plc.person_id_mis = eligible_cases.PERSON_ID_MIS
       ) unique_contracts
@@ -380,6 +388,8 @@ export function buildLoadContactProfilesSql(
     master_contacts.is_ineligible        AS "isIneligible",
     master_contacts.cancel_reason_code   AS "cancelReasonCode",
     master_contacts.care_end_date        AS "careEndDate",
+    cases.X_ADM_FIRST_NAME               AS "prevRecipientFirstName",
+    cases.X_ADM_LAST_NAME                AS "prevRecipientLastName",
     cases.X_DECEASED                     AS "deceased",
     COALESCE(icm_plc.data, '[]'::json)  AS "icmPlacements",
     COALESCE(icm_ord.data, '[]'::json)  AS "icmOrders",

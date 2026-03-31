@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
 import { ContactProfile, OrderRecord } from '../../eligibility.types'
 import { makeOrder as makeBaseOrder, makeContact } from '../../test-helpers'
 import { EligibilityContext } from '../rule.interface'
@@ -228,6 +229,49 @@ describe('step6_OrderPaymentCheck', () => {
       )
       const result = step6_OrderPaymentCheck.evaluate(ctx)
       expect(result!.step).toBe(9)
+    })
+  })
+
+  describe('careEndDate computation', () => {
+    it('should compute careEndDate for IN_PAY contact when no previous-month orders', () => {
+      const ctx = makeCtx(
+        {
+          csaStatus: CSA_STATUS.IN_PAY,
+          orders: [
+            makeOrder({
+              effectiveStartDate: new Date('2025-12-15'),
+              effectiveEndDate: new Date('2025-12-31'),
+              orderStatus: 'Closed',
+              source: 'ICM',
+            }),
+          ],
+        },
+        { hasNonPlacement: false },
+      )
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(9)
+      expect(result!.careEndDate).toEqual(new Date('2025-12-31'))
+    })
+
+    it('should compute careEndDate for IN_PAY contact when multiple criteria fail', () => {
+      const ctx = makeCtx(
+        {
+          csaStatus: CSA_STATUS.IN_PAY,
+          orders: [
+            makeOrder({
+              orderType: 'Invalid Type',
+              amount: 1000.0,
+              effectiveEndDate: new Date('2026-01-20'),
+              orderStatus: 'Closed',
+              source: 'ICM',
+            }),
+          ],
+        },
+        { hasNonPlacement: false },
+      )
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(9)
+      expect(result!.careEndDate).toEqual(new Date('2026-01-20'))
     })
   })
 })

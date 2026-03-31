@@ -388,6 +388,8 @@ export function buildLoadContactProfilesSql(
     master_contacts.is_ineligible        AS "isIneligible",
     master_contacts.cancel_reason_code   AS "cancelReasonCode",
     master_contacts.care_end_date        AS "careEndDate",
+    cases.X_ADM_FIRST_NAME               AS "prevRecipientFirstName",
+    cases.X_ADM_LAST_NAME                AS "prevRecipientLastName",
     cases.X_DECEASED                     AS "deceased",
     COALESCE(icm_plc.data, '[]'::json)  AS "icmPlacements",
     COALESCE(icm_ord.data, '[]'::json)  AS "icmOrders",

@@ -67,7 +67,7 @@ describe('OutboundFileService', () => {
   })
 
   it('should create file successfully', () => {
-    ; (existsSync as unknown as Mock).mockReturnValue(true)
+    ;(existsSync as unknown as Mock).mockReturnValue(true)
 
     service.createFile(header, details, trailer, 'test-destination', 1)
     expect(writeFileSync).toHaveBeenCalled()
@@ -110,28 +110,28 @@ describe('CRA Detail format', () => {
 
     expect(result.length).toBe(
       4 +
-      20 +
-      15 +
-      1 +
-      30 +
-      1 +
-      30 +
-      30 +
-      30 +
-      8 +
-      1 +
-      28 +
-      2 +
-      2 +
-      9 +
-      6 +
-      30 +
-      30 +
-      8 +
-      1 +
-      10 +
-      9 +
-      15,
+        20 +
+        15 +
+        1 +
+        30 +
+        1 +
+        30 +
+        30 +
+        30 +
+        8 +
+        1 +
+        28 +
+        2 +
+        2 +
+        9 +
+        6 +
+        30 +
+        30 +
+        8 +
+        1 +
+        10 +
+        9 +
+        15,
     )
   })
   it('should pad fields correctly and maintain CRA Cancelation field sequence', () => {

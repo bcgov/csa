@@ -67,7 +67,7 @@ describe('OutboundFileService', () => {
   })
 
   it('should create file successfully', () => {
-    ;(existsSync as unknown as Mock).mockReturnValue(true)
+    ; (existsSync as unknown as Mock).mockReturnValue(true)
 
     service.createFile(header, details, trailer, 'test-destination', 1)
     expect(writeFileSync).toHaveBeenCalled()
@@ -110,28 +110,28 @@ describe('CRA Detail format', () => {
 
     expect(result.length).toBe(
       4 +
-        20 +
-        15 +
-        1 +
-        30 +
-        1 +
-        30 +
-        30 +
-        30 +
-        8 +
-        1 +
-        28 +
-        2 +
-        2 +
-        9 +
-        6 +
-        30 +
-        30 +
-        8 +
-        1 +
-        10 +
-        9 +
-        15,
+      20 +
+      15 +
+      1 +
+      30 +
+      1 +
+      30 +
+      30 +
+      30 +
+      8 +
+      1 +
+      28 +
+      2 +
+      2 +
+      9 +
+      6 +
+      30 +
+      30 +
+      8 +
+      1 +
+      10 +
+      9 +
+      15,
     )
   })
   it('should pad fields correctly and maintain CRA Cancelation field sequence', () => {
@@ -142,7 +142,7 @@ describe('CRA Detail format', () => {
     expect(result.substring(24, 39).trim()).toBe(TEST_BUSINESS_NUM)
 
     expect(result.length).toBe(
-      4 + 20 + 15 + 1 + 30 + 1 + 30 + 30 + 30 + 8 + 1 + 28 + 2 + 2 + 75 + 8 + 1 + 8 + 2 + 9,
+      4 + 20 + 15 + 1 + 30 + 1 + 30 + 30 + 30 + 8 + 1 + 28 + 2 + 2 + 75 + 8 + 1 + 8 + 2 + 9 + 15,
     )
   })
 })
@@ -234,8 +234,8 @@ describe('OutboundDataService->OutboundFileService integration', () => {
     const { details } = craDataService.buildCraFileData(batchDetails as any)
     const line = (fileCreateService as any).buildCanDetail(details[0])
 
-    // Total length = 305 (CRA spec)
-    expect(line.length).toBe(305)
+    // Total length = 320 (CRA spec)
+    expect(line.length).toBe(320)
 
     expect(line.substring(0, 4)).toBe('6134') // tranCode
     expect(line.substring(4, 24).trim()).toBe('LFN001-200') // referenceNum

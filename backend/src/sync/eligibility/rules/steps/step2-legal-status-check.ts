@@ -1,5 +1,4 @@
 import { normalize } from 'src/common/utils'
-import { determineCareEndDate } from '../../cancellation/determine-care-end-date'
 import { ELIGIBILITY_CONFIG } from '../../eligibility.config'
 import { EligibilityResult } from '../../eligibility.types'
 import { EligibilityContext, EligibilityRule } from '../rule.interface'
@@ -34,13 +33,10 @@ export const step2_LegalStatusCheck: EligibilityRule = {
       const normalizedEnroll = normalize(enrollForCsa)
       if (normalizedEnroll === 'YES') return null
       if (normalizedEnroll === 'TBD') return step8_UpdateEligibleTbd(csaStatus)
-      if (normalizedEnroll === 'NO') {
-        const careEndDate = determineCareEndDate(ctx.contact.orders, ctx.contact.placements)
-        return step9_UpdateNotEligible(csaStatus, null, careEndDate, ctx.referenceDate)
-      }
+      if (normalizedEnroll === 'NO')
+        return step9_UpdateNotEligible(csaStatus, null, null, ctx.referenceDate)
     }
 
-    const careEndDate = determineCareEndDate(ctx.contact.orders, ctx.contact.placements)
-    return step9_UpdateNotEligible(csaStatus, null, careEndDate, ctx.referenceDate)
+    return step9_UpdateNotEligible(csaStatus, null, null, ctx.referenceDate)
   },
 }

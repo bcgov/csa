@@ -3,10 +3,6 @@ name: Promote (Build Images + Update GitOps)
 on:
   push:
     branches: [dev, test, main]
-    paths:
-      - "frontend/**"
-      - "backend/**"
-      - "migrations/**"
 
   workflow_dispatch:
     inputs:

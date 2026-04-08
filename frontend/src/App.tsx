@@ -60,9 +60,9 @@ import type { AppEnvironment } from './types/runtime-config'
 const getEnvBackgroundColor = (env?: AppEnvironment): string => {
   switch (env) {
     case 'DEV':
-      return '#f8e0e6' // Light pink
-    case 'TEST':
       return '#f5e6c8' // Light yellow/tan
+    case 'TEST':
+      return '#f8e0e6' // Light pink
     case 'PRE-PROD':
       return '#e8e8e8' // Light grey
     case 'PROD':

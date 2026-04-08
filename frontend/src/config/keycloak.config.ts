@@ -33,6 +33,7 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
       VITE_KEYCLOAK_CLIENT_ID: keycloakConfig.clientId,
       VITE_API_BASE_URL: config.apiBaseUrl || '/api', // Load API base URL from config
       VITE_APP_REDIRECT: config.redirectUri || window.location.origin + '/', // Load redirect URI from config
+      VITE_APP_ENV: config.appEnv, // Load app environment for toolbar color
     }
 
     // Cache the config

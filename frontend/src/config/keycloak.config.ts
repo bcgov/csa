@@ -40,6 +40,8 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
     window.__RUNTIME_CONFIG__ = runtimeConfig
     console.log('Keycloak configuration loaded successfully from /config.json')
     console.log('API base URL:', runtimeConfig.VITE_API_BASE_URL)
+    console.log('App environment:', runtimeConfig.VITE_APP_ENV)
+    console.log('Full config object:', JSON.stringify(config))
 
     return runtimeConfig
   } catch (error) {

@@ -33,6 +33,7 @@ import {
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
+import { getRuntimeConfig } from './config/keycloak.config'
 import { useAuth } from './context/AuthContext'
 import logo from './icons/image.png'
 import {
@@ -53,6 +54,22 @@ import {
   type Contact,
   type ContactBatchDetail,
 } from './service/contacts-service'
+import type { AppEnvironment } from './types/runtime-config'
+
+// Environment-based toolbar background colors
+const getEnvBackgroundColor = (env?: AppEnvironment): string => {
+  switch (env) {
+    case 'DEV':
+      return '#f5e6c8' // Light yellow/tan
+    case 'TEST':
+      return '#f8e0e6' // Light pink
+    case 'PRE-PROD':
+      return '#d4e5f7' // Light blue
+    case 'PROD':
+    default:
+      return '#ffffff' // White (no color)
+  }
+}
 
 // Valid CSA statuses for Hold/Resume button
 // Maps to backend CSA_STATUSES constants
@@ -1898,7 +1915,7 @@ function App() {
       <AppBar
         position="static"
         sx={{
-          backgroundColor: '#ffffff',
+          backgroundColor: getEnvBackgroundColor(getRuntimeConfig()?.VITE_APP_ENV),
           boxShadow: 'none',
           borderBottom: '1px solid #e0e0e0',
           flexShrink: 0,

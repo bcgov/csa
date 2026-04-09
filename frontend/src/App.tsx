@@ -64,7 +64,7 @@ const getEnvBackgroundColor = (env?: AppEnvironment): string => {
     case 'TEST':
       return '#f8e0e6' // Light pink
     case 'PRE-PROD':
-      return '#e8e8e8' // Light grey
+      return '#d4e5f7' // Light blue
     case 'PROD':
     default:
       return '#ffffff' // White (no color)

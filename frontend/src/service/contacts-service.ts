@@ -222,6 +222,7 @@ export interface BatchContactDetail {
   contactId: number
   batchId: number
   transactionType: string
+  effectiveDate: string | null
   systemComments: string | null
   createdAt: string
   createdBy: string

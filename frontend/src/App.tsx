@@ -1829,6 +1829,7 @@ function App() {
       middleName: detail.contact.middleName || '',
       givenName: detail.contact.firstName,
       transactionType: capitalize(detail.transactionType),
+      effectiveDate: detail.effectiveDate ? formatDateYMD(detail.effectiveDate) : '',
       status: detail.statusLabel || detail.status || '',
       systemComments: detail.systemComments || '',
     }))
@@ -1847,6 +1848,7 @@ function App() {
           row.middleName.toLowerCase().includes(searchLower) ||
           row.givenName.toLowerCase().includes(searchLower) ||
           row.transactionType.toLowerCase().includes(searchLower) ||
+          row.effectiveDate.toLowerCase().includes(searchLower) ||
           row.status.toLowerCase().includes(searchLower) ||
           row.systemComments.toLowerCase().includes(searchLower)
         )
@@ -4699,6 +4701,7 @@ function App() {
                               </IconButton>
                             </Box>
                           </TableCell>
+                          <TableCell>Effective Date</TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               Status
@@ -4740,7 +4743,7 @@ function App() {
                       <TableBody>
                         {loadingBatchDetails ? (
                           <TableRow>
-                            <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                            <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                               <Typography variant="body2" color="text.secondary">
                                 Loading batch details...
                               </Typography>
@@ -4748,7 +4751,7 @@ function App() {
                           </TableRow>
                         ) : filteredBatchDetails.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                            <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                               <Typography variant="body2" color="text.secondary">
                                 {selectedBatch
                                   ? 'No contacts found in this batch'
@@ -4779,6 +4782,7 @@ function App() {
                               <TableCell>{row.middleName}</TableCell>
                               <TableCell>{row.givenName}</TableCell>
                               <TableCell>{row.transactionType}</TableCell>
+                              <TableCell>{row.effectiveDate}</TableCell>
                               <TableCell>{row.status}</TableCell>
                               <TableCell>{row.systemComments}</TableCell>
                             </TableRow>

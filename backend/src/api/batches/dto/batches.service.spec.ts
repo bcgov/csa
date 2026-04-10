@@ -109,6 +109,8 @@ describe('BatchesService', () => {
             firstName: 'John',
             din: '123',
             csaStatus: 'eligible',
+            effectiveDate: new Date('2025-01-01'),
+            careEndDate: null,
           },
         },
       ]
@@ -121,8 +123,10 @@ describe('BatchesService', () => {
         details.map((d) => ({
           ...d,
           statusLabel: 'Pending',
+          effectiveDate: '2025-01-01',
           contact: {
             ...d.contact,
+            effectiveDate: '2025-01-01',
             csaStatusLabel: 'Eligible',
           },
         })),
@@ -138,6 +142,8 @@ describe('BatchesService', () => {
               middleName: true,
               din: true,
               csaStatus: true,
+              effectiveDate: true,
+              careEndDate: true,
             },
           },
         },

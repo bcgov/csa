@@ -111,6 +111,8 @@ describe('BatchesService', () => {
             csaStatus: 'eligible',
             effectiveDate: new Date('2025-01-01'),
             careEndDate: null,
+            caseNumber: 'CASE-001',
+            cancelReasonCode: null,
           },
         },
       ]
@@ -124,6 +126,9 @@ describe('BatchesService', () => {
           ...d,
           statusLabel: 'Pending',
           effectiveDate: '2025-01-01',
+          caseNumber: 'CASE-001',
+          cancelReasonCode: null,
+          cancelReasonLabel: null,
           contact: {
             ...d.contact,
             effectiveDate: '2025-01-01',
@@ -144,11 +149,46 @@ describe('BatchesService', () => {
               csaStatus: true,
               effectiveDate: true,
               careEndDate: true,
+              caseNumber: true,
+              cancelReasonCode: true,
             },
           },
         },
         orderBy: { createdAt: 'desc' },
       })
+    })
+
+    it('should return cancellation reason for cancellation transactions', async () => {
+      const batch = { id: 1, status: 'pending' }
+      const details = [
+        {
+          id: 2,
+          contactId: 101,
+          batchId: 1,
+          transactionType: 'cancellation',
+          status: 'pending',
+          contact: {
+            id: 101,
+            lastName: 'Smith',
+            firstName: 'Jane',
+            din: '456',
+            csaStatus: 'not_eligible_in_pay',
+            effectiveDate: new Date('2025-01-01'),
+            careEndDate: new Date('2025-06-15'),
+            caseNumber: 'CASE-002',
+            cancelReasonCode: '21',
+          },
+        },
+      ]
+      mockPrismaService.batch.findUnique.mockResolvedValue(batch)
+      mockPrismaService.contactBatchDetail.findMany.mockResolvedValue(details)
+
+      const result = await service.findBatchContacts(1)
+
+      expect(result[0].cancelReasonCode).toBe('21')
+      expect(result[0].cancelReasonLabel).toBe('Child Left')
+      expect(result[0].effectiveDate).toBe('2025-06-15')
+      expect(result[0].caseNumber).toBe('CASE-002')
     })
 
     it('should throw NotFoundException if batch not found', async () => {

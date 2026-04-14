@@ -1825,6 +1825,7 @@ function App() {
     return batchDetails.map((detail) => ({
       id: detail.id,
       contactId: detail.contactId,
+      caseNumber: detail.caseNumber || '',
       lastName: detail.contact.lastName,
       middleName: detail.contact.middleName || '',
       givenName: detail.contact.firstName,
@@ -1832,6 +1833,9 @@ function App() {
       effectiveDate: detail.effectiveDate ? formatDateYMD(detail.effectiveDate) : '',
       status: detail.statusLabel || detail.status || '',
       systemComments: detail.systemComments || '',
+      lastUpdatedBy: detail.lastUpdatedBy || '',
+      cancelReasonCode: detail.cancelReasonCode || '',
+      cancelReasonLabel: detail.cancelReasonLabel || '',
     }))
   }, [batchDetails])
 
@@ -1844,13 +1848,17 @@ function App() {
       const searchLower = batchDetailsSearchTerm.toLowerCase()
       data = data.filter((row) => {
         return (
+          row.caseNumber.toLowerCase().includes(searchLower) ||
           row.lastName.toLowerCase().includes(searchLower) ||
           row.middleName.toLowerCase().includes(searchLower) ||
           row.givenName.toLowerCase().includes(searchLower) ||
           row.transactionType.toLowerCase().includes(searchLower) ||
           row.effectiveDate.toLowerCase().includes(searchLower) ||
           row.status.toLowerCase().includes(searchLower) ||
-          row.systemComments.toLowerCase().includes(searchLower)
+          row.systemComments.toLowerCase().includes(searchLower) ||
+          row.lastUpdatedBy.toLowerCase().includes(searchLower) ||
+          row.cancelReasonCode.toLowerCase().includes(searchLower) ||
+          row.cancelReasonLabel.toLowerCase().includes(searchLower)
         )
       })
     }
@@ -4629,6 +4637,7 @@ function App() {
                               }}
                             />
                           </TableCell>
+                          <TableCell>ICM Case Number</TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               Last Name
@@ -4738,12 +4747,15 @@ function App() {
                               </IconButton>
                             </Box>
                           </TableCell>
+                          <TableCell>Last Updated By</TableCell>
+                          <TableCell>Cancel Code</TableCell>
+                          <TableCell>Cancel Reason</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {loadingBatchDetails ? (
                           <TableRow>
-                            <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                            <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
                               <Typography variant="body2" color="text.secondary">
                                 Loading batch details...
                               </Typography>
@@ -4751,7 +4763,7 @@ function App() {
                           </TableRow>
                         ) : filteredBatchDetails.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                            <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
                               <Typography variant="body2" color="text.secondary">
                                 {selectedBatch
                                   ? 'No contacts found in this batch'
@@ -4778,6 +4790,7 @@ function App() {
                                   }}
                                 />
                               </TableCell>
+                              <TableCell>{row.caseNumber}</TableCell>
                               <TableCell>{row.lastName}</TableCell>
                               <TableCell>{row.middleName}</TableCell>
                               <TableCell>{row.givenName}</TableCell>
@@ -4785,6 +4798,9 @@ function App() {
                               <TableCell>{row.effectiveDate}</TableCell>
                               <TableCell>{row.status}</TableCell>
                               <TableCell>{row.systemComments}</TableCell>
+                              <TableCell>{row.lastUpdatedBy}</TableCell>
+                              <TableCell>{row.cancelReasonCode}</TableCell>
+                              <TableCell>{row.cancelReasonLabel}</TableCell>
                             </TableRow>
                           ))
                         )}

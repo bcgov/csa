@@ -147,18 +147,29 @@ export class BatchesService {
             middleName: true,
             din: true,
             csaStatus: true,
+            effectiveDate: true,
+            careEndDate: true,
           },
         },
       },
       orderBy: { createdAt: 'desc' },
     })
 
-    return details.map((detail) =>
-      enrichLabels({
+    return details.map((detail) => {
+      // Compute effectiveDate based on transaction type:
+      // - Application: Legal Authority's Effective Date (contact.effectiveDate)
+      // - Cancellation: Child's Care End Date (contact.careEndDate)
+      const effectiveDate =
+        detail.transactionType === TRANSACTION_TYPES.CANCELLATION
+          ? detail.contact.careEndDate
+          : detail.contact.effectiveDate
+
+      return enrichLabels({
         ...detail,
+        effectiveDate,
         contact: enrichLabels(detail.contact),
-      }),
-    )
+      })
+    })
   }
 
   async findOrCreatePendingBatch() {

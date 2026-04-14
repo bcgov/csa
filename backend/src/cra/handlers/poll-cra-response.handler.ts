@@ -165,13 +165,13 @@ export class PollCraResponseHandler extends BaseJob {
 
     let parsed: ReturnType<InboundResponseService['parseFile']>
     try {
-      if (responseFile.fileName.includes(RESPONSE_FILE_TYPE.WKL)) {
+      if (responseFile?.fileName?.includes(RESPONSE_FILE_TYPE.WKL)) {
         console.log(
           `Parsing weekly response file ${responseFile.fileName} with InboundWeeklyResponseService`,
         )
         parsed = this.craWeeklyResponseService.parseWeeklyResponseFile(localFilePath) as any // TO DO- NEED TO MODIFY
         this.logger.log(`Parsed ${responseFile.fileName} with ${parsed} detail records`)
-        return
+        return 
       } else {
         parsed = this.inboundResponseService.parseFile(localFilePath)
       }

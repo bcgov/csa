@@ -209,6 +209,7 @@ export interface ContactBatchDetail {
   lastUpdatedAt: string
   lastUpdatedBy: string
   status: string | null
+  statusLabel: string | null
   batch: {
     id: number
     batchDate: string

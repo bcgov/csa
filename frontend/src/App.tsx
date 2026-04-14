@@ -1825,17 +1825,18 @@ function App() {
     return batchDetails.map((detail) => ({
       id: detail.id,
       contactId: detail.contactId,
-      caseNumber: detail.caseNumber || '',
       lastName: detail.contact.lastName,
-      middleName: detail.contact.middleName || '',
       givenName: detail.contact.firstName,
+      middleName: detail.contact.middleName || '',
+      caseNumber: detail.caseNumber || '',
       transactionType: capitalize(detail.transactionType),
       effectiveDate: detail.effectiveDate ? formatDateYMD(detail.effectiveDate) : '',
-      status: detail.statusLabel || detail.status || '',
+      cancellationReason:
+        detail.cancelReasonCode && detail.cancelReasonLabel
+          ? `${detail.cancelReasonCode} - ${detail.cancelReasonLabel}`
+          : detail.cancelReasonCode || '',
       systemComments: detail.systemComments || '',
       lastUpdatedBy: detail.lastUpdatedBy || '',
-      cancelReasonCode: detail.cancelReasonCode || '',
-      cancelReasonLabel: detail.cancelReasonLabel || '',
     }))
   }, [batchDetails])
 
@@ -1848,17 +1849,15 @@ function App() {
       const searchLower = batchDetailsSearchTerm.toLowerCase()
       data = data.filter((row) => {
         return (
-          row.caseNumber.toLowerCase().includes(searchLower) ||
           row.lastName.toLowerCase().includes(searchLower) ||
-          row.middleName.toLowerCase().includes(searchLower) ||
           row.givenName.toLowerCase().includes(searchLower) ||
+          row.middleName.toLowerCase().includes(searchLower) ||
+          row.caseNumber.toLowerCase().includes(searchLower) ||
           row.transactionType.toLowerCase().includes(searchLower) ||
           row.effectiveDate.toLowerCase().includes(searchLower) ||
-          row.status.toLowerCase().includes(searchLower) ||
+          row.cancellationReason.toLowerCase().includes(searchLower) ||
           row.systemComments.toLowerCase().includes(searchLower) ||
-          row.lastUpdatedBy.toLowerCase().includes(searchLower) ||
-          row.cancelReasonCode.toLowerCase().includes(searchLower) ||
-          row.cancelReasonLabel.toLowerCase().includes(searchLower)
+          row.lastUpdatedBy.toLowerCase().includes(searchLower)
         )
       })
     }
@@ -4637,7 +4636,6 @@ function App() {
                               }}
                             />
                           </TableCell>
-                          <TableCell>ICM Case Number</TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               Last Name
@@ -4648,24 +4646,6 @@ function App() {
                                   padding: 0.5,
                                   color:
                                     batchDetailsColumnFilters.lastName?.length > 0
-                                      ? '#1976d2'
-                                      : '#666',
-                                }}
-                              >
-                                <FilterListIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              Middle Name(s)
-                              <IconButton
-                                size="small"
-                                onClick={(e) => handleBatchDetailsFilterClick(e, 'middleName')}
-                                sx={{
-                                  padding: 0.5,
-                                  color:
-                                    batchDetailsColumnFilters.middleName?.length > 0
                                       ? '#1976d2'
                                       : '#666',
                                 }}
@@ -4694,6 +4674,25 @@ function App() {
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              Middle Name(s)
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleBatchDetailsFilterClick(e, 'middleName')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchDetailsColumnFilters.middleName?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell>Case Number</TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               Transaction Type
                               <IconButton
                                 size="small"
@@ -4711,24 +4710,7 @@ function App() {
                             </Box>
                           </TableCell>
                           <TableCell>Effective Date</TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              Status
-                              <IconButton
-                                size="small"
-                                onClick={(e) => handleBatchDetailsFilterClick(e, 'status')}
-                                sx={{
-                                  padding: 0.5,
-                                  color:
-                                    batchDetailsColumnFilters.status?.length > 0
-                                      ? '#1976d2'
-                                      : '#666',
-                                }}
-                              >
-                                <FilterListIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </TableCell>
+                          <TableCell>Reason for Cancellation</TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               System Comments
@@ -4748,14 +4730,12 @@ function App() {
                             </Box>
                           </TableCell>
                           <TableCell>Last Updated By</TableCell>
-                          <TableCell>Cancel Code</TableCell>
-                          <TableCell>Cancel Reason</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {loadingBatchDetails ? (
                           <TableRow>
-                            <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
+                            <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                               <Typography variant="body2" color="text.secondary">
                                 Loading batch details...
                               </Typography>
@@ -4763,7 +4743,7 @@ function App() {
                           </TableRow>
                         ) : filteredBatchDetails.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
+                            <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                               <Typography variant="body2" color="text.secondary">
                                 {selectedBatch
                                   ? 'No contacts found in this batch'
@@ -4790,17 +4770,15 @@ function App() {
                                   }}
                                 />
                               </TableCell>
-                              <TableCell>{row.caseNumber}</TableCell>
                               <TableCell>{row.lastName}</TableCell>
-                              <TableCell>{row.middleName}</TableCell>
                               <TableCell>{row.givenName}</TableCell>
+                              <TableCell>{row.middleName}</TableCell>
+                              <TableCell>{row.caseNumber}</TableCell>
                               <TableCell>{row.transactionType}</TableCell>
                               <TableCell>{row.effectiveDate}</TableCell>
-                              <TableCell>{row.status}</TableCell>
+                              <TableCell>{row.cancellationReason}</TableCell>
                               <TableCell>{row.systemComments}</TableCell>
                               <TableCell>{row.lastUpdatedBy}</TableCell>
-                              <TableCell>{row.cancelReasonCode}</TableCell>
-                              <TableCell>{row.cancelReasonLabel}</TableCell>
                             </TableRow>
                           ))
                         )}

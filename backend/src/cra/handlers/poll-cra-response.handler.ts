@@ -171,7 +171,7 @@ export class PollCraResponseHandler extends BaseJob {
         )
         parsed = this.craWeeklyResponseService.parseWeeklyResponseFile(localFilePath) as any // TO DO- NEED TO MODIFY
         this.logger.log(`Parsed ${responseFile.fileName} with ${parsed} detail records`)
-        return 
+        return
       } else {
         parsed = this.inboundResponseService.parseFile(localFilePath)
       }

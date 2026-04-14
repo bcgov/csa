@@ -169,13 +169,9 @@ export class PollCraResponseHandler extends BaseJob {
         console.log(
           `Parsing weekly response file ${responseFile.fileName} with InboundWeeklyResponseService`,
         )
-        const weeklyfileResult = this.craWeeklyResponseService.parseWeeklyResponseFile(
-          localFilePath,
-        ) as any // TO DO- NEED TO MODIFY
-        this.logger.log(
-          `Parsed ${responseFile.fileName} with ${weeklyfileResult.detailRecords.length} detail records`,
-        )
-        return weeklyfileResult.detailRecords.length
+        parsed = this.craWeeklyResponseService.parseWeeklyResponseFile(localFilePath) as any // TO DO- NEED TO MODIFY
+        this.logger.log(`Parsed ${responseFile.fileName} with ${parsed} detail records`)
+        return
       } else {
         parsed = this.inboundResponseService.parseFile(localFilePath)
       }

@@ -1,3 +1,5 @@
+/* eslint-disable prefer-const */
+
 import {
   BATCH_DETAIL_EVENT,
   BATCH_DETAIL_STATUS,

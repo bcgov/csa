@@ -52,6 +52,7 @@ describe('PollCraResponseHandler', () => {
   let mockCraTransferService: any
   let mockInboundFileService: any
   let mockInboundResponseService: any
+  let mockInboundWeeklyResponseService: any
   let mockPrisma: any
   let mockBatchesService: any
   let mockContactsService: any
@@ -62,81 +63,86 @@ describe('PollCraResponseHandler', () => {
       listInboundFiles: vi.fn().mockResolvedValue([]),
       downloadInboundFile: vi.fn(),
     }
-
-    mockInboundFileService = {
-      getLocalFilePath: vi.fn().mockReturnValue('/tmp/cra/inbound/default.txt'),
-      isValidResponseFile: vi.fn().mockReturnValue(true),
-    }
-
-    mockInboundResponseService = {
-      parseFile: vi.fn(),
-      classifyDetail: vi.fn().mockImplementation((detail) => {
-        if (detail.fileStatCd !== FILE_STAT_CODE.FILE_OK) {
-          return { outcome: DETAIL_OUTCOME.FILE_ERROR, systemComments: 'File error', din: null }
-        }
-
-        const rejectCodes = ['rejectCd1', 'rejectCd2', 'rejectCd3', 'rejectCd4', 'rejectCd5']
-          .map((k: string) => detail[k])
-          .filter(Boolean)
-        const systemComments = rejectCodes.length > 0 ? rejectCodes.join('; ') : null
-        const din = detail.ccraDinNum?.trim() || null
-
-        if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_ACCEPTED) {
-          return { outcome: DETAIL_OUTCOME.ACCEPTED, systemComments, din }
-        }
-
-        if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_RECYCLED) {
-          return { outcome: DETAIL_OUTCOME.RECYCLED, systemComments, din: null }
-        }
-
-        return { outcome: DETAIL_OUTCOME.REJECTED, systemComments, din: null }
-      }),
-    }
-
-    mockPrisma = {
-      transferFile: {
-        findMany: vi.fn().mockResolvedValue([]),
-        update: vi.fn().mockResolvedValue({}),
-      },
-      contactBatchDetail: {
-        findUnique: vi.fn(),
-        findMany: vi.fn(),
-        update: vi.fn().mockResolvedValue({}),
-      },
-      contact: {
-        findUnique: vi.fn(),
-      },
-      batch: {
-        findUnique: vi.fn().mockResolvedValue({ systemComments: null }),
-      },
-    }
-
-    mockBatchesService = {
-      updateBatchStatus: vi.fn().mockResolvedValue({ success: true }),
-      updateBatchDetailStatus: vi.fn().mockResolvedValue({ success: true }),
-      aggregateBatchStatus: vi.fn().mockResolvedValue(undefined),
-    }
-
-    mockContactsService = {
-      updateCsaStatus: vi.fn().mockResolvedValue({ success: true }),
-    }
-
-    mockIcmSyncBackService = {
-      syncFlaggedWithRetry: vi
-        .fn()
-        .mockResolvedValue({ totalFlagged: 0, synced: 0, failed: 0, chunks: 0 }),
-    }
-
-    handler = new PollCraResponseHandler(
-      mockCraTransferService,
-      mockInboundFileService,
-      mockInboundResponseService,
-      mockPrisma,
-      mockBatchesService,
-      mockContactsService,
-      mockIcmSyncBackService as any,
-    )
   })
+  mockInboundFileService = {
+    getLocalFilePath: vi.fn().mockReturnValue('/tmp/cra/inbound/default.txt'),
+    isValidResponseFile: vi.fn().mockReturnValue(true),
+  }
+
+  mockInboundResponseService = {
+    parseFile: vi.fn(),
+    classifyDetail: vi.fn().mockImplementation((detail) => {
+      if (detail.fileStatCd !== FILE_STAT_CODE.FILE_OK) {
+        return { outcome: DETAIL_OUTCOME.FILE_ERROR, systemComments: 'File error', din: null }
+      }
+
+      const rejectCodes = ['rejectCd1', 'rejectCd2', 'rejectCd3', 'rejectCd4', 'rejectCd5']
+        .map((k: string) => detail[k])
+        .filter(Boolean)
+      const systemComments = rejectCodes.length > 0 ? rejectCodes.join('; ') : null
+      const din = detail.ccraDinNum?.trim() || null
+
+      if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_ACCEPTED) {
+        return { outcome: DETAIL_OUTCOME.ACCEPTED, systemComments, din }
+      }
+
+      if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_RECYCLED) {
+        return { outcome: DETAIL_OUTCOME.RECYCLED, systemComments, din: null }
+      }
+
+      return { outcome: DETAIL_OUTCOME.REJECTED, systemComments, din: null }
+    }),
+  }
+
+  mockInboundWeeklyResponseService = {
+    parseWeeklyResponseFile: vi.fn(),
+    parseFile: vi.fn(),
+  }
+
+  mockPrisma = {
+    transferFile: {
+      findMany: vi.fn().mockResolvedValue([]),
+      update: vi.fn().mockResolvedValue({}),
+    },
+    contactBatchDetail: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn().mockResolvedValue({}),
+    },
+    contact: {
+      findUnique: vi.fn(),
+    },
+    batch: {
+      findUnique: vi.fn().mockResolvedValue({ systemComments: null }),
+    },
+  }
+
+  mockBatchesService = {
+    updateBatchStatus: vi.fn().mockResolvedValue({ success: true }),
+    updateBatchDetailStatus: vi.fn().mockResolvedValue({ success: true }),
+    aggregateBatchStatus: vi.fn().mockResolvedValue(undefined),
+  }
+
+  mockContactsService = {
+    updateCsaStatus: vi.fn().mockResolvedValue({ success: true }),
+  }
+
+  mockIcmSyncBackService = {
+    syncFlaggedWithRetry: vi
+      .fn()
+      .mockResolvedValue({ totalFlagged: 0, synced: 0, failed: 0, chunks: 0 }),
+  }
+
+  handler = new PollCraResponseHandler(
+    mockCraTransferService,
+    mockInboundFileService,
+    mockInboundResponseService,
+    mockInboundWeeklyResponseService,
+    mockPrisma,
+    mockBatchesService,
+    mockContactsService,
+    mockIcmSyncBackService as any,
+  )
 
   it('should have jobType POLL_CRA_RESPONSE', () => {
     expect(handler.jobType).toBe(JobType.POLL_CRA_RESPONSE)

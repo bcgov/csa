@@ -23,6 +23,9 @@ export class InboundFileService {
     const fileMiddle = fileName.split('.')[1] ?? ''
     const fileEnvFlag = fileMiddle.slice(0, 1)
     const fileTypeFlag = fileMiddle.slice(1, 4)
-    return fileTypeFlag === RESPONSE_FILE_TYPE.RSP && fileEnvFlag === this.responseEnvFlag
+    return (
+      (fileTypeFlag === RESPONSE_FILE_TYPE.RSP || fileTypeFlag === RESPONSE_FILE_TYPE.WKL) &&
+      fileEnvFlag === this.responseEnvFlag
+    )
   }
 }

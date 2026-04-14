@@ -16,8 +16,10 @@ import { InboundFileService } from '../inbound/inbound-file.service'
 import { InboundResponseService } from '../inbound/inbound-response.service'
 import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import { CraTransferService } from '../transfer/cra-transfer.service'
+import { InboundWeeklyResponseService } from '../inbound/inbound-weekly-response.service'
 
-const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
+const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY, RESPONSE_FILE_TYPE } =
+  CRA_DATA_HANDLING_CONSTANT
 
 @Injectable()
 export class PollCraResponseHandler extends BaseJob {
@@ -32,6 +34,7 @@ export class PollCraResponseHandler extends BaseJob {
     private readonly craTransferService: CraTransferService,
     private readonly inboundFileService: InboundFileService,
     private readonly inboundResponseService: InboundResponseService,
+    private readonly craWeeklyResponseService: InboundWeeklyResponseService,
     private readonly prisma: PrismaService,
     private readonly batchesService: BatchesService,
     private readonly contactsService: ContactsService,
@@ -51,6 +54,27 @@ export class PollCraResponseHandler extends BaseJob {
     const unprocessedResponseFiles = await this.prisma.transferFile.findMany({
       where: { direction: FILE_DIRECTION.INBOUND, isDetailsProcessed: false, isValid: true },
     })
+
+    console.log(
+      `Found ${JSON.stringify(unprocessedResponseFiles, null, 2)} unprocessed CRA response file(s)`,
+    )
+
+    //temporary push for development
+    // unprocessedResponseFiles.push({
+    //   id: 1,
+    //   batchId: 123,
+    //   destinationId: 'cra',
+    //   direction: 'INBOUND',
+    //   fileName: 'TST0016.AWKL0001',
+    //   // fileName: 'TST0016.ARSP0021',
+    //   deliveredAt: new Date(),
+    //   downloadedAt: new Date(),
+    //   referenceNumbers: [],
+    //   fileSize: '100',
+    //   isDetailsProcessed: false,
+    //   isValid: true,
+    //   sequenceNumber: 1,
+    // })
 
     if (unprocessedResponseFiles.length === 0) {
       return {
@@ -141,7 +165,15 @@ export class PollCraResponseHandler extends BaseJob {
 
     let parsed: ReturnType<InboundResponseService['parseFile']>
     try {
-      parsed = this.inboundResponseService.parseFile(localFilePath)
+      if (responseFile.fileName.includes(RESPONSE_FILE_TYPE.WKL)) {
+        console.log(
+          `Parsing weekly response file ${responseFile.fileName} with InboundWeeklyResponseService`,
+        )
+        parsed = this.craWeeklyResponseService.parseWeeklyResponseFile(localFilePath) as any // TO DO- NEED TO MODIFY
+        return
+      } else {
+        parsed = this.inboundResponseService.parseFile(localFilePath)
+      }
     } catch (error) {
       this.logger.error(`Failed to parse response file ${responseFile.fileName}: ${error}`)
       await this.prisma.transferFile.update({

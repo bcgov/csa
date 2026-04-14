@@ -3478,7 +3478,7 @@ function App() {
                                     variant="caption"
                                     sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
                                   >
-                                    Legal Status Code
+                                    Effective Legal Status
                                   </Typography>
                                   <Typography
                                     variant="body2"

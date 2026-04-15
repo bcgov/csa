@@ -140,7 +140,8 @@ const BATCH_DETAILS_STATUS_FILTER_OPTIONS = [
 const COLUMN_LABELS: Record<string, string> = {
   lastName: 'Last Name',
   firstName: 'First Name',
-  middleName: 'Middle Name',
+  middleName: 'Middle Name(s)',
+  givenName: 'First Name',
   dob: 'Date Of Birth',
   din: 'DIN',
   csaStatus: 'CSA Status',
@@ -161,6 +162,14 @@ const COLUMN_LABELS: Record<string, string> = {
   createdBy: 'Created By',
   contactId: 'Contact ID',
   icmNumber: 'ICM Number',
+  // Batch Details columns
+  cancellationReason: 'Reason for Cancellation',
+  systemComments: 'System Comments',
+  addedBy: 'Added By',
+  effectiveDate: 'Effective Date',
+  // Batch History columns
+  batchRequestStatus: 'Batch Request Status',
+  batchDetailStatus: 'Batch Detail Status',
 }
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
@@ -324,7 +333,6 @@ function App() {
     Record<string, string[]>
   >({
     batchId: [],
-    createdDate: [],
     batchDate: [],
     batchRequestStatus: [],
     transactionType: [],
@@ -368,7 +376,6 @@ function App() {
     cancellationReason: [],
     status: [],
     systemComments: [],
-    lastUpdatedBy: [],
     addedBy: [],
   })
   const [batchDetailsFilterAnchor, setBatchDetailsFilterAnchor] = useState<FilterAnchor>({
@@ -1481,7 +1488,6 @@ function App() {
     // Transform API data to match the table structure, then get unique values
     const transformedData = contactBatchHistory.map((item) => ({
       batchId: String(item.batch.id),
-      createdDate: formatDateTimeYMD(item.createdAt),
       batchDate: item.batch.batchDate ? formatDateYMD(item.batch.batchDate) : '',
       batchRequestStatus: item.batch.statusLabel || item.batch.status || '',
       transactionType: capitalize(item.transactionType) || '',
@@ -1742,7 +1748,6 @@ function App() {
     let data = contactBatchHistory.map((item) => ({
       id: item.id,
       batchId: String(item.batch.id),
-      createdDate: formatDateTimeYMD(item.createdAt),
       batchDate: item.batch.batchDate ? formatDateYMD(item.batch.batchDate) : '',
       batchRequestStatus: item.batch.statusLabel || item.batch.status || '',
       transactionType: capitalize(item.transactionType) || '',
@@ -1756,7 +1761,6 @@ function App() {
       data = data.filter((row) => {
         return (
           row.batchId.toLowerCase().includes(searchLower) ||
-          row.createdDate.toLowerCase().includes(searchLower) ||
           row.batchDate.toLowerCase().includes(searchLower) ||
           row.batchRequestStatus.toLowerCase().includes(searchLower) ||
           row.transactionType.toLowerCase().includes(searchLower) ||
@@ -1848,7 +1852,6 @@ function App() {
           : detail.cancelReasonCode || '',
       status: detail.statusLabel || detail.status || '',
       systemComments: detail.systemComments || '',
-      lastUpdatedBy: detail.lastUpdatedBy || '',
       addedBy: detail.createdBy || '',
     }))
   }, [batchDetails])
@@ -1871,7 +1874,6 @@ function App() {
           row.cancellationReason.toLowerCase().includes(searchLower) ||
           row.status.toLowerCase().includes(searchLower) ||
           row.systemComments.toLowerCase().includes(searchLower) ||
-          row.lastUpdatedBy.toLowerCase().includes(searchLower) ||
           row.addedBy.toLowerCase().includes(searchLower)
         )
       })
@@ -4214,11 +4216,6 @@ function App() {
                               </TableCell>
                               <TableCell sx={{ fontWeight: 600 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  Created Date
-                                </Box>
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                   Batch Date
                                 </Box>
                               </TableCell>
@@ -4307,7 +4304,7 @@ function App() {
                           <TableBody>
                             {loadingBatchHistory ? (
                               <TableRow>
-                                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                                   <Typography variant="body2" color="text.secondary">
                                     Loading batch history...
                                   </Typography>
@@ -4315,7 +4312,7 @@ function App() {
                               </TableRow>
                             ) : filteredBatchHistory.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                                   <Typography variant="body2" color="text.secondary">
                                     {selectedChild
                                       ? 'No batch history found for this contact'
@@ -4344,7 +4341,6 @@ function App() {
                                   <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
                                     {row.batchId}
                                   </TableCell>
-                                  <TableCell>{row.createdDate}</TableCell>
                                   <TableCell>{row.batchDate}</TableCell>
                                   <TableCell>
                                     {row.batchRequestStatus === 'Pending' && (
@@ -4827,24 +4823,6 @@ function App() {
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              Last Updated By
-                              <IconButton
-                                size="small"
-                                onClick={(e) => handleBatchDetailsFilterClick(e, 'lastUpdatedBy')}
-                                sx={{
-                                  padding: 0.5,
-                                  color:
-                                    batchDetailsColumnFilters.lastUpdatedBy?.length > 0
-                                      ? '#1976d2'
-                                      : '#666',
-                                }}
-                              >
-                                <FilterListIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               Added By
                               <IconButton
                                 size="small"
@@ -4866,7 +4844,7 @@ function App() {
                       <TableBody>
                         {loadingBatchDetails ? (
                           <TableRow>
-                            <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
+                            <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
                               <Typography variant="body2" color="text.secondary">
                                 Loading batch details...
                               </Typography>
@@ -4874,7 +4852,7 @@ function App() {
                           </TableRow>
                         ) : filteredBatchDetails.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
+                            <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
                               <Typography variant="body2" color="text.secondary">
                                 {selectedBatch
                                   ? 'No contacts found in this batch'
@@ -4910,7 +4888,6 @@ function App() {
                               <TableCell>{row.cancellationReason}</TableCell>
                               <TableCell>{row.status}</TableCell>
                               <TableCell>{row.systemComments}</TableCell>
-                              <TableCell>{row.lastUpdatedBy}</TableCell>
                               <TableCell>{row.addedBy}</TableCell>
                             </TableRow>
                           ))

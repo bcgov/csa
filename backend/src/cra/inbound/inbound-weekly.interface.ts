@@ -27,7 +27,9 @@ interface BaseRecord {
 export interface HeaderRecord extends BaseRecord {
   tranCode: TranCode.HEADER
   recordTypeCode: RecordTypeCode.HEADER
-  processDate: string // YYYYMMDD
+  filler1: string // X(08)
+  processDate: string // X(08) YYYYMMDD
+  filler2: string // X(219)
 }
 
 // DETAIL 01
@@ -126,21 +128,28 @@ export interface UpdateRecord extends DetailRecord04Base {
 export type DetailRecord04 = ApplicationRecord | CancellationRecord | UpdateRecord
 
 // DETAIL 05
-
+// 613705;ALL TRANSACTIONS COMPLETED BEFORE 2025-05-13 AT 18.19 WILL BE INCLUDED IN THE MONTHLY RECONCILIATION REPORT FOR JUNE     ;
 export interface DetailRecord05 extends BaseRecord {
-  tranCode: TranCode.DETAIL
-  recordTypeCode: RecordTypeCode.DETAIL_05
-  nextDate: string // YYYY-MM-DD
-  nextTime: string // HH.MM
-  nextMonth: string
+  tranCode: TranCode.DETAIL // X(04)
+  recordTypeCode: RecordTypeCode.DETAIL_05 // X(02)
+  filler1: string // X(35)
+  nextDate: string // X(10)  YYYY-MM-DD
+  filler2: string // X(04)
+  nextTime: string // X(05) HH.MM
+  filler3: string // X(59)
+  nextMonth: string // X(09)
+  filler4: string // X(01)
+  filler5: string // X(112)
 }
 
 // TRAILER
 
 export interface TrailerRecord extends BaseRecord {
-  tranCode: TranCode.TRAILER
-  recordTypeCode: RecordTypeCode.HEADER // '00'
-  recordCount: number
+  tranCode: TranCode.TRAILER // X(04)
+  recordTypeCode: RecordTypeCode.HEADER // X(02)
+  filler1: string // X(09)
+  recordCount: number // 9(09)
+  filler2: string // X(217)
 }
 
 // BLANK

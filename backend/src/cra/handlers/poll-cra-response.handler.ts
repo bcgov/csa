@@ -17,9 +17,18 @@ import { InboundResponseService } from '../inbound/inbound-response.service'
 import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import { CraTransferService } from '../transfer/cra-transfer.service'
 import { InboundWeeklyResponseService } from '../inbound/inbound-weekly-response.service'
+import { DetailRecord04 } from '../inbound/inbound-weekly.interface'
 
-const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY, RESPONSE_FILE_TYPE } =
-  CRA_DATA_HANDLING_CONSTANT
+const {
+  DESTINATION_ID,
+  FILE_DIRECTION,
+  UPDATED_BY,
+  RESPONSE_FILE_TYPE,
+  RESPONSE_FILE,
+  WEEKLY_FILE,
+} = CRA_DATA_HANDLING_CONSTANT
+
+const { RECORD_TYPE_CODE } = WEEKLY_FILE
 
 @Injectable()
 export class PollCraResponseHandler extends BaseJob {
@@ -54,27 +63,6 @@ export class PollCraResponseHandler extends BaseJob {
     const unprocessedResponseFiles = await this.prisma.transferFile.findMany({
       where: { direction: FILE_DIRECTION.INBOUND, isDetailsProcessed: false, isValid: true },
     })
-
-    console.log(
-      `Found ${JSON.stringify(unprocessedResponseFiles, null, 2)} unprocessed CRA response file(s)`,
-    )
-
-    //temporary push for development
-    // unprocessedResponseFiles.push({
-    //   id: 1,
-    //   batchId: 123,
-    //   destinationId: 'cra',
-    //   direction: 'INBOUND',
-    //   fileName: 'TST0016.AWKL0001',
-    //   // fileName: 'TST0016.ARSP0021',
-    //   deliveredAt: new Date(),
-    //   downloadedAt: new Date(),
-    //   referenceNumbers: [],
-    //   fileSize: '100',
-    //   isDetailsProcessed: false,
-    //   isValid: true,
-    //   sequenceNumber: 1,
-    // })
 
     if (unprocessedResponseFiles.length === 0) {
       return {
@@ -163,15 +151,15 @@ export class PollCraResponseHandler extends BaseJob {
       responseFile.fileName,
     )
 
-    let parsed: ReturnType<InboundResponseService['parseFile']>
+    let parsed:
+      | ReturnType<InboundResponseService['parseFile']>
+      | ReturnType<InboundWeeklyResponseService['parseWeeklyResponseFile']>
     try {
       if (responseFile?.fileName?.includes(RESPONSE_FILE_TYPE.WKL)) {
-        console.log(
+        this.logger.log(
           `Parsing weekly response file ${responseFile.fileName} with InboundWeeklyResponseService`,
         )
-        parsed = this.craWeeklyResponseService.parseWeeklyResponseFile(localFilePath) as any // TO DO- NEED TO MODIFY
-        this.logger.log(`Parsed ${responseFile.fileName} with ${parsed} detail records`)
-        return
+        parsed = this.craWeeklyResponseService.parseWeeklyResponseFile(localFilePath) // TO DO- NEED TO MODIFY
       } else {
         parsed = this.inboundResponseService.parseFile(localFilePath)
       }
@@ -184,14 +172,23 @@ export class PollCraResponseHandler extends BaseJob {
       return 0
     }
 
-    const { header, details } = parsed
+    const { header, details, trailer } = parsed
+    const isResponseFile = header.tranCode === RESPONSE_FILE.HEADER_TRAN_CODE
+
+    const recordCount =
+      (header && 'recordCount' in header ? header.recordCount : undefined) ??
+      (trailer && 'recordCount' in trailer ? trailer.recordCount : undefined)
 
     this.logger.log(
-      `Parsed ${responseFile.fileName}: ${details.length} detail records, header recordCount=${header.recordCount}`,
+      `Parsed File: ${responseFile.fileName}, Valid Processed records= ${details.length} ` +
+        (recordCount !== undefined ? `, Total Records in File = ${recordCount}` : ''),
     )
-
     for (const detail of details) {
-      await this.processResponseDetail(detail)
+      if (this.isWeeklyDetail(detail)) {
+        await this.processWeeklyResponseDetail(detail)
+      } else {
+        await this.processResponseDetail(detail)
+      }
     }
 
     await this.prisma.transferFile.update({
@@ -199,7 +196,9 @@ export class PollCraResponseHandler extends BaseJob {
       data: {
         isDetailsProcessed: true,
         deliveredAt: new Date(),
-        referenceNumbers: details.map((detail) => detail.referenceNum),
+        referenceNumbers: isResponseFile
+          ? (details as CraResDetail[]).map((detail) => detail.referenceNum)
+          : [],
       },
     })
 
@@ -292,5 +291,29 @@ export class PollCraResponseHandler extends BaseJob {
       })
       this.recordsRecycled++
     }
+  }
+
+  private async processWeeklyResponseDetail(detail: DetailRecord04): Promise<void> {
+    // To Do Write the State transition logic here for batch details , contacts table & sync back.
+
+    console.log(
+      'Processing weekly response detail, start writting state transition logic here: ',
+      JSON.stringify(detail, null, 2),
+    )
+    // await this.contactsService.updateCsaStatus(
+    //   detail.childDin,
+    //   CSA_EVENT.CRA_ACCEPTED,
+    //   UPDATED_BY.SYSTEM,
+    //   { additionalData },
+    // )
+  }
+
+  private isWeeklyDetail(detail: any): detail is DetailRecord04 {
+    // return 'recordTypeCode' in detail
+    return detail.tranCode + detail.recordTypeCode === RECORD_TYPE_CODE.DATA_RECORD
+  }
+
+  private isResponseDetail(detail: any): detail is CraResDetail {
+    return detail.tranCode === RESPONSE_FILE.HEADER_TRAN_CODE
   }
 }

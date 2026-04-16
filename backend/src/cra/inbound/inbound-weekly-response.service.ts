@@ -4,6 +4,8 @@ import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { AppLogger } from 'src/common/logger/app-logger'
 import {
   DetailRecord04,
+  HeaderRecord,
+  TrailerRecord,
   TranCode,
   RecordTypeCode,
   ApplicationType,
@@ -22,29 +24,57 @@ export class InboundWeeklyResponseService {
   protected readonly logger = new AppLogger(InboundWeeklyResponseService.name)
   private totalDetailsRecords = 0
   private readonly detailRecords: DetailRecord04[] = []
+  private headerRecord: HeaderRecord
+  private trailerRecord: TrailerRecord
+  private reporttitle1: string
+  private reporttitle2: string
+  private trailerMessage: string
 
-  parseWeeklyResponseFile(filePath: string): { detailRecords: DetailRecord04[] } {
+  parseWeeklyResponseFile(filePath: string): {
+    details: DetailRecord04[]
+    header: HeaderRecord
+    trailer: TrailerRecord
+  } {
     const content = readFileSync(filePath, 'utf8')
     const lines = content.split('\n').filter(Boolean)
-    // console.log('Response file lines: ', JSON.stringify(lines, null, 2))
     for (const line of lines) {
+      const headerRecord = line.startsWith(RECORD_TYPE_CODE.HEADER_RECORD)
+      const reporttitle1 = line.startsWith(RECORD_TYPE_CODE.REPORT_TITLE_RECORD)
+      const reporttitle2 = line.startsWith(RECORD_TYPE_CODE.REPORT_DATE_RANGE_RECORD)
       const detailDataRecord = line.startsWith(RECORD_TYPE_CODE.DATA_RECORD)
+      const trailerMessage = line.startsWith(RECORD_TYPE_CODE.TRAILER_MESSAGE)
+      const trailerRecord = line.startsWith(RECORD_TYPE_CODE.TRAILER_RECORD)
       const elcetronicRecord = line.slice(14, 15) === RECEIVE_MODE.ELECTQRONIC
-      if (!detailDataRecord || !elcetronicRecord) continue
 
-      this.totalDetailsRecords++
-      const eachRecords = this.parseFile(line)
-      this.detailRecords.push(eachRecords)
+      if (headerRecord) {
+        this.headerRecord = this.parseHeader(line)
+      } else if (reporttitle1) {
+        this.reporttitle1 = line
+      } else if (reporttitle2) {
+        this.reporttitle2 = line
+      } else if (detailDataRecord && elcetronicRecord) {
+        const eachDetail = this.parseDetails(line)
+        this.detailRecords.push(eachDetail)
+        this.totalDetailsRecords++
+      } else if (trailerMessage) {
+        this.trailerMessage = line
+      } else if (trailerRecord) {
+        this.trailerRecord = this.parseTrailer(line)
+      }
     }
 
     this.logger.log(
-      `Total electronic filled records in weekly response ${path?.basename(filePath)} file is: ${this.totalDetailsRecords}`,
+      `Weekly Response File Summary:\n   
+       Weekly Response File = ${path?.basename(filePath)}\n
+       Report Title2 = ${this.reporttitle2}\n 
+       Total Records in File = ${this.trailerRecord?.recordCount}\n
+       Total Electronic records = ${this.totalDetailsRecords}\n
+       Trailer Message = ${this.trailerMessage}`,
     )
-    this.logger.log('Parsed Weekly File JSON data: ', JSON.stringify(this.detailRecords, null, 2))
-    return { detailRecords: this.detailRecords }
+    return { header: this.headerRecord, details: this.detailRecords, trailer: this.trailerRecord }
   }
 
-  parseFile(line: string): DetailRecord04 {
+  parseDetails(line: string): DetailRecord04 {
     return {
       tranCode: line.substring(0, 4) as TranCode.DETAIL, // X(04)
       recordTypeCode: line.substring(4, 6) as RecordTypeCode.DETAIL_04, // X(02)
@@ -62,26 +92,26 @@ export class InboundWeeklyResponseService {
       childDin: line.substring(21, 30), // X(09)
       filler6: line.substring(30, 31), // X(01)
 
-      childGivenName: line.substring(31, 61), // X(30)
+      childGivenName: line.substring(31, 61).trim(), // X(30)
       filler7: line.substring(61, 62), // X(01)
 
-      childInitial: line.substring(62, 63), // X(01)
+      childInitial: line.substring(62, 63).trim(), // X(01)
       filler8: line.substring(63, 70), // X(07)
       filler9: line.substring(70, 71), // X(01)
 
-      childSurName: line.substring(71, 101), // X(30)
+      childSurName: line.substring(71, 101).trim(), // X(30)
       filler10: line.substring(101, 102), // X(01)
 
       childSex: line.substring(102, 103) as Sex, // X(01)
       filler11: line.substring(103, 106), // X(03)
       filler12: line.substring(106, 107), // X(01)
 
-      childBirthDate: line.substring(107, 115), // X(08)
+      childBirthDate: line.substring(107, 115).trim(), // X(08)
 
       filler13: line.substring(115, 117), // X(02)
       filler14: line.substring(117, 118), // X(01)
 
-      childBirthCity: line.substring(118, 146), // X(28)
+      childBirthCity: line.substring(118, 146).trim(), // X(28)
       filler15: line.substring(146, 147), // X(01)
 
       childBirthProv: line.substring(147, 149) as ProvinceCode, // X(02)
@@ -89,7 +119,7 @@ export class InboundWeeklyResponseService {
       filler16: line.substring(149, 164), // X(15)
       filler17: line.substring(164, 165), // X(01)
 
-      childBirthCountry: line.substring(165, 167), // X(02)
+      childBirthCountry: line.substring(165, 167).trim(), // X(02)
 
       filler18: line.substring(167, 181), // X(14)
       filler19: line.substring(181, 182), // X(01)
@@ -117,6 +147,26 @@ export class InboundWeeklyResponseService {
 
       filler27: line.substring(231, 240), // X(09)
       filler28: line.substring(240, 241), // X(01)
+    }
+  }
+
+  parseHeader(line: string): HeaderRecord {
+    return {
+      tranCode: line?.substring(0, 4) as TranCode.HEADER, // X(04)
+      recordTypeCode: line?.substring(4, 6) as RecordTypeCode.HEADER, // X(02)
+      filler1: line?.substring(6, 14), // X(08)
+      processDate: line?.substring(14, 22), // X(08) YYYYMMDD
+      filler2: line?.substring(22, 241), // X(219)
+    }
+  }
+
+  parseTrailer(line: string): TrailerRecord {
+    return {
+      tranCode: line?.substring(0, 4) as TranCode.TRAILER, // X(04)
+      recordTypeCode: line?.substring(4, 6) as RecordTypeCode.HEADER, // X(02)
+      filler1: line?.substring(6, 15), // X(09)
+      recordCount: parseInt(line?.substring(15, 24), 10), // 9(09)
+      filler2: line?.substring(24, 241), // X(217)
     }
   }
 }

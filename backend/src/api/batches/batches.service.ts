@@ -10,6 +10,7 @@ import {
 import type { TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { appendSystemComment, enrichLabels } from 'src/common/utils'
+import { CANCEL_REASON_LABELS } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
 import { ContactsService } from '../contacts/contacts.service'
 import { BulkOperationResponse } from '../contacts/interfaces'
@@ -149,6 +150,8 @@ export class BatchesService {
             csaStatus: true,
             effectiveDate: true,
             careEndDate: true,
+            caseNumber: true,
+            cancelReasonCode: true,
           },
         },
       },
@@ -164,9 +167,20 @@ export class BatchesService {
           ? detail.contact.careEndDate
           : detail.contact.effectiveDate
 
+      // Get cancellation reason label for cancellation transactions
+      const cancelReasonCode = detail.contact.cancelReasonCode
+      const cancelReasonLabel =
+        cancelReasonCode && detail.transactionType === TRANSACTION_TYPES.CANCELLATION
+          ? CANCEL_REASON_LABELS[cancelReasonCode as keyof typeof CANCEL_REASON_LABELS] || null
+          : null
+
       return enrichLabels({
         ...detail,
         effectiveDate,
+        caseNumber: detail.contact.caseNumber,
+        cancelReasonCode:
+          detail.transactionType === TRANSACTION_TYPES.CANCELLATION ? cancelReasonCode : null,
+        cancelReasonLabel,
         contact: enrichLabels(detail.contact),
       })
     })

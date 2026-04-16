@@ -2986,60 +2986,6 @@ function App() {
                   </MenuItem>
                 </Menu>
 
-                {/* Batch Requests Sort Menu */}
-                <Menu
-                  anchorEl={batchRequestsSortAnchor.element}
-                  open={Boolean(batchRequestsSortAnchor.element)}
-                  onClose={handleBatchRequestsSortClose}
-                  PaperProps={{
-                    sx: {
-                      width: 200,
-                    },
-                  }}
-                >
-                  <MenuItem
-                    onClick={() => handleBatchRequestsSort(batchRequestsSortAnchor.column, 'asc')}
-                    sx={{ gap: 1.5 }}
-                  >
-                    <ArrowUpwardIcon fontSize="small" />
-                    <Typography variant="body2">Sort Ascending</Typography>
-                  </MenuItem>
-                  <MenuItem
-                    onClick={() => handleBatchRequestsSort(batchRequestsSortAnchor.column, 'desc')}
-                    sx={{ gap: 1.5 }}
-                  >
-                    <ArrowDownwardIcon fontSize="small" />
-                    <Typography variant="body2">Sort Descending</Typography>
-                  </MenuItem>
-                </Menu>
-
-                {/* Batch Details Sort Menu */}
-                <Menu
-                  anchorEl={batchDetailsSortAnchor.element}
-                  open={Boolean(batchDetailsSortAnchor.element)}
-                  onClose={handleBatchDetailsSortClose}
-                  PaperProps={{
-                    sx: {
-                      width: 200,
-                    },
-                  }}
-                >
-                  <MenuItem
-                    onClick={() => handleBatchDetailsSort(batchDetailsSortAnchor.column, 'asc')}
-                    sx={{ gap: 1.5 }}
-                  >
-                    <ArrowUpwardIcon fontSize="small" />
-                    <Typography variant="body2">Sort Ascending</Typography>
-                  </MenuItem>
-                  <MenuItem
-                    onClick={() => handleBatchDetailsSort(batchDetailsSortAnchor.column, 'desc')}
-                    sx={{ gap: 1.5 }}
-                  >
-                    <ArrowDownwardIcon fontSize="small" />
-                    <Typography variant="body2">Sort Descending</Typography>
-                  </MenuItem>
-                </Menu>
-
                 {/* Batch History Filter Menu */}
                 <Menu
                   anchorEl={batchHistoryFilterAnchor.element}
@@ -5258,7 +5204,61 @@ function App() {
             )}
           </Box>
 
-          {/* Filter Menus - Outside tabs so they're always available */}
+          {/* Sort and Filter Menus - Outside tabs so they're always available */}
+
+          {/* Batch Requests Sort Menu */}
+          <Menu
+            anchorEl={batchRequestsSortAnchor.element}
+            open={Boolean(batchRequestsSortAnchor.element)}
+            onClose={handleBatchRequestsSortClose}
+            PaperProps={{
+              sx: {
+                width: 200,
+              },
+            }}
+          >
+            <MenuItem
+              onClick={() => handleBatchRequestsSort(batchRequestsSortAnchor.column, 'asc')}
+              sx={{ gap: 1.5 }}
+            >
+              <ArrowUpwardIcon fontSize="small" />
+              <Typography variant="body2">Sort Ascending</Typography>
+            </MenuItem>
+            <MenuItem
+              onClick={() => handleBatchRequestsSort(batchRequestsSortAnchor.column, 'desc')}
+              sx={{ gap: 1.5 }}
+            >
+              <ArrowDownwardIcon fontSize="small" />
+              <Typography variant="body2">Sort Descending</Typography>
+            </MenuItem>
+          </Menu>
+
+          {/* Batch Details Sort Menu */}
+          <Menu
+            anchorEl={batchDetailsSortAnchor.element}
+            open={Boolean(batchDetailsSortAnchor.element)}
+            onClose={handleBatchDetailsSortClose}
+            PaperProps={{
+              sx: {
+                width: 200,
+              },
+            }}
+          >
+            <MenuItem
+              onClick={() => handleBatchDetailsSort(batchDetailsSortAnchor.column, 'asc')}
+              sx={{ gap: 1.5 }}
+            >
+              <ArrowUpwardIcon fontSize="small" />
+              <Typography variant="body2">Sort Ascending</Typography>
+            </MenuItem>
+            <MenuItem
+              onClick={() => handleBatchDetailsSort(batchDetailsSortAnchor.column, 'desc')}
+              sx={{ gap: 1.5 }}
+            >
+              <ArrowDownwardIcon fontSize="small" />
+              <Typography variant="body2">Sort Descending</Typography>
+            </MenuItem>
+          </Menu>
 
           {/* Batch Requests Filter Menu */}
           <Menu

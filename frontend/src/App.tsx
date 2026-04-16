@@ -372,6 +372,7 @@ function App() {
     lastName: [],
     middleName: [],
     givenName: [],
+    caseNumber: [],
     transactionType: [],
     cancellationReason: [],
     status: [],
@@ -4745,7 +4746,24 @@ function App() {
                               </IconButton>
                             </Box>
                           </TableCell>
-                          <TableCell>Case Number</TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              Case Number
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleBatchDetailsFilterClick(e, 'caseNumber')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchDetailsColumnFilters.caseNumber?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               Transaction Type

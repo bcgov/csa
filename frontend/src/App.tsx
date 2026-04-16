@@ -202,6 +202,39 @@ const formatDateTimeYMDHMS = (dateString: string): string => {
   return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
 }
 
+// Parse formatted date string (YYYY-MMM-DD or YYYY-MMM-DD HH:MM:SS) back to Date for sorting
+const parseFormattedDate = (dateStr: string): Date | null => {
+  if (!dateStr) return null
+  const months: Record<string, number> = {
+    Jan: 0,
+    Feb: 1,
+    Mar: 2,
+    Apr: 3,
+    May: 4,
+    Jun: 5,
+    Jul: 6,
+    Aug: 7,
+    Sep: 8,
+    Oct: 9,
+    Nov: 10,
+    Dec: 11,
+  }
+  // Handle both "YYYY-MMM-DD" and "YYYY-MMM-DD HH:MM:SS" formats
+  const match = dateStr.match(/^(\d{4})-(\w{3})-(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/)
+  if (!match) return null
+  const [, year, month, day, hour = '0', minute = '0', second = '0'] = match
+  const monthNum = months[month]
+  if (monthNum === undefined) return null
+  return new Date(
+    parseInt(year),
+    monthNum,
+    parseInt(day),
+    parseInt(hour),
+    parseInt(minute),
+    parseInt(second),
+  )
+}
+
 // Capitalize first letter of a string
 const capitalize = (str: string): string => {
   if (!str) return str
@@ -1850,9 +1883,24 @@ function App() {
     // Apply sorting
     if (batchHistorySortConfig) {
       const { column, direction } = batchHistorySortConfig
+      const dateColumns = ['batchDate']
       data.sort((a, b) => {
         const aValue = String(a[column as keyof typeof a] || '')
         const bValue = String(b[column as keyof typeof b] || '')
+
+        // Use date parsing for date columns
+        if (dateColumns.includes(column)) {
+          const aDate = parseFormattedDate(aValue)
+          const bDate = parseFormattedDate(bValue)
+          if (aDate && bDate) {
+            const comparison = aDate.getTime() - bDate.getTime()
+            return direction === 'asc' ? comparison : -comparison
+          }
+          // If one or both dates are invalid, fall back to string comparison
+          if (aDate && !bDate) return direction === 'asc' ? 1 : -1
+          if (!aDate && bDate) return direction === 'asc' ? -1 : 1
+        }
+
         const comparison = aValue.localeCompare(bValue, undefined, { numeric: true })
         return direction === 'asc' ? comparison : -comparison
       })
@@ -1917,9 +1965,24 @@ function App() {
     // Apply sorting
     if (batchRequestsSortConfig) {
       const { column, direction } = batchRequestsSortConfig
+      const dateColumns = ['batchDate', 'createdDate']
       data.sort((a, b) => {
         const aValue = String(a[column as keyof typeof a] || '')
         const bValue = String(b[column as keyof typeof b] || '')
+
+        // Use date parsing for date columns
+        if (dateColumns.includes(column)) {
+          const aDate = parseFormattedDate(aValue)
+          const bDate = parseFormattedDate(bValue)
+          if (aDate && bDate) {
+            const comparison = aDate.getTime() - bDate.getTime()
+            return direction === 'asc' ? comparison : -comparison
+          }
+          // If one or both dates are invalid, fall back to string comparison
+          if (aDate && !bDate) return direction === 'asc' ? 1 : -1
+          if (!aDate && bDate) return direction === 'asc' ? -1 : 1
+        }
+
         const comparison = aValue.localeCompare(bValue, undefined, { numeric: true })
         return direction === 'asc' ? comparison : -comparison
       })
@@ -1986,9 +2049,24 @@ function App() {
     // Apply sorting
     if (batchDetailsSortConfig) {
       const { column, direction } = batchDetailsSortConfig
+      const dateColumns = ['effectiveDate']
       data.sort((a, b) => {
         const aValue = String(a[column as keyof typeof a] || '')
         const bValue = String(b[column as keyof typeof b] || '')
+
+        // Use date parsing for date columns
+        if (dateColumns.includes(column)) {
+          const aDate = parseFormattedDate(aValue)
+          const bDate = parseFormattedDate(bValue)
+          if (aDate && bDate) {
+            const comparison = aDate.getTime() - bDate.getTime()
+            return direction === 'asc' ? comparison : -comparison
+          }
+          // If one or both dates are invalid, fall back to string comparison
+          if (aDate && !bDate) return direction === 'asc' ? 1 : -1
+          if (!aDate && bDate) return direction === 'asc' ? -1 : 1
+        }
+
         const comparison = aValue.localeCompare(bValue, undefined, { numeric: true })
         return direction === 'asc' ? comparison : -comparison
       })

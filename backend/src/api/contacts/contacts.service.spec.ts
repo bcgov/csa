@@ -940,7 +940,7 @@ describe('ContactsService', () => {
         )
       })
 
-      it('should clear preBatchStatus on CRA_ACCEPTED', async () => {
+      it('should clear preBatchStatus on CRA_RSP_REJECTED', async () => {
         const contact = {
           id: 1,
           csaStatus: 'batch_sent_application',
@@ -950,10 +950,10 @@ describe('ContactsService', () => {
         vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
         const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
-        const result = await service.updateCsaStatus(1, 'CRA_ACCEPTED', 'SYSTEM')
+        const result = await service.updateCsaStatus(1, 'CRA_RSP_REJECTED', 'SYSTEM')
 
         expect(result.success).toBe(true)
-        expect(result.to).toBe('in_pay')
+        expect(result.to).toBe('cra_error_application')
         expect(updateSpy).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({
@@ -1150,20 +1150,20 @@ describe('ContactsService', () => {
         expect(result.success).toBe(false)
       })
 
-      it('should clear preBatchStatus on CRA_RECORD_REJECTED', async () => {
+      it('should clear preBatchStatus on CRA_RSP_REJECTED from cancellation', async () => {
         const contact = {
           id: 1,
-          csaStatus: 'batch_sent_application',
-          preBatchStatus: 'eligible',
+          csaStatus: 'batch_sent_cancellation',
+          preBatchStatus: 'not_eligible_in_pay',
           resumeStatus: null,
         }
         vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
         const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
-        const result = await service.updateCsaStatus(1, 'CRA_RECORD_REJECTED', 'SYSTEM')
+        const result = await service.updateCsaStatus(1, 'CRA_RSP_REJECTED', 'SYSTEM')
 
         expect(result.success).toBe(true)
-        expect(result.to).toBe('application_refused_cra')
+        expect(result.to).toBe('cra_error_cancellation')
         expect(updateSpy).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({

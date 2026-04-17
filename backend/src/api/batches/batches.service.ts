@@ -333,7 +333,7 @@ export class BatchesService {
       batchEvent = BATCH_EVENT.CRA_ACCEPTED
     } else {
       batchEvent = BATCH_EVENT.CRA_ALL_REJECTED
-      batchMessage = 'All child(ren) in the Batch Details are in Error.'
+      batchMessage = 'CRA sent back Error for all transactions in Response file. Please review.'
     }
 
     const batch = await this.prisma.batch.findUnique({

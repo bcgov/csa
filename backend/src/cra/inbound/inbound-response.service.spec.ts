@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'fs'
 import { InboundResponseService } from './inbound-response.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
+import { CraResDetail, DETAIL_OUTCOME } from './inbound.interface'
 
 vi.mock('fs', () => ({
   readFileSync: vi.fn(),
@@ -68,5 +69,76 @@ describe('InboundResponseService', () => {
     service.parseFile('/test/file.txt')
 
     expect(readFileSync).toHaveBeenCalledWith('/test/file.txt', 'utf8')
+  })
+
+  describe('classifyDetail', () => {
+    const { FILE_STAT_CODE, TRAN_STAT_CODE } = CRA_DATA_HANDLING_CONSTANT
+
+    const makeDetail = (overrides: Partial<CraResDetail> = {}): CraResDetail => ({
+      tranCode: 6119,
+      fileStatCd: FILE_STAT_CODE.FILE_OK,
+      tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED,
+      rejectCd1: '',
+      rejectCd2: '',
+      rejectCd3: '',
+      rejectCd4: '',
+      rejectCd5: '',
+      outTranCode: 6134,
+      referenceNum: '100',
+      businessNum: 'BN123456789',
+      tranType: 2,
+      childGivenName: 'John',
+      childInitial: '',
+      childSurName: 'Doe',
+      childGivenNameAka: '',
+      childSurNameAka: '',
+      childBirthDate: '20200101',
+      childSex: 'M',
+      childBirthCity: 'Vancouver',
+      childBirthProv: 'BC',
+      childBirthCountry: 'CA',
+      prevRecipSin: '',
+      filler1: '',
+      prevRecipGivenName: '',
+      prevRecipSurName: '',
+      appStartDate: '20240101',
+      newBornCode: 'N',
+      ccraDinNum: '',
+      ...overrides,
+    })
+
+    it('should override RECYCLED to REJECTED when reject code is 999', () => {
+      const detail = makeDetail({
+        fileStatCd: FILE_STAT_CODE.FILE_OK,
+        tranStatCd: TRAN_STAT_CODE.TRAN_RECYCLED,
+        rejectCd1: '999',
+      })
+
+      const result = service.classifyDetail(detail, null)
+
+      expect(result.outcome).toBe(DETAIL_OUTCOME.REJECTED)
+    })
+
+    it('should keep RECYCLED outcome for normal recycle code 998', () => {
+      const detail = makeDetail({
+        fileStatCd: FILE_STAT_CODE.FILE_OK,
+        tranStatCd: TRAN_STAT_CODE.TRAN_RECYCLED,
+        rejectCd1: '998',
+      })
+
+      const result = service.classifyDetail(detail, null)
+
+      expect(result.outcome).toBe(DETAIL_OUTCOME.RECYCLED)
+    })
+  })
+
+  describe('getErrorMessageByRejectCode', () => {
+    it('should format reject codes with descriptions separated by semicolons', () => {
+      const result = service.getErrorMessageByRejectCode(['007', '010'])
+
+      expect(result).toBe(
+        "007: The child's first name must be entered.; 010: The child's birth date must be entered.",
+      )
+    })
   })
 })

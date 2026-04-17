@@ -160,6 +160,7 @@ export function appendSystemComment(
 }
 
 // A child is eligible through the last day of their birth month at age 18.
+// Returns Pacific midnight so formatDatePacific round-trips correctly.
 export function getAgeCutoffDate(referenceDate: Date = pacificToday()): Date {
   const year = referenceDate.getUTCFullYear() - 18
   const month = referenceDate.getUTCMonth() + 1

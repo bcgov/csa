@@ -161,11 +161,14 @@ export function appendSystemComment(
 
 // A child is eligible through the last day of their birth month at age 18.
 export function getAgeCutoffDate(referenceDate: Date = pacificToday()): Date {
-  return new Date(Date.UTC(referenceDate.getUTCFullYear() - 18, referenceDate.getUTCMonth(), 1))
+  const year = referenceDate.getUTCFullYear() - 18
+  const month = referenceDate.getUTCMonth() + 1
+  return DateTime.fromObject({ year, month, day: 1 }, { zone: PACIFIC_ZONE }).toJSDate()
 }
 
 export function isEligibleAge(dateOfBirth: Date, referenceDate: Date = pacificToday()): boolean {
-  return dateOfBirth >= getAgeCutoffDate(referenceDate)
+  const cutoff = getAgeCutoffDate(referenceDate)
+  return dateOfBirth.toISOString().slice(0, 10) >= cutoff.toISOString().slice(0, 10)
 }
 
 export interface S3ConnectionParams {

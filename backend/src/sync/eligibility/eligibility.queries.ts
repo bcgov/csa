@@ -35,7 +35,7 @@ const CHANGED_CONTACTS_CTE = `
       SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
-      INNER JOIN stg_icm_legal_authority_admin legal_admin ON legal_admin.LGL_AUTH_CD = legal_auth.LGL_AUTH_CD
+      INNER JOIN stg_icm_legal_authority_admin legal_admin ON legal_admin.LGL_AUTH_CD = COALESCE(legal_auth.EFF_LGL_STATUS, legal_auth.LGL_AUTH_CD)
       WHERE legal_admin.ingested_at >= $1
 
       UNION
@@ -402,7 +402,7 @@ export function buildLoadContactProfilesSql(
   LEFT JOIN latest_legal_auth legal_auth
     ON legal_auth.X_CONTACT_NUM = cases.X_CONTACT_NUM
   LEFT JOIN unique_legal_admin legal_admin
-    ON legal_admin.LGL_AUTH_CD = legal_auth.LGL_AUTH_CD
+    ON legal_admin.LGL_AUTH_CD = COALESCE(legal_auth.EFF_LGL_STATUS, legal_auth.LGL_AUTH_CD)
   LEFT JOIN contacts master_contacts
     ON master_contacts.person_id_icm = cases.X_CONTACT_NUM
   LEFT JOIN icm_placements_agg icm_plc ON icm_plc.X_CONTACT_NUM = cases.X_CONTACT_NUM
@@ -429,7 +429,7 @@ export function buildFindAgedOutContactIdsSql(cutoffDate: Date): {
     FROM csa.contacts
     WHERE csa_status IN ('eligible', 'in_pay', 'not_eligible_out_of_pay')
       AND date_of_birth IS NOT NULL
-      AND date_of_birth < $1
+      AND date_of_birth < $1::DATE
   `
   return { sql, params: [cutoffDate] }
 }

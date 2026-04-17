@@ -429,7 +429,7 @@ export function buildFindAgedOutContactIdsSql(cutoffDate: Date): {
     FROM csa.contacts
     WHERE csa_status IN ('eligible', 'in_pay', 'not_eligible_out_of_pay')
       AND date_of_birth IS NOT NULL
-      AND date_of_birth < $1
+      AND date_of_birth < $1::DATE
   `
   return { sql, params: [cutoffDate] }
 }

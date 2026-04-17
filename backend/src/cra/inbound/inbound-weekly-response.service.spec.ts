@@ -11,13 +11,10 @@ describe('InboundWeeklyResponseService', () => {
 
   beforeEach(() => {
     service = new InboundWeeklyResponseService()
-    vi.clearAllMocks() 
+    vi.clearAllMocks()
   })
 
   const mockFilePath = '/tmp/test-file.txt'
-
-  const buildLine = (prefix: string, length = 241) =>
-    (prefix + ''.padEnd(length, ' ')).substring(0, length)
 
   const buildDetailLine = (receiveMode = 'E') => {
     let line = ''.padEnd(241, ' ')
@@ -63,10 +60,7 @@ describe('InboundWeeklyResponseService', () => {
   })
 
   it('should filter only electronic (E) records', () => {
-    const fileContent = [
-      buildDetailLine('E'),
-      buildDetailLine(' ')
-    ].join('\n')
+    const fileContent = [buildDetailLine('E'), buildDetailLine(' ')].join('\n')
 
     ;(fs.readFileSync as any).mockReturnValue(fileContent)
 
@@ -103,7 +97,7 @@ describe('InboundWeeklyResponseService', () => {
 
   it('should parse trailer recordCount correctly', () => {
     const trailerLine = buildTrailerLine(123)
-    const fileContent = [ trailerLine].join('\n')
+    const fileContent = [trailerLine].join('\n')
 
     ;(fs.readFileSync as any).mockReturnValue(fileContent)
 
@@ -112,9 +106,7 @@ describe('InboundWeeklyResponseService', () => {
   })
 
   it('should handle file with no electronic records', () => {
-    const fileContent = [
-      buildDetailLine(' ')
-    ].join('\n')
+    const fileContent = [buildDetailLine(' ')].join('\n')
 
     ;(fs.readFileSync as any).mockReturnValue(fileContent)
 
@@ -126,7 +118,7 @@ describe('InboundWeeklyResponseService', () => {
   it('should log summary after parsing', () => {
     const logSpy = vi.spyOn(service['logger'], 'log')
 
-    const fileContent = [ buildHeaderLine(), buildDetailLine('E'), buildTrailerLine(3)].join('\n')
+    const fileContent = [buildHeaderLine(), buildDetailLine('E'), buildTrailerLine(3)].join('\n')
 
     ;(fs.readFileSync as any).mockReturnValue(fileContent)
 

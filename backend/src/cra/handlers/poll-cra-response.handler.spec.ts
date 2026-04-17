@@ -96,7 +96,7 @@ describe('PollCraResponseHandler', () => {
     }
 
     mockInboundWeeklyResponseService = {
-      parseFile: vi.fn()
+      parseFile: vi.fn(),
     }
 
     mockPrisma = {
@@ -755,7 +755,7 @@ describe('PollCraResponseHandler', () => {
 
       expect(
         referenceNumbers.length === 0 ||
-        JSON.stringify(referenceNumbers) === JSON.stringify(['100', '200']),
+          JSON.stringify(referenceNumbers) === JSON.stringify(['100', '200']),
       ).toBe(true)
     })
   })

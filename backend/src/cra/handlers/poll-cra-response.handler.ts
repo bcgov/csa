@@ -6,14 +6,16 @@ import { BatchesService } from 'src/api/batches/batches.service'
 import { ContactsService } from 'src/api/contacts/contacts.service'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_DETAIL_EVENT, CSA_EVENT } from 'src/common/state-machine/constants'
+import { appendSystemComment } from 'src/common/utils'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
-import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
+import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { IcmSyncBackService, SyncBackResult } from 'src/sync/icm/icm-sync-back.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { InboundFileService } from '../inbound/inbound-file.service'
 import { InboundResponseService } from '../inbound/inbound-response.service'
+import { InboundWeeklyResponseService } from '../inbound/inbound-weekly-response.service'
 import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import { CraTransferService } from '../transfer/cra-transfer.service'
 
@@ -32,6 +34,7 @@ export class PollCraResponseHandler extends BaseJob {
     private readonly craTransferService: CraTransferService,
     private readonly inboundFileService: InboundFileService,
     private readonly inboundResponseService: InboundResponseService,
+    private readonly craWeeklyResponseService: InboundWeeklyResponseService,
     private readonly prisma: PrismaService,
     private readonly batchesService: BatchesService,
     private readonly contactsService: ContactsService,
@@ -67,6 +70,27 @@ export class PollCraResponseHandler extends BaseJob {
 
     for (const batchId of this.processedBatchIds) {
       await this.batchesService.aggregateBatchStatus(batchId)
+    }
+
+    // Set batch-level system comment for RSP acknowledgement
+    if (this.recordsAccepted > 0) {
+      for (const batchId of this.processedBatchIds) {
+        const batch = await this.prisma.batch.findUnique({
+          where: { id: batchId },
+          select: { status: true, systemComments: true },
+        })
+        if (batch && batch.status === 'in_progress') {
+          await this.prisma.batch.update({
+            where: { id: batchId },
+            data: {
+              systemComments: appendSystemComment(
+                'CRA Acknowledgement received.',
+                batch.systemComments,
+              ),
+            },
+          })
+        }
+      }
     }
 
     let syncResult: SyncBackResult | null = null
@@ -139,9 +163,21 @@ export class PollCraResponseHandler extends BaseJob {
       responseFile.fileName,
     )
 
-    let parsed: ReturnType<InboundResponseService['parseFile']>
+    const fileType = this.inboundFileService.getResponseFileType(responseFile.fileName)
+    const isWeekly = fileType === 'WKL'
+
+    let parsed:
+      | ReturnType<InboundResponseService['parseFile']>
+      | ReturnType<InboundWeeklyResponseService['parseWeeklyResponseFile']>
     try {
-      parsed = this.inboundResponseService.parseFile(localFilePath)
+      if (isWeekly) {
+        this.logger.log(
+          `Parsing weekly response file ${responseFile.fileName} with InboundWeeklyResponseService`,
+        )
+        parsed = this.craWeeklyResponseService.parseWeeklyResponseFile(localFilePath)
+      } else {
+        parsed = this.inboundResponseService.parseFile(localFilePath)
+      }
     } catch (error) {
       this.logger.error(`Failed to parse response file ${responseFile.fileName}: ${error}`)
       await this.prisma.transferFile.update({
@@ -151,14 +187,26 @@ export class PollCraResponseHandler extends BaseJob {
       return 0
     }
 
-    const { header, details } = parsed
+    const { header, details, trailer } = parsed
+
+    const recordCount =
+      (header && 'recordCount' in header ? header.recordCount : undefined) ??
+      (trailer && 'recordCount' in trailer ? trailer.recordCount : undefined)
 
     this.logger.log(
-      `Parsed ${responseFile.fileName}: ${details.length} detail records, header recordCount=${header.recordCount}`,
+      `Parsed File: ${responseFile.fileName}, Valid Processed records= ${details.length} ` +
+        (recordCount !== undefined ? `, Total Records in File = ${recordCount}` : ''),
     )
 
-    for (const detail of details) {
-      await this.processResponseDetail(detail)
+    if (isWeekly) {
+      this.logger.warn(
+        `Weekly response file ${responseFile.fileName} parsed with ${details.length} ` +
+          `detail record(s); state-transition logic is not yet implemented — details are not being persisted`,
+      )
+    } else {
+      for (const detail of details as CraResDetail[]) {
+        await this.processResponseDetail(detail)
+      }
     }
 
     await this.prisma.transferFile.update({
@@ -166,7 +214,9 @@ export class PollCraResponseHandler extends BaseJob {
       data: {
         isDetailsProcessed: true,
         deliveredAt: new Date(),
-        referenceNumbers: details.map((detail) => detail.referenceNum),
+        referenceNumbers: isWeekly
+          ? []
+          : (details as CraResDetail[]).map((detail) => detail.referenceNum),
       },
     })
 
@@ -191,37 +241,12 @@ export class PollCraResponseHandler extends BaseJob {
 
     this.processedBatchIds.add(batchDetail.batchId)
 
-    const { outcome, systemComments, din } = this.inboundResponseService.classifyDetail(
+    const { outcome, systemComments } = this.inboundResponseService.classifyDetail(
       detail,
       batchDetail.systemComments,
     )
 
     if (outcome === DETAIL_OUTCOME.ACCEPTED) {
-      await this.batchesService.updateBatchDetailStatus(
-        batchDetail.id,
-        BATCH_DETAIL_EVENT.CRA_ACCEPTED,
-        {
-          additionalData: { systemComments },
-        },
-      )
-
-      const additionalData: Record<string, unknown> = {}
-      if (din) {
-        const contact = await this.prisma.contact.findUnique({
-          where: { id: batchDetail.contactId },
-          select: { din: true },
-        })
-        if (!contact?.din) {
-          additionalData.din = din
-        }
-      }
-
-      await this.contactsService.updateCsaStatus(
-        batchDetail.contactId,
-        CSA_EVENT.CRA_ACCEPTED,
-        UPDATED_BY.SYSTEM,
-        { additionalData },
-      )
       this.recordsAccepted++
     } else if (outcome === DETAIL_OUTCOME.FILE_ERROR) {
       await this.batchesService.updateBatchDetailStatus(
@@ -240,14 +265,14 @@ export class PollCraResponseHandler extends BaseJob {
     } else if (outcome === DETAIL_OUTCOME.REJECTED) {
       await this.batchesService.updateBatchDetailStatus(
         batchDetail.id,
-        BATCH_DETAIL_EVENT.CRA_RECORD_REJECTED,
+        BATCH_DETAIL_EVENT.CRA_RSP_REJECTED,
         {
           additionalData: { systemComments },
         },
       )
       await this.contactsService.updateCsaStatus(
         batchDetail.contactId,
-        CSA_EVENT.CRA_RECORD_REJECTED,
+        CSA_EVENT.CRA_RSP_REJECTED,
         UPDATED_BY.SYSTEM,
       )
       this.recordsRejected++

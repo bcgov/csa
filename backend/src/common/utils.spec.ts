@@ -251,6 +251,16 @@ describe('getAgeCutoffDate', () => {
     expect(result.getUTCMonth()).toBe(1) // February
     expect(result.getUTCDate()).toBe(1)
   })
+
+  it('should round-trip through formatDatePacific without date shift', () => {
+    const cutoff = getAgeCutoffDate(new Date('2026-03-31T00:00:00.000Z'))
+    expect(formatDatePacific(cutoff)).toBe('03/01/2008')
+  })
+
+  it('should round-trip through formatDatePacific for winter dates', () => {
+    const cutoff = getAgeCutoffDate(new Date('2026-01-15T00:00:00.000Z'))
+    expect(formatDatePacific(cutoff)).toBe('01/01/2008')
+  })
 })
 
 describe('isEligibleAge', () => {
@@ -277,6 +287,18 @@ describe('isEligibleAge', () => {
 
   it('should return false for child clearly over 18', () => {
     expect(isEligibleAge(new Date('2005-06-15T00:00:00.000Z'), REF_DATE)).toBe(false)
+  })
+
+  it('should handle reference date on DST spring-forward day', () => {
+    const ref = new Date('2026-03-08T00:00:00.000Z')
+    const dob = new Date('2008-03-01T00:00:00.000Z')
+    expect(isEligibleAge(dob, ref)).toBe(true)
+  })
+
+  it('should handle reference date on DST fall-back day', () => {
+    const ref = new Date('2026-11-01T00:00:00.000Z')
+    const dob = new Date('2008-11-01T00:00:00.000Z')
+    expect(isEligibleAge(dob, ref)).toBe(true)
   })
 })
 

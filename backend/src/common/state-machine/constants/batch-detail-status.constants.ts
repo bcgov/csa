@@ -16,9 +16,8 @@ export const BATCH_DETAIL_STATUS_LABELS: Record<string, string> = {
 
 export const BATCH_DETAIL_EVENT = {
   SEND_TO_CRA: 'SEND_TO_CRA',
-  CRA_RECORD_REJECTED: 'CRA_RECORD_REJECTED',
+  CRA_RSP_REJECTED: 'CRA_RSP_REJECTED',
   CRA_FILE_REJECTED: 'CRA_FILE_REJECTED',
-  CRA_ACCEPTED: 'CRA_ACCEPTED',
 } as const
 
 export type BatchDetailEvent = (typeof BATCH_DETAIL_EVENT)[keyof typeof BATCH_DETAIL_EVENT]

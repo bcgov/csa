@@ -142,9 +142,9 @@ export class InboundResponseService {
     const errorMessages: string[] = []
     for (const rejectCode of rejectCodes) {
       if (REJECT_CODE[rejectCode]) {
-        errorMessages.push(REJECT_CODE[rejectCode])
+        errorMessages.push(`${rejectCode}: ${REJECT_CODE[rejectCode]}`)
       } else {
-        errorMessages.push(`Unknown reject code: ${rejectCode}`)
+        errorMessages.push(`${rejectCode}: Unknown reject code`)
       }
     }
     return errorMessages.join('; ')
@@ -179,6 +179,9 @@ export class InboundResponseService {
     }
 
     if (detail.tranStatCd === TRAN_STAT_CODE.TRAN_RECYCLED) {
+      if (rejectCodes.includes('999')) {
+        return { outcome: DETAIL_OUTCOME.REJECTED, systemComments, din: null }
+      }
       return { outcome: DETAIL_OUTCOME.RECYCLED, systemComments, din: null }
     }
 

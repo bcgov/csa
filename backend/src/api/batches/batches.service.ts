@@ -10,6 +10,7 @@ import {
 import type { TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { appendSystemComment, enrichLabels } from 'src/common/utils'
+import { CANCEL_REASON_LABELS } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
 import { ContactsService } from '../contacts/contacts.service'
 import { BulkOperationResponse } from '../contacts/interfaces'
@@ -147,18 +148,42 @@ export class BatchesService {
             middleName: true,
             din: true,
             csaStatus: true,
+            effectiveDate: true,
+            careEndDate: true,
+            caseNumber: true,
+            cancelReasonCode: true,
           },
         },
       },
       orderBy: { createdAt: 'desc' },
     })
 
-    return details.map((detail) =>
-      enrichLabels({
+    return details.map((detail) => {
+      // Compute effectiveDate based on transaction type:
+      // - Application: Legal Authority's Effective Date (contact.effectiveDate)
+      // - Cancellation: Child's Care End Date (contact.careEndDate)
+      const effectiveDate =
+        detail.transactionType === TRANSACTION_TYPES.CANCELLATION
+          ? detail.contact.careEndDate
+          : detail.contact.effectiveDate
+
+      // Get cancellation reason label for cancellation transactions
+      const cancelReasonCode = detail.contact.cancelReasonCode
+      const cancelReasonLabel =
+        cancelReasonCode && detail.transactionType === TRANSACTION_TYPES.CANCELLATION
+          ? CANCEL_REASON_LABELS[cancelReasonCode as keyof typeof CANCEL_REASON_LABELS] || null
+          : null
+
+      return enrichLabels({
         ...detail,
+        effectiveDate,
+        caseNumber: detail.contact.caseNumber,
+        cancelReasonCode:
+          detail.transactionType === TRANSACTION_TYPES.CANCELLATION ? cancelReasonCode : null,
+        cancelReasonLabel,
         contact: enrichLabels(detail.contact),
-      }),
-    )
+      })
+    })
   }
 
   async findOrCreatePendingBatch() {
@@ -308,7 +333,7 @@ export class BatchesService {
       batchEvent = BATCH_EVENT.CRA_ACCEPTED
     } else {
       batchEvent = BATCH_EVENT.CRA_ALL_REJECTED
-      batchMessage = 'All child(ren) in the Batch Details are in Error.'
+      batchMessage = 'CRA sent back Error for all transactions in Response file. Please review.'
     }
 
     const batch = await this.prisma.batch.findUnique({

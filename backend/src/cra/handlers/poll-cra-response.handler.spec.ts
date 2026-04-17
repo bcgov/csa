@@ -96,7 +96,7 @@ describe('PollCraResponseHandler', () => {
     }
 
     mockInboundWeeklyResponseService = {
-      parseFile: vi.fn(),
+      parseWeeklyResponseFile: vi.fn(),
     }
 
     mockPrisma = {

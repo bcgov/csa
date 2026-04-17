@@ -53,7 +53,7 @@ export class InboundWeeklyResponseService {
       } else if (reporttitle2) {
         this.reporttitle2 = line
       } else if (detailDataRecord && elcetronicRecord) {
-        const eachDetail = this.parseDetails(line)
+        const eachDetail = this.parseDetail(line)
         this.detailRecords.push(eachDetail)
         this.totalDetailsRecords++
       } else if (trailerMessage) {
@@ -74,7 +74,7 @@ export class InboundWeeklyResponseService {
     return { header: this.headerRecord, details: this.detailRecords, trailer: this.trailerRecord }
   }
 
-  parseDetails(line: string): DetailRecord04 {
+  parseDetail(line: string): DetailRecord04 {
     return {
       tranCode: line.substring(0, 4) as TranCode.DETAIL, // X(04)
       recordTypeCode: line.substring(4, 6) as RecordTypeCode.DETAIL_04, // X(02)

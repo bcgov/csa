@@ -12,10 +12,10 @@ describe('batchDetailStatusMachine', () => {
       expect(nextState).toBe(BATCH_DETAIL_STATUS.IN_PROGRESS)
     })
 
-    it('should transition from in_progress to error on CRA_RECORD_REJECTED', () => {
+    it('should transition from in_progress to error on CRA_RSP_REJECTED', () => {
       const nextState = getNextBatchDetailState(
         BATCH_DETAIL_STATUS.IN_PROGRESS,
-        BATCH_DETAIL_EVENT.CRA_RECORD_REJECTED,
+        BATCH_DETAIL_EVENT.CRA_RSP_REJECTED,
       )
       expect(nextState).toBe(BATCH_DETAIL_STATUS.ERROR)
     })
@@ -28,18 +28,10 @@ describe('batchDetailStatusMachine', () => {
       expect(nextState).toBe(BATCH_DETAIL_STATUS.ERROR)
     })
 
-    it('should transition from in_progress to processed on CRA_ACCEPTED', () => {
-      const nextState = getNextBatchDetailState(
-        BATCH_DETAIL_STATUS.IN_PROGRESS,
-        BATCH_DETAIL_EVENT.CRA_ACCEPTED,
-      )
-      expect(nextState).toBe(BATCH_DETAIL_STATUS.PROCESSED)
-    })
-
     it('should return current state for invalid transition', () => {
       const nextState = getNextBatchDetailState(
         BATCH_DETAIL_STATUS.PENDING,
-        BATCH_DETAIL_EVENT.CRA_RECORD_REJECTED,
+        BATCH_DETAIL_EVENT.CRA_RSP_REJECTED,
       )
       expect(nextState).toBe(BATCH_DETAIL_STATUS.PENDING)
     })
@@ -54,10 +46,7 @@ describe('batchDetailStatusMachine', () => {
 
     it('should return false for invalid transition', () => {
       expect(
-        canTransitionBatchDetail(
-          BATCH_DETAIL_STATUS.PENDING,
-          BATCH_DETAIL_EVENT.CRA_RECORD_REJECTED,
-        ),
+        canTransitionBatchDetail(BATCH_DETAIL_STATUS.PENDING, BATCH_DETAIL_EVENT.CRA_RSP_REJECTED),
       ).toBe(false)
     })
 

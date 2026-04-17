@@ -8,6 +8,7 @@ import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
+import type { ResponseFileType } from '../inbound/inbound-file.service'
 import { DETAIL_OUTCOME } from '../inbound/inbound.interface'
 import { PollCraResponseHandler } from './poll-cra-response.handler'
 
@@ -67,7 +68,7 @@ describe('PollCraResponseHandler', () => {
     mockInboundFileService = {
       getLocalFilePath: vi.fn().mockReturnValue('/tmp/cra/inbound/default.txt'),
       isValidResponseFile: vi.fn().mockReturnValue(true),
-      getResponseFileType: vi.fn().mockReturnValue('RSP'),
+      getResponseFileType: vi.fn().mockReturnValue('RSP' satisfies ResponseFileType),
     }
 
     mockInboundResponseService = {
@@ -891,6 +892,97 @@ describe('PollCraResponseHandler', () => {
       await handler.execute(mockContext)
 
       expect(mockBatchesService.aggregateBatchStatus).toHaveBeenCalledWith(10)
+    })
+  })
+
+  describe('Weekly response file (WKL)', () => {
+    const WEEKLY_FILE_NAME = 'craUserId.AWKL0001.txt'
+
+    function setupWeeklyFile(fileName = WEEKLY_FILE_NAME, id = 1) {
+      mockInboundFileService.getResponseFileType.mockReturnValue('WKL' satisfies ResponseFileType)
+      setupUnprocessedFile(fileName, id)
+    }
+
+    function setupWeeklyParseFile(detailCount = 1) {
+      const details = Array.from({ length: detailCount }, (_, i) => ({
+        tranCode: '6137',
+        recordTypeCode: '04',
+        childDin: `00000000${i}`,
+        transactionType: 'A',
+      }))
+      mockInboundWeeklyResponseService.parseWeeklyResponseFile.mockReturnValue({
+        header: { tranCode: '6136', recordTypeCode: '00' },
+        details,
+        trailer: { tranCode: '6138', recordTypeCode: '00', recordCount: detailCount + 2 },
+      })
+      return details
+    }
+
+    it('routes WKL filenames to InboundWeeklyResponseService and does not call the RSP parser', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile(2)
+
+      await handler.execute(mockContext)
+
+      expect(mockInboundWeeklyResponseService.parseWeeklyResponseFile).toHaveBeenCalledWith(
+        `/tmp/cra/inbound/${WEEKLY_FILE_NAME}`,
+      )
+      expect(mockInboundResponseService.parseFile).not.toHaveBeenCalled()
+    })
+
+    it('does not drive any RSP-branch side effects for weekly details', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile(3)
+
+      await handler.execute(mockContext)
+
+      expect(mockInboundResponseService.classifyDetail).not.toHaveBeenCalled()
+      expect(mockBatchesService.updateBatchDetailStatus).not.toHaveBeenCalled()
+      expect(mockContactsService.updateCsaStatus).not.toHaveBeenCalled()
+      expect(mockPrisma.contactBatchDetail.findUnique).not.toHaveBeenCalled()
+    })
+
+    it('persists isDetailsProcessed=true and referenceNumbers=[] for the weekly file', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile(2)
+
+      await handler.execute(mockContext)
+
+      expect(mockPrisma.transferFile.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          isDetailsProcessed: true,
+          deliveredAt: expect.any(Date),
+          referenceNumbers: [],
+        },
+      })
+    })
+
+    it('does not increment accept/reject/recycle counters for weekly files', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile(4)
+
+      const result = await handler.execute(mockContext)
+
+      expect(result.metadata.records_accepted).toBe(0)
+      expect(result.metadata.records_rejected).toBe(0)
+      expect(result.metadata.records_recycled).toBe(0)
+      expect(result.metadata.files_processed).toBe(1)
+    })
+
+    it('marks the transfer file invalid when weekly parsing throws', async () => {
+      setupWeeklyFile()
+      mockInboundWeeklyResponseService.parseWeeklyResponseFile.mockImplementation(() => {
+        throw new Error('corrupted weekly file')
+      })
+
+      await handler.execute(mockContext)
+
+      expect(mockPrisma.transferFile.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { isValid: false, isDetailsProcessed: true },
+      })
+      expect(mockInboundResponseService.parseFile).not.toHaveBeenCalled()
     })
   })
 })

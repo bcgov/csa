@@ -5,7 +5,12 @@ import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 
 const { LOCAL_DIR, RESPONSE_FILE_TYPE } = CRA_DATA_HANDLING_CONSTANT
 
-export type ResponseFileType = 'RSP' | 'WKL'
+export const SUPPORTED_RESPONSE_FILE_TYPES = [
+  RESPONSE_FILE_TYPE.RSP,
+  RESPONSE_FILE_TYPE.WKL,
+] as const
+
+export type ResponseFileType = (typeof SUPPORTED_RESPONSE_FILE_TYPES)[number]
 
 @Injectable()
 export class InboundFileService {
@@ -28,9 +33,7 @@ export class InboundFileService {
     const fileEnvFlag = fileMiddle.slice(0, 1)
     const fileTypeFlag = fileMiddle.slice(1, 4)
     if (fileEnvFlag !== this.responseEnvFlag) return null
-    if (fileTypeFlag === RESPONSE_FILE_TYPE.RSP) return 'RSP'
-    if (fileTypeFlag === RESPONSE_FILE_TYPE.WKL) return 'WKL'
-    return null
+    return SUPPORTED_RESPONSE_FILE_TYPES.find((type) => type === fileTypeFlag) ?? null
   }
 
   isValidResponseFile(fileName: string): boolean {

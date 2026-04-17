@@ -20,6 +20,10 @@ const { WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
 
 const { RECEIVE_MODE, RECORD_TYPE_CODE } = WEEKLY_FILE
 
+// TODO(weekly-state-transitions): parseWeeklyResponseFile mutates singleton instance fields
+// (detailRecords, headerRecord, trailerRecord, ...) instead of locals, so repeated or concurrent
+// calls leak/overwrite state across files. Move this state into locals before wiring up any
+// real state-transition logic for WKL files; also add @Injectable() for consistency.
 export class InboundWeeklyResponseService {
   protected readonly logger = new AppLogger(InboundWeeklyResponseService.name)
   private totalDetailsRecords = 0

@@ -209,6 +209,7 @@ export interface ContactBatchDetail {
   lastUpdatedAt: string
   lastUpdatedBy: string
   status: string | null
+  statusLabel: string | null
   batch: {
     id: number
     batchDate: string
@@ -223,6 +224,9 @@ export interface BatchContactDetail {
   batchId: number
   transactionType: string
   effectiveDate: string | null
+  caseNumber: string | null
+  cancelReasonCode: string | null
+  cancelReasonLabel: string | null
   systemComments: string | null
   createdAt: string
   createdBy: string

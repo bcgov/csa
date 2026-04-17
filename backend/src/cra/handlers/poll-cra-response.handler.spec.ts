@@ -67,6 +67,7 @@ describe('PollCraResponseHandler', () => {
     mockInboundFileService = {
       getLocalFilePath: vi.fn().mockReturnValue('/tmp/cra/inbound/default.txt'),
       isValidResponseFile: vi.fn().mockReturnValue(true),
+      getResponseFileType: vi.fn().mockReturnValue('RSP'),
     }
 
     mockInboundResponseService = {
@@ -731,7 +732,7 @@ describe('PollCraResponseHandler', () => {
         data: {
           isDetailsProcessed: true,
           deliveredAt: expect.any(Date),
-          referenceNumbers: expect.any(Array),
+          referenceNumbers: ['100'],
         },
       })
     })
@@ -751,12 +752,12 @@ describe('PollCraResponseHandler', () => {
 
       await handler.execute(mockContext)
 
-      const referenceNumbers = mockPrisma.transferFile.update.mock.calls[0][0].data.referenceNumbers
-
-      expect(
-        referenceNumbers.length === 0 ||
-          JSON.stringify(referenceNumbers) === JSON.stringify(['100', '200']),
-      ).toBe(true)
+      expect(mockPrisma.transferFile.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: expect.objectContaining({
+          referenceNumbers: ['100', '200'],
+        }),
+      })
     })
   })
 

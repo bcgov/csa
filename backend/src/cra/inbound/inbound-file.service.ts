@@ -5,6 +5,8 @@ import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 
 const { LOCAL_DIR, RESPONSE_FILE_TYPE } = CRA_DATA_HANDLING_CONSTANT
 
+export type ResponseFileType = 'RSP' | 'WKL'
+
 @Injectable()
 export class InboundFileService {
   private readonly fileStoragePath: string
@@ -19,13 +21,19 @@ export class InboundFileService {
     return path.join(this.fileStoragePath, destinationId, LOCAL_DIR.INBOUND, fileName)
   }
 
-  isValidResponseFile(fileName: string): boolean {
+  // CRA file naming convention: `<prefix>.<envFlag><typeFlag><seq>.<ext>`
+  // envFlag is 1 char ('P' prod / 'A' test), typeFlag is the 3-char response type (RSP, WKL, ...)
+  getResponseFileType(fileName: string): ResponseFileType | null {
     const fileMiddle = fileName.split('.')[1] ?? ''
     const fileEnvFlag = fileMiddle.slice(0, 1)
     const fileTypeFlag = fileMiddle.slice(1, 4)
-    return (
-      (fileTypeFlag === RESPONSE_FILE_TYPE.RSP || fileTypeFlag === RESPONSE_FILE_TYPE.WKL) &&
-      fileEnvFlag === this.responseEnvFlag
-    )
+    if (fileEnvFlag !== this.responseEnvFlag) return null
+    if (fileTypeFlag === RESPONSE_FILE_TYPE.RSP) return 'RSP'
+    if (fileTypeFlag === RESPONSE_FILE_TYPE.WKL) return 'WKL'
+    return null
+  }
+
+  isValidResponseFile(fileName: string): boolean {
+    return this.getResponseFileType(fileName) !== null
   }
 }

@@ -17,18 +17,8 @@ import { InboundResponseService } from '../inbound/inbound-response.service'
 import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import { CraTransferService } from '../transfer/cra-transfer.service'
 import { InboundWeeklyResponseService } from '../inbound/inbound-weekly-response.service'
-import { DetailRecord04 } from '../inbound/inbound-weekly.interface'
 
-const {
-  DESTINATION_ID,
-  FILE_DIRECTION,
-  UPDATED_BY,
-  RESPONSE_FILE_TYPE,
-  RESPONSE_FILE,
-  WEEKLY_FILE,
-} = CRA_DATA_HANDLING_CONSTANT
-
-const { RECORD_TYPE_CODE } = WEEKLY_FILE
+const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
 @Injectable()
 export class PollCraResponseHandler extends BaseJob {
@@ -151,15 +141,18 @@ export class PollCraResponseHandler extends BaseJob {
       responseFile.fileName,
     )
 
+    const fileType = this.inboundFileService.getResponseFileType(responseFile.fileName)
+    const isWeekly = fileType === 'WKL'
+
     let parsed:
       | ReturnType<InboundResponseService['parseFile']>
       | ReturnType<InboundWeeklyResponseService['parseWeeklyResponseFile']>
     try {
-      if (responseFile?.fileName?.includes(RESPONSE_FILE_TYPE.WKL)) {
+      if (isWeekly) {
         this.logger.log(
           `Parsing weekly response file ${responseFile.fileName} with InboundWeeklyResponseService`,
         )
-        parsed = this.craWeeklyResponseService.parseWeeklyResponseFile(localFilePath) // TO DO- NEED TO MODIFY
+        parsed = this.craWeeklyResponseService.parseWeeklyResponseFile(localFilePath)
       } else {
         parsed = this.inboundResponseService.parseFile(localFilePath)
       }
@@ -173,7 +166,6 @@ export class PollCraResponseHandler extends BaseJob {
     }
 
     const { header, details, trailer } = parsed
-    const isResponseFile = header.tranCode === RESPONSE_FILE.HEADER_TRAN_CODE
 
     const recordCount =
       (header && 'recordCount' in header ? header.recordCount : undefined) ??
@@ -183,10 +175,14 @@ export class PollCraResponseHandler extends BaseJob {
       `Parsed File: ${responseFile.fileName}, Valid Processed records= ${details.length} ` +
         (recordCount !== undefined ? `, Total Records in File = ${recordCount}` : ''),
     )
-    for (const detail of details) {
-      if (this.isWeeklyDetail(detail)) {
-        await this.processWeeklyResponseDetail(detail)
-      } else {
+
+    if (isWeekly) {
+      this.logger.warn(
+        `Weekly response file ${responseFile.fileName} parsed with ${details.length} ` +
+          `detail record(s); state-transition logic is not yet implemented — details are not being persisted`,
+      )
+    } else {
+      for (const detail of details as CraResDetail[]) {
         await this.processResponseDetail(detail)
       }
     }
@@ -196,9 +192,9 @@ export class PollCraResponseHandler extends BaseJob {
       data: {
         isDetailsProcessed: true,
         deliveredAt: new Date(),
-        referenceNumbers: isResponseFile
-          ? (details as CraResDetail[]).map((detail) => detail.referenceNum)
-          : [],
+        referenceNumbers: isWeekly
+          ? []
+          : (details as CraResDetail[]).map((detail) => detail.referenceNum),
       },
     })
 
@@ -291,23 +287,5 @@ export class PollCraResponseHandler extends BaseJob {
       })
       this.recordsRecycled++
     }
-  }
-
-  private async processWeeklyResponseDetail(detail: DetailRecord04): Promise<void> {
-    // To Do Write the State transition logic here for batch details , contacts table & sync back.
-
-    console.log(
-      'Processing weekly response detail, start writting state transition logic here: ',
-      JSON.stringify(detail, null, 2),
-    )
-  }
-
-  private isWeeklyDetail(detail: any): detail is DetailRecord04 {
-    // return 'recordTypeCode' in detail
-    return detail.tranCode + detail.recordTypeCode === RECORD_TYPE_CODE.DATA_RECORD
-  }
-
-  private isResponseDetail(detail: any): detail is CraResDetail {
-    return detail.tranCode === RESPONSE_FILE.HEADER_TRAN_CODE
   }
 }

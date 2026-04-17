@@ -16,6 +16,7 @@ import { InboundFileService } from '../inbound/inbound-file.service'
 import { InboundResponseService } from '../inbound/inbound-response.service'
 import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import { CraTransferService } from '../transfer/cra-transfer.service'
+import { InboundWeeklyResponseService } from '../inbound/inbound-weekly-response.service'
 
 const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
@@ -32,6 +33,7 @@ export class PollCraResponseHandler extends BaseJob {
     private readonly craTransferService: CraTransferService,
     private readonly inboundFileService: InboundFileService,
     private readonly inboundResponseService: InboundResponseService,
+    private readonly craWeeklyResponseService: InboundWeeklyResponseService,
     private readonly prisma: PrismaService,
     private readonly batchesService: BatchesService,
     private readonly contactsService: ContactsService,
@@ -139,9 +141,21 @@ export class PollCraResponseHandler extends BaseJob {
       responseFile.fileName,
     )
 
-    let parsed: ReturnType<InboundResponseService['parseFile']>
+    const fileType = this.inboundFileService.getResponseFileType(responseFile.fileName)
+    const isWeekly = fileType === 'WKL'
+
+    let parsed:
+      | ReturnType<InboundResponseService['parseFile']>
+      | ReturnType<InboundWeeklyResponseService['parseWeeklyResponseFile']>
     try {
-      parsed = this.inboundResponseService.parseFile(localFilePath)
+      if (isWeekly) {
+        this.logger.log(
+          `Parsing weekly response file ${responseFile.fileName} with InboundWeeklyResponseService`,
+        )
+        parsed = this.craWeeklyResponseService.parseWeeklyResponseFile(localFilePath)
+      } else {
+        parsed = this.inboundResponseService.parseFile(localFilePath)
+      }
     } catch (error) {
       this.logger.error(`Failed to parse response file ${responseFile.fileName}: ${error}`)
       await this.prisma.transferFile.update({
@@ -151,14 +165,26 @@ export class PollCraResponseHandler extends BaseJob {
       return 0
     }
 
-    const { header, details } = parsed
+    const { header, details, trailer } = parsed
+
+    const recordCount =
+      (header && 'recordCount' in header ? header.recordCount : undefined) ??
+      (trailer && 'recordCount' in trailer ? trailer.recordCount : undefined)
 
     this.logger.log(
-      `Parsed ${responseFile.fileName}: ${details.length} detail records, header recordCount=${header.recordCount}`,
+      `Parsed File: ${responseFile.fileName}, Valid Processed records= ${details.length} ` +
+        (recordCount !== undefined ? `, Total Records in File = ${recordCount}` : ''),
     )
 
-    for (const detail of details) {
-      await this.processResponseDetail(detail)
+    if (isWeekly) {
+      this.logger.warn(
+        `Weekly response file ${responseFile.fileName} parsed with ${details.length} ` +
+          `detail record(s); state-transition logic is not yet implemented — details are not being persisted`,
+      )
+    } else {
+      for (const detail of details as CraResDetail[]) {
+        await this.processResponseDetail(detail)
+      }
     }
 
     await this.prisma.transferFile.update({
@@ -166,7 +192,9 @@ export class PollCraResponseHandler extends BaseJob {
       data: {
         isDetailsProcessed: true,
         deliveredAt: new Date(),
-        referenceNumbers: details.map((detail) => detail.referenceNum),
+        referenceNumbers: isWeekly
+          ? []
+          : (details as CraResDetail[]).map((detail) => detail.referenceNum),
       },
     })
 

@@ -11,7 +11,7 @@ describe('InboundWeeklyResponseService', () => {
 
   beforeEach(() => {
     service = new InboundWeeklyResponseService()
-    vi.clearAllMocks() // ✅ keep mocks, just reset calls
+    vi.clearAllMocks() 
   })
 
   const mockFilePath = '/tmp/test-file.txt'
@@ -64,10 +64,8 @@ describe('InboundWeeklyResponseService', () => {
 
   it('should filter only electronic (E) records', () => {
     const fileContent = [
-      buildLine('0000'),
       buildDetailLine('E'),
-      buildDetailLine('P'),
-      '9999TR' + ' '.repeat(9) + '000000002' + ' '.repeat(241 - 24),
+      buildDetailLine(' ')
     ].join('\n')
 
     ;(fs.readFileSync as any).mockReturnValue(fileContent)
@@ -105,7 +103,7 @@ describe('InboundWeeklyResponseService', () => {
 
   it('should parse trailer recordCount correctly', () => {
     const trailerLine = buildTrailerLine(123)
-    const fileContent = [buildLine('6138'), trailerLine].join('\n')
+    const fileContent = [ trailerLine].join('\n')
 
     ;(fs.readFileSync as any).mockReturnValue(fileContent)
 
@@ -115,9 +113,7 @@ describe('InboundWeeklyResponseService', () => {
 
   it('should handle file with no electronic records', () => {
     const fileContent = [
-      buildLine('0000'),
-      buildDetailLine('P'),
-      '9999TR' + ' '.repeat(9) + '000000001',
+      buildDetailLine(' ')
     ].join('\n')
 
     ;(fs.readFileSync as any).mockReturnValue(fileContent)
@@ -130,7 +126,7 @@ describe('InboundWeeklyResponseService', () => {
   it('should log summary after parsing', () => {
     const logSpy = vi.spyOn(service['logger'], 'log')
 
-    const fileContent = [buildLine('0000'), '9999TR' + ' '.repeat(9) + '000000000'].join('\n')
+    const fileContent = [ buildHeaderLine(), buildDetailLine('E'), buildTrailerLine(3)].join('\n')
 
     ;(fs.readFileSync as any).mockReturnValue(fileContent)
 

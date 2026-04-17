@@ -300,12 +300,6 @@ export class PollCraResponseHandler extends BaseJob {
       'Processing weekly response detail, start writting state transition logic here: ',
       JSON.stringify(detail, null, 2),
     )
-    // await this.contactsService.updateCsaStatus(
-    //   detail.childDin,
-    //   CSA_EVENT.CRA_ACCEPTED,
-    //   UPDATED_BY.SYSTEM,
-    //   { additionalData },
-    // )
   }
 
   private isWeeklyDetail(detail: any): detail is DetailRecord04 {

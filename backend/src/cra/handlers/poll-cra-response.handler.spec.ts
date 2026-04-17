@@ -731,7 +731,7 @@ describe('PollCraResponseHandler', () => {
         data: {
           isDetailsProcessed: true,
           deliveredAt: expect.any(Date),
-          referenceNumbers: expect.any(Array), // ✅ FIX
+          referenceNumbers: expect.any(Array),
         },
       })
     })

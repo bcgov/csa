@@ -659,7 +659,16 @@ function App() {
           }
         }
 
-        const response = await getAllContacts(page, recordsPerPage, combinedFilter)
+        // Build sort parameter if sortConfig is set
+        let sort: Array<{ [key: string]: 'asc' | 'desc' }> | undefined
+        if (sortConfig) {
+          const backendField = columnToFieldMapping[sortConfig.column]
+          if (backendField) {
+            sort = [{ [backendField]: sortConfig.direction }]
+          }
+        }
+
+        const response = await getAllContacts(page, recordsPerPage, combinedFilter, sort)
         setContacts(response.data)
         setTotalPages(response.totalPages)
         setTotalRecords(response.total)
@@ -671,7 +680,7 @@ function App() {
         setLoadingContacts(false)
       }
     },
-    [preDefinedFilter, recordsPerPage, columnToFieldMapping, getPreDefinedFilterConfig],
+    [preDefinedFilter, recordsPerPage, columnToFieldMapping, getPreDefinedFilterConfig, sortConfig],
   )
 
   // Function to perform full-text search

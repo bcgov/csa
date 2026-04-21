@@ -102,12 +102,14 @@ const CSA_STATUS_FILTER_OPTIONS = [
   { value: 'in_batch_application', label: 'In Batch - Application' },
   { value: 'batch_sent_application', label: 'Batch Sent - Application' },
   { value: 'application_refused_cra', label: 'Application Refused - CRA' },
+  { value: 'cra_error_application', label: 'CRA Error - Application' },
   { value: 'in_pay', label: 'In Pay' },
   { value: 'not_eligible_in_pay', label: 'Not Eligible - In Pay' },
   { value: 'not_eligible_ip_tbd', label: 'Not Eligible - IP - TBD' },
   { value: 'in_batch_cancellation', label: 'In Batch - Cancellation' },
   { value: 'batch_sent_cancellation', label: 'Batch Sent - Cancellation' },
   { value: 'cancellation_refused_cra', label: 'Cancellation Refused - CRA' },
+  { value: 'cra_error_cancellation', label: 'CRA Error - Cancellation' },
   { value: 'over_18', label: 'Over 18' },
 ]
 

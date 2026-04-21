@@ -13,6 +13,7 @@ ARCHIVE_PATH="${WORK_DIR}/${ARCHIVE_NAME}"
 : "${s3URI:?s3URI is required}"
 : "${s3BucketName:?s3BucketName is required}"
 : "${S3_PREFIX:?S3_PREFIX is required}"
+: "${MC_CONFIG_DIR:?MC_CONFIG_DIR is required}"
 
 if [ ! -d "${SOURCE_DIR}" ]; then
   echo "ERROR: Source directory does not exist: ${SOURCE_DIR}"
@@ -20,6 +21,7 @@ if [ ! -d "${SOURCE_DIR}" ]; then
 fi
 
 mkdir -p "${WORK_DIR}"
+mkdir -p "${MC_CONFIG_DIR}"
 
 echo "Source directory: ${SOURCE_DIR}"
 echo "Work directory: ${WORK_DIR}"
@@ -29,7 +31,8 @@ echo "Prefix: ${S3_PREFIX}"
 
 echo "Extracting credentials and endpoint from s3URI..."
 
-NO_SCHEME="${s3URI#https://}"
+RAW_URI="${s3URI}"
+NO_SCHEME="${RAW_URI#https://}"
 NO_SCHEME="${NO_SCHEME#http://}"
 CREDS="${NO_SCHEME%@*}"
 HOST="${NO_SCHEME#*@}"
@@ -37,7 +40,7 @@ HOST="${NO_SCHEME#*@}"
 ACCESS_KEY="${CREDS%%:*}"
 SECRET_KEY="${CREDS#*:}"
 
-case "${s3URI}" in
+case "${RAW_URI}" in
   https://*) ENDPOINT_URL="https://${HOST}" ;;
   http://*)  ENDPOINT_URL="http://${HOST}" ;;
   *)

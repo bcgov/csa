@@ -86,9 +86,11 @@ const VALID_BATCH_STATUSES = [
   'eligible', // Eligible
   'eligible_tbd', // Eligible - TBD
   'application_refused_cra', // Application Refused - CRA
+  'cra_error_application', // CRA Error - Application
   'not_eligible_in_pay', // Not Eligible - In Pay
   'not_eligible_ip_tbd', // Not Eligible - IP - TBD
   'cancellation_refused_cra', // Cancellation Refused - CRA
+  'cra_error_cancellation', // CRA Error - Cancellation
 ]
 
 // CSA Status options for filter dropdown
@@ -478,6 +480,8 @@ function App() {
             { key: 'csaStatus', op: 'eq', value: 'not_eligible_ip_tbd' },
             { key: 'csaStatus', op: 'eq', value: 'eligible' },
             { key: 'csaStatus', op: 'eq', value: 'not_eligible_in_pay' },
+            { key: 'csaStatus', op: 'eq', value: 'cra_error_application' },
+            { key: 'csaStatus', op: 'eq', value: 'cra_error_cancellation' },
           ],
         },
       ]
@@ -530,7 +534,7 @@ function App() {
         // Apply filter based on selected pre-defined filter
         // Note: csaStatus values must match database format (snake_case)
         if (preDefinedFilter === 'Pending User review/action') {
-          // csaStatus = 'on_hold' OR 'eligible_tbd' OR 'not_eligible_ip_tbd' OR 'eligible' OR 'not_eligible_in_pay'
+          // csaStatus = 'on_hold' OR 'eligible_tbd' OR 'not_eligible_ip_tbd' OR 'eligible' OR 'not_eligible_in_pay' OR 'cra_error_application' OR 'cra_error_cancellation'
           filter = [
             {
               OR: [
@@ -539,6 +543,8 @@ function App() {
                 { key: 'csaStatus', op: 'eq', value: 'not_eligible_ip_tbd' },
                 { key: 'csaStatus', op: 'eq', value: 'eligible' },
                 { key: 'csaStatus', op: 'eq', value: 'not_eligible_in_pay' },
+                { key: 'csaStatus', op: 'eq', value: 'cra_error_application' },
+                { key: 'csaStatus', op: 'eq', value: 'cra_error_cancellation' },
               ],
             },
           ]

@@ -1342,7 +1342,7 @@ describe('ContactsService', () => {
           contactId: 1,
           batchId: 5,
           transactionType: 'application',
-          status: 'processed',
+          status: 'approved',
           batch: { id: 5, batchDate: new Date('2026-01-15'), status: 'processed' },
         },
       ]
@@ -1355,7 +1355,7 @@ describe('ContactsService', () => {
       expect(result).toEqual([
         {
           ...batchDetails[0],
-          statusLabel: 'Processed',
+          statusLabel: 'Approved',
           batch: { ...batchDetails[0].batch, batchDate: '2026-01-15', statusLabel: 'Processed' },
         },
       ])

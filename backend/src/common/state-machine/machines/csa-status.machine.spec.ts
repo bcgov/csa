@@ -154,6 +154,48 @@ describe('csaStatusMachine', () => {
     })
   })
 
+  describe('WKL disposition flow', () => {
+    it('should transition batch_sent_application to in_pay on CRA_WKL_APPROVED', () => {
+      const state = getNextCsaState(CSA_STATUS.BATCH_SENT_APPLICATION, CSA_EVENT.CRA_WKL_APPROVED)
+      expect(state).toBe(CSA_STATUS.IN_PAY)
+    })
+
+    it('should transition batch_sent_application to application_refused_cra on CRA_WKL_REFUSED', () => {
+      const state = getNextCsaState(CSA_STATUS.BATCH_SENT_APPLICATION, CSA_EVENT.CRA_WKL_REFUSED)
+      expect(state).toBe(CSA_STATUS.APPLICATION_REFUSED_CRA)
+    })
+
+    it('should transition batch_sent_cancellation to not_eligible_out_of_pay on CRA_WKL_APPROVED', () => {
+      const state = getNextCsaState(CSA_STATUS.BATCH_SENT_CANCELLATION, CSA_EVENT.CRA_WKL_APPROVED)
+      expect(state).toBe(CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY)
+    })
+
+    it('should transition batch_sent_cancellation to cancellation_refused_cra on CRA_WKL_REFUSED', () => {
+      const state = getNextCsaState(CSA_STATUS.BATCH_SENT_CANCELLATION, CSA_EVENT.CRA_WKL_REFUSED)
+      expect(state).toBe(CSA_STATUS.CANCELLATION_REFUSED_CRA)
+    })
+
+    it('should handle full application WKL approved flow', () => {
+      let state = CSA_STATUS.ELIGIBLE as string
+      state = getNextCsaState(state, CSA_EVENT.ADD_TO_BATCH) as string
+      expect(state).toBe(CSA_STATUS.IN_BATCH_APPLICATION)
+      state = getNextCsaState(state, CSA_EVENT.SEND_TO_CRA) as string
+      expect(state).toBe(CSA_STATUS.BATCH_SENT_APPLICATION)
+      state = getNextCsaState(state, CSA_EVENT.CRA_WKL_APPROVED) as string
+      expect(state).toBe(CSA_STATUS.IN_PAY)
+    })
+
+    it('should handle full cancellation WKL refused flow', () => {
+      let state = CSA_STATUS.NOT_ELIGIBLE_IN_PAY as string
+      state = getNextCsaState(state, CSA_EVENT.ADD_TO_BATCH) as string
+      expect(state).toBe(CSA_STATUS.IN_BATCH_CANCELLATION)
+      state = getNextCsaState(state, CSA_EVENT.SEND_TO_CRA) as string
+      expect(state).toBe(CSA_STATUS.BATCH_SENT_CANCELLATION)
+      state = getNextCsaState(state, CSA_EVENT.CRA_WKL_REFUSED) as string
+      expect(state).toBe(CSA_STATUS.CANCELLATION_REFUSED_CRA)
+    })
+  })
+
   describe('remove from batch', () => {
     it('should return array of valid targets for REMOVE_FROM_BATCH from in_batch_application', () => {
       const targets = getNextCsaState(CSA_STATUS.IN_BATCH_APPLICATION, CSA_EVENT.REMOVE_FROM_BATCH)

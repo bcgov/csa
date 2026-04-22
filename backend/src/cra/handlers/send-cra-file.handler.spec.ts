@@ -1,10 +1,10 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { SendCraFileHandler } from './send-cra-file.handler'
-import { JobType } from 'src/jobs/enums/job-type.enum'
-import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
-import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { BATCH_EVENT, CSA_EVENT } from 'src/common/state-machine/constants'
+import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
+import { JobType } from 'src/jobs/enums/job-type.enum'
+import { JobContext } from 'src/jobs/interfaces/job.interface'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
+import { SendCraFileHandler } from './send-cra-file.handler'
 
 vi.mock('fs/promises', () => ({
   readFile: vi.fn().mockResolvedValue(Buffer.from('mock-file-content')),
@@ -105,9 +105,19 @@ describe('SendCraFileHandler', () => {
     mockOutboundDataService = {
       buildCraFileData: vi.fn().mockReturnValue({
         header: { tranCode: 6133 },
-        details: [{ tranCode: 6134 }],
+        details: [{ tranCode: 6134 }, { tranCode: 6134 }],
         trailer: { tranCode: 6135 },
       }),
+      buildMatchingSnapshot: vi.fn().mockImplementation((_detail: any) => ({
+        childGivenName: 'EMILY',
+        childSurName: 'SMITH',
+        childSex: 'F',
+        childBirthDate: '20150215',
+        childBirthCity: 'TORONTO',
+        childBirthProv: 'ON',
+        childBirthCountry: 'CA',
+        ccraDinNum: '987654321',
+      })),
     }
 
     mockOutboundFileService = {
@@ -279,7 +289,7 @@ describe('SendCraFileHandler', () => {
 
       expect(mockOutboundFileService.createFile).toHaveBeenCalledWith(
         { tranCode: 6133 },
-        [{ tranCode: 6134 }],
+        [{ tranCode: 6134 }, { tranCode: 6134 }],
         { tranCode: 6135 },
         DESTINATION_ID,
         1,
@@ -317,6 +327,36 @@ describe('SendCraFileHandler', () => {
         file_path: '/tmp/cra/testfile.txt',
         record_count: 3,
         contacts_count: 2,
+      })
+    })
+
+    it('should save craMatchingSnapshot on each batch detail', async () => {
+      await handler.execute(mockContext)
+
+      expect(mockOutboundDataService.buildMatchingSnapshot).toHaveBeenCalledTimes(2)
+      expect(mockPrisma.contactBatchDetail.update).toHaveBeenCalledWith({
+        where: { id: 100 },
+        data: {
+          craMatchingSnapshot: {
+            childGivenName: 'EMILY',
+            childSurName: 'SMITH',
+            childSex: 'F',
+            childBirthDate: '20150215',
+            childBirthCity: 'TORONTO',
+            childBirthProv: 'ON',
+            childBirthCountry: 'CA',
+            ccraDinNum: '987654321',
+          },
+        },
+      })
+      expect(mockPrisma.contactBatchDetail.update).toHaveBeenCalledWith({
+        where: { id: 101 },
+        data: {
+          craMatchingSnapshot: expect.objectContaining({
+            childGivenName: 'EMILY',
+            childSurName: 'SMITH',
+          }),
+        },
       })
     })
 

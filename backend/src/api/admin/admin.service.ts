@@ -118,7 +118,7 @@ export class AdminService {
       }
 
       const response = await firstValueFrom(
-        this.httpService.get(`${icmApiUrl}/Employee/Employee?${params.toString()}`, {
+        this.httpService.get(`${icmApiUrl}/EmployeeRest/EmployeeRest?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${bearerToken}`,
             'X-ICM-TrustedUsername': trustedUser,

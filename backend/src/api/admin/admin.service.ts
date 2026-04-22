@@ -90,7 +90,7 @@ export class AdminService {
       this.logger.log('Requesting ICM API with username:', icmApiUsername)
 
       const queryHierarchy = {
-        Employee: {
+        EmployeeRest: {
           fields: 'Login Name, Party Name',
           searchspec: `[Login Name] = '${icmApiUsername.replace(/'/g, "''")}'`,
           Responsibility: {

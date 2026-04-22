@@ -76,8 +76,10 @@ const getEnvBackgroundColor = (env?: AppEnvironment): string => {
 const VALID_CSA_STATUSES = [
   'eligible_tbd', // Eligible - TBD
   'application_refused_cra', // Application Refused - CRA
+  'cra_error_application', // CRA Error - Application
   'not_eligible_ip_tbd', // Not Eligible - IP - TBD
   'cancellation_refused_cra', // Cancellation Refused - CRA
+  'cra_error_cancellation', // CRA Error - Cancellation
   'on_hold', // On Hold
 ]
 

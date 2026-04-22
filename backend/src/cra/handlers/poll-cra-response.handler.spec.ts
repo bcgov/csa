@@ -592,7 +592,7 @@ describe('PollCraResponseHandler', () => {
       setupBatchDetail(101, 2, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.APPROVED },
         { status: BATCH_DETAIL_STATUS.ERROR },
       ])
 
@@ -662,7 +662,7 @@ describe('PollCraResponseHandler', () => {
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.APPROVED },
       ])
 
       await handler.execute(mockContext)
@@ -687,7 +687,7 @@ describe('PollCraResponseHandler', () => {
       setupBatchDetail(200, 2, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.APPROVED },
       ])
 
       await handler.execute(mockContext)
@@ -710,7 +710,7 @@ describe('PollCraResponseHandler', () => {
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.APPROVED },
       ])
 
       const result1 = await handler.execute(mockContext)
@@ -760,7 +760,7 @@ describe('PollCraResponseHandler', () => {
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.APPROVED },
       ])
 
       await handler.execute(mockContext)
@@ -775,7 +775,7 @@ describe('PollCraResponseHandler', () => {
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.APPROVED },
       ])
 
       await handler.execute(mockContext)
@@ -811,7 +811,7 @@ describe('PollCraResponseHandler', () => {
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.APPROVED },
       ])
 
       const result = await handler.execute(mockContext)
@@ -820,43 +820,17 @@ describe('PollCraResponseHandler', () => {
     })
   })
 
-  describe('Batch acknowledgement comment', () => {
-    it('should set "CRA Acknowledgement received." on batch when accepted records exist and batch is in_progress', async () => {
+  describe('Batch system comments', () => {
+    it('should delegate batch comments to aggregateBatchStatus, not set them directly', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
       setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
-      mockPrisma.batch.findUnique.mockResolvedValue({ status: 'in_progress', systemComments: null })
-      mockPrisma.batch.update = vi.fn().mockResolvedValue({})
 
       await handler.execute(mockContext)
 
-      expect(mockPrisma.batch.update).toHaveBeenCalledWith({
-        where: { id: 10 },
-        data: {
-          systemComments: expect.stringContaining('CRA Acknowledgement received.'),
-        },
-      })
-    })
-
-    it('should NOT set acknowledgement comment when all records are rejected', async () => {
-      const detail = makeDetail({
-        referenceNum: '100',
-        tranStatCd: TRAN_STAT_CODE.TRAN_REJECTED,
-        rejectCd1: '007',
-      })
-      setupUnprocessedFile(VALID_FILE_NAME)
-      setupParseFile([detail])
-      setupBatchDetail(100, 1, 10)
-      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.ERROR },
-      ])
-      mockPrisma.batch.update = vi.fn().mockResolvedValue({})
-
-      await handler.execute(mockContext)
-
-      expect(mockPrisma.batch.update).not.toHaveBeenCalled()
+      expect(mockBatchesService.aggregateBatchStatus).toHaveBeenCalledWith(10)
     })
   })
 

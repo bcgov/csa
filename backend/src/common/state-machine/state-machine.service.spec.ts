@@ -125,7 +125,7 @@ describe('StateMachineService', () => {
     })
 
     it('should return display label for BatchDetail status', () => {
-      expect(service.getStatusLabel('batchDetail', BATCH_DETAIL_STATUS.PROCESSED)).toBe('Processed')
+      expect(service.getStatusLabel('batchDetail', BATCH_DETAIL_STATUS.APPROVED)).toBe('Approved')
     })
 
     it('should return raw value if label not found', () => {

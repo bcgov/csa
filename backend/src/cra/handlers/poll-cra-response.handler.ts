@@ -6,7 +6,7 @@ import { BatchesService } from 'src/api/batches/batches.service'
 import { ContactsService } from 'src/api/contacts/contacts.service'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_DETAIL_EVENT, CSA_EVENT } from 'src/common/state-machine/constants'
-import { appendSystemComment } from 'src/common/utils'
+
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
@@ -70,27 +70,6 @@ export class PollCraResponseHandler extends BaseJob {
 
     for (const batchId of this.processedBatchIds) {
       await this.batchesService.aggregateBatchStatus(batchId)
-    }
-
-    // Set batch-level system comment for RSP acknowledgement
-    if (this.recordsAccepted > 0) {
-      for (const batchId of this.processedBatchIds) {
-        const batch = await this.prisma.batch.findUnique({
-          where: { id: batchId },
-          select: { status: true, systemComments: true },
-        })
-        if (batch && batch.status === 'in_progress') {
-          await this.prisma.batch.update({
-            where: { id: batchId },
-            data: {
-              systemComments: appendSystemComment(
-                'CRA Acknowledgement received.',
-                batch.systemComments,
-              ),
-            },
-          })
-        }
-      }
     }
 
     let syncResult: SyncBackResult | null = null

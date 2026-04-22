@@ -314,38 +314,79 @@ export class BatchesService {
       select: { status: true },
     })
 
-    const statuses = allDetails.map((d) => d.status)
-    const hasProcessed = statuses.includes(BATCH_DETAIL_STATUS.PROCESSED)
-    const hasError = statuses.includes(BATCH_DETAIL_STATUS.ERROR)
-    const hasInProgress = statuses.includes(BATCH_DETAIL_STATUS.IN_PROGRESS)
+    if (allDetails.length === 0) return
 
-    if (hasInProgress) {
-      this.logger.log(`Batch ${batchId}: some details still in_progress, batch stays in_progress`)
+    const statuses = allDetails.map((d) => d.status)
+    const hasApproved = statuses.includes(BATCH_DETAIL_STATUS.APPROVED)
+    const hasRefused = statuses.includes(BATCH_DETAIL_STATUS.REFUSED)
+    const hasInProgress = statuses.includes(BATCH_DETAIL_STATUS.IN_PROGRESS)
+    const hasResolved = hasApproved || hasRefused
+
+    // All in error, none resolved
+    if (!hasResolved && !hasInProgress) {
+      const batchMessage =
+        'CRA sent back Error for all transactions in Response file. Please review.'
+      const batch = await this.prisma.batch.findUnique({
+        where: { id: batchId },
+        select: { systemComments: true },
+      })
+      const systemComments = appendSystemComment(batchMessage, batch?.systemComments ?? null)
+      await this.updateBatchStatus(batchId, BATCH_EVENT.CRA_ALL_REJECTED, {
+        additionalData: { systemComments },
+      })
       return
     }
 
-    let batchEvent: string
-    let batchMessage: string | null = null
-    if (hasProcessed && hasError) {
-      batchEvent = BATCH_EVENT.CRA_PARTIAL_REJECTED
-      batchMessage = 'At least one of the child record(s) in the Batch Details is in Error.'
-    } else if (hasProcessed && !hasError) {
-      batchEvent = BATCH_EVENT.CRA_ACCEPTED
-    } else {
-      batchEvent = BATCH_EVENT.CRA_ALL_REJECTED
-      batchMessage = 'CRA sent back Error for all transactions in Response file. Please review.'
+    // Some still in progress — partially processed
+    if (hasInProgress && hasResolved) {
+      const batchMessage = this.getWklSystemComment(hasApproved, hasRefused, true)
+      const batch = await this.prisma.batch.findUnique({
+        where: { id: batchId },
+        select: { status: true, systemComments: true },
+      })
+      const systemComments = appendSystemComment(batchMessage, batch?.systemComments ?? null)
+
+      if (batch?.status === BATCH_STATUS.IN_PROGRESS) {
+        await this.updateBatchStatus(batchId, BATCH_EVENT.CRA_PARTIALLY_PROCESSED, {
+          additionalData: { systemComments },
+        })
+      } else {
+        // Already partially_processed, just update comments
+        await this.prisma.batch.update({
+          where: { id: batchId },
+          data: { systemComments },
+        })
+      }
+      return
     }
 
-    const batch = await this.prisma.batch.findUnique({
-      where: { id: batchId },
-      select: { systemComments: true },
-    })
+    // Nothing in progress, has resolved — all processed
+    if (!hasInProgress && hasResolved) {
+      const batchMessage = this.getWklSystemComment(hasApproved, hasRefused, false)
+      const batch = await this.prisma.batch.findUnique({
+        where: { id: batchId },
+        select: { systemComments: true },
+      })
+      const systemComments = appendSystemComment(batchMessage, batch?.systemComments ?? null)
+      await this.updateBatchStatus(batchId, BATCH_EVENT.CRA_ALL_PROCESSED, {
+        additionalData: { systemComments },
+      })
+      return
+    }
 
-    const systemComments = appendSystemComment(batchMessage, batch?.systemComments ?? null)
+    // All still in progress — no action
+    this.logger.log(`Batch ${batchId}: all details still in_progress, no aggregation needed`)
+  }
 
-    await this.updateBatchStatus(batchId, batchEvent, {
-      additionalData: systemComments != null ? { systemComments } : {},
-    })
+  private getWklSystemComment(
+    hasApproved: boolean,
+    hasRefused: boolean,
+    isPartial: boolean,
+  ): string {
+    const suffix = isPartial ? ' so far.' : '.'
+    if (hasApproved && hasRefused) return `Some accepted, some refused by CRA${suffix}`
+    if (hasApproved) return `All accepted by CRA${suffix}`
+    return `All refused by CRA${suffix}`
   }
 
   async removeContactFromPendingBatch(contactId: number, userId?: string): Promise<void> {

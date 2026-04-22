@@ -119,9 +119,10 @@ model ContactBatchDetail {
   createdBy       String   @map("created_by")
   lastUpdatedAt   DateTime @map("last_updated_at") @db.Timestamptz() @updatedAt
   lastUpdatedBy   String   @map("last_updated_by")
-  status          String?
-  batch           Batch    @relation(fields: [batchId], references: [id])
-  contact         Contact  @relation(fields: [contactId], references: [id])
+  status              String?
+  craMatchingSnapshot Json?    @map("cra_matching_snapshot") @db.JsonB
+  batch               Batch    @relation(fields: [batchId], references: [id])
+  contact             Contact  @relation(fields: [contactId], references: [id])
 
   @@unique([contactId, batchId], name: "contact_batch_unique")
   @@map("contact_batch_details")

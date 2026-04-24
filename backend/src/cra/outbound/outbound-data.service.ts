@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { normalize, formatDatePacificCompact } from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
+import { CraMatchingSnapshot } from '../inbound/cra-matching-snapshot.interface'
 import { CraDetail, CraHeader, CraTrailer } from './outbound.interface'
 
 const { REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
@@ -48,6 +49,19 @@ export class OutboundDataService {
 
   constructor(private readonly configService: ConfigService) {
     this.businessNum = this.configService.get<string>('cra.businessNum')!
+  }
+
+  buildMatchingSnapshot(detail: CraDetail): CraMatchingSnapshot {
+    return {
+      childGivenName: detail.childGivenName.trim(),
+      childSurName: detail.childSurName.trim(),
+      childSex: detail.childSex.trim(),
+      childBirthDate: detail.childBirthDate.trim(),
+      childBirthCity: detail.childBirthCity.trim(),
+      childBirthProv: detail.childBirthProv.trim(),
+      childBirthCountry: detail.childBirthCountry.trim(),
+      ccraDinNum: detail.ccraDinNum.trim(),
+    }
   }
 
   buildCraFileData(batchDetails: BatchDetailWithContact[]): CraFileData {

@@ -101,6 +101,7 @@ model Batch {
   createdAt           DateTime             @map("created_at") @db.Timestamptz()
   updatedAt           DateTime             @map("updated_at") @db.Timestamptz() @updatedAt
   systemComments      String?              @map("system_comments")
+  initiatedBy         String               @default("Ministry") @map("initiated_by")
   contactBatchDetails ContactBatchDetail[]
   transferFiles       TransferFile[]
 

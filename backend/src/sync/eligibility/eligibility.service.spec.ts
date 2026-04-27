@@ -247,13 +247,9 @@ describe('EligibilityService', () => {
   })
 
   it('should upsert contacts with no status transition (existing status preserved)', async () => {
-    mockPrisma.$queryRawUnsafe
-      .mockResolvedValueOnce([
-        makeEligibleContact({ csaStatus: 'eligible', existingContactId: 10 }),
-      ])
-      .mockResolvedValueOnce([{ id: 10, person_id_icm: 'ICM-ELIG' }]) // get contact DB IDs
-      .mockResolvedValueOnce([{ id: 100 }]) // find pending batch
-      .mockResolvedValueOnce([{ contact_id: 10 }]) // already in batch
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+      makeEligibleContact({ csaStatus: 'eligible', existingContactId: 10 }),
+    ])
 
     const result = await service.run()
 
@@ -448,132 +444,44 @@ describe('EligibilityService', () => {
     }
   }
 
-  it('should auto-batch eligible contacts as application', async () => {
-    mockPrisma.$queryRawUnsafe
-      .mockResolvedValueOnce([makeEligibleContact()]) // loadContactProfiles
-      .mockResolvedValueOnce([{ id: 1, person_id_icm: 'ICM-ELIG' }]) // get contact DB IDs
-      .mockResolvedValueOnce([{ id: 100 }]) // find pending batch
-      .mockResolvedValueOnce([]) // check already in batch
-
-    mockPrisma.$executeRawUnsafe
-      .mockResolvedValueOnce(0) // batchUpsertRows
-      .mockResolvedValueOnce(1) // insert batch details
-      .mockResolvedValueOnce(1) // update application contacts status
-      .mockResolvedValueOnce(1) // update batch record count
+  it('should process eligible contacts and upsert to master table', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeEligibleContact()])
 
     const result = await service.run()
 
-    expect(result.autoBatched.application).toBe(1)
-    expect(result.autoBatched.cancellation).toBe(0)
-    // Verify pre_batch_status is set for REMOVE_FROM_BATCH support
-    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(
-      expect.stringContaining('pre_batch_status'),
-      'in_batch_application',
-      [1],
-      'eligible',
-    )
+    expect(result.processed).toBe(1)
+    expect(result.statusChanges).toBe(1)
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1) // batchUpsertRows only
   })
 
-  it('should auto-batch not_eligible_in_pay contacts as cancellation', async () => {
-    mockPrisma.$queryRawUnsafe
-      .mockResolvedValueOnce([makeInPayCancelContact()]) // loadContactProfiles
-      .mockResolvedValueOnce([{ id: 2, person_id_icm: 'ICM-CANCEL' }]) // get contact DB IDs
-      .mockResolvedValueOnce([{ id: 100 }]) // find pending batch
-      .mockResolvedValueOnce([]) // check already in batch
-
-    mockPrisma.$executeRawUnsafe
-      .mockResolvedValueOnce(0) // batchUpsertRows
-      .mockResolvedValueOnce(1) // insert batch details
-      .mockResolvedValueOnce(1) // update cancellation contacts status
-      .mockResolvedValueOnce(1) // update batch record count
+  it('should process not_eligible_in_pay contacts and upsert to master table', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeInPayCancelContact()])
 
     const result = await service.run()
 
-    expect(result.autoBatched.application).toBe(0)
-    expect(result.autoBatched.cancellation).toBe(1)
-    // Verify pre_batch_status is set for REMOVE_FROM_BATCH support
-    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(
-      expect.stringContaining('pre_batch_status'),
-      'in_batch_cancellation',
-      [2],
-      'not_eligible_in_pay',
-    )
+    expect(result.processed).toBe(1)
+    expect(result.statusChanges).toBe(1)
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1) // batchUpsertRows only
   })
 
-  it('should create pending batch when none exists', async () => {
-    mockPrisma.$queryRawUnsafe
-      .mockResolvedValueOnce([makeEligibleContact()]) // loadContactProfiles
-      .mockResolvedValueOnce([{ id: 1, person_id_icm: 'ICM-ELIG' }]) // get contact DB IDs
-      .mockResolvedValueOnce([]) // find pending batch->none
-      .mockResolvedValueOnce([{ id: 200 }]) // INSERT batch RETURNING id
-      .mockResolvedValueOnce([]) // check already in batch
-
-    mockPrisma.$executeRawUnsafe
-      .mockResolvedValueOnce(0) // batchUpsertRows
-      .mockResolvedValueOnce(1) // insert batch details
-      .mockResolvedValueOnce(1) // update contacts status
-      .mockResolvedValueOnce(1) // update batch record count
+  it('should process mixed eligible and not_eligible_in_pay contacts in same run', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeEligibleContact(), makeInPayCancelContact()])
 
     const result = await service.run()
 
-    expect(result.autoBatched.application).toBe(1)
-    // Verify batch creation SQL was called
-    expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO batches'),
-      'pending',
-    )
+    expect(result.processed).toBe(2)
+    expect(result.statusChanges).toBe(2)
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1) // batchUpsertRows only
   })
 
-  it('should skip contacts already in pending batch', async () => {
-    mockPrisma.$queryRawUnsafe
-      .mockResolvedValueOnce([makeEligibleContact()]) // loadContactProfiles
-      .mockResolvedValueOnce([{ id: 1, person_id_icm: 'ICM-ELIG' }]) // get contact DB IDs
-      .mockResolvedValueOnce([{ id: 100 }]) // find pending batch
-      .mockResolvedValueOnce([{ contact_id: 1 }]) // already in batch!
-
-    mockPrisma.$executeRawUnsafe.mockResolvedValueOnce(0) // batchUpsertRows only
-
-    const result = await service.run()
-
-    expect(result.autoBatched.application).toBe(0)
-    expect(result.autoBatched.cancellation).toBe(0)
-    // Only the upsert call, no batch detail insert
-    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
-  })
-
-  it('should handle mixed application and cancellation in same run', async () => {
-    mockPrisma.$queryRawUnsafe
-      .mockResolvedValueOnce([makeEligibleContact(), makeInPayCancelContact()]) // loadContactProfiles
-      .mockResolvedValueOnce([
-        // get contact DB IDs
-        { id: 1, person_id_icm: 'ICM-ELIG' },
-        { id: 2, person_id_icm: 'ICM-CANCEL' },
-      ])
-      .mockResolvedValueOnce([{ id: 100 }]) // find pending batch
-      .mockResolvedValueOnce([]) // check already in batch
-
-    mockPrisma.$executeRawUnsafe
-      .mockResolvedValueOnce(0) // batchUpsertRows
-      .mockResolvedValueOnce(2) // insert batch details (both)
-      .mockResolvedValueOnce(1) // update application contacts status
-      .mockResolvedValueOnce(1) // update cancellation contacts status
-      .mockResolvedValueOnce(1) // update batch record count
-
-    const result = await service.run()
-
-    expect(result.autoBatched.application).toBe(1)
-    expect(result.autoBatched.cancellation).toBe(1)
-  })
-
-  it('should not auto-batch over_18 or other non-batchable statuses', async () => {
+  it('should skip new contacts who are already over 18', async () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeOver18Contact()])
 
-    mockPrisma.$executeRawUnsafe.mockResolvedValueOnce(0) // batchUpsertRows only
-
     const result = await service.run()
 
-    expect(result.autoBatched.application).toBe(0)
-    expect(result.autoBatched.cancellation).toBe(0)
+    expect(result.processed).toBe(1)
+    expect(result.skipped).toBe(1)
+    expect(result.statusChanges).toBe(0)
   })
 })
 

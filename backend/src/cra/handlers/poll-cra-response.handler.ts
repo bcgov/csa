@@ -286,17 +286,6 @@ export class PollCraResponseHandler extends BaseJob {
     }
 
     const batchDetail = await this.weeklyContactMatcher.findMatchingBatchDetail(detail)
-    if (!batchDetail) {
-      this.logger.warn(
-        `WKL: no matching batch detail for ${detail.childGivenName.trim()} ${detail.childSurName.trim()} ` +
-          `(DIN: ${detail.childDin?.trim() || 'none'})`,
-      )
-      this.recordsWklSkipped++
-      return
-    }
-
-    this.processedBatchIds.add(batchDetail.batchId)
-
     let wklType: string
     if (detail.transactionType === 'A') {
       wklType = 'application'
@@ -309,6 +298,25 @@ export class PollCraResponseHandler extends BaseJob {
       this.recordsWklSkipped++
       return
     }
+    if (!batchDetail) {
+      this.logger.warn(
+        `WKL: no matching batch detail for ${detail.childGivenName.trim()} ${detail.childSurName.trim()} ` +
+          `(DIN: ${detail.childDin?.trim() || 'none'})`,
+      )
+      const contacts = await this.weeklyContactMatcher.findMatchingContact(detail)
+      if (!contacts) {
+        this.logger.warn(
+          `WKL: no matching contacts for ${detail.childGivenName.trim()} ${detail.childSurName.trim()} ` +
+            `(DIN: ${detail.childDin?.trim() || 'none'})`,
+        )
+        this.recordsWklSkipped++
+        return
+      }
+
+      await this.processUnmatchedWeeklyDetail(detail, wklType, contacts.id, contacts.caseNumber)
+    }
+
+    this.processedBatchIds.add(batchDetail.batchId)
 
     if (batchDetail.transactionType !== wklType) {
       this.logger.warn(
@@ -355,5 +363,22 @@ export class PollCraResponseHandler extends BaseJob {
       this.recordsWklSkipped++
       return
     }
+  }
+
+  private async processUnmatchedWeeklyDetail(
+    detail: DetailRecord04,
+    wklType: string,
+    contactId: number,
+    caseNumber: string,
+  ): Promise<void> {
+    const batchCreatedResult = await this.batchesService.createWklBatchForUnmatchedRecords()
+    this.processedBatchIds.add(batchCreatedResult.id)
+    await this.batchesService.createBatchDetailsForWklUnmatchedRecords(
+      batchCreatedResult.id,
+      contactId,
+      wklType,
+      detail.status,
+      caseNumber,
+    )
   }
 }

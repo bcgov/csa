@@ -16,6 +16,7 @@ describe('BatchesService', () => {
         update: vi.fn(),
         findMany: vi.fn(),
         findFirst: vi.fn(),
+        create: vi.fn(),
       },
     }
 
@@ -254,6 +255,32 @@ describe('BatchesService', () => {
           },
         },
       )
+    })
+  })
+
+  describe('createWklBatchForUnmatchedRecords', () => {
+    it('should create a batch with initiatedBy CRA and status in_progress', async () => {
+      mockPrisma.batch.create.mockResolvedValue({
+        id: 99,
+        initiatedBy: 'CRA',
+        status: 'in_progress',
+        recordCount: 0,
+        batchDate: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        systemComments: null,
+      })
+
+      const batch = await service.createWklBatchForUnmatchedRecords()
+
+      expect(mockPrisma.batch.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          initiatedBy: 'CRA',
+          status: 'in_progress',
+          recordCount: 0,
+        }),
+      })
+      expect(batch.id).toBe(99)
     })
   })
 })

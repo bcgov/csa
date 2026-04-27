@@ -28,6 +28,13 @@ export interface MatchedBatchDetail {
   contact: { din: string | null }
 }
 
+export interface MatchedContact {
+  id: number
+  din: string | null
+  csaStatus: string | null
+  caseNumber: string | null
+}
+
 @Injectable()
 export class WeeklyContactMatcherService {
   private readonly logger = new AppLogger(WeeklyContactMatcherService.name)
@@ -114,5 +121,57 @@ export class WeeklyContactMatcherService {
       systemComments: detail.systemComments,
       contact: detail.contact,
     }
+  }
+
+  async findMatchingContact(wklDetail: WklChildDetails): Promise<MatchedContact | null> {
+    const din = wklDetail.childDin?.trim()
+
+    // Step 1: DIN match
+    if (din) {
+      const dinMatches = await this.prisma.contact.findMany({
+        where: { din },
+        select: { id: true, din: true, csaStatus: true, caseNumber: true },
+      })
+      if (dinMatches.length === 1) return dinMatches[0]
+      if (dinMatches.length > 1) {
+        this.logger.warn(`WKL contact match: multiple contacts with DIN ${din}, skipping`)
+        return null
+      }
+      this.logger.log(`WKL contact match: DIN ${din} not found, falling back to child details`)
+    }
+
+    // Step 2: Child details match against contacts table
+    const detailMatches = await this.prisma.contact.findMany({
+      where: {
+        firstName: wklDetail.childGivenName.trim(),
+        lastName: wklDetail.childSurName.trim(),
+        gender: wklDetail.childSex.trim(),
+        dateOfBirth: this.parseWklDate(wklDetail.childBirthDate),
+        birthCity: wklDetail.childBirthCity.trim(),
+        birthProvince: wklDetail.childBirthProv.trim(),
+        birthCountry: wklDetail.childBirthCountry.trim(),
+      },
+      select: { id: true, din: true, csaStatus: true, caseNumber: true },
+    })
+
+    if (detailMatches.length === 1) return detailMatches[0]
+
+    if (detailMatches.length > 1) {
+      this.logger.warn(
+        `WKL contact match: multiple contacts (${detailMatches.length}) for ` +
+          `${wklDetail.childGivenName.trim()} ${wklDetail.childSurName.trim()}, skipping`,
+      )
+      return null
+    }
+
+    return null
+  }
+
+  private parseWklDate(dateStr: string): Date | undefined {
+    if (!dateStr || dateStr.trim().length !== 8) return undefined
+    const y = dateStr.substring(0, 4)
+    const m = dateStr.substring(4, 6)
+    const d = dateStr.substring(6, 8)
+    return new Date(`${y}-${m}-${d}`)
   }
 }

@@ -14,6 +14,9 @@ import { CANCEL_REASON_LABELS } from 'src/sync/eligibility/cancellation/cancella
 import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
 import { ContactsService } from '../contacts/contacts.service'
 import { BulkOperationResponse } from '../contacts/interfaces'
+import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
+
+const { WEEKLY_FILE, BATCH_INITIATED_BY, CREATED_BY, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
 export interface AddContactsResult extends BulkOperationResponse {
   batch: {
@@ -203,6 +206,33 @@ export class BatchesService {
     }
 
     return enrichLabels(pendingBatch)
+  }
+
+  async createWklBatchForUnmatchedRecords() {
+    const existingBatch = await this.prisma.batch.findFirst({
+      where: {
+        initiatedBy: BATCH_INITIATED_BY.CRA,
+        status: BATCH_STATUS.IN_PROGRESS,
+      },
+    })
+
+    if (existingBatch) {
+      this.logger.warn(
+        `Attempted to create WKL batch for unmatched records, but batch ${existingBatch.id} is already in progress. ` +
+          `This should not happen as we check for unmatched records before creating the batch, but it could occur in rare cases of high concurrency. ` +
+          `Please review batch ${existingBatch.id} for details.`,
+      )
+      return existingBatch
+    }
+    return this.prisma.batch.create({
+      data: {
+        batchDate: new Date(),
+        initiatedBy: BATCH_INITIATED_BY.CRA,
+        status: BATCH_STATUS.IN_PROGRESS,
+        recordCount: 0,
+        createdAt: new Date(),
+      },
+    })
   }
 
   async addContactsToPendingBatch(
@@ -435,5 +465,33 @@ export class BatchesService {
         },
       }),
     ])
+  }
+
+  async createBatchDetailsForWklUnmatchedRecords(
+    batchId: number,
+    contactId: number,
+    transactionType: string,
+    craStatus: string,
+    caseNumber: string,
+  ): Promise<void> {
+    const now = new Date()
+    await this.prisma.$transaction(async (tx) => {
+      const batchDetail = await tx.contactBatchDetail.create({
+        data: {
+          contactId,
+          batchId,
+          transactionType,
+          status: WEEKLY_FILE.STATUS[craStatus.toUpperCase()],
+          createdAt: now,
+          createdBy: CREATED_BY.SYSTEM,
+          lastUpdatedAt: now,
+          lastUpdatedBy: UPDATED_BY.SYSTEM,
+        },
+      })
+      await tx.contactBatchDetail.update({
+        where: { id: batchDetail.id },
+        data: { referenceNumber: `${caseNumber}-${batchDetail.id}` },
+      })
+    })
   }
 }

@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common'
 import { AppLogger } from 'src/common/logger/app-logger'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
 import {
   getAgeCutoffDate,
   isEligibleAge,
@@ -546,11 +545,9 @@ export class EligibilityService {
 
     this.logger.log(`Step counts: ${JSON.stringify(stats.stepCounts)}, updates: ${updates.length}`)
 
-    let validRows: UpsertContext[] = []
     if (updates.length > 0) {
       const upsertResult = await this.upsertContacts(updates)
       stats.skipped = upsertResult.skipped
-      validRows = upsertResult.validRows
     }
 
     this.logger.log(

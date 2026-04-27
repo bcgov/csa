@@ -465,7 +465,10 @@ describe('EligibilityService', () => {
   })
 
   it('should process mixed eligible and not_eligible_in_pay contacts in same run', async () => {
-    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeEligibleContact(), makeInPayCancelContact()])
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+      makeEligibleContact(),
+      makeInPayCancelContact(),
+    ])
 
     const result = await service.run()
 

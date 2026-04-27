@@ -186,5 +186,4 @@ export class AutoBatchService {
 
     return { application: appDbIds.length, cancellation: cancelDbIds.length }
   }
-
 }

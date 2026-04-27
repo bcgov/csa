@@ -46,8 +46,12 @@ describe('IngestDataHandler', () => {
       expect(result.success).toBe(true)
       expect(result.message).toBe('Data ingestion completed successfully')
       expect(runJobTypeSpy).toHaveBeenCalledTimes(2)
-      expect(runJobTypeSpy).toHaveBeenCalledWith(JobType.INGEST_ICM, JobTrigger.CRON, { parentJobId: 1 })
-      expect(runJobTypeSpy).toHaveBeenCalledWith(JobType.INGEST_MIS, JobTrigger.CRON, { parentJobId: 1 })
+      expect(runJobTypeSpy).toHaveBeenCalledWith(JobType.INGEST_ICM, JobTrigger.CRON, {
+        parentJobId: 1,
+      })
+      expect(runJobTypeSpy).toHaveBeenCalledWith(JobType.INGEST_MIS, JobTrigger.CRON, {
+        parentJobId: 1,
+      })
     })
   })
 
@@ -80,6 +84,5 @@ describe('IngestDataHandler', () => {
       expect(result.success).toBe(false)
       expect(result.message).toBe('Ingestion failed')
     })
-
   })
 })

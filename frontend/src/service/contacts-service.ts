@@ -388,3 +388,49 @@ export const updateOver18Status = async (
   })
   return response.data
 }
+
+/**
+ * Eligibility run result
+ */
+export interface EligibilityRunResult {
+  processed: number
+  statusChanges: number
+  newContacts: number
+  skipped: number
+  stepCounts: {
+    step7: number
+    step8: number
+    step9: number
+    step10: number
+    noChange: number
+  }
+}
+
+/**
+ * Result from running eligibility for a single contact
+ */
+export interface ContactEligibilityResult {
+  previousStatus: string | null
+  newStatus: string
+}
+
+/**
+ * Run eligibility query for a specific contact
+ * @param contactId - Contact ID to run eligibility for
+ */
+export const runEligibilityForContact = async (
+  contactId: number,
+): Promise<ContactEligibilityResult> => {
+  const response = await APIService.getAxiosInstance().post(
+    `/contacts/${contactId}/run-eligibility`,
+  )
+  return response.data
+}
+
+/**
+ * Run eligibility query for all contacts
+ */
+export const runEligibilityForAll = async (): Promise<EligibilityRunResult> => {
+  const response = await APIService.getAxiosInstance().post('/contacts/run-eligibility')
+  return response.data
+}

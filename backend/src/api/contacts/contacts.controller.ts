@@ -12,8 +12,8 @@ import {
 } from '@nestjs/common'
 import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
-import { ContactIdsDto, ContactIdsWithActionDto } from '../common/dto/contact-ids.dto'
 import { CurrentUser } from '../common/decorators'
+import { ContactIdsDto, ContactIdsWithActionDto } from '../common/dto/contact-ids.dto'
 import { CSAGuard } from '../common/guards/csa.guard'
 import { ContactsService } from './contacts.service'
 import { ContactDto } from './dto/contact.dto'
@@ -175,6 +175,34 @@ export class ContactsController {
   @ApiResponse({ status: 404, description: 'Contact not found' })
   async findContactBatches(@Param('id', ParseIntPipe) id: number) {
     return this.contactsService.findContactBatches(id)
+  }
+
+  @Post('run-eligibility')
+  @HttpCode(200)
+  @ApiResponse({
+    status: 200,
+    description: 'Eligibility run result for all contacts',
+    schema: {
+      properties: {
+        processed: { type: 'number' },
+        statusChanges: { type: 'number' },
+        newContacts: { type: 'number' },
+        skipped: { type: 'number' },
+        stepCounts: {
+          type: 'object',
+          properties: {
+            step7: { type: 'number' },
+            step8: { type: 'number' },
+            step9: { type: 'number' },
+            step10: { type: 'number' },
+            noChange: { type: 'number' },
+          },
+        },
+      },
+    },
+  })
+  async runEligibilityForAll() {
+    return this.contactsService.runAllContactsEligibility()
   }
 
   @Post(':id/run-eligibility')

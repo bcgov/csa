@@ -12,6 +12,7 @@ import {
   FormControl,
   IconButton,
   InputAdornment,
+  LinearProgress,
   Menu,
   MenuItem,
   Pagination,
@@ -46,6 +47,8 @@ import {
   holdContacts,
   removeContactFromBatch,
   resumeContacts,
+  runEligibilityForAll,
+  runEligibilityForContact,
   updateEligibilityStatus,
   updateNotEligibleStatusAlt,
   updateOver18Status,
@@ -53,6 +56,8 @@ import {
   type BatchContactDetail,
   type Contact,
   type ContactBatchDetail,
+  type ContactEligibilityResult,
+  type EligibilityRunResult,
 } from './service/contacts-service'
 import type { AppEnvironment } from './types/runtime-config'
 
@@ -298,6 +303,14 @@ function App() {
     message: '',
     severity: 'success',
   })
+
+  // Run Eligibility Query dropdown menu state
+  const [eligibilityMenuAnchor, setEligibilityMenuAnchor] = useState<null | HTMLElement>(null)
+  const eligibilityMenuOpen = Boolean(eligibilityMenuAnchor)
+  const [isRunningEligibilityAll, setIsRunningEligibilityAll] = useState(false)
+  const [runningEligibilityContactId, setRunningEligibilityContactId] = useState<number | null>(
+    null,
+  )
 
   // Effect to show CSA access alert from auth context
   useEffect(() => {
@@ -1229,6 +1242,103 @@ function App() {
         message: errorMessage,
         severity: 'error',
       })
+    }
+  }
+
+  // Run Eligibility Query menu handlers
+  const handleEligibilityMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setEligibilityMenuAnchor(event.currentTarget)
+  }
+
+  const handleEligibilityMenuClose = () => {
+    setEligibilityMenuAnchor(null)
+  }
+
+  const handleRunEligibilityForAll = async () => {
+    handleEligibilityMenuClose()
+    setIsRunningEligibilityAll(true)
+    try {
+      setSnackbar({
+        open: true,
+        message: 'Running eligibility query on all contacts...',
+        severity: 'info',
+      })
+
+      const result: EligibilityRunResult = await runEligibilityForAll()
+
+      const message = `Eligibility complete: ${result.processed} processed, ${result.statusChanges} updated, ${result.skipped} skipped`
+      setSnackbar({
+        open: true,
+        message,
+        severity: result.statusChanges > 0 ? 'success' : 'info',
+      })
+
+      // Refresh the list if there were changes
+      if (result.statusChanges > 0) {
+        if (isSearchActive && searchTerm.trim().length >= 3) {
+          await performFullTextSearch(searchTerm.trim(), currentPage)
+        } else {
+          await fetchContacts(currentPage)
+        }
+      }
+    } catch (error: any) {
+      console.error('Run eligibility for all error:', error)
+      const errorMessage =
+        error?.response?.data?.message || error?.message || 'Failed to run eligibility query'
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error',
+      })
+    } finally {
+      setIsRunningEligibilityAll(false)
+    }
+  }
+
+  const handleRunEligibilityForSelected = async () => {
+    handleEligibilityMenuClose()
+    if (selected.length !== 1) return
+
+    const contactId = selected[0]
+    setRunningEligibilityContactId(contactId)
+    try {
+      setSnackbar({
+        open: true,
+        message: 'Running eligibility query on selected contact...',
+        severity: 'info',
+      })
+
+      const result: ContactEligibilityResult = await runEligibilityForContact(contactId)
+
+      const statusChanged = result.previousStatus !== result.newStatus
+      const message = statusChanged
+        ? `Eligibility updated for contact ${contactId}: ${result.previousStatus || 'none'} → ${result.newStatus}`
+        : `No eligibility changes for contact ${contactId}`
+      setSnackbar({
+        open: true,
+        message,
+        severity: statusChanged ? 'success' : 'info',
+      })
+
+      // Refresh the list if there were changes
+      if (statusChanged) {
+        if (isSearchActive && searchTerm.trim().length >= 3) {
+          await performFullTextSearch(searchTerm.trim(), currentPage)
+        } else {
+          await fetchContacts(currentPage)
+        }
+      }
+    } catch (error: any) {
+      console.error('Run eligibility for contact error:', error)
+      const errorMessage =
+        error?.response?.data?.message || error?.message || 'Failed to run eligibility query'
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error',
+      })
+    } finally {
+      setRunningEligibilityContactId(null)
     }
   }
 
@@ -2366,9 +2476,52 @@ function App() {
                       </Select>
                     </FormControl>
                     <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={handleEligibilityMenuOpen}
+                      disabled={isRunningEligibilityAll}
+                      sx={{
+                        textTransform: 'none',
+                      }}
+                    >
+                      {isRunningEligibilityAll ? 'Running Eligibility...' : 'Run Eligibility Query'}
+                      <Tooltip
+                        title="Run eligibility rules against staging data to update contact CSA status"
+                        arrow
+                      >
+                        <InfoOutlinedIcon
+                          fontSize="small"
+                          sx={{ ml: 0.5, fontSize: '16px', color: 'inherit' }}
+                        />
+                      </Tooltip>
+                      <Box component="span" sx={{ ml: 0.5 }}>
+                        ▾
+                      </Box>
+                    </Button>
+                    <Menu
+                      anchorEl={eligibilityMenuAnchor}
+                      open={eligibilityMenuOpen}
+                      onClose={handleEligibilityMenuClose}
+                    >
+                      <MenuItem
+                        onClick={handleRunEligibilityForAll}
+                        disabled={isRunningEligibilityAll}
+                      >
+                        Run eligibility query on all Contacts
+                      </MenuItem>
+                      {selected.length === 1 && (
+                        <MenuItem
+                          onClick={handleRunEligibilityForSelected}
+                          disabled={isRunningEligibilityAll}
+                        >
+                          Run eligibility query on selected contact
+                        </MenuItem>
+                      )}
+                    </Menu>
+                    <Button
                       variant="contained"
                       size="small"
-                      disabled={!canAddToBatch}
+                      disabled={!canAddToBatch || isRunningEligibilityAll}
                       onClick={handleAddToBatch}
                       sx={{
                         textTransform: 'none',
@@ -2383,7 +2536,7 @@ function App() {
                     <Button
                       variant="outlined"
                       size="small"
-                      disabled={!canHoldResume}
+                      disabled={!canHoldResume || isRunningEligibilityAll}
                       onClick={handleHoldResume}
                       sx={{
                         textTransform: 'none',
@@ -2398,11 +2551,12 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canUpdateEligibility}
+                      disabled={!canUpdateEligibility || isRunningEligibilityAll}
                       onClick={handleCSAEligible}
                       sx={{
                         textTransform: 'none',
-                        backgroundColor: canUpdateEligibility ? '#1976d2' : undefined,
+                        backgroundColor:
+                          canUpdateEligibility && !isRunningEligibilityAll ? '#1976d2' : undefined,
                         '&.Mui-disabled': {
                           opacity: 0.5,
                           cursor: 'not-allowed',
@@ -2414,11 +2568,12 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canUpdateNotEligible}
+                      disabled={!canUpdateNotEligible || isRunningEligibilityAll}
                       onClick={handleCSANotEligible}
                       sx={{
                         textTransform: 'none',
-                        backgroundColor: canUpdateNotEligible ? '#d32f2f' : undefined,
+                        backgroundColor:
+                          canUpdateNotEligible && !isRunningEligibilityAll ? '#d32f2f' : undefined,
                         '&.Mui-disabled': {
                           opacity: 0.5,
                           cursor: 'not-allowed',
@@ -2430,11 +2585,12 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canUpdateOver18}
+                      disabled={!canUpdateOver18 || isRunningEligibilityAll}
                       onClick={handleChildOver18}
                       sx={{
                         textTransform: 'none',
-                        backgroundColor: canUpdateOver18 ? '#ff9800' : undefined,
+                        backgroundColor:
+                          canUpdateOver18 && !isRunningEligibilityAll ? '#ff9800' : undefined,
                         '&.Mui-disabled': {
                           opacity: 0.5,
                           cursor: 'not-allowed',
@@ -2446,6 +2602,17 @@ function App() {
                   </Box>
                 </Box>
 
+                {/* Eligibility running banner */}
+                {isRunningEligibilityAll && (
+                  <Box sx={{ mb: 2 }}>
+                    <Alert severity="info" sx={{ mb: 1 }}>
+                      Eligibility query is running in the background. Editing is disabled until the
+                      process completes.
+                    </Alert>
+                    <LinearProgress />
+                  </Box>
+                )}
+
                 {/* Table */}
                 <TableContainer component={Paper} sx={{ boxShadow: 1 }}>
                   <Table size="small">
@@ -2453,6 +2620,7 @@ function App() {
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                         <TableCell padding="checkbox">
                           <Checkbox
+                            disabled={isRunningEligibilityAll}
                             indeterminate={
                               selected.length > 0 &&
                               selected.length < filteredData.length &&
@@ -2783,12 +2951,21 @@ function App() {
                           onClick={() => handleContactClick(row.id)}
                           sx={{
                             '&:hover': { backgroundColor: '#f9f9f9' },
-                            cursor: 'pointer',
-                            backgroundColor: selectedChild === row.id ? '#e0e0e0' : 'inherit',
+                            cursor: runningEligibilityContactId === row.id ? 'wait' : 'pointer',
+                            backgroundColor:
+                              runningEligibilityContactId === row.id
+                                ? '#fff3e0'
+                                : selectedChild === row.id
+                                  ? '#e0e0e0'
+                                  : 'inherit',
+                            opacity: runningEligibilityContactId === row.id ? 0.7 : 1,
                           }}
                         >
                           <TableCell padding="checkbox">
                             <Checkbox
+                              disabled={
+                                isRunningEligibilityAll || runningEligibilityContactId === row.id
+                              }
                               checked={selected.includes(row.id)}
                               onChange={(e) => {
                                 e.stopPropagation()

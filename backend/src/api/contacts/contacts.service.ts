@@ -612,6 +612,15 @@ export class ContactsService {
     )
   }
 
+  /**
+   * Run eligibility rules for all contacts (full load mode).
+   * Returns statistics about the eligibility run.
+   */
+  async runAllContactsEligibility() {
+    this.logger.log('Running eligibility for all contacts')
+    return this.eligibilityService.run(null)
+  }
+
   async runContactEligibility(
     contactId: number,
   ): Promise<{ previousStatus: string | null; newStatus: string }> {

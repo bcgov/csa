@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common'
 import { AppLogger } from 'src/common/logger/app-logger'
-import { ConfigService } from '@nestjs/config'
 import { PrismaService } from 'src/common/database/prisma.service'
 import {
   getAgeCutoffDate,
@@ -9,10 +8,9 @@ import {
   pacificToday,
   parseISODatePacific,
 } from 'src/common/utils'
-import { JobType } from 'src/jobs/enums/job-type.enum'
-import { JobsService } from 'src/jobs/jobs.service'
 import { CANCEL_REASON } from './cancellation/cancellation-reason.constants'
 import { ELIGIBILITY_CONFIG, PROTECTED_STATUSES } from './eligibility.config'
+import { EligibilityInputError } from './eligibility.errors'
 import { buildFindAgedOutContactIdsSql, buildLoadContactProfilesSql } from './eligibility.queries'
 import {
   AgreementRecord,
@@ -439,11 +437,7 @@ const UPSERT_SQL = `
 export class EligibilityService {
   private readonly logger = new AppLogger(EligibilityService.name)
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly jobsService: JobsService,
-    private readonly configService: ConfigService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async validateStagingTables(): Promise<void> {
     const sql = REQUIRED_STAGING_TABLES.map(
@@ -463,12 +457,11 @@ export class EligibilityService {
     )
   }
 
-  async run(): Promise<EligibilityRunResult> {
+  async run(threshold: Date | null): Promise<EligibilityRunResult> {
     const referenceDate = pacificToday()
 
     await this.validateStagingTables()
 
-    const threshold = await this.computeThreshold()
     this.logger.log(
       threshold
         ? `Incremental mode: threshold ${threshold.toISOString()}`
@@ -557,14 +550,6 @@ export class EligibilityService {
     return stats
   }
 
-  private async computeThreshold(): Promise<Date | null> {
-    const lastSuccess = await this.jobsService.getLastSuccessTimestamp(JobType.RUN_ELIGIBILITY)
-    if (!lastSuccess) return null
-
-    const lookbackDays = this.configService.get<number>('sync.eligibilityLookbackDays')!
-    return new Date(lastSuccess.getTime() - lookbackDays * 24 * 60 * 60 * 1000)
-  }
-
   private async findAgedOutContactIds(referenceDate: Date): Promise<string[]> {
     const cutoff = getAgeCutoffDate(referenceDate)
     const { sql, params } = buildFindAgedOutContactIdsSql(cutoff)
@@ -572,11 +557,55 @@ export class EligibilityService {
     return rows.map((row) => row.person_id_icm)
   }
 
+  async runForContact(
+    personIdIcm: string,
+  ): Promise<{ previousStatus: string | null; newStatus: string }> {
+    const referenceDate = pacificToday()
+    const profiles = await this.loadContactProfiles(null, undefined, personIdIcm)
+
+    if (profiles.length === 0) {
+      throw new EligibilityInputError(`Contact ${personIdIcm} not found in staging tables`)
+    }
+
+    const profile = profiles[0]
+    const previousStatus = profile.csaStatus ?? null
+
+    if (
+      profile.csaStatus &&
+      (PROTECTED_STATUSES as readonly string[]).includes(profile.csaStatus)
+    ) {
+      await this.upsertContacts([
+        {
+          profile,
+          result: {
+            newStatus: profile.csaStatus,
+            cancelReasonCode: profile.cancelReasonCode,
+            careEndDate: profile.careEndDate,
+          },
+        },
+      ])
+      return { previousStatus, newStatus: profile.csaStatus }
+    }
+
+    if (!profile.dateOfBirth) {
+      throw new EligibilityInputError(`Contact ${personIdIcm} has no date of birth in staging`)
+    }
+
+    const result = runEligibility(profile, RULES, referenceDate)
+    if (!result) {
+      throw new EligibilityInputError(`No eligibility result for contact ${personIdIcm}`)
+    }
+
+    await this.upsertContacts([{ profile, result }])
+    return { previousStatus, newStatus: result.newStatus }
+  }
+
   private async loadContactProfiles(
     threshold: Date | null,
     agedOutContactIds?: string[],
+    personIdIcm?: string,
   ): Promise<ContactProfile[]> {
-    const { sql, params } = buildLoadContactProfilesSql(threshold, agedOutContactIds)
+    const { sql, params } = buildLoadContactProfilesSql(threshold, agedOutContactIds, personIdIcm)
     const rows = await this.prisma.$queryRawUnsafe<any[]>(sql, ...params)
 
     return rows.map((raw) => {

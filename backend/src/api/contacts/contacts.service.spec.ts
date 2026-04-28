@@ -1,8 +1,10 @@
-import { NotFoundException } from '@nestjs/common'
+import { NotFoundException, UnprocessableEntityException } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
+import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
+import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { ContactsService } from './contacts.service'
 
@@ -65,6 +67,12 @@ describe('ContactsService', () => {
           provide: IcmSyncBackService,
           useValue: {
             syncSingleContact: vi.fn().mockResolvedValue(true),
+          },
+        },
+        {
+          provide: EligibilityService,
+          useValue: {
+            runForContact: vi.fn(),
           },
         },
         {
@@ -1375,6 +1383,97 @@ describe('ContactsService', () => {
 
       await expect(service.findContactBatches(999)).rejects.toThrow(NotFoundException)
       await expect(service.findContactBatches(999)).rejects.toThrow('Contact 999 not found')
+    })
+  })
+
+  describe('runContactEligibility', () => {
+    it('should throw NotFoundException when contact does not exist', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(null)
+
+      await expect(service.runContactEligibility(999)).rejects.toThrow(NotFoundException)
+      await expect(service.runContactEligibility(999)).rejects.toThrow('Contact 999 not found')
+    })
+
+    it('should map EligibilityInputError to UnprocessableEntityException', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({ personIdIcm: 'ICM-1' } as any)
+      const eligibility = service['eligibilityService'] as { runForContact: any }
+      eligibility.runForContact = vi
+        .fn()
+        .mockRejectedValue(new EligibilityInputError('Contact ICM-1 not found in staging tables'))
+
+      await expect(service.runContactEligibility(1)).rejects.toThrow(UnprocessableEntityException)
+      await expect(service.runContactEligibility(1)).rejects.toThrow(
+        'Contact ICM-1 not found in staging tables',
+      )
+    })
+
+    it('should propagate generic Errors without wrapping (becomes 500 at HTTP layer)', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({ personIdIcm: 'ICM-1' } as any)
+      const eligibility = service['eligibilityService'] as { runForContact: any }
+      const dbError = new Error('connection terminated unexpectedly')
+      eligibility.runForContact = vi.fn().mockRejectedValue(dbError)
+
+      await expect(service.runContactEligibility(1)).rejects.toBe(dbError)
+      // Specifically must NOT have been rewrapped as a 422
+      await expect(service.runContactEligibility(1)).rejects.not.toBeInstanceOf(
+        UnprocessableEntityException,
+      )
+    })
+
+    it('should return previous and new status on success', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({ personIdIcm: 'ICM-1' } as any)
+      const eligibility = service['eligibilityService'] as { runForContact: any }
+      eligibility.runForContact = vi
+        .fn()
+        .mockResolvedValue({ previousStatus: 'eligible', newStatus: 'in_pay' })
+
+      await expect(service.runContactEligibility(1)).resolves.toEqual({
+        previousStatus: 'eligible',
+        newStatus: 'in_pay',
+      })
+      expect(eligibility.runForContact).toHaveBeenCalledWith('ICM-1')
+    })
+
+    it('should trigger immediate ICM sync when csa_status changed', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({ personIdIcm: 'ICM-1' } as any)
+      const eligibility = service['eligibilityService'] as { runForContact: any }
+      eligibility.runForContact = vi
+        .fn()
+        .mockResolvedValue({ previousStatus: 'eligible', newStatus: 'in_pay' })
+      const icmSync = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
+
+      await service.runContactEligibility(1)
+
+      expect(icmSync).toHaveBeenCalledWith(1)
+    })
+
+    it('should NOT trigger ICM sync when csa_status is unchanged', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({ personIdIcm: 'ICM-1' } as any)
+      const eligibility = service['eligibilityService'] as { runForContact: any }
+      eligibility.runForContact = vi
+        .fn()
+        .mockResolvedValue({ previousStatus: 'eligible', newStatus: 'eligible' })
+      const icmSync = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
+
+      await service.runContactEligibility(1)
+
+      expect(icmSync).not.toHaveBeenCalled()
+    })
+
+    it('should not throw if syncSingleContact fails (flag stays for retry sweep)', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({ personIdIcm: 'ICM-1' } as any)
+      const eligibility = service['eligibilityService'] as { runForContact: any }
+      eligibility.runForContact = vi
+        .fn()
+        .mockResolvedValue({ previousStatus: 'eligible', newStatus: 'in_pay' })
+      vi.spyOn(service['icmSyncBackService'], 'syncSingleContact').mockRejectedValue(
+        new Error('ICM down'),
+      )
+
+      await expect(service.runContactEligibility(1)).resolves.toEqual({
+        previousStatus: 'eligible',
+        newStatus: 'in_pay',
+      })
     })
   })
 })

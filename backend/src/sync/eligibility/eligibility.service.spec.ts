@@ -1,7 +1,5 @@
-import { ConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { JobsService } from 'src/jobs/jobs.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildFindAgedOutContactIdsSql, buildLoadContactProfilesSql } from './eligibility.queries'
 import { EligibilityService } from './eligibility.service'
@@ -12,8 +10,6 @@ describe('EligibilityService', () => {
     $queryRawUnsafe: ReturnType<typeof vi.fn>
     $executeRawUnsafe: ReturnType<typeof vi.fn>
   }
-  let mockJobsService: { getLastSuccessTimestamp: ReturnType<typeof vi.fn> }
-  let mockConfigService: { get: ReturnType<typeof vi.fn> }
 
   const allTablesPopulated = [
     'stg_icm_cases',
@@ -33,21 +29,8 @@ describe('EligibilityService', () => {
       $executeRawUnsafe: vi.fn().mockResolvedValue(0),
     }
 
-    mockJobsService = {
-      getLastSuccessTimestamp: vi.fn().mockResolvedValue(null), // default: full load
-    }
-
-    mockConfigService = {
-      get: vi.fn().mockReturnValue(2), // lookback days
-    }
-
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        EligibilityService,
-        { provide: PrismaService, useValue: mockPrisma },
-        { provide: JobsService, useValue: mockJobsService },
-        { provide: ConfigService, useValue: mockConfigService },
-      ],
+      providers: [EligibilityService, { provide: PrismaService, useValue: mockPrisma }],
     }).compile()
 
     service = module.get<EligibilityService>(EligibilityService)
@@ -65,19 +48,19 @@ describe('EligibilityService', () => {
     )
     mockPrisma.$queryRawUnsafe.mockReset().mockResolvedValueOnce(partiallyEmpty)
 
-    await expect(service.run()).rejects.toThrow(
+    await expect(service.run(null)).rejects.toThrow(
       'Staging validation failed: empty tables [stg_icm_cases, stg_mis_payments]',
     )
   })
 
   it('should proceed when all staging tables have data', async () => {
-    const result = await service.run()
+    const result = await service.run(null)
     expect(result.processed).toBe(0)
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(expect.stringContaining('UNION ALL'))
   })
 
   it('should return zero counts when no staging data', async () => {
-    const result = await service.run()
+    const result = await service.run(null)
     expect(result.processed).toBe(0)
     expect(result.statusChanges).toBe(0)
   })
@@ -126,7 +109,7 @@ describe('EligibilityService', () => {
       },
     ])
 
-    const result = await service.run()
+    const result = await service.run(null)
     expect(result.processed).toBe(1)
   })
 
@@ -180,7 +163,7 @@ describe('EligibilityService', () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
       makeOver18Contact({ personIdIcm: null, existingContactId: 99 }),
     ])
-    const result = await service.run()
+    const result = await service.run(null)
 
     expect(result.statusChanges).toBe(1)
     expect(result.skipped).toBe(1)
@@ -197,7 +180,7 @@ describe('EligibilityService', () => {
       makeOver18Contact({ personIdIcm: null, existingContactId: 99 }),
     ])
 
-    const result = await service.run()
+    const result = await service.run(null)
 
     expect(result.statusChanges).toBe(2)
     expect(result.skipped).toBe(1)
@@ -210,7 +193,7 @@ describe('EligibilityService', () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
       makeOver18Contact({ personIdIcm: null, existingContactId: 99 }),
     ])
-    await service.run()
+    await service.run(null)
 
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('person_id_icm'),
@@ -226,7 +209,7 @@ describe('EligibilityService', () => {
       makeOver18Contact({ personIdIcm: 'ICM-HOLD', csaStatus: 'on_hold', existingContactId: 99 }),
     ])
 
-    const result = await service.run()
+    const result = await service.run(null)
 
     expect(result.processed).toBe(1)
     expect(result.statusChanges).toBe(0)
@@ -239,7 +222,7 @@ describe('EligibilityService', () => {
       makeOver18Contact({ personIdIcm: 'ICM-ELIG', csaStatus: 'eligible', existingContactId: 88 }),
     ])
 
-    const result = await service.run()
+    const result = await service.run(null)
 
     expect(result.processed).toBe(2)
     expect(result.statusChanges).toBe(1)
@@ -251,7 +234,7 @@ describe('EligibilityService', () => {
       makeEligibleContact({ csaStatus: 'eligible', existingContactId: 10 }),
     ])
 
-    const result = await service.run()
+    const result = await service.run(null)
 
     expect(result.processed).toBe(1)
     expect(result.statusChanges).toBe(0)
@@ -259,23 +242,19 @@ describe('EligibilityService', () => {
     expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1) // upsert only
   })
 
-  it('should pass threshold to query when last success exists', async () => {
-    const lastSuccess = new Date('2026-02-14T10:00:00Z')
-    mockJobsService.getLastSuccessTimestamp.mockResolvedValue(lastSuccess)
+  it('should pass threshold to query when threshold is provided', async () => {
+    const threshold = new Date('2026-02-12T10:00:00Z') // already computed by handler
 
-    await service.run()
+    await service.run(threshold)
 
-    const expectedThreshold = new Date(lastSuccess.getTime() - 2 * 24 * 60 * 60 * 1000)
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
       expect.stringContaining('changed_contacts'),
-      expectedThreshold,
+      threshold,
     )
   })
 
-  it('should use full load when no previous success', async () => {
-    mockJobsService.getLastSuccessTimestamp.mockResolvedValue(null)
-
-    await service.run()
+  it('should use full load when threshold is null', async () => {
+    await service.run(null)
 
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
       expect.not.stringContaining('changed_contacts'),
@@ -283,10 +262,9 @@ describe('EligibilityService', () => {
   })
 
   it('should query for aged-out contacts in incremental mode', async () => {
-    const lastSuccess = new Date('2026-02-14T10:00:00Z')
-    mockJobsService.getLastSuccessTimestamp.mockResolvedValue(lastSuccess)
+    const threshold = new Date('2026-02-12T10:00:00Z')
 
-    await service.run()
+    await service.run(threshold)
 
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
       expect.stringContaining('csa_status IN'),
@@ -295,9 +273,7 @@ describe('EligibilityService', () => {
   })
 
   it('should not query for aged-out contacts in full load mode', async () => {
-    mockJobsService.getLastSuccessTimestamp.mockResolvedValue(null)
-
-    await service.run()
+    await service.run(null)
 
     expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalledWith(
       expect.stringContaining('csa_status IN'),
@@ -306,19 +282,17 @@ describe('EligibilityService', () => {
   })
 
   it('should include aged-out IDs in profile query when found', async () => {
-    const lastSuccess = new Date('2026-02-14T10:00:00Z')
-    mockJobsService.getLastSuccessTimestamp.mockResolvedValue(lastSuccess)
+    const threshold = new Date('2026-02-12T10:00:00Z')
 
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([{ person_id_icm: 'AGED-1' }, { person_id_icm: 'AGED-2' }]) // aged-out query
       .mockResolvedValueOnce([]) // loadContactProfiles
 
-    await service.run()
+    await service.run(threshold)
 
-    const expectedThreshold = new Date(lastSuccess.getTime() - 2 * 24 * 60 * 60 * 1000)
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
       expect.stringContaining('ANY($2::TEXT[])'),
-      expectedThreshold,
+      threshold,
       ['AGED-1', 'AGED-2'],
     )
   })

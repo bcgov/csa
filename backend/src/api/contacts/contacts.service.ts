@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
 import {
@@ -11,6 +17,8 @@ import {
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { enrichLabels, isEligibleAge, pacificToday } from 'src/common/utils'
+import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
+import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { ALLOWED_FILTER_SORT_FIELDS, BULK_OPERATION_SKIP_REASONS } from './constants'
 import { ContactDto } from './dto/contact.dto'
@@ -29,6 +37,7 @@ export class ContactsService {
     private prisma: PrismaService,
     private stateMachine: StateMachineService,
     private icmSyncBackService: IcmSyncBackService,
+    private eligibilityService: EligibilityService,
   ) {}
 
   async findAll(
@@ -601,6 +610,42 @@ export class ContactsService {
         batch: enrichLabels(detail.batch),
       }),
     )
+  }
+
+  async runContactEligibility(
+    contactId: number,
+  ): Promise<{ previousStatus: string | null; newStatus: string }> {
+    const contact = await this.prisma.contact.findUnique({
+      where: { id: contactId },
+      select: { personIdIcm: true },
+    })
+
+    if (!contact) {
+      throw new NotFoundException(`Contact ${contactId} not found`)
+    }
+
+    let result: { previousStatus: string | null; newStatus: string }
+    try {
+      result = await this.eligibilityService.runForContact(contact.personIdIcm)
+    } catch (err) {
+      if (err instanceof EligibilityInputError) {
+        throw new UnprocessableEntityException(err.message)
+      }
+      throw err
+    }
+
+    // If the eligibility run flipped csa_status, the upsert flagged
+    // icm_integration_status=true. Try to push immediately; on failure
+    // the flag stays set and the RETRY_FAILED cron will sweep it.
+    if (result.previousStatus !== result.newStatus) {
+      this.icmSyncBackService.syncSingleContact(contactId).catch((err) => {
+        this.logger.warn(
+          `Immediate ICM sync failed for contact ${contactId}: ${(err as Error).message}`,
+        )
+      })
+    }
+
+    return result
   }
 
   // Escape ILIKE special characters to prevent wildcard injection

@@ -1283,8 +1283,17 @@ function App() {
       }
     } catch (error: any) {
       console.error('Run eligibility for all error:', error)
-      const errorMessage =
+      const rawMessage =
         error?.response?.data?.message || error?.message || 'Failed to run eligibility query'
+
+      // Make staging validation errors more user-friendly
+      let errorMessage = rawMessage
+      if (rawMessage.includes('Staging validation failed: empty tables')) {
+        const tableMatch = rawMessage.match(/\[([^\]]+)\]/)
+        const tables = tableMatch ? tableMatch[1] : 'some required tables'
+        errorMessage = `Cannot run eligibility query: staging data is incomplete. Missing data in: ${tables}. Please ensure all data sources have been synced before running the eligibility query.`
+      }
+
       setSnackbar({
         open: true,
         message: errorMessage,
@@ -1330,8 +1339,17 @@ function App() {
       }
     } catch (error: any) {
       console.error('Run eligibility for contact error:', error)
-      const errorMessage =
+      const rawMessage =
         error?.response?.data?.message || error?.message || 'Failed to run eligibility query'
+
+      // Make staging validation errors more user-friendly
+      let errorMessage = rawMessage
+      if (rawMessage.includes('Staging validation failed: empty tables')) {
+        const tableMatch = rawMessage.match(/\[([^\]]+)\]/)
+        const tables = tableMatch ? tableMatch[1] : 'some required tables'
+        errorMessage = `Cannot run eligibility query: staging data is incomplete. Missing data in: ${tables}. Please ensure all data sources have been synced before running the eligibility query.`
+      }
+
       setSnackbar({
         open: true,
         message: errorMessage,

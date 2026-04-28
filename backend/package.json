@@ -20,6 +20,7 @@
     "job:ingest-mis": "node dist/jobs/entrypoints/ingest-mis",
     "job:run-eligibility": "node dist/jobs/entrypoints/run-eligibility",
     "job:sync-icm": "node dist/jobs/entrypoints/sync-icm",
+    "job:auto-batch": "node dist/jobs/entrypoints/auto-batch",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "make-badges": "istanbul-badges-readme --logo=vitest --exitCode=1",

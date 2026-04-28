@@ -294,7 +294,9 @@ export class ContactsService {
     if (
       event === CSA_EVENT.REMOVE_FROM_BATCH ||
       event === CSA_EVENT.CRA_RSP_REJECTED ||
-      event === CSA_EVENT.CRA_FILE_REJECTED
+      event === CSA_EVENT.CRA_FILE_REJECTED ||
+      event === CSA_EVENT.CRA_WKL_APPROVED ||
+      event === CSA_EVENT.CRA_WKL_REFUSED
     ) {
       updateData.preBatchStatus = null
     }

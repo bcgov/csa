@@ -48,6 +48,12 @@ export const CRA_DATA_HANDLING_CONSTANT = {
       ELECTQRONIC: 'E',
       PAPER: ' ',
     },
+    STATUS: {
+      COMPLETED: 'completed',
+      ABANDONED: 'abandoned',
+      IN_PROGRESS: 'in-progress',
+      UPDATED: 'updated',
+    },
   },
   // CRA spec: fileStatCd is 9(02). 2-digit zero-padded string
   FILE_STAT_CODE: {

@@ -76,8 +76,10 @@ const getEnvBackgroundColor = (env?: AppEnvironment): string => {
 const VALID_CSA_STATUSES = [
   'eligible_tbd', // Eligible - TBD
   'application_refused_cra', // Application Refused - CRA
+  'cra_error_application', // CRA Error - Application
   'not_eligible_ip_tbd', // Not Eligible - IP - TBD
   'cancellation_refused_cra', // Cancellation Refused - CRA
+  'cra_error_cancellation', // CRA Error - Cancellation
   'on_hold', // On Hold
 ]
 
@@ -86,9 +88,11 @@ const VALID_BATCH_STATUSES = [
   'eligible', // Eligible
   'eligible_tbd', // Eligible - TBD
   'application_refused_cra', // Application Refused - CRA
+  'cra_error_application', // CRA Error - Application
   'not_eligible_in_pay', // Not Eligible - In Pay
   'not_eligible_ip_tbd', // Not Eligible - IP - TBD
   'cancellation_refused_cra', // Cancellation Refused - CRA
+  'cra_error_cancellation', // CRA Error - Cancellation
 ]
 
 // CSA Status options for filter dropdown
@@ -100,12 +104,14 @@ const CSA_STATUS_FILTER_OPTIONS = [
   { value: 'in_batch_application', label: 'In Batch - Application' },
   { value: 'batch_sent_application', label: 'Batch Sent - Application' },
   { value: 'application_refused_cra', label: 'Application Refused - CRA' },
+  { value: 'cra_error_application', label: 'CRA Error - Application' },
   { value: 'in_pay', label: 'In Pay' },
   { value: 'not_eligible_in_pay', label: 'Not Eligible - In Pay' },
   { value: 'not_eligible_ip_tbd', label: 'Not Eligible - IP - TBD' },
   { value: 'in_batch_cancellation', label: 'In Batch - Cancellation' },
   { value: 'batch_sent_cancellation', label: 'Batch Sent - Cancellation' },
   { value: 'cancellation_refused_cra', label: 'Cancellation Refused - CRA' },
+  { value: 'cra_error_cancellation', label: 'CRA Error - Cancellation' },
   { value: 'over_18', label: 'Over 18' },
 ]
 
@@ -478,6 +484,8 @@ function App() {
             { key: 'csaStatus', op: 'eq', value: 'not_eligible_ip_tbd' },
             { key: 'csaStatus', op: 'eq', value: 'eligible' },
             { key: 'csaStatus', op: 'eq', value: 'not_eligible_in_pay' },
+            { key: 'csaStatus', op: 'eq', value: 'cra_error_application' },
+            { key: 'csaStatus', op: 'eq', value: 'cra_error_cancellation' },
           ],
         },
       ]
@@ -530,7 +538,7 @@ function App() {
         // Apply filter based on selected pre-defined filter
         // Note: csaStatus values must match database format (snake_case)
         if (preDefinedFilter === 'Pending User review/action') {
-          // csaStatus = 'on_hold' OR 'eligible_tbd' OR 'not_eligible_ip_tbd' OR 'eligible' OR 'not_eligible_in_pay'
+          // csaStatus = 'on_hold' OR 'eligible_tbd' OR 'not_eligible_ip_tbd' OR 'eligible' OR 'not_eligible_in_pay' OR 'cra_error_application' OR 'cra_error_cancellation'
           filter = [
             {
               OR: [
@@ -539,6 +547,8 @@ function App() {
                 { key: 'csaStatus', op: 'eq', value: 'not_eligible_ip_tbd' },
                 { key: 'csaStatus', op: 'eq', value: 'eligible' },
                 { key: 'csaStatus', op: 'eq', value: 'not_eligible_in_pay' },
+                { key: 'csaStatus', op: 'eq', value: 'cra_error_application' },
+                { key: 'csaStatus', op: 'eq', value: 'cra_error_cancellation' },
               ],
             },
           ]

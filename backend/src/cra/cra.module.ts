@@ -18,6 +18,7 @@ import { SendCraFileHandler } from './handlers/send-cra-file.handler'
 import { InboundFileService } from './inbound/inbound-file.service'
 import { InboundResponseService } from './inbound/inbound-response.service'
 import { InboundWeeklyResponseService } from './inbound/inbound-weekly-response.service'
+import { WeeklyContactMatcherService } from './inbound/weekly-contact-matcher.service'
 import { OutboundDataService } from './outbound/outbound-data.service'
 import { OutboundFileService } from './outbound/outbound-file.service'
 import { CraTransferService } from './transfer/cra-transfer.service'
@@ -48,6 +49,7 @@ import { S3CraTransferService } from './transfer/s3-cra-transfer.service'
     InboundFileService,
     InboundResponseService,
     InboundWeeklyResponseService,
+    WeeklyContactMatcherService,
     OutboundDataService,
     {
       provide: CraTransferService,

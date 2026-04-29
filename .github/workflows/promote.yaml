@@ -7,6 +7,8 @@ on:
       - "frontend/**"
       - "backend/**"
       - "migrations/**"
+      - "backup/**"
+
 
   workflow_dispatch:
     inputs:
@@ -20,7 +22,7 @@ on:
         description: "Which service(s) to promote"
         type: choice
         required: true
-        options: [frontend, backend, migrations, all]
+        options: [frontend, backend, migrations, backup, all]
 
       tag:
         description: "Image tag to promote (manual runs). If empty and build_images=true, defaults to <env>-<branch>-<sha7>."
@@ -47,6 +49,7 @@ env:
   SERVICE_FRONTEND: csa-frontend
   SERVICE_BACKEND: csa-backend
   SERVICE_MIGRATIONS: csa-flyway
+  SERVICE_BACKUP: csa-backup
 
   # GitOps repo ArgoCD watches
   GITOPS_REPO: bcgov-c/tenant-gitops-dec59b
@@ -60,6 +63,7 @@ env:
   FRONTEND_IMAGE: ghcr.io/bcgov/csa-frontend
   BACKEND_IMAGE: ghcr.io/bcgov/csa-backend
   MIGRATIONS_IMAGE: ghcr.io/bcgov/csa-flyway
+  BACKUP_IMAGE: ghcr.io/bcgov/csa-backup
 
 jobs:
   detect:
@@ -68,9 +72,11 @@ jobs:
     outputs:
       envname: ${{ steps.vars.outputs.envname }}
       tag: ${{ steps.vars.outputs.tag }}
+      backup_tag: ${{ steps.vars.outputs.backup_tag }}
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
       migrations: ${{ steps.filter.outputs.migrations }}
+      backup: ${{ steps.filter.outputs.backup }}
       svc: ${{ steps.vars.outputs.svc }}
       build_images: ${{ steps.vars.outputs.build_images }}
     steps:
@@ -90,6 +96,8 @@ jobs:
               - 'backend/**'
             migrations:
               - 'migrations/**'
+            backup:
+              - 'backup/**'
 
       - id: vars
         shell: bash
@@ -100,6 +108,7 @@ jobs:
           ENVNAME=""
           SVC=""
           BUILD_IMAGES="true"
+          BACKUP_TAG=""
 
           echo "Event: ${GITHUB_EVENT_NAME}"
           echo "RefName: ${GITHUB_REF_NAME}"
@@ -136,11 +145,13 @@ jobs:
 
             TAG="${ENVNAME}-${GITHUB_SHA::7}"
             BUILD_IMAGES="true"
+            BACKUP_TAG="backup-${GITHUB_SHA::7}"
 
             {
               echo "envname=$ENVNAME"
               echo "svc=$SVC"
               echo "tag=$TAG"
+              echo "backup_tag=$BACKUP_TAG"
               echo "build_images=$BUILD_IMAGES"
             } >> "$GITHUB_OUTPUT"
             exit 0
@@ -152,9 +163,10 @@ jobs:
             SVC="${{ inputs.service }}"
             TAG_IN="${{ inputs.tag }}"
             BUILD_IMAGES="${{ inputs.build_images }}"
+            BACKUP_TAG="backup-${GITHUB_SHA::7}"
 
             [[ "$ENVNAME" =~ ^(dev|test|pre-prod|prod)$ ]] || { echo "Invalid environment: $ENVNAME"; exit 1; }
-            [[ "$SVC" =~ ^(frontend|backend|migrations|all)$ ]] || { echo "Invalid service: $SVC"; exit 1; }
+            [[ "$SVC" =~ ^(frontend|backend|migrations|backup|all)$ ]] || { echo "Invalid service: $SVC"; exit 1; }
 
             if [[ "$BUILD_IMAGES" != "true" && -z "$TAG_IN" ]]; then
               echo "ERROR: build_images=false requires a tag input (promoting existing image)."
@@ -174,6 +186,7 @@ jobs:
               echo "envname=$ENVNAME"
               echo "svc=$SVC"
               echo "tag=$TAG"
+              echo "backup_tag=$BACKUP_TAG"
               echo "build_images=$BUILD_IMAGES"
             } >> "$GITHUB_OUTPUT"
             exit 0
@@ -262,6 +275,36 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.SERVICE_MIGRATIONS }}:${{ needs.detect.outputs.tag }}
+
+  build-backup:
+    name: Build & Push Backup Image
+    needs: [detect]
+    if: >-
+      (
+        needs.detect.outputs.backup == 'true' ||
+        needs.detect.outputs.svc == 'backup' ||
+        needs.detect.outputs.svc == 'all'
+      ) &&
+      (
+        github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && needs.detect.outputs.build_images == 'true')
+      )
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./backup
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.SERVICE_BACKUP }}:${{ needs.detect.outputs.backup_tag }}
 
   update-gitops:
     name: Update GitOps overlays

@@ -2485,15 +2485,17 @@ function App() {
             {/* Last Successful Runs Info */}
             <Box
               sx={{
-                padding: '8px 16px',
+                padding: '6px 12px',
                 mr: 2,
                 textAlign: 'left',
+                border: '1px solid #666',
+                borderRadius: '4px',
               }}
             >
-              <Typography variant="body2" sx={{ color: '#333', fontSize: '0.85rem' }}>
+              <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
                 Last Data Fetch: {formatJobTimestamp(lastSuccessfulRuns.lastDataIngestion)}
               </Typography>
-              <Typography variant="body2" sx={{ color: '#333', fontSize: '0.85rem' }}>
+              <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
                 Last Eligibility Run: {formatJobTimestamp(lastSuccessfulRuns.lastEligibilityRun)}
               </Typography>
             </Box>

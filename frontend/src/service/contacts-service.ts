@@ -434,3 +434,62 @@ export const runEligibilityForAll = async (): Promise<EligibilityRunResult> => {
   const response = await APIService.getAxiosInstance().post('/contacts/run-eligibility')
   return response.data
 }
+
+/**
+ * Job run details
+ */
+export interface JobRun {
+  id: number
+  jobType: string
+  status: string
+  jobTrigger: string
+  retryCount: number | null
+  error: string | null
+  metadata: Record<string, unknown> | null
+  createdAt: string
+  startedAt: string | null
+  completedAt: string | null
+}
+
+export interface JobsResponse {
+  data: JobRun[]
+  total: number
+  page: number
+  limit: number
+}
+
+/**
+ * Get last successful job run for a specific job type
+ */
+export const getLastSuccessfulJob = async (jobType: string): Promise<JobRun | null> => {
+  const response = await APIService.getAxiosInstance().get<JobsResponse>('/jobs', {
+    params: {
+      jobType,
+      status: 'SUCCESS',
+      limit: 1,
+    },
+  })
+  return response.data.data.length > 0 ? response.data.data[0] : null
+}
+
+/**
+ * Get last successful runs for data ingestion and eligibility
+ */
+export interface LastSuccessfulRuns {
+  lastDataIngestion: Date | null
+  lastEligibilityRun: Date | null
+}
+
+export const getLastSuccessfulRuns = async (): Promise<LastSuccessfulRuns> => {
+  const [dataIngestionJob, eligibilityJob] = await Promise.all([
+    getLastSuccessfulJob('INGEST_DATA'),
+    getLastSuccessfulJob('RUN_ELIGIBILITY'),
+  ])
+
+  return {
+    lastDataIngestion: dataIngestionJob?.completedAt
+      ? new Date(dataIngestionJob.completedAt)
+      : null,
+    lastEligibilityRun: eligibilityJob?.completedAt ? new Date(eligibilityJob.completedAt) : null,
+  }
+}

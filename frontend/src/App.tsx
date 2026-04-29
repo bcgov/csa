@@ -44,6 +44,7 @@ import {
   getAllContacts,
   getBatchContacts,
   getContactBatches,
+  getLastSuccessfulRuns,
   holdContacts,
   removeContactFromBatch,
   resumeContacts,
@@ -58,6 +59,7 @@ import {
   type ContactBatchDetail,
   type ContactEligibilityResult,
   type EligibilityRunResult,
+  type LastSuccessfulRuns,
 } from './service/contacts-service'
 import type { AppEnvironment } from './types/runtime-config'
 
@@ -312,6 +314,12 @@ function App() {
     null,
   )
 
+  // Last successful job runs state
+  const [lastSuccessfulRuns, setLastSuccessfulRuns] = useState<LastSuccessfulRuns>({
+    lastDataIngestion: null,
+    lastEligibilityRun: null,
+  })
+
   // Effect to show CSA access alert from auth context
   useEffect(() => {
     if (csaAccessAlert) {
@@ -323,6 +331,33 @@ function App() {
       clearCsaAccessAlert()
     }
   }, [csaAccessAlert, clearCsaAccessAlert])
+
+  // Fetch last successful job runs on mount
+  useEffect(() => {
+    if (isAuthenticated) {
+      getLastSuccessfulRuns()
+        .then(setLastSuccessfulRuns)
+        .catch((err) => console.error('Failed to fetch last successful runs:', err))
+    }
+  }, [isAuthenticated])
+
+  // Helper function to format date for display
+  const formatJobTimestamp = (date: Date | null): string => {
+    if (!date) return 'Never'
+    return (
+      date.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }) +
+      ' ' +
+      date.toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    )
+  }
 
   // Batch history state for selected contact
   const [contactBatchHistory, setContactBatchHistory] = useState<ContactBatchDetail[]>([])
@@ -1301,6 +1336,10 @@ function App() {
       })
     } finally {
       setIsRunningEligibilityAll(false)
+      // Refresh the last successful runs timestamps
+      getLastSuccessfulRuns()
+        .then(setLastSuccessfulRuns)
+        .catch((err) => console.error('Failed to refresh last successful runs:', err))
     }
   }
 
@@ -1357,6 +1396,10 @@ function App() {
       })
     } finally {
       setRunningEligibilityContactId(null)
+      // Refresh the last successful runs timestamps
+      getLastSuccessfulRuns()
+        .then(setLastSuccessfulRuns)
+        .catch((err) => console.error('Failed to refresh last successful runs:', err))
     }
   }
 
@@ -2388,17 +2431,11 @@ function App() {
               padding: '6px',
               borderBottom: '1px solid #e0e0e0',
               boxSizing: 'border-box',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
             }}
           >
-            {/* <Typography variant="h5" component="h1" sx={{
-            color: '#333',
-            fontWeight: 500,
-            textAlign: 'center',
-            marginBottom: '24px'
-          }}>
-            Children&apos;s Special Allowance
-          </Typography> */}
-
             {/* Tabs Section */}
             <Tabs
               value={selectedTab}
@@ -2419,6 +2456,24 @@ function App() {
               <Tab label="Eligibility List" />
               <Tab label="Batch Requests" />
             </Tabs>
+
+            {/* Last Successful Runs Info */}
+            <Box
+              sx={{
+                border: '1px solid #999',
+                borderRadius: '4px',
+                padding: '8px 16px',
+                backgroundColor: '#fce4ec',
+                mr: 2,
+              }}
+            >
+              <Typography variant="body2" sx={{ color: '#333', fontSize: '0.85rem' }}>
+                Last Data Ingestion: {formatJobTimestamp(lastSuccessfulRuns.lastDataIngestion)}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#333', fontSize: '0.85rem' }}>
+                Last Eligibility Run: {formatJobTimestamp(lastSuccessfulRuns.lastEligibilityRun)}
+              </Typography>
+            </Box>
           </Box>
 
           {/* Content Section */}

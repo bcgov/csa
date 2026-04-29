@@ -177,34 +177,6 @@ export class ContactsController {
     return this.contactsService.findContactBatches(id)
   }
 
-  @Post('run-eligibility')
-  @HttpCode(200)
-  @ApiResponse({
-    status: 200,
-    description: 'Eligibility run result for all contacts',
-    schema: {
-      properties: {
-        processed: { type: 'number' },
-        statusChanges: { type: 'number' },
-        newContacts: { type: 'number' },
-        skipped: { type: 'number' },
-        stepCounts: {
-          type: 'object',
-          properties: {
-            step7: { type: 'number' },
-            step8: { type: 'number' },
-            step9: { type: 'number' },
-            step10: { type: 'number' },
-            noChange: { type: 'number' },
-          },
-        },
-      },
-    },
-  })
-  async runEligibilityForAll() {
-    return this.contactsService.runAllContactsEligibility()
-  }
-
   @Post(':id/run-eligibility')
   @HttpCode(200)
   @ApiResponse({ status: 200, description: 'Eligibility result with previous and new status' })

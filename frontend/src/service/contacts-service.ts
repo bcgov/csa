@@ -428,11 +428,52 @@ export const runEligibilityForContact = async (
 }
 
 /**
- * Run eligibility query for all contacts
+ * Run eligibility query for all contacts (via jobs API)
+ * Returns the job run ID for tracking
  */
-export const runEligibilityForAll = async (): Promise<EligibilityRunResult> => {
-  const response = await APIService.getAxiosInstance().post('/contacts/run-eligibility')
+export const startEligibilityJob = async (): Promise<{ jobRunId: number }> => {
+  const response = await APIService.getAxiosInstance().post('/jobs/run-eligibility')
   return response.data
+}
+
+/**
+ * Get job status by ID
+ */
+export const getJobStatus = async (jobId: number): Promise<JobRun> => {
+  const response = await APIService.getAxiosInstance().get<JobRun>(`/jobs/${jobId}`)
+  return response.data
+}
+
+/**
+ * Run eligibility query for all contacts and poll until complete
+ * @param onProgress - Optional callback for progress updates
+ */
+export const runEligibilityForAllWithPolling = async (
+  onProgress?: (status: string) => void,
+): Promise<JobRun> => {
+  // Start the job
+  const { jobRunId } = await startEligibilityJob()
+
+  // Poll for completion
+  const pollInterval = 2000 // 2 seconds
+  const maxAttempts = 300 // 10 minutes max
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const job = await getJobStatus(jobRunId)
+
+    if (onProgress) {
+      onProgress(job.status)
+    }
+
+    if (job.status === 'SUCCESS' || job.status === 'FAILED') {
+      return job
+    }
+
+    // Wait before next poll
+    await new Promise((resolve) => setTimeout(resolve, pollInterval))
+  }
+
+  throw new Error('Eligibility job timed out')
 }
 
 /**

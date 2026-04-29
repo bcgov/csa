@@ -48,7 +48,7 @@ import {
   holdContacts,
   removeContactFromBatch,
   resumeContacts,
-  runEligibilityForAll,
+  runEligibilityForAllWithPolling,
   runEligibilityForContact,
   updateEligibilityStatus,
   updateNotEligibleStatusAlt,
@@ -58,7 +58,7 @@ import {
   type Contact,
   type ContactBatchDetail,
   type ContactEligibilityResult,
-  type EligibilityRunResult,
+  type JobRun,
   type LastSuccessfulRuns,
 } from './service/contacts-service'
 import type { AppEnvironment } from './types/runtime-config'
@@ -341,22 +341,19 @@ function App() {
     }
   }, [isAuthenticated])
 
-  // Helper function to format date for display
+  // Helper function to format date for display (matches table date format)
   const formatJobTimestamp = (date: Date | null): string => {
     if (!date) return '--'
-    return (
-      date.toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }) +
-      ' ' +
-      date.toLocaleTimeString('en-GB', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })
-    )
+    const parts = new Intl.DateTimeFormat('en-US', {
+      ...DATE_FORMAT,
+      timeZone: 'America/Vancouver',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(date)
+    const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
+    return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
   }
 
   // Batch history state for selected contact
@@ -1295,31 +1292,59 @@ function App() {
     try {
       setSnackbar({
         open: true,
-        message: 'Running eligibility query on all contacts...',
+        message: 'Starting eligibility query job...',
         severity: 'info',
       })
 
-      const result: EligibilityRunResult = await runEligibilityForAll()
-
-      const message = `Eligibility complete: ${result.processed} processed, ${result.statusChanges} updated, ${result.skipped} skipped`
-      setSnackbar({
-        open: true,
-        message,
-        severity: result.statusChanges > 0 ? 'success' : 'info',
+      const job: JobRun = await runEligibilityForAllWithPolling((status) => {
+        if (status === 'RUNNING') {
+          setSnackbar({
+            open: true,
+            message: 'Eligibility query is running...',
+            severity: 'info',
+          })
+        }
       })
 
-      // Refresh the list if there were changes
-      if (result.statusChanges > 0) {
-        if (isSearchActive && searchTerm.trim().length >= 3) {
-          await performFullTextSearch(searchTerm.trim(), currentPage)
-        } else {
-          await fetchContacts(currentPage)
+      if (job.status === 'SUCCESS') {
+        const metadata = job.metadata as {
+          processed?: number
+          statusChanges?: number
+          skipped?: number
+        } | null
+        const processed = metadata?.processed ?? 0
+        const statusChanges = metadata?.statusChanges ?? 0
+        const skipped = metadata?.skipped ?? 0
+
+        const message = `Eligibility complete: ${processed} processed, ${statusChanges} updated, ${skipped} skipped`
+        setSnackbar({
+          open: true,
+          message,
+          severity: statusChanges > 0 ? 'success' : 'info',
+        })
+
+        // Refresh the list if there were changes
+        if (statusChanges > 0) {
+          if (isSearchActive && searchTerm.trim().length >= 3) {
+            await performFullTextSearch(searchTerm.trim(), currentPage)
+          } else {
+            await fetchContacts(currentPage)
+          }
         }
+      } else {
+        // Job failed
+        const errorMessage = job.error || 'Eligibility query failed'
+        throw new Error(errorMessage)
       }
     } catch (error: any) {
       console.error('Run eligibility for all error:', error)
-      const rawMessage =
+      let rawMessage =
         error?.response?.data?.message || error?.message || 'Failed to run eligibility query'
+
+      // Handle 409 Conflict (job already running)
+      if (error?.response?.status === 409) {
+        rawMessage = 'An eligibility query is already running. Please wait for it to complete.'
+      }
 
       // Make staging validation errors more user-friendly
       let errorMessage = rawMessage
@@ -2462,6 +2487,7 @@ function App() {
               sx={{
                 padding: '8px 16px',
                 mr: 2,
+                textAlign: 'left',
               }}
             >
               <Typography variant="body2" sx={{ color: '#333', fontSize: '0.85rem' }}>
@@ -2576,15 +2602,17 @@ function App() {
                       <MenuItem
                         onClick={handleRunEligibilityForAll}
                         disabled={isRunningEligibilityAll}
+                        sx={{ fontSize: '0.85rem' }}
                       >
-                        Run eligibility query on all Contacts
+                        Run query on all contacts
                       </MenuItem>
                       {selected.length === 1 && (
                         <MenuItem
                           onClick={handleRunEligibilityForSelected}
                           disabled={isRunningEligibilityAll}
+                          sx={{ fontSize: '0.85rem' }}
                         >
-                          Run eligibility query on selected contact
+                          Run query on selected contact
                         </MenuItem>
                       )}
                     </Menu>

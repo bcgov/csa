@@ -1,12 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BATCH_DETAIL_STATUS, BATCH_EVENT, BATCH_STATUS } from 'src/common/state-machine/constants'
 import { BatchesService } from './batches.service'
+import { RecordTypeCode, TranCode, HeaderRecord } from 'src/cra/inbound/inbound-weekly.interface'
 
 describe('BatchesService', () => {
   let service: BatchesService
   let mockPrisma: any
   let mockStateMachine: any
   let mockContactsService: any
+
+  const buildHeader = (): HeaderRecord => ({
+    tranCode: TranCode.HEADER,
+    recordTypeCode: RecordTypeCode.HEADER,
+    filler1: '',
+    processDate: '20250101',
+    filler2: '',
+  })
 
   beforeEach(() => {
     mockPrisma = {
@@ -271,7 +280,7 @@ describe('BatchesService', () => {
         systemComments: null,
       })
 
-      const batch = await service.createWklBatchForUnmatchedRecords()
+      const batch = await service.createWklBatchForUnmatchedRecords(buildHeader())
 
       expect(mockPrisma.batch.create).toHaveBeenCalledWith({
         data: expect.objectContaining({

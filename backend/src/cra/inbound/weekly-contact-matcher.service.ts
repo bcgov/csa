@@ -5,6 +5,7 @@ import { BATCH_DETAIL_STATUS } from 'src/common/state-machine/constants/batch-de
 import { BATCH_STATUS } from 'src/common/state-machine/constants/batch-status.constants'
 import { AppLogger } from 'src/common/logger/app-logger'
 import { CraMatchingSnapshot } from './cra-matching-snapshot.interface'
+import { DetailRecord04 } from './inbound-weekly.interface'
 
 const ACTIVE_BATCH_STATUSES = [BATCH_STATUS.IN_PROGRESS, BATCH_STATUS.PARTIALLY_PROCESSED]
 
@@ -165,6 +166,19 @@ export class WeeklyContactMatcherService {
     }
 
     return null
+  }
+
+  buildWklMatchingSnapshot(detail: DetailRecord04): CraMatchingSnapshot {
+    return {
+      childGivenName: detail.childGivenName.trim(),
+      childSurName: detail.childSurName.trim(),
+      childSex: detail.childSex.trim(),
+      childBirthDate: detail.childBirthDate.trim(),
+      childBirthCity: detail.childBirthCity.trim(),
+      childBirthProv: detail.childBirthProv.trim(),
+      childBirthCountry: detail.childBirthCountry.trim(),
+      ccraDinNum: detail.childDin?.trim(),
+    }
   }
 
   private parseWklDate(dateStr: string): Date | undefined {

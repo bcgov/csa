@@ -17,10 +17,9 @@ import { InboundFileService } from '../inbound/inbound-file.service'
 import { InboundResponseService } from '../inbound/inbound-response.service'
 import { InboundWeeklyResponseService } from '../inbound/inbound-weekly-response.service'
 import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
-import type { DetailRecord04 } from '../inbound/inbound-weekly.interface'
+import type { DetailRecord04, HeaderRecord } from '../inbound/inbound-weekly.interface'
 import { WeeklyContactMatcherService } from '../inbound/weekly-contact-matcher.service'
 import { CraTransferService } from '../transfer/cra-transfer.service'
-
 const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
 const { STATUS: WKL_STATUS } = WEEKLY_FILE
 
@@ -35,6 +34,10 @@ export class PollCraResponseHandler extends BaseJob {
   private recordsWklApproved!: number
   private recordsWklRefused!: number
   private recordsWklSkipped!: number
+  private recordsWklUnmatchedApproved!: number
+  private recordsWklUnmatchedRefused!: number
+  private recordsWklUnmatchedSkipped!: number
+  private newCraRecordsInWkl: DetailRecord04[] = []
 
   constructor(
     private readonly craTransferService: CraTransferService,
@@ -58,6 +61,9 @@ export class PollCraResponseHandler extends BaseJob {
     this.recordsWklApproved = 0
     this.recordsWklRefused = 0
     this.recordsWklSkipped = 0
+    this.recordsWklUnmatchedApproved = 0
+    this.recordsWklUnmatchedRefused = 0
+    this.recordsWklUnmatchedSkipped = 0
 
     await this.downloadAndRegisterNewFiles()
 
@@ -90,7 +96,12 @@ export class PollCraResponseHandler extends BaseJob {
     }
 
     const totalUpdated =
-      this.recordsAccepted + this.recordsRejected + this.recordsWklApproved + this.recordsWklRefused
+      this.recordsAccepted +
+      this.recordsRejected +
+      this.recordsWklApproved +
+      this.recordsWklRefused +
+      this.recordsWklUnmatchedApproved +
+      this.recordsWklUnmatchedRefused
     return {
       success: true,
       message: `Processed ${totalRecordsProcessed} CRA response records from ${unprocessedResponseFiles.length} file(s)`,
@@ -103,7 +114,14 @@ export class PollCraResponseHandler extends BaseJob {
         records_wkl_approved: this.recordsWklApproved,
         records_wkl_refused: this.recordsWklRefused,
         records_wkl_skipped: this.recordsWklSkipped,
+        records_wkl_unmatched_approved: this.recordsWklUnmatchedApproved,
+        records_wkl_unmatched_refused: this.recordsWklUnmatchedRefused,
+        records_wkl_unmatched_skipped: this.recordsWklUnmatchedSkipped,
         syncResult,
+        craNewRecordsInWkl: {
+          count: this.newCraRecordsInWkl.length,
+          records: this.newCraRecordsInWkl,
+        },
       },
     }
   }
@@ -194,7 +212,7 @@ export class PollCraResponseHandler extends BaseJob {
     if (isWeekly) {
       await this.weeklyContactMatcher.loadCandidates()
       for (const detail of details as DetailRecord04[]) {
-        await this.processWeeklyDetail(detail)
+        await this.processWeeklyDetail(detail, header as HeaderRecord)
       }
     } else {
       for (const detail of details as CraResDetail[]) {
@@ -279,7 +297,7 @@ export class PollCraResponseHandler extends BaseJob {
     }
   }
 
-  private async processWeeklyDetail(detail: DetailRecord04): Promise<void> {
+  private async processWeeklyDetail(detail: DetailRecord04, header: HeaderRecord): Promise<void> {
     if (detail.status === WKL_STATUS.IN_PROGRESS) {
       this.recordsWklSkipped++
       return
@@ -309,11 +327,19 @@ export class PollCraResponseHandler extends BaseJob {
           `WKL: no matching contacts for ${detail.childGivenName.trim()} ${detail.childSurName.trim()} ` +
             `(DIN: ${detail.childDin?.trim() || 'none'})`,
         )
+        this.newCraRecordsInWkl.push(detail)
         this.recordsWklSkipped++
         return
       }
 
-      await this.processUnmatchedWeeklyDetail(detail, wklType, contacts.id, contacts.caseNumber)
+      await this.processUnmatchedWeeklyDetail(
+        detail,
+        wklType,
+        contacts.id,
+        contacts.caseNumber,
+        header as HeaderRecord,
+      )
+      return
     }
 
     this.processedBatchIds.add(batchDetail.batchId)
@@ -326,8 +352,9 @@ export class PollCraResponseHandler extends BaseJob {
     }
 
     const isApproved =
-      detail.status === WKL_STATUS.COMPLETED || detail.status === WKL_STATUS.UPDATED
-    const isRefused = detail.status === WKL_STATUS.ABANDONED
+      detail.status?.toLocaleLowerCase() === WKL_STATUS.COMPLETED ||
+      detail.status?.toLocaleLowerCase() === WKL_STATUS.UPDATED
+    const isRefused = detail.status?.toLocaleLowerCase() === WKL_STATUS.ABANDONED
 
     const din = detail.childDin?.trim()
     const additionalData = din && !batchDetail.contact.din ? { din } : undefined
@@ -370,15 +397,65 @@ export class PollCraResponseHandler extends BaseJob {
     wklType: string,
     contactId: number,
     caseNumber: string,
+    header: HeaderRecord,
   ): Promise<void> {
-    const batchCreatedResult = await this.batchesService.createWklBatchForUnmatchedRecords()
-    this.processedBatchIds.add(batchCreatedResult.id)
-    await this.batchesService.createBatchDetailsForWklUnmatchedRecords(
-      batchCreatedResult.id,
+    const batch = await this.batchesService.createWklBatchForUnmatchedRecords(header)
+    this.processedBatchIds.add(batch.id)
+
+    const batchDetail = await this.batchesService.createBatchDetailsForWklUnmatchedRecords(
+      batch.id,
       contactId,
       wklType,
       detail.status,
       caseNumber,
+      this.weeklyContactMatcher.buildWklMatchingSnapshot(detail),
     )
+
+    if (batchDetail.transactionType !== wklType) {
+      this.logger.warn(
+        `WKL: transaction type mismatch for contact ${batchDetail.contactId} — ` +
+          `WKL says ${wklType}, batch detail says ${batchDetail.transactionType}`,
+      )
+    }
+
+    const isApproved =
+      detail.status?.toLowerCase() === WKL_STATUS.COMPLETED ||
+      detail.status?.toLowerCase() === WKL_STATUS.UPDATED
+    const isRefused = detail.status === WKL_STATUS.ABANDONED
+
+    const din = detail.childDin?.trim()
+    const additionalData = din && !batchDetail.contact.din ? { din } : undefined
+
+    if (isApproved) {
+      await this.batchesService.updateBatchDetailStatus(
+        batchDetail.id,
+        BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
+      )
+      await this.contactsService.updateCsaStatus(
+        batchDetail.contactId,
+        CSA_EVENT.CRA_WKL_APPROVED,
+        UPDATED_BY.SYSTEM,
+        { additionalData },
+      )
+      this.recordsWklUnmatchedApproved++
+    } else if (isRefused) {
+      await this.batchesService.updateBatchDetailStatus(
+        batchDetail.id,
+        BATCH_DETAIL_EVENT.CRA_WKL_REFUSED,
+      )
+      await this.contactsService.updateCsaStatus(
+        batchDetail.contactId,
+        CSA_EVENT.CRA_WKL_REFUSED,
+        UPDATED_BY.SYSTEM,
+        { additionalData },
+      )
+      this.recordsWklUnmatchedRefused++
+    } else {
+      this.logger.warn(
+        `WKL: unexpected status '${detail.status}' for contact ${batchDetail.contactId}, skipping`,
+      )
+      this.recordsWklUnmatchedSkipped++
+      return
+    }
   }
 }

@@ -10,11 +10,13 @@ import {
 import type { TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { appendSystemComment, enrichLabels } from 'src/common/utils'
+import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
+import { HeaderRecord } from 'src/cra/inbound/inbound-weekly.interface'
+import { MatchedBatchDetail } from 'src/cra/inbound/weekly-contact-matcher.service'
 import { CANCEL_REASON_LABELS } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
 import { ContactsService } from '../contacts/contacts.service'
 import { BulkOperationResponse } from '../contacts/interfaces'
-import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 
 const { WEEKLY_FILE, BATCH_INITIATED_BY, CREATED_BY, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
@@ -41,7 +43,7 @@ export class BatchesService {
     private prisma: PrismaService,
     private stateMachine: StateMachineService,
     private contactsService: ContactsService,
-  ) {}
+  ) { }
 
   async findAll() {
     const batches = await this.prisma.batch.findMany({
@@ -208,7 +210,7 @@ export class BatchesService {
     return enrichLabels(pendingBatch)
   }
 
-  async createWklBatchForUnmatchedRecords() {
+  async createWklBatchForUnmatchedRecords(header: HeaderRecord) {
     const existingBatch = await this.prisma.batch.findFirst({
       where: {
         initiatedBy: BATCH_INITIATED_BY.CRA,
@@ -219,17 +221,19 @@ export class BatchesService {
     if (existingBatch) {
       this.logger.warn(
         `Attempted to create WKL batch for unmatched records, but batch ${existingBatch.id} is already in progress. ` +
-          `This should not happen as we check for unmatched records before creating the batch, but it could occur in rare cases of high concurrency. ` +
-          `Please review batch ${existingBatch.id} for details.`,
+        `This should not happen as we check for unmatched records before creating the batch, but it could occur in rare cases of high concurrency. ` +
+        `Please review batch ${existingBatch.id} for details.`,
       )
       return existingBatch
     }
+    const systemComments = appendSystemComment(`CRA initiated batch from WKL file`, null)
     return this.prisma.batch.create({
       data: {
-        batchDate: new Date(),
+        batchDate: this.parseWklDate(header.processDate),
         initiatedBy: BATCH_INITIATED_BY.CRA,
         status: BATCH_STATUS.IN_PROGRESS,
         recordCount: 0,
+        systemComments,
         createdAt: new Date(),
       },
     })
@@ -345,6 +349,12 @@ export class BatchesService {
     })
 
     if (allDetails.length === 0) return
+    await this.prisma.batch.update({
+      where: { id: batchId },
+      data: {
+        recordCount: allDetails.length,
+      },
+    })
 
     const statuses = allDetails.map((d) => d.status)
     const hasApproved = statuses.includes(BATCH_DETAIL_STATUS.APPROVED)
@@ -473,15 +483,41 @@ export class BatchesService {
     transactionType: string,
     craStatus: string,
     caseNumber: string,
-  ): Promise<void> {
+    craMatchingSnapshot: any,
+  ): Promise<MatchedBatchDetail> {
+    const isExistInBatch = await this.prisma.contactBatchDetail.findFirst({
+      where: {
+        batchId,
+        contactId,
+      },
+      select: {
+        id: true,
+        contactId: true,
+        batchId: true,
+        transactionType: true,
+        systemComments: true,
+        craMatchingSnapshot: true,
+        contact: { select: { din: true } },
+      },
+    })
+    if (isExistInBatch) {
+      this.logger.warn(
+        `Attempted to create WKL batch detail for contact ${contactId} in batch ${batchId}, but it already exists. ` +
+        `This should not happen as we check for unmatched records before creating the batch detail, but it could occur in rare cases of high concurrency. ` +
+        `Please review batch detail ${isExistInBatch.id} for details.`,
+      )
+      return isExistInBatch
+    }
     const now = new Date()
-    await this.prisma.$transaction(async (tx) => {
+    craMatchingSnapshot.childBirthDate = this.parseWklDate(craMatchingSnapshot.childBirthDate)
+    return await this.prisma.$transaction(async (tx) => {
       const batchDetail = await tx.contactBatchDetail.create({
         data: {
           contactId,
           batchId,
           transactionType,
           status: WEEKLY_FILE.STATUS[craStatus.toUpperCase()],
+          craMatchingSnapshot,
           createdAt: now,
           createdBy: CREATED_BY.SYSTEM,
           lastUpdatedAt: now,
@@ -492,6 +528,26 @@ export class BatchesService {
         where: { id: batchDetail.id },
         data: { referenceNumber: `${caseNumber}-${batchDetail.id}` },
       })
+      return await tx.contactBatchDetail.findUnique({
+        where: { id: batchDetail.id },
+        select: {
+          id: true,
+          contactId: true,
+          batchId: true,
+          transactionType: true,
+          systemComments: true,
+          craMatchingSnapshot: true,
+          contact: { select: { din: true } },
+        },
+      })
     })
+  }
+
+  private parseWklDate(dateStr: string): Date | undefined {
+    if (!dateStr || dateStr.trim().length !== 8) return undefined
+    const y = dateStr.substring(0, 4)
+    const m = dateStr.substring(4, 6)
+    const d = dateStr.substring(6, 8)
+    return new Date(`${y}-${m}-${d}`)
   }
 }

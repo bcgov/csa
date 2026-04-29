@@ -2465,7 +2465,7 @@ function App() {
               }}
             >
               <Typography variant="body2" sx={{ color: '#333', fontSize: '0.85rem' }}>
-                Last Data Ingestion: {formatJobTimestamp(lastSuccessfulRuns.lastDataIngestion)}
+                Last Data Fetch: {formatJobTimestamp(lastSuccessfulRuns.lastDataIngestion)}
               </Typography>
               <Typography variant="body2" sx={{ color: '#333', fontSize: '0.85rem' }}>
                 Last Eligibility Run: {formatJobTimestamp(lastSuccessfulRuns.lastEligibilityRun)}

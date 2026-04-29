@@ -2706,8 +2706,9 @@ function App() {
                 {isRunningEligibilityAll && (
                   <Box sx={{ mb: 2 }}>
                     <Alert severity="info" sx={{ mb: 1 }}>
-                      Eligibility query is running in the background. Editing is disabled until the
-                      process completes.
+                      Eligibility Query is running. Please do not make any manual CSA transitions
+                      while the job is in progress. This banner will disappear once the job is
+                      complete.
                     </Alert>
                     <LinearProgress />
                   </Box>

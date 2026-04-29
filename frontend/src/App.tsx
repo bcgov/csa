@@ -343,7 +343,7 @@ function App() {
 
   // Helper function to format date for display
   const formatJobTimestamp = (date: Date | null): string => {
-    if (!date) return 'Never'
+    if (!date) return '--'
     return (
       date.toLocaleDateString('en-GB', {
         day: 'numeric',
@@ -2460,10 +2460,7 @@ function App() {
             {/* Last Successful Runs Info */}
             <Box
               sx={{
-                border: '1px solid #999',
-                borderRadius: '4px',
                 padding: '8px 16px',
-                backgroundColor: '#fce4ec',
                 mr: 2,
               }}
             >

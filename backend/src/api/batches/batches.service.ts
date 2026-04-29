@@ -43,7 +43,7 @@ export class BatchesService {
     private prisma: PrismaService,
     private stateMachine: StateMachineService,
     private contactsService: ContactsService,
-  ) { }
+  ) {}
 
   async findAll() {
     const batches = await this.prisma.batch.findMany({
@@ -221,8 +221,8 @@ export class BatchesService {
     if (existingBatch) {
       this.logger.warn(
         `Attempted to create WKL batch for unmatched records, but batch ${existingBatch.id} is already in progress. ` +
-        `This should not happen as we check for unmatched records before creating the batch, but it could occur in rare cases of high concurrency. ` +
-        `Please review batch ${existingBatch.id} for details.`,
+          `This should not happen as we check for unmatched records before creating the batch, but it could occur in rare cases of high concurrency. ` +
+          `Please review batch ${existingBatch.id} for details.`,
       )
       return existingBatch
     }
@@ -503,8 +503,8 @@ export class BatchesService {
     if (isExistInBatch) {
       this.logger.warn(
         `Attempted to create WKL batch detail for contact ${contactId} in batch ${batchId}, but it already exists. ` +
-        `This should not happen as we check for unmatched records before creating the batch detail, but it could occur in rare cases of high concurrency. ` +
-        `Please review batch detail ${isExistInBatch.id} for details.`,
+          `This should not happen as we check for unmatched records before creating the batch detail, but it could occur in rare cases of high concurrency. ` +
+          `Please review batch detail ${isExistInBatch.id} for details.`,
       )
       return isExistInBatch
     }

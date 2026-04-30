@@ -46,16 +46,42 @@ describe('BatchesService', () => {
       expect(mockPrisma.batch.update).not.toHaveBeenCalled()
     })
 
-    it('should take no action when all details are in_progress', async () => {
+    it('should add CRA Acknowledgement Received comment when all details are in_progress', async () => {
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
         { status: BATCH_DETAIL_STATUS.IN_PROGRESS },
         { status: BATCH_DETAIL_STATUS.IN_PROGRESS },
       ])
+      mockPrisma.batch.findUnique.mockResolvedValue({ systemComments: null })
+      mockPrisma.batch.update.mockResolvedValue({})
 
       await service.aggregateBatchStatus(1)
 
       expect(service.updateBatchStatus).not.toHaveBeenCalled()
-      expect(mockPrisma.batch.update).not.toHaveBeenCalled()
+      expect(mockPrisma.batch.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          systemComments: expect.stringContaining('CRA Acknowledgement received.'),
+        },
+      })
+    })
+
+    it('should add CRA Acknowledgement received. comment when details are mix of in_progress and error', async () => {
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
+        { status: BATCH_DETAIL_STATUS.IN_PROGRESS },
+        { status: BATCH_DETAIL_STATUS.ERROR },
+      ])
+      mockPrisma.batch.findUnique.mockResolvedValue({ systemComments: null })
+      mockPrisma.batch.update.mockResolvedValue({})
+
+      await service.aggregateBatchStatus(1)
+
+      expect(service.updateBatchStatus).not.toHaveBeenCalled()
+      expect(mockPrisma.batch.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          systemComments: expect.stringContaining('CRA Acknowledgement received.'),
+        },
+      })
     })
 
     it('should transition to CRA_ALL_REJECTED when all details are error', async () => {

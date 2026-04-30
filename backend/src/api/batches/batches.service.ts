@@ -374,8 +374,20 @@ export class BatchesService {
       return
     }
 
-    // All still in progress — no action
-    this.logger.log(`Batch ${batchId}: all details still in_progress, no aggregation needed`)
+    // All still in progress — acknowledgement received, no status change
+    this.logger.log(`Batch ${batchId}: RSP acknowledgement received, all details still in_progress`)
+    const batch = await this.prisma.batch.findUnique({
+      where: { id: batchId },
+      select: { systemComments: true },
+    })
+    const systemComments = appendSystemComment(
+      'CRA Acknowledgement received.',
+      batch?.systemComments ?? null,
+    )
+    await this.prisma.batch.update({
+      where: { id: batchId },
+      data: { systemComments },
+    })
   }
 
   private getWklSystemComment(

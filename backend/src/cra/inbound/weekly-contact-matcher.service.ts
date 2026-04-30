@@ -181,5 +181,4 @@ export class WeeklyContactMatcherService {
       ccraDinNum: detail.childDin?.trim(),
     }
   }
-
 }

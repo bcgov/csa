@@ -317,9 +317,7 @@ export class PollCraResponseHandler extends BaseJob {
     } else if (detail.transactionType === 'C') {
       wklType = 'cancellation'
     } else {
-      this.logger.warn(
-        `WKL: unexpected transaction type '${detail.transactionType}', skipping`,
-      )
+      this.logger.warn(`WKL: unexpected transaction type '${detail.transactionType}', skipping`)
       this.recordsWklSkipped++
       return
     }

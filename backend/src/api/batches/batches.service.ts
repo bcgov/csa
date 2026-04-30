@@ -516,7 +516,8 @@ export class BatchesService {
     const now = new Date()
     const snapshot = {
       ...craMatchingSnapshot,
-      childBirthDate: parseWklDate(craMatchingSnapshot.childBirthDate) ?? craMatchingSnapshot.childBirthDate,
+      childBirthDate:
+        parseWklDate(craMatchingSnapshot.childBirthDate) ?? craMatchingSnapshot.childBirthDate,
     }
     return await this.prisma.$transaction(async (tx) => {
       const batchDetail = await tx.contactBatchDetail.create({
@@ -550,5 +551,4 @@ export class BatchesService {
       })
     })
   }
-
 }

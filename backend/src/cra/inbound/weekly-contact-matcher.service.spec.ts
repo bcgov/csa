@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { WeeklyContactMatcherService } from './weekly-contact-matcher.service'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CraMatchingSnapshot } from './cra-matching-snapshot.interface'
+import { WeeklyContactMatcherService } from './weekly-contact-matcher.service'
 
 const mockPrisma = {
   contactBatchDetail: { findMany: vi.fn() },
+  contact: { findMany: vi.fn() },
 }
 
 const makeSnapshot = (overrides = {}): CraMatchingSnapshot => ({
@@ -160,6 +161,91 @@ describe('WeeklyContactMatcherService', () => {
 
       // findMany called once (in loadCandidates), not per findMatchingBatchDetail call
       expect(mockPrisma.contactBatchDetail.findMany).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('findMatchingContact', () => {
+    it('should match contact by DIN', async () => {
+      mockPrisma.contact.findMany.mockResolvedValue([
+        { id: 10, din: 'DIN123', csaStatus: 'batch_sent_application' },
+      ])
+
+      const result = await service.findMatchingContact({
+        childDin: 'DIN123',
+        childGivenName: 'JOHN',
+        childSurName: 'DOE',
+        childSex: 'M',
+        childBirthDate: '20100101',
+        childBirthCity: 'VICTORIA',
+        childBirthProv: 'BC',
+        childBirthCountry: 'CAN',
+      })
+
+      expect(result).toEqual({
+        id: 10,
+        din: 'DIN123',
+        csaStatus: 'batch_sent_application',
+      })
+    })
+
+    it('should fall back to child details when DIN has no match', async () => {
+      mockPrisma.contact.findMany.mockResolvedValue([])
+      mockPrisma.contact.findMany.mockResolvedValueOnce([]) // DIN query
+      mockPrisma.contact.findMany.mockResolvedValueOnce([
+        { id: 20, din: null, csaStatus: 'eligible' },
+      ]) // details query
+
+      const result = await service.findMatchingContact({
+        childDin: 'UNKNOWN',
+        childGivenName: 'JANE',
+        childSurName: 'SMITH',
+        childSex: 'F',
+        childBirthDate: '20120315',
+        childBirthCity: 'VANCOUVER',
+        childBirthProv: 'BC',
+        childBirthCountry: 'CAN',
+      })
+
+      expect(result).toEqual({ id: 20, din: null, csaStatus: 'eligible' })
+    })
+
+    it('should return null when no contact matches', async () => {
+      mockPrisma.contact.findMany.mockResolvedValue([])
+
+      const result = await service.findMatchingContact({
+        childDin: '',
+        childGivenName: 'NOBODY',
+        childSurName: 'NOONE',
+        childSex: 'M',
+        childBirthDate: '20000101',
+        childBirthCity: 'NOWHERE',
+        childBirthProv: 'BC',
+        childBirthCountry: 'CAN',
+      })
+
+      expect(result).toBeNull()
+    })
+
+    it('should return null when multiple contacts match by details', async () => {
+      mockPrisma.contact.findMany.mockResolvedValue([])
+      mockPrisma.contact.findMany.mockResolvedValueOnce([]) // DIN
+      mockPrisma.contact.findMany.mockResolvedValueOnce([
+        { id: 30, din: null, csaStatus: 'eligible' },
+        { id: 31, din: null, csaStatus: 'eligible_tbd' },
+      ]) // details — ambiguous
+
+      const result = await service.findMatchingContact({
+        childDin: '',
+        childGivenName: 'DUP',
+        childSurName: 'NAME',
+        childSex: 'F',
+        childBirthDate: '20100101',
+        childBirthCity: 'VICTORIA',
+        childBirthProv: 'BC',
+        childBirthCountry: 'CAN',
+      })
+
+      expect(result).toBeNull()
     })
   })
 })

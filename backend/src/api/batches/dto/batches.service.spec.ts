@@ -225,6 +225,7 @@ describe('BatchesService', () => {
           batchDate: null,
           status: BATCH_STATUS.PENDING,
           recordCount: 0,
+          initiatedBy: 'Ministry',
           createdAt: expect.any(Date),
         },
       })

@@ -272,6 +272,7 @@ async function seedBatches() {
       recordCount: faker.number.int({ min: 5, max: 50 }),
       createdAt: batchDate,
       updatedAt: batchDate,
+      initiatedBy: faker.helpers.arrayElement(['CRA', 'Ministry']),
       systemComments: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.5 }),
     }
   })

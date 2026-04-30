@@ -4,6 +4,7 @@ import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_DETAIL_STATUS } from 'src/common/state-machine/constants/batch-detail-status.constants'
 import { BATCH_STATUS } from 'src/common/state-machine/constants/batch-status.constants'
 import { AppLogger } from 'src/common/logger/app-logger'
+import { parseWklDate } from 'src/common/utils'
 import { CraMatchingSnapshot } from './cra-matching-snapshot.interface'
 import { DetailRecord04 } from './inbound-weekly.interface'
 
@@ -147,7 +148,7 @@ export class WeeklyContactMatcherService {
         firstName: wklDetail.childGivenName.trim(),
         lastName: wklDetail.childSurName.trim(),
         gender: wklDetail.childSex.trim(),
-        dateOfBirth: this.parseWklDate(wklDetail.childBirthDate),
+        dateOfBirth: parseWklDate(wklDetail.childBirthDate),
         birthCity: wklDetail.childBirthCity.trim(),
         birthProvince: wklDetail.childBirthProv.trim(),
         birthCountry: wklDetail.childBirthCountry.trim(),
@@ -181,11 +182,4 @@ export class WeeklyContactMatcherService {
     }
   }
 
-  private parseWklDate(dateStr: string): Date | undefined {
-    if (!dateStr || dateStr.trim().length !== 8) return undefined
-    const y = dateStr.substring(0, 4)
-    const m = dateStr.substring(4, 6)
-    const d = dateStr.substring(6, 8)
-    return new Date(`${y}-${m}-${d}`)
-  }
 }

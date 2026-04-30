@@ -9,7 +9,7 @@ import {
 } from 'src/common/state-machine/constants'
 import type { TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
-import { appendSystemComment, enrichLabels } from 'src/common/utils'
+import { appendSystemComment, enrichLabels, parseWklDate } from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 import { HeaderRecord } from 'src/cra/inbound/inbound-weekly.interface'
 import { MatchedBatchDetail } from 'src/cra/inbound/weekly-contact-matcher.service'
@@ -18,7 +18,7 @@ import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/cons
 import { ContactsService } from '../contacts/contacts.service'
 import { BulkOperationResponse } from '../contacts/interfaces'
 
-const { WEEKLY_FILE, BATCH_INITIATED_BY, CREATED_BY, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
+const { WEEKLY_FILE, BATCH_INITIATED_BY, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
 export interface AddContactsResult extends BulkOperationResponse {
   batch: {
@@ -202,6 +202,7 @@ export class BatchesService {
           batchDate: null,
           status: BATCH_STATUS.PENDING,
           recordCount: 0,
+          initiatedBy: BATCH_INITIATED_BY.MINISTRY,
           createdAt: new Date(),
         },
       })
@@ -229,7 +230,7 @@ export class BatchesService {
     const systemComments = appendSystemComment(`CRA initiated batch from WKL file`, null)
     return this.prisma.batch.create({
       data: {
-        batchDate: this.parseWklDate(header.processDate),
+        batchDate: parseWklDate(header.processDate),
         initiatedBy: BATCH_INITIATED_BY.CRA,
         status: BATCH_STATUS.IN_PROGRESS,
         recordCount: 0,
@@ -349,12 +350,17 @@ export class BatchesService {
     })
 
     if (allDetails.length === 0) return
-    await this.prisma.batch.update({
+
+    const batchRecord = await this.prisma.batch.findUnique({
       where: { id: batchId },
-      data: {
-        recordCount: allDetails.length,
-      },
+      select: { initiatedBy: true },
     })
+    if (batchRecord?.initiatedBy === BATCH_INITIATED_BY.CRA) {
+      await this.prisma.batch.update({
+        where: { id: batchId },
+        data: { recordCount: allDetails.length },
+      })
+    }
 
     const statuses = allDetails.map((d) => d.status)
     const hasApproved = statuses.includes(BATCH_DETAIL_STATUS.APPROVED)
@@ -485,7 +491,7 @@ export class BatchesService {
     caseNumber: string,
     craMatchingSnapshot: any,
   ): Promise<MatchedBatchDetail> {
-    const isExistInBatch = await this.prisma.contactBatchDetail.findFirst({
+    const existingDetail = await this.prisma.contactBatchDetail.findFirst({
       where: {
         batchId,
         contactId,
@@ -500,16 +506,18 @@ export class BatchesService {
         contact: { select: { din: true } },
       },
     })
-    if (isExistInBatch) {
+    if (existingDetail) {
       this.logger.warn(
         `Attempted to create WKL batch detail for contact ${contactId} in batch ${batchId}, but it already exists. ` +
-          `This should not happen as we check for unmatched records before creating the batch detail, but it could occur in rare cases of high concurrency. ` +
-          `Please review batch detail ${isExistInBatch.id} for details.`,
+          `Please review batch detail ${existingDetail.id} for details.`,
       )
-      return isExistInBatch
+      return existingDetail
     }
     const now = new Date()
-    craMatchingSnapshot.childBirthDate = this.parseWklDate(craMatchingSnapshot.childBirthDate)
+    const snapshot = {
+      ...craMatchingSnapshot,
+      childBirthDate: parseWklDate(craMatchingSnapshot.childBirthDate) ?? craMatchingSnapshot.childBirthDate,
+    }
     return await this.prisma.$transaction(async (tx) => {
       const batchDetail = await tx.contactBatchDetail.create({
         data: {
@@ -517,9 +525,9 @@ export class BatchesService {
           batchId,
           transactionType,
           status: WEEKLY_FILE.STATUS[craStatus.toUpperCase()],
-          craMatchingSnapshot,
+          craMatchingSnapshot: snapshot,
           createdAt: now,
-          createdBy: CREATED_BY.SYSTEM,
+          createdBy: UPDATED_BY.SYSTEM,
           lastUpdatedAt: now,
           lastUpdatedBy: UPDATED_BY.SYSTEM,
         },
@@ -543,11 +551,4 @@ export class BatchesService {
     })
   }
 
-  private parseWklDate(dateStr: string): Date | undefined {
-    if (!dateStr || dateStr.trim().length !== 8) return undefined
-    const y = dateStr.substring(0, 4)
-    const m = dateStr.substring(4, 6)
-    const d = dateStr.substring(6, 8)
-    return new Date(`${y}-${m}-${d}`)
-  }
 }

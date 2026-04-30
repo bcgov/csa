@@ -17,9 +17,6 @@ export const CRA_DATA_HANDLING_CONSTANT = {
   UPDATED_BY: {
     SYSTEM: 'SYSTEM',
   },
-  CREATED_BY: {
-    SYSTEM: 'SYSTEM',
-  },
   BATCH_INITIATED_BY: {
     MINISTRY: 'Ministry',
     CRA: 'CRA',

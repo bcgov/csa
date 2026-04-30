@@ -65,7 +65,7 @@ describe('BatchesService', () => {
       await service.aggregateBatchStatus(1)
 
       expect(service.updateBatchStatus).not.toHaveBeenCalled()
-      expect(mockPrisma.batch.update).toHaveBeenCalledOnce()
+      expect(mockPrisma.batch.update).not.toHaveBeenCalled()
     })
 
     it('should transition to CRA_ALL_REJECTED when all details are error', async () => {

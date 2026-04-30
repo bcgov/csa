@@ -8,6 +8,7 @@ on:
       - "backend/**"
       - "frontend/**"
       - ".github/workflows/**"
+      - "backup/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number }}

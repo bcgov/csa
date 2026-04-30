@@ -340,6 +340,38 @@ export class ContactsService {
     return { success: true, from: currentState, to: nextState }
   }
 
+  async forceUpdateCsaStatus(
+    contactId: number,
+    nextState: string,
+    additionalData?: Record<string, unknown>,
+  ): Promise<TransitionResult> {
+    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
+    if (!contact) {
+      return { success: false, reason: 'Contact not found' }
+    }
+
+    const currentState = contact.csaStatus ?? ''
+
+    await this.prisma.contact.update({
+      where: { id: contactId },
+      data: {
+        csaStatus: nextState,
+        csaStatusEffectiveDate: new Date(),
+        icmIntegrationStatus: true,
+        lastUpdatedBy: 'SYSTEM',
+        lastUpdatedAt: new Date(),
+        preBatchStatus: null,
+        resumeStatus: null,
+        holdBy: null,
+        ...additionalData,
+      },
+    })
+
+    this.logger.log(`Contact ${contactId}: ${currentState}->${nextState} [FORCE/WKL] by SYSTEM`)
+
+    return { success: true, from: currentState, to: nextState }
+  }
+
   async fullTextSearch(
     query: string,
     page: number = 1,

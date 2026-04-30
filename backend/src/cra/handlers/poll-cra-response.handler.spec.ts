@@ -144,6 +144,7 @@ describe('PollCraResponseHandler', () => {
     mockWeeklyContactMatcher = {
       loadCandidates: vi.fn().mockResolvedValue(undefined),
       findMatchingBatchDetail: vi.fn(),
+      findMatchingContact: vi.fn(),
     }
 
     handler = new PollCraResponseHandler(
@@ -286,6 +287,17 @@ describe('PollCraResponseHandler', () => {
       await handler.execute(mockContext)
 
       expect(mockContactsService.updateCsaStatus).not.toHaveBeenCalled()
+    })
+
+    it('should make no contactBatchDetail update when record is accepted', async () => {
+      const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
+      setupUnprocessedFile(VALID_FILE_NAME)
+      setupParseFile([detail])
+      setupBatchDetail(100, 1, 10)
+
+      await handler.execute(mockContext)
+
+      expect(mockPrisma.contactBatchDetail.update).not.toHaveBeenCalled()
     })
 
     it('should call aggregateBatchStatus for the batch', async () => {

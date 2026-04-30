@@ -4,7 +4,9 @@ import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_DETAIL_STATUS } from 'src/common/state-machine/constants/batch-detail-status.constants'
 import { BATCH_STATUS } from 'src/common/state-machine/constants/batch-status.constants'
 import { AppLogger } from 'src/common/logger/app-logger'
+import { parseWklDate } from 'src/common/utils'
 import { CraMatchingSnapshot } from './cra-matching-snapshot.interface'
+import { DetailRecord04 } from './inbound-weekly.interface'
 
 const ACTIVE_BATCH_STATUSES = [BATCH_STATUS.IN_PROGRESS, BATCH_STATUS.PARTIALLY_PROCESSED]
 
@@ -26,6 +28,13 @@ export interface MatchedBatchDetail {
   transactionType: string
   systemComments: string | null
   contact: { din: string | null }
+}
+
+export interface MatchedContact {
+  id: number
+  din: string | null
+  csaStatus: string | null
+  caseNumber: string | null
 }
 
 @Injectable()
@@ -113,6 +122,63 @@ export class WeeklyContactMatcherService {
       transactionType: detail.transactionType,
       systemComments: detail.systemComments,
       contact: detail.contact,
+    }
+  }
+
+  async findMatchingContact(wklDetail: WklChildDetails): Promise<MatchedContact | null> {
+    const din = wklDetail.childDin?.trim()
+
+    // Step 1: DIN match
+    if (din) {
+      const dinMatches = await this.prisma.contact.findMany({
+        where: { din },
+        select: { id: true, din: true, csaStatus: true, caseNumber: true },
+      })
+      if (dinMatches.length === 1) return dinMatches[0]
+      if (dinMatches.length > 1) {
+        this.logger.warn(`WKL contact match: multiple contacts with DIN ${din}, skipping`)
+        return null
+      }
+      this.logger.log(`WKL contact match: DIN ${din} not found, falling back to child details`)
+    }
+
+    // Step 2: Child details match against contacts table
+    const detailMatches = await this.prisma.contact.findMany({
+      where: {
+        firstName: wklDetail.childGivenName.trim(),
+        lastName: wklDetail.childSurName.trim(),
+        gender: wklDetail.childSex.trim(),
+        dateOfBirth: parseWklDate(wklDetail.childBirthDate),
+        birthCity: wklDetail.childBirthCity.trim(),
+        birthProvince: wklDetail.childBirthProv.trim(),
+        birthCountry: wklDetail.childBirthCountry.trim(),
+      },
+      select: { id: true, din: true, csaStatus: true, caseNumber: true },
+    })
+
+    if (detailMatches.length === 1) return detailMatches[0]
+
+    if (detailMatches.length > 1) {
+      this.logger.warn(
+        `WKL contact match: multiple contacts (${detailMatches.length}) for ` +
+          `${wklDetail.childGivenName.trim()} ${wklDetail.childSurName.trim()}, skipping`,
+      )
+      return null
+    }
+
+    return null
+  }
+
+  buildWklMatchingSnapshot(detail: DetailRecord04): CraMatchingSnapshot {
+    return {
+      childGivenName: detail.childGivenName.trim(),
+      childSurName: detail.childSurName.trim(),
+      childSex: detail.childSex.trim(),
+      childBirthDate: detail.childBirthDate.trim(),
+      childBirthCity: detail.childBirthCity.trim(),
+      childBirthProv: detail.childBirthProv.trim(),
+      childBirthCountry: detail.childBirthCountry.trim(),
+      ccraDinNum: detail.childDin?.trim(),
     }
   }
 }

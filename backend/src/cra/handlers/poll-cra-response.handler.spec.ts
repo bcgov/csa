@@ -144,6 +144,7 @@ describe('PollCraResponseHandler', () => {
     mockWeeklyContactMatcher = {
       loadCandidates: vi.fn().mockResolvedValue(undefined),
       findMatchingBatchDetail: vi.fn(),
+      findMatchingContact: vi.fn(),
     }
 
     handler = new PollCraResponseHandler(

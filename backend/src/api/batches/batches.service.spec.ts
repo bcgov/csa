@@ -1,12 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BATCH_DETAIL_STATUS, BATCH_EVENT, BATCH_STATUS } from 'src/common/state-machine/constants'
 import { BatchesService } from './batches.service'
+import { RecordTypeCode, TranCode, HeaderRecord } from 'src/cra/inbound/inbound-weekly.interface'
 
 describe('BatchesService', () => {
   let service: BatchesService
   let mockPrisma: any
   let mockStateMachine: any
   let mockContactsService: any
+
+  const buildHeader = (): HeaderRecord => ({
+    tranCode: TranCode.HEADER,
+    recordTypeCode: RecordTypeCode.HEADER,
+    filler1: '',
+    processDate: '20250101',
+    filler2: '',
+  })
 
   beforeEach(() => {
     mockPrisma = {
@@ -16,6 +25,7 @@ describe('BatchesService', () => {
         update: vi.fn(),
         findMany: vi.fn(),
         findFirst: vi.fn(),
+        create: vi.fn(),
       },
     }
 
@@ -280,6 +290,32 @@ describe('BatchesService', () => {
           },
         },
       )
+    })
+  })
+
+  describe('createWklBatchForUnmatchedRecords', () => {
+    it('should create a batch with initiatedBy CRA and status in_progress', async () => {
+      mockPrisma.batch.create.mockResolvedValue({
+        id: 99,
+        initiatedBy: 'CRA',
+        status: 'in_progress',
+        recordCount: 0,
+        batchDate: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        systemComments: null,
+      })
+
+      const batch = await service.createWklBatchForUnmatchedRecords(buildHeader())
+
+      expect(mockPrisma.batch.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          initiatedBy: 'CRA',
+          status: 'in_progress',
+          recordCount: 0,
+        }),
+      })
+      expect(batch.id).toBe(99)
     })
   })
 })

@@ -359,8 +359,9 @@ export class PollCraResponseHandler extends BaseJob {
     }
 
     const isApproved =
-      detail.status === WKL_STATUS.COMPLETED || detail.status === WKL_STATUS.UPDATED
-    const isRefused = detail.status === WKL_STATUS.ABANDONED
+      detail.status?.toLowerCase() === WKL_STATUS.COMPLETED ||
+      detail.status?.toLowerCase() === WKL_STATUS.UPDATED
+    const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
 
     const din = detail.childDin?.trim()
     const additionalData = din && !batchDetail.contact.din ? { din } : undefined
@@ -428,9 +429,9 @@ export class PollCraResponseHandler extends BaseJob {
     }
 
     const isApproved =
-      detail.status === WKL_STATUS.COMPLETED || detail.status === WKL_STATUS.UPDATED
-    const isRefused = detail.status === WKL_STATUS.ABANDONED
-
+      detail.status?.toLowerCase() === WKL_STATUS.COMPLETED ||
+      detail.status?.toLowerCase() === WKL_STATUS.UPDATED
+    const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
     const din = detail.childDin?.trim()
     const additionalData = din && !batchDetail.contact.din ? { din } : undefined
 

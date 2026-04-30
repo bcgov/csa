@@ -45,6 +45,7 @@ import {
   getBatchContacts,
   getContactBatches,
   getLastSuccessfulRuns,
+  getRunningEligibilityJob,
   holdContacts,
   removeContactFromBatch,
   resumeContacts,
@@ -53,6 +54,7 @@ import {
   updateEligibilityStatus,
   updateNotEligibleStatusAlt,
   updateOver18Status,
+  waitForEligibilityJobCompletion,
   type Batch,
   type BatchContactDetail,
   type Contact,
@@ -339,6 +341,76 @@ function App() {
         .then(setLastSuccessfulRuns)
         .catch((err) => console.error('Failed to fetch last successful runs:', err))
     }
+  }, [isAuthenticated])
+
+  // Check for running eligibility job on page load and resume monitoring
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    const checkAndResumeRunningJob = async () => {
+      try {
+        const runningJob = await getRunningEligibilityJob()
+        if (runningJob) {
+          // Found a running job - lock the UI and wait for completion
+          setIsRunningEligibilityAll(true)
+          setSnackbar({
+            open: true,
+            message: 'Eligibility query is running in the background...',
+            severity: 'info',
+          })
+
+          // Wait for the job to complete
+          const completedJob = await waitForEligibilityJobCompletion(runningJob.id, (status) => {
+            if (status === 'RUNNING') {
+              setSnackbar({
+                open: true,
+                message: 'Eligibility query is still running...',
+                severity: 'info',
+              })
+            }
+          })
+
+          // Handle completion
+          if (completedJob.status === 'SUCCESS') {
+            const metadata = completedJob.metadata as {
+              processed?: number
+              statusChanges?: number
+              skipped?: number
+            } | null
+            const processed = metadata?.processed ?? 0
+            const statusChanges = metadata?.statusChanges ?? 0
+            const skipped = metadata?.skipped ?? 0
+
+            setSnackbar({
+              open: true,
+              message: `Eligibility complete: ${processed} processed, ${statusChanges} updated, ${skipped} skipped`,
+              severity: statusChanges > 0 ? 'success' : 'info',
+            })
+
+            // Refresh the page to get updated data if there were changes
+            if (statusChanges > 0) {
+              window.location.reload()
+            }
+          } else {
+            setSnackbar({
+              open: true,
+              message: completedJob.error || 'Eligibility query failed',
+              severity: 'error',
+            })
+          }
+
+          setIsRunningEligibilityAll(false)
+          // Refresh timestamps
+          getLastSuccessfulRuns()
+            .then(setLastSuccessfulRuns)
+            .catch((err) => console.error('Failed to refresh last successful runs:', err))
+        }
+      } catch (err) {
+        console.error('Failed to check for running eligibility job:', err)
+      }
+    }
+
+    checkAndResumeRunningJob()
   }, [isAuthenticated])
 
   // Helper function to format date for display (matches table date format)

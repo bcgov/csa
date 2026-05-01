@@ -364,7 +364,7 @@ export class PollCraResponseHandler extends BaseJob {
     const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
 
     const din = detail.childDin?.trim()
-    const additionalData = din && !batchDetail.contact.din ? { din } : undefined
+    const additionalData = din ? { din } : undefined
 
     if (isApproved) {
       await this.batchesService.updateBatchDetailStatus(
@@ -433,7 +433,7 @@ export class PollCraResponseHandler extends BaseJob {
       detail.status?.toLowerCase() === WKL_STATUS.UPDATED
     const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
     const din = detail.childDin?.trim()
-    const additionalData = din && !batchDetail.contact.din ? { din } : undefined
+    const additionalData = din ? { din } : undefined
 
     if (isApproved) {
       const nextState =

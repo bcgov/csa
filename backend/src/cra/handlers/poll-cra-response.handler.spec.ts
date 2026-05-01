@@ -1096,7 +1096,7 @@ describe('PollCraResponseHandler', () => {
       )
     })
 
-    it('does not pass DIN when contact already has one', async () => {
+    it('always updates DIN from WKL even when contact already has one', async () => {
       setupWeeklyFile()
       setupWeeklyParseFile([makeWklDetail({ childDin: '987654321' })])
       mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
@@ -1110,7 +1110,7 @@ describe('PollCraResponseHandler', () => {
         42,
         CSA_EVENT.CRA_WKL_APPROVED,
         'SYSTEM',
-        { additionalData: undefined },
+        { additionalData: { din: '987654321' } },
       )
     })
 

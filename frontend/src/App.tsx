@@ -9,6 +9,11 @@ import {
   Box,
   Button,
   Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   FormControl,
   IconButton,
   InputAdornment,
@@ -315,6 +320,7 @@ function App() {
   const [runningEligibilityContactId, setRunningEligibilityContactId] = useState<number | null>(
     null,
   )
+  const [confirmRunAllDialogOpen, setConfirmRunAllDialogOpen] = useState(false)
 
   // Last successful job runs state
   const [lastSuccessfulRuns, setLastSuccessfulRuns] = useState<LastSuccessfulRuns>({
@@ -1358,8 +1364,17 @@ function App() {
     setEligibilityMenuAnchor(null)
   }
 
-  const handleRunEligibilityForAll = async () => {
+  const handleRunEligibilityForAllClick = () => {
     handleEligibilityMenuClose()
+    setConfirmRunAllDialogOpen(true)
+  }
+
+  const handleConfirmRunAllDialogClose = () => {
+    setConfirmRunAllDialogOpen(false)
+  }
+
+  const handleRunEligibilityForAll = async () => {
+    setConfirmRunAllDialogOpen(false)
     setIsRunningEligibilityAll(true)
     try {
       setSnackbar({
@@ -2690,7 +2705,7 @@ function App() {
                       onClose={handleEligibilityMenuClose}
                     >
                       <MenuItem
-                        onClick={handleRunEligibilityForAll}
+                        onClick={handleRunEligibilityForAllClick}
                         disabled={isRunningEligibilityAll}
                         sx={{ fontSize: '0.85rem' }}
                       >
@@ -6028,6 +6043,30 @@ function App() {
           © 2026 Government of British Columbia.
         </Typography>
       </Box>
+
+      {/* Confirmation Dialog for Run Eligibility on All Contacts */}
+      <Dialog
+        open={confirmRunAllDialogOpen}
+        onClose={handleConfirmRunAllDialogClose}
+        aria-labelledby="confirm-run-all-dialog-title"
+        aria-describedby="confirm-run-all-dialog-description"
+      >
+        <DialogTitle id="confirm-run-all-dialog-title">Confirm Eligibility Query</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="confirm-run-all-dialog-description">
+            Are you sure you want to run the eligibility query on all contacts? This operation may
+            take several minutes to complete.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleConfirmRunAllDialogClose} color="inherit">
+            Cancel
+          </Button>
+          <Button onClick={handleRunEligibilityForAll} variant="contained" autoFocus>
+            Ok
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar for hold/resume feedback */}
       <Snackbar

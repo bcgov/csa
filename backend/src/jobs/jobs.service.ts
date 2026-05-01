@@ -170,4 +170,24 @@ export class JobsService {
     const lastJob = await this.getLastSuccessfulJob(jobType)
     return lastJob?.completedAt ?? null
   }
+
+  async hasStuckOrFailedJobs(stuckThresholdMinutes: number = 40): Promise<boolean> {
+    const threshold = new Date(Date.now() - stuckThresholdMinutes * 60 * 1000)
+
+    const stuck = await this.prisma.jobRun.findFirst({
+      where: { status: JobStatus.RUNNING, startedAt: { lt: threshold } },
+      select: { id: true },
+    })
+    if (stuck) return true
+
+    const failed = await this.prisma.jobRun.findFirst({
+      where: {
+        status: JobStatus.FAILED,
+        parentJobId: null,
+        jobTrigger: JobTrigger.CRON,
+      },
+      select: { id: true },
+    })
+    return failed !== null
+  }
 }

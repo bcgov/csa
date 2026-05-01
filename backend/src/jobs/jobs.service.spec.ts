@@ -295,6 +295,60 @@ describe('JobsService', () => {
     })
   })
 
+  describe('hasStuckOrFailedJobs', () => {
+    it('should return true when a stuck RUNNING job exists', async () => {
+      vi.spyOn(prisma.jobRun, 'findFirst').mockResolvedValueOnce({ id: 99 } as any)
+
+      const result = await service.hasStuckOrFailedJobs()
+
+      expect(result).toBe(true)
+      expect(prisma.jobRun.findFirst).toHaveBeenCalledWith({
+        where: { status: JobStatus.RUNNING, startedAt: { lt: expect.any(Date) } },
+        select: { id: true },
+      })
+    })
+
+    it('should return true when a FAILED top-level CRON job exists', async () => {
+      vi.spyOn(prisma.jobRun, 'findFirst')
+        .mockResolvedValueOnce(null) // no stuck jobs
+        .mockResolvedValueOnce({ id: 50 } as any) // failed job found
+
+      const result = await service.hasStuckOrFailedJobs()
+
+      expect(result).toBe(true)
+      expect(prisma.jobRun.findFirst).toHaveBeenCalledWith({
+        where: {
+          status: JobStatus.FAILED,
+          parentJobId: null,
+          jobTrigger: JobTrigger.CRON,
+        },
+        select: { id: true },
+      })
+    })
+
+    it('should return false when no stuck or failed jobs exist', async () => {
+      vi.spyOn(prisma.jobRun, 'findFirst')
+        .mockResolvedValueOnce(null) // no stuck jobs
+        .mockResolvedValueOnce(null) // no failed jobs
+
+      const result = await service.hasStuckOrFailedJobs()
+
+      expect(result).toBe(false)
+    })
+
+    it('should use the default 40-minute threshold', async () => {
+      vi.spyOn(prisma.jobRun, 'findFirst').mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+      const before = new Date(Date.now() - 40 * 60 * 1000)
+
+      await service.hasStuckOrFailedJobs()
+
+      const calledThreshold = (prisma.jobRun.findFirst as any).mock.calls[0][0].where.startedAt.lt
+      // threshold should be ~40 min ago (within 1 second tolerance)
+      expect(calledThreshold.getTime()).toBeGreaterThanOrEqual(before.getTime() - 1000)
+      expect(calledThreshold.getTime()).toBeLessThanOrEqual(before.getTime() + 1000)
+    })
+  })
+
   describe('getLastSuccessTimestamp', () => {
     it('should return completed_at of last successful job of given type', async () => {
       const completedAt = new Date()

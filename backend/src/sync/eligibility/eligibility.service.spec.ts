@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { pacificToday } from 'src/common/utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildFindAgedOutContactIdsSql, buildLoadContactProfilesSql } from './eligibility.queries'
 import { EligibilityService } from './eligibility.service'
@@ -301,8 +302,10 @@ describe('EligibilityService', () => {
 
   //contact that reaches step 7->eligible (under 18, valid placement + order)
   function makeEligibleContact(overrides: Record<string, unknown> = {}) {
-    const now = new Date()
-    const prevMonth = new Date(Date.UTC(now.getFullYear(), now.getUTCMonth() - 1, 15))
+    const todayPacific = pacificToday()
+    const prevMonth = new Date(
+      Date.UTC(todayPacific.getUTCFullYear(), todayPacific.getUTCMonth() - 1, 15),
+    )
     return {
       caseRowId: 'CASE-E',
       personIdIcm: 'ICM-ELIG',

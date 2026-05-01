@@ -1,5 +1,5 @@
 import type { INestApplication } from '@nestjs/common'
-import { NotFoundException } from '@nestjs/common'
+import { NotFoundException, UnprocessableEntityException } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
@@ -44,6 +44,7 @@ describe('ContactsController', () => {
     updateEligibilityStatus: vi.fn(),
     updateNotEligibleStatus: vi.fn(),
     updateChildOver18: vi.fn(),
+    runContactEligibility: vi.fn(),
   }
 
   beforeEach(async () => {
@@ -342,6 +343,34 @@ describe('ContactsController', () => {
         .get('/contacts/1/batches')
         .expect(200)
         .expect(batchDetails)
+    })
+  })
+
+  describe('POST /contacts/:id/run-eligibility', () => {
+    it('should return previous and new status', async () => {
+      const result = { previousStatus: 'eligible', newStatus: 'not_eligible_out_of_pay' }
+      vi.spyOn(service, 'runContactEligibility').mockResolvedValue(result)
+
+      const res = await request(app.getHttpServer()).post('/contacts/1/run-eligibility').expect(200)
+
+      expect(res.body).toEqual(result)
+      expect(service.runContactEligibility).toHaveBeenCalledWith(1)
+    })
+
+    it('should return 404 when contact not found', async () => {
+      vi.spyOn(service, 'runContactEligibility').mockRejectedValue(
+        new NotFoundException('Contact 999 not found'),
+      )
+
+      await request(app.getHttpServer()).post('/contacts/999/run-eligibility').expect(404)
+    })
+
+    it('should return 422 when contact not in staging', async () => {
+      vi.spyOn(service, 'runContactEligibility').mockRejectedValue(
+        new UnprocessableEntityException('Contact X not found in staging tables'),
+      )
+
+      await request(app.getHttpServer()).post('/contacts/1/run-eligibility').expect(422)
     })
   })
 })

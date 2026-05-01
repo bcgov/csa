@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   HttpException,
   Param,
   ParseIntPipe,
@@ -174,5 +175,14 @@ export class ContactsController {
   @ApiResponse({ status: 404, description: 'Contact not found' })
   async findContactBatches(@Param('id', ParseIntPipe) id: number) {
     return this.contactsService.findContactBatches(id)
+  }
+
+  @Post(':id/run-eligibility')
+  @HttpCode(200)
+  @ApiResponse({ status: 200, description: 'Eligibility result with previous and new status' })
+  @ApiResponse({ status: 404, description: 'Contact not found' })
+  @ApiResponse({ status: 422, description: 'Contact not found in staging tables' })
+  async runEligibility(@Param('id', ParseIntPipe) id: number) {
+    return this.contactsService.runContactEligibility(id)
   }
 }

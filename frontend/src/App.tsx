@@ -9,9 +9,15 @@ import {
   Box,
   Button,
   Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   FormControl,
   IconButton,
   InputAdornment,
+  LinearProgress,
   Menu,
   MenuItem,
   Pagination,
@@ -43,16 +49,24 @@ import {
   getAllContacts,
   getBatchContacts,
   getContactBatches,
+  getLastSuccessfulRuns,
+  getRunningEligibilityJob,
   holdContacts,
   removeContactFromBatch,
   resumeContacts,
+  runEligibilityForAllWithPolling,
+  runEligibilityForContact,
   updateEligibilityStatus,
   updateNotEligibleStatusAlt,
   updateOver18Status,
+  waitForEligibilityJobCompletion,
   type Batch,
   type BatchContactDetail,
   type Contact,
   type ContactBatchDetail,
+  type ContactEligibilityResult,
+  type JobRun,
+  type LastSuccessfulRuns,
 } from './service/contacts-service'
 import type { AppEnvironment } from './types/runtime-config'
 
@@ -299,6 +313,21 @@ function App() {
     severity: 'success',
   })
 
+  // Run Eligibility Query dropdown menu state
+  const [eligibilityMenuAnchor, setEligibilityMenuAnchor] = useState<null | HTMLElement>(null)
+  const eligibilityMenuOpen = Boolean(eligibilityMenuAnchor)
+  const [isRunningEligibilityAll, setIsRunningEligibilityAll] = useState(false)
+  const [runningEligibilityContactId, setRunningEligibilityContactId] = useState<number | null>(
+    null,
+  )
+  const [confirmRunAllDialogOpen, setConfirmRunAllDialogOpen] = useState(false)
+
+  // Last successful job runs state
+  const [lastSuccessfulRuns, setLastSuccessfulRuns] = useState<LastSuccessfulRuns>({
+    lastDataIngestion: null,
+    lastEligibilityRun: null,
+  })
+
   // Effect to show CSA access alert from auth context
   useEffect(() => {
     if (csaAccessAlert) {
@@ -310,6 +339,167 @@ function App() {
       clearCsaAccessAlert()
     }
   }, [csaAccessAlert, clearCsaAccessAlert])
+
+  // Fetch last successful job runs on mount
+  useEffect(() => {
+    if (isAuthenticated) {
+      getLastSuccessfulRuns()
+        .then(setLastSuccessfulRuns)
+        .catch((err) => console.error('Failed to fetch last successful runs:', err))
+    }
+  }, [isAuthenticated])
+
+  // Check for running eligibility job on page load and resume monitoring
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    const checkAndResumeRunningJob = async () => {
+      try {
+        const runningJob = await getRunningEligibilityJob()
+        if (runningJob) {
+          // Found a running job - lock the UI and wait for completion
+          setIsRunningEligibilityAll(true)
+          setSnackbar({
+            open: true,
+            message: 'Eligibility query is running in the background...',
+            severity: 'info',
+          })
+
+          // Wait for the job to complete
+          const completedJob = await waitForEligibilityJobCompletion(runningJob.id, (status) => {
+            if (status === 'RUNNING') {
+              setSnackbar({
+                open: true,
+                message: 'Eligibility query is still running...',
+                severity: 'info',
+              })
+            }
+          })
+
+          // Handle completion
+          if (completedJob.status === 'SUCCESS') {
+            const metadata = completedJob.metadata as {
+              processed?: number
+              statusChanges?: number
+              skipped?: number
+            } | null
+            const processed = metadata?.processed ?? 0
+            const statusChanges = metadata?.statusChanges ?? 0
+            const skipped = metadata?.skipped ?? 0
+
+            setSnackbar({
+              open: true,
+              message: `Eligibility complete: ${processed} processed, ${statusChanges} updated, ${skipped} skipped`,
+              severity: statusChanges > 0 ? 'success' : 'info',
+            })
+
+            // Refresh the page to get updated data if there were changes
+            if (statusChanges > 0) {
+              window.location.reload()
+            }
+          } else {
+            setSnackbar({
+              open: true,
+              message: completedJob.error || 'Eligibility query failed',
+              severity: 'error',
+            })
+          }
+
+          setIsRunningEligibilityAll(false)
+          // Refresh timestamps
+          getLastSuccessfulRuns()
+            .then(setLastSuccessfulRuns)
+            .catch((err) => console.error('Failed to refresh last successful runs:', err))
+        }
+      } catch (err) {
+        console.error('Failed to check for running eligibility job:', err)
+      }
+    }
+
+    checkAndResumeRunningJob()
+  }, [isAuthenticated])
+
+  // Helper function to check for running eligibility job before data modifications
+  // Returns true if a job is running (action should be blocked), false otherwise
+  const checkAndHandleRunningEligibilityJob = async (): Promise<boolean> => {
+    try {
+      const runningJob = await getRunningEligibilityJob()
+      if (runningJob) {
+        // Found a running job - lock the UI and wait for completion
+        setIsRunningEligibilityAll(true)
+        setSnackbar({
+          open: true,
+          message: 'An eligibility query is currently running. Please wait...',
+          severity: 'info',
+        })
+
+        // Wait for the job to complete
+        const completedJob = await waitForEligibilityJobCompletion(runningJob.id, (status) => {
+          if (status === 'RUNNING') {
+            setSnackbar({
+              open: true,
+              message: 'Eligibility query is still running...',
+              severity: 'info',
+            })
+          }
+        })
+
+        // Handle completion
+        if (completedJob.status === 'SUCCESS') {
+          const metadata = completedJob.metadata as {
+            processed?: number
+            statusChanges?: number
+            skipped?: number
+          } | null
+          const statusChanges = metadata?.statusChanges ?? 0
+
+          setSnackbar({
+            open: true,
+            message: 'Eligibility query completed. Please try your action again.',
+            severity: 'success',
+          })
+
+          // Refresh the page to get updated data if there were changes
+          if (statusChanges > 0) {
+            window.location.reload()
+          }
+        } else {
+          setSnackbar({
+            open: true,
+            message: completedJob.error || 'Eligibility query failed',
+            severity: 'error',
+          })
+        }
+
+        setIsRunningEligibilityAll(false)
+        // Refresh timestamps
+        getLastSuccessfulRuns()
+          .then(setLastSuccessfulRuns)
+          .catch((err) => console.error('Failed to refresh last successful runs:', err))
+
+        return true // Job was running, action should be blocked
+      }
+      return false // No job running, can proceed
+    } catch (err) {
+      console.error('Failed to check for running eligibility job:', err)
+      return false // On error, allow the action to proceed
+    }
+  }
+
+  // Helper function to format date for display (matches table date format)
+  const formatJobTimestamp = (date: Date | null): string => {
+    if (!date) return '--'
+    const parts = new Intl.DateTimeFormat('en-US', {
+      ...DATE_FORMAT,
+      timeZone: 'America/Vancouver',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(date)
+    const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
+    return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
+  }
 
   // Batch history state for selected contact
   const [contactBatchHistory, setContactBatchHistory] = useState<ContactBatchDetail[]>([])
@@ -936,6 +1126,9 @@ function App() {
   const handleHoldResume = async () => {
     if (selected.length === 0) return
 
+    // Check if eligibility job is running
+    if (await checkAndHandleRunningEligibilityJob()) return
+
     try {
       // Separate selected contacts into hold and resume groups
       const toHold: number[] = []
@@ -1039,6 +1232,9 @@ function App() {
   const handleCSAEligible = async () => {
     if (selected.length === 0) return
 
+    // Check if eligibility job is running
+    if (await checkAndHandleRunningEligibilityJob()) return
+
     try {
       const response = await updateEligibilityStatus(selected, 'ELIGIBLE')
 
@@ -1103,6 +1299,9 @@ function App() {
   // CSA Not Eligible handler
   const handleCSANotEligible = async () => {
     if (selected.length === 0) return
+
+    // Check if eligibility job is running
+    if (await checkAndHandleRunningEligibilityJob()) return
 
     try {
       const response = await updateNotEligibleStatusAlt(selected, 'SET_NOT_ELIGIBLE')
@@ -1171,6 +1370,9 @@ function App() {
   const handleChildOver18 = async () => {
     if (selected.length === 0) return
 
+    // Check if eligibility job is running
+    if (await checkAndHandleRunningEligibilityJob()) return
+
     try {
       const response = await updateOver18Status(selected, 'AGE_OUT')
 
@@ -1232,6 +1434,166 @@ function App() {
     }
   }
 
+  // Run Eligibility Query menu handlers
+  const handleEligibilityMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setEligibilityMenuAnchor(event.currentTarget)
+  }
+
+  const handleEligibilityMenuClose = () => {
+    setEligibilityMenuAnchor(null)
+  }
+
+  const handleRunEligibilityForAllClick = () => {
+    handleEligibilityMenuClose()
+    setConfirmRunAllDialogOpen(true)
+  }
+
+  const handleConfirmRunAllDialogClose = () => {
+    setConfirmRunAllDialogOpen(false)
+  }
+
+  const handleRunEligibilityForAll = async () => {
+    setConfirmRunAllDialogOpen(false)
+    setIsRunningEligibilityAll(true)
+    try {
+      setSnackbar({
+        open: true,
+        message: 'Starting eligibility query job...',
+        severity: 'info',
+      })
+
+      const job: JobRun = await runEligibilityForAllWithPolling((status) => {
+        if (status === 'RUNNING') {
+          setSnackbar({
+            open: true,
+            message: 'Eligibility query is running...',
+            severity: 'info',
+          })
+        }
+      })
+
+      if (job.status === 'SUCCESS') {
+        const metadata = job.metadata as {
+          processed?: number
+          statusChanges?: number
+          skipped?: number
+        } | null
+        const processed = metadata?.processed ?? 0
+        const statusChanges = metadata?.statusChanges ?? 0
+        const skipped = metadata?.skipped ?? 0
+
+        const message = `Eligibility complete: ${processed} processed, ${statusChanges} updated, ${skipped} skipped`
+        setSnackbar({
+          open: true,
+          message,
+          severity: statusChanges > 0 ? 'success' : 'info',
+        })
+
+        // Refresh the list if there were changes
+        if (statusChanges > 0) {
+          if (isSearchActive && searchTerm.trim().length >= 3) {
+            await performFullTextSearch(searchTerm.trim(), currentPage)
+          } else {
+            await fetchContacts(currentPage)
+          }
+        }
+      } else {
+        // Job failed
+        const errorMessage = job.error || 'Eligibility query failed'
+        throw new Error(errorMessage)
+      }
+    } catch (error: any) {
+      console.error('Run eligibility for all error:', error)
+      let rawMessage =
+        error?.response?.data?.message || error?.message || 'Failed to run eligibility query'
+
+      // Handle 409 Conflict (job already running)
+      if (error?.response?.status === 409) {
+        rawMessage = 'An eligibility query is already running. Please wait for it to complete.'
+      }
+
+      // Make staging validation errors more user-friendly
+      let errorMessage = rawMessage
+      if (rawMessage.includes('Staging validation failed: empty tables')) {
+        const tableMatch = rawMessage.match(/\[([^\]]+)\]/)
+        const tables = tableMatch ? tableMatch[1] : 'some required tables'
+        errorMessage = `Cannot run eligibility query: staging data is incomplete. Missing data in: ${tables}. Please ensure all data sources have been synced before running the eligibility query.`
+      }
+
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error',
+      })
+    } finally {
+      setIsRunningEligibilityAll(false)
+      // Refresh the last successful runs timestamps
+      getLastSuccessfulRuns()
+        .then(setLastSuccessfulRuns)
+        .catch((err) => console.error('Failed to refresh last successful runs:', err))
+    }
+  }
+
+  const handleRunEligibilityForSelected = async () => {
+    handleEligibilityMenuClose()
+    if (selected.length !== 1) return
+
+    const contactId = selected[0]
+    setRunningEligibilityContactId(contactId)
+    try {
+      setSnackbar({
+        open: true,
+        message: 'Running eligibility query on selected contact...',
+        severity: 'info',
+      })
+
+      const result: ContactEligibilityResult = await runEligibilityForContact(contactId)
+
+      const statusChanged = result.previousStatus !== result.newStatus
+      const message = statusChanged
+        ? `Eligibility updated for contact ${contactId}: ${result.previousStatus || 'none'} → ${result.newStatus}`
+        : `No eligibility changes for contact ${contactId}`
+      setSnackbar({
+        open: true,
+        message,
+        severity: statusChanged ? 'success' : 'info',
+      })
+
+      // Refresh the list if there were changes
+      if (statusChanged) {
+        if (isSearchActive && searchTerm.trim().length >= 3) {
+          await performFullTextSearch(searchTerm.trim(), currentPage)
+        } else {
+          await fetchContacts(currentPage)
+        }
+      }
+    } catch (error: any) {
+      console.error('Run eligibility for contact error:', error)
+      const rawMessage =
+        error?.response?.data?.message || error?.message || 'Failed to run eligibility query'
+
+      // Make staging validation errors more user-friendly
+      let errorMessage = rawMessage
+      if (rawMessage.includes('Staging validation failed: empty tables')) {
+        const tableMatch = rawMessage.match(/\[([^\]]+)\]/)
+        const tables = tableMatch ? tableMatch[1] : 'some required tables'
+        errorMessage = `Cannot run eligibility query: staging data is incomplete. Missing data in: ${tables}. Please ensure all data sources have been synced before running the eligibility query.`
+      }
+
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error',
+      })
+    } finally {
+      setRunningEligibilityContactId(null)
+      // Refresh the last successful runs timestamps
+      getLastSuccessfulRuns()
+        .then(setLastSuccessfulRuns)
+        .catch((err) => console.error('Failed to refresh last successful runs:', err))
+    }
+  }
+
   const handleSnackbarClose = () => {
     setSnackbar({ ...snackbar, open: false })
   }
@@ -1239,6 +1601,9 @@ function App() {
   // Handle Add to Batch button click
   const handleAddToBatch = async () => {
     if (selected.length === 0) return
+
+    // Check if eligibility job is running
+    if (await checkAndHandleRunningEligibilityJob()) return
 
     try {
       const response = await addContactsToBatch(selected)
@@ -1338,6 +1703,9 @@ function App() {
   const handleRemoveFromBatch = async () => {
     if (!selectedBatchHistoryId || !selectedChild) return
 
+    // Check if eligibility job is running
+    if (await checkAndHandleRunningEligibilityJob()) return
+
     try {
       const result = await removeContactFromBatch(selectedChild)
 
@@ -1424,6 +1792,9 @@ function App() {
   // Handle Remove from Batch button click in Batch Details table
   const handleRemoveFromBatchDetails = async () => {
     if (selectedBatchDetails.length === 0) return
+
+    // Check if eligibility job is running
+    if (await checkAndHandleRunningEligibilityJob()) return
 
     try {
       // Map selected batch_contact IDs to their corresponding contact IDs
@@ -1870,6 +2241,7 @@ function App() {
       batchDate: item.batch.batchDate ? formatDateYMD(item.batch.batchDate) : '',
       batchRequestStatus: item.batch.statusLabel || item.batch.status || '',
       transactionType: capitalize(item.transactionType) || '',
+      effectiveDate: item.effectiveDate ? formatDateYMD(item.effectiveDate) : '',
       batchDetailStatus: item.statusLabel || item.status || '',
       systemComments: item.systemComments || '',
     }))
@@ -1883,6 +2255,7 @@ function App() {
           row.batchDate.toLowerCase().includes(searchLower) ||
           row.batchRequestStatus.toLowerCase().includes(searchLower) ||
           row.transactionType.toLowerCase().includes(searchLower) ||
+          row.effectiveDate.toLowerCase().includes(searchLower) ||
           row.batchDetailStatus.toLowerCase().includes(searchLower) ||
           row.systemComments.toLowerCase().includes(searchLower)
         )
@@ -1902,7 +2275,7 @@ function App() {
     // Apply sorting
     if (batchHistorySortConfig) {
       const { column, direction } = batchHistorySortConfig
-      const dateColumns = ['batchDate']
+      const dateColumns = ['batchDate', 'effectiveDate']
       data.sort((a, b) => {
         const aValue = String(a[column as keyof typeof a] || '')
         const bValue = String(b[column as keyof typeof b] || '')
@@ -2155,6 +2528,20 @@ function App() {
         }}
       >
         <Toolbar sx={{ padding: '8px 24px', justifyContent: 'center', position: 'relative' }}>
+          {getRuntimeConfig()?.VITE_APP_ENV && getRuntimeConfig()?.VITE_APP_ENV !== 'PROD' && (
+            <Typography
+              variant="body2"
+              sx={{
+                position: 'absolute',
+                left: 24,
+                color: '#666',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+              }}
+            >
+              {getRuntimeConfig()?.VITE_APP_ENV}
+            </Typography>
+          )}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <img src={logo} alt="BC Logo" style={{ height: '40px' }} />
             <Typography variant="h6" component="div" sx={{ color: '#333', fontWeight: 500 }}>
@@ -2260,17 +2647,11 @@ function App() {
               padding: '6px',
               borderBottom: '1px solid #e0e0e0',
               boxSizing: 'border-box',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
             }}
           >
-            {/* <Typography variant="h5" component="h1" sx={{
-            color: '#333',
-            fontWeight: 500,
-            textAlign: 'center',
-            marginBottom: '24px'
-          }}>
-            Children&apos;s Special Allowance
-          </Typography> */}
-
             {/* Tabs Section */}
             <Tabs
               value={selectedTab}
@@ -2291,6 +2672,24 @@ function App() {
               <Tab label="Eligibility List" />
               <Tab label="Batch Requests" />
             </Tabs>
+
+            {/* Last Successful Runs Info */}
+            <Box
+              sx={{
+                padding: '6px 12px',
+                mr: 2,
+                textAlign: 'left',
+                border: '1px solid #666',
+                borderRadius: '4px',
+              }}
+            >
+              <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
+                Last Data Fetch: {formatJobTimestamp(lastSuccessfulRuns.lastDataIngestion)}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
+                Last Eligibility Run: {formatJobTimestamp(lastSuccessfulRuns.lastEligibilityRun)}
+              </Typography>
+            </Box>
           </Box>
 
           {/* Content Section */}
@@ -2366,9 +2765,54 @@ function App() {
                       </Select>
                     </FormControl>
                     <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={handleEligibilityMenuOpen}
+                      disabled={isRunningEligibilityAll}
+                      sx={{
+                        textTransform: 'none',
+                      }}
+                    >
+                      {isRunningEligibilityAll ? 'Running Eligibility...' : 'Run Eligibility Query'}
+                      <Tooltip
+                        title="Run eligibility rules against staging data to update contact CSA status"
+                        arrow
+                      >
+                        <InfoOutlinedIcon
+                          fontSize="small"
+                          sx={{ ml: 0.5, fontSize: '16px', color: 'inherit' }}
+                        />
+                      </Tooltip>
+                      <Box component="span" sx={{ ml: 0.5 }}>
+                        ▾
+                      </Box>
+                    </Button>
+                    <Menu
+                      anchorEl={eligibilityMenuAnchor}
+                      open={eligibilityMenuOpen}
+                      onClose={handleEligibilityMenuClose}
+                    >
+                      <MenuItem
+                        onClick={handleRunEligibilityForAllClick}
+                        disabled={isRunningEligibilityAll}
+                        sx={{ fontSize: '0.85rem' }}
+                      >
+                        Run query on all contacts
+                      </MenuItem>
+                      {selected.length === 1 && (
+                        <MenuItem
+                          onClick={handleRunEligibilityForSelected}
+                          disabled={isRunningEligibilityAll}
+                          sx={{ fontSize: '0.85rem' }}
+                        >
+                          Run query on selected contact
+                        </MenuItem>
+                      )}
+                    </Menu>
+                    <Button
                       variant="contained"
                       size="small"
-                      disabled={!canAddToBatch}
+                      disabled={!canAddToBatch || isRunningEligibilityAll}
                       onClick={handleAddToBatch}
                       sx={{
                         textTransform: 'none',
@@ -2383,7 +2827,7 @@ function App() {
                     <Button
                       variant="outlined"
                       size="small"
-                      disabled={!canHoldResume}
+                      disabled={!canHoldResume || isRunningEligibilityAll}
                       onClick={handleHoldResume}
                       sx={{
                         textTransform: 'none',
@@ -2398,11 +2842,12 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canUpdateEligibility}
+                      disabled={!canUpdateEligibility || isRunningEligibilityAll}
                       onClick={handleCSAEligible}
                       sx={{
                         textTransform: 'none',
-                        backgroundColor: canUpdateEligibility ? '#1976d2' : undefined,
+                        backgroundColor:
+                          canUpdateEligibility && !isRunningEligibilityAll ? '#1976d2' : undefined,
                         '&.Mui-disabled': {
                           opacity: 0.5,
                           cursor: 'not-allowed',
@@ -2414,11 +2859,12 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canUpdateNotEligible}
+                      disabled={!canUpdateNotEligible || isRunningEligibilityAll}
                       onClick={handleCSANotEligible}
                       sx={{
                         textTransform: 'none',
-                        backgroundColor: canUpdateNotEligible ? '#d32f2f' : undefined,
+                        backgroundColor:
+                          canUpdateNotEligible && !isRunningEligibilityAll ? '#d32f2f' : undefined,
                         '&.Mui-disabled': {
                           opacity: 0.5,
                           cursor: 'not-allowed',
@@ -2430,11 +2876,12 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canUpdateOver18}
+                      disabled={!canUpdateOver18 || isRunningEligibilityAll}
                       onClick={handleChildOver18}
                       sx={{
                         textTransform: 'none',
-                        backgroundColor: canUpdateOver18 ? '#ff9800' : undefined,
+                        backgroundColor:
+                          canUpdateOver18 && !isRunningEligibilityAll ? '#ff9800' : undefined,
                         '&.Mui-disabled': {
                           opacity: 0.5,
                           cursor: 'not-allowed',
@@ -2446,6 +2893,18 @@ function App() {
                   </Box>
                 </Box>
 
+                {/* Eligibility running banner */}
+                {isRunningEligibilityAll && (
+                  <Box sx={{ mb: 2 }}>
+                    <Alert severity="info" sx={{ mb: 1 }}>
+                      Eligibility Query is running. Please do not make any manual CSA transitions
+                      while the job is in progress. This banner will disappear once the job is
+                      complete.
+                    </Alert>
+                    <LinearProgress />
+                  </Box>
+                )}
+
                 {/* Table */}
                 <TableContainer component={Paper} sx={{ boxShadow: 1 }}>
                   <Table size="small">
@@ -2453,6 +2912,7 @@ function App() {
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                         <TableCell padding="checkbox">
                           <Checkbox
+                            disabled={isRunningEligibilityAll}
                             indeterminate={
                               selected.length > 0 &&
                               selected.length < filteredData.length &&
@@ -2783,12 +3243,21 @@ function App() {
                           onClick={() => handleContactClick(row.id)}
                           sx={{
                             '&:hover': { backgroundColor: '#f9f9f9' },
-                            cursor: 'pointer',
-                            backgroundColor: selectedChild === row.id ? '#e0e0e0' : 'inherit',
+                            cursor: runningEligibilityContactId === row.id ? 'wait' : 'pointer',
+                            backgroundColor:
+                              runningEligibilityContactId === row.id
+                                ? '#fff3e0'
+                                : selectedChild === row.id
+                                  ? '#e0e0e0'
+                                  : 'inherit',
+                            opacity: runningEligibilityContactId === row.id ? 0.7 : 1,
                           }}
                         >
                           <TableCell padding="checkbox">
                             <Checkbox
+                              disabled={
+                                isRunningEligibilityAll || runningEligibilityContactId === row.id
+                              }
                               checked={selected.includes(row.id)}
                               onChange={(e) => {
                                 e.stopPropagation()
@@ -4406,7 +4875,7 @@ function App() {
                           <Button
                             variant="contained"
                             size="small"
-                            disabled={!canRemoveFromBatch}
+                            disabled={!canRemoveFromBatch || isRunningEligibilityAll}
                             onClick={handleRemoveFromBatch}
                             sx={{
                               textTransform: 'none',
@@ -4520,6 +4989,16 @@ function App() {
                               <TableCell sx={{ fontWeight: 600 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                   <span
+                                    onClick={(e) => handleBatchHistorySortClick(e, 'effectiveDate')}
+                                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                                  >
+                                    Effective Date
+                                  </span>
+                                </Box>
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <span
                                     onClick={(e) =>
                                       handleBatchHistorySortClick(e, 'batchDetailStatus')
                                     }
@@ -4576,7 +5055,7 @@ function App() {
                           <TableBody>
                             {loadingBatchHistory ? (
                               <TableRow>
-                                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                                   <Typography variant="body2" color="text.secondary">
                                     Loading batch history...
                                   </Typography>
@@ -4584,7 +5063,7 @@ function App() {
                               </TableRow>
                             ) : filteredBatchHistory.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                                   <Typography variant="body2" color="text.secondary">
                                     {selectedChild
                                       ? 'No batch history found for this contact'
@@ -4637,6 +5116,7 @@ function App() {
                                     {row.batchRequestStatus !== 'Pending' && row.batchRequestStatus}
                                   </TableCell>
                                   <TableCell>{row.transactionType}</TableCell>
+                                  <TableCell>{row.effectiveDate}</TableCell>
                                   <TableCell>{row.batchDetailStatus}</TableCell>
                                   <TableCell>{row.systemComments}</TableCell>
                                 </TableRow>
@@ -4953,7 +5433,7 @@ function App() {
                       <Button
                         variant="contained"
                         size="small"
-                        disabled={!canRemoveFromBatchDetails}
+                        disabled={!canRemoveFromBatchDetails || isRunningEligibilityAll}
                         onClick={handleRemoveFromBatchDetails}
                         sx={{
                           backgroundColor: '#d32f2f',
@@ -4976,6 +5456,7 @@ function App() {
                         <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                           <TableCell padding="checkbox">
                             <Checkbox
+                              disabled={isRunningEligibilityAll}
                               indeterminate={
                                 selectedBatchDetails.length > 0 &&
                                 selectedBatchDetails.length < filteredBatchDetails.length
@@ -5244,6 +5725,7 @@ function App() {
                             >
                               <TableCell padding="checkbox">
                                 <Checkbox
+                                  disabled={isRunningEligibilityAll}
                                   checked={selectedBatchDetails.includes(row.id)}
                                   onChange={() => {
                                     setSelectedBatchDetails((prev) =>
@@ -5651,6 +6133,30 @@ function App() {
           © 2026 Government of British Columbia.
         </Typography>
       </Box>
+
+      {/* Confirmation Dialog for Run Eligibility on All Contacts */}
+      <Dialog
+        open={confirmRunAllDialogOpen}
+        onClose={handleConfirmRunAllDialogClose}
+        aria-labelledby="confirm-run-all-dialog-title"
+        aria-describedby="confirm-run-all-dialog-description"
+      >
+        <DialogTitle id="confirm-run-all-dialog-title">Confirm Eligibility Query</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="confirm-run-all-dialog-description">
+            Are you sure you want to run the eligibility query on all contacts? This operation may
+            take several minutes to complete.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleConfirmRunAllDialogClose} color="inherit">
+            Cancel
+          </Button>
+          <Button onClick={handleRunEligibilityForAll} variant="contained" autoFocus>
+            Ok
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar for hold/resume feedback */}
       <Snackbar

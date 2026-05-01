@@ -128,15 +128,19 @@ const CHANGED_CONTACTS_CTE = `
 export function buildLoadContactProfilesSql(
   threshold: Date | null,
   agedOutContactIds?: string[],
+  personIdIcm?: string,
 ): {
   sql: string
   params: unknown[]
 } {
-  const isIncremental = threshold !== null
+  const isSingleContact = personIdIcm !== undefined
+  const isIncremental = !isSingleContact && threshold !== null
   const hasAgedOut = isIncremental && agedOutContactIds && agedOutContactIds.length > 0
 
   let eligibleCasesFilter = ''
-  if (isIncremental) {
+  if (isSingleContact) {
+    eligibleCasesFilter = 'WHERE cases.X_CONTACT_NUM = $1'
+  } else if (isIncremental) {
     eligibleCasesFilter = hasAgedOut
       ? 'WHERE cases.X_CONTACT_NUM IN (SELECT X_CONTACT_NUM FROM changed_contacts) OR cases.X_CONTACT_NUM = ANY($2::TEXT[])'
       : 'WHERE cases.X_CONTACT_NUM IN (SELECT X_CONTACT_NUM FROM changed_contacts)'
@@ -414,10 +418,18 @@ export function buildLoadContactProfilesSql(
   ORDER BY cases.X_CONTACT_NUM
 `
 
-  return {
-    sql,
-    params: hasAgedOut ? [threshold, agedOutContactIds] : isIncremental ? [threshold] : [],
+  let params: unknown[]
+  if (isSingleContact) {
+    params = [personIdIcm]
+  } else if (hasAgedOut) {
+    params = [threshold, agedOutContactIds]
+  } else if (isIncremental) {
+    params = [threshold]
+  } else {
+    params = []
   }
+
+  return { sql, params }
 }
 
 export function buildFindAgedOutContactIdsSql(cutoffDate: Date): {

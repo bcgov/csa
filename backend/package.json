@@ -20,6 +20,7 @@
     "job:ingest-mis": "node dist/jobs/entrypoints/ingest-mis",
     "job:run-eligibility": "node dist/jobs/entrypoints/run-eligibility",
     "job:sync-icm": "node dist/jobs/entrypoints/sync-icm",
+    "job:auto-batch": "node dist/jobs/entrypoints/auto-batch",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "make-badges": "istanbul-badges-readme --logo=vitest --exitCode=1",
@@ -94,19 +95,13 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "overrides": {
-    "minimist@<1.2.6": "1.2.6",
     "reflect-metadata": "^0.2.2",
-    "minio": {
-      "fast-xml-parser": "^5.3.5"
-    },
-    "hono": "4.12.7",
-    "@hono/node-server": "1.19.11",
+    "@hono/node-server": "1.19.13",
     "file-type": "21.3.2",
     "@angular-devkit/core": {
       "ajv": "8.18.0"
     },
-    "lodash": "4.17.23",
-    "effect": "^3.20.0",
+    "lodash": "4.18.1",
     "path-to-regexp": "^8.4.0",
     "picomatch": "^4.0.4",
     "brace-expansion": "^2.0.3"

@@ -123,7 +123,6 @@ export interface EligibilityRunResult {
   statusChanges: number
   newContacts: number
   skipped: number // rows skipped due to invalid staging data (null in required fields)
-  autoBatched: { application: number; cancellation: number }
   stepCounts: {
     step7: number
     step8: number

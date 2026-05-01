@@ -5,81 +5,40 @@ import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobRunner } from 'src/jobs/job-runner.service'
-import { IcmSyncBackService, SyncBackResult } from '../icm/icm-sync-back.service'
 
 /*
- * Orchestrates the complete data sync flow:
- * 1. INGEST_ICM + INGEST_MIS
- * 2. RUN_ELIGIBILITY (after ingestion complete)
- * 3. Sync flagged contacts back to ICM (after eligibility)
+ * Fetches data from ICM and MIS into staging tables.
+ * Does not run eligibility or sync-back — those are independent jobs.
  */
 @Injectable()
 export class IngestDataHandler extends BaseJob {
   readonly jobType = JobType.INGEST_DATA
   readonly inlineRetryAttempts = 0 // Orchestrator: children handle their own retries
 
-  constructor(
-    private readonly jobRunner: JobRunner,
-    private readonly icmSyncBackService: IcmSyncBackService,
-  ) {
+  constructor(private readonly jobRunner: JobRunner) {
     super()
   }
 
   async execute(context: JobContext): Promise<JobResult> {
     const parentJobId = context.jobRunId
 
-    try {
-      this.logger.log('Starting parallel ingestion from ICM and MIS...')
-      const [icmResult, misResult] = await Promise.all([
-        this.jobRunner.runJobType(JobType.INGEST_ICM, JobTrigger.CRON, { parentJobId }),
-        this.jobRunner.runJobType(JobType.INGEST_MIS, JobTrigger.CRON, { parentJobId }),
-      ])
+    this.logger.log('Starting parallel ingestion from ICM and MIS...')
+    const [icmResult, misResult] = await Promise.all([
+      this.jobRunner.runJobType(JobType.INGEST_ICM, JobTrigger.CRON, { parentJobId }),
+      this.jobRunner.runJobType(JobType.INGEST_MIS, JobTrigger.CRON, { parentJobId }),
+    ])
 
-      if (!icmResult.success || !misResult.success) {
-        return {
-          success: false,
-          message: 'Ingestion failed',
-          metadata: { icmResult, misResult },
-        }
-      }
-
-      this.logger.log('Running eligibility processing...')
-      const eligibilityResult = await this.jobRunner.runJobType(
-        JobType.RUN_ELIGIBILITY,
-        JobTrigger.CRON,
-        { parentJobId },
-      )
-
-      if (!eligibilityResult.success) {
-        return {
-          success: false,
-          message: 'Eligibility processing failed',
-          metadata: { eligibilityResult },
-        }
-      }
-
-      let syncResult: SyncBackResult | null = null
-      try {
-        syncResult = await this.icmSyncBackService.syncFlaggedWithRetry()
-      } catch (err) {
-        this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`)
-      }
-
-      return {
-        success: true,
-        message: 'Data ingestion and eligibility completed successfully',
-        metadata: { syncResult },
-      }
-    } catch (error) {
-      this.logger.error(`Unexpected error in INGEST_DATA: ${error.message}`, error.stack)
+    if (!icmResult.success || !misResult.success) {
       return {
         success: false,
-        message: error.message,
-        metadata: {
-          errorStack: error.stack,
-          errorName: error.name,
-        },
+        message: 'Ingestion failed',
+        metadata: { icmResult, misResult },
       }
+    }
+
+    return {
+      success: true,
+      message: 'Data ingestion completed successfully',
     }
   }
 }

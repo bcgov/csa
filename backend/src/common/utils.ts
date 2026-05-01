@@ -137,6 +137,14 @@ export function normalize(value: string | null | undefined): string | undefined 
   return value?.trim().toUpperCase()
 }
 
+export function parseWklDate(dateStr: string): Date | undefined {
+  if (!dateStr || dateStr.trim().length !== 8) return undefined
+  const y = dateStr.substring(0, 4)
+  const m = dateStr.substring(4, 6)
+  const d = dateStr.substring(6, 8)
+  return new Date(`${y}-${m}-${d}`)
+}
+
 export function pacificToday(): Date {
   const isoDate = DateTime.now().setZone(PACIFIC_ZONE).toISODate()!
   return new Date(isoDate)

@@ -179,6 +179,7 @@ const COLUMN_LABELS: Record<string, string> = {
   status: 'Status',
   transactionType: 'Transaction Type',
   recordCount: 'Record Count',
+  initiatedBy: 'Initiated By',
   createdBy: 'Created By',
   contactId: 'Contact ID',
   icmNumber: 'ICM Number',
@@ -592,6 +593,7 @@ function App() {
     batchDate: [],
     status: [],
     recordCount: [],
+    initiatedBy: [],
     createdDate: [],
     systemComments: [],
   })
@@ -2325,6 +2327,7 @@ function App() {
       batchDate: batch.batchDate ? formatDateYMD(batch.batchDate) : '',
       status: batch.statusLabel || batch.status,
       recordCount: batch.recordCount,
+      initiatedBy: batch.initiatedBy || '',
       createdDate: formatDateTimeYMD(batch.createdAt),
       systemComments: batch.systemComments || '',
     }))
@@ -2338,6 +2341,7 @@ function App() {
           row.batchDate.toLowerCase().includes(searchLower) ||
           row.status.toLowerCase().includes(searchLower) ||
           String(row.recordCount).toLowerCase().includes(searchLower) ||
+          row.initiatedBy.toLowerCase().includes(searchLower) ||
           row.createdDate.toLowerCase().includes(searchLower) ||
           row.systemComments.toLowerCase().includes(searchLower)
         )
@@ -5286,6 +5290,29 @@ function App() {
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
+                              onClick={(e) => handleBatchRequestsSortClick(e, 'initiatedBy')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Initiated By
+                            </span>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleBatchRequestsFilterClick(e, 'initiatedBy')}
+                              sx={{
+                                padding: 0.5,
+                                color:
+                                  batchRequestsColumnFilters.initiatedBy?.length > 0
+                                    ? '#1976d2'
+                                    : '#666',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <span
                               onClick={(e) => handleBatchRequestsSortClick(e, 'createdDate')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
@@ -5321,7 +5348,7 @@ function App() {
                     <TableBody>
                       {loadingBatches ? (
                         <TableRow>
-                          <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                          <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                             <Typography variant="body2" color="text.secondary">
                               Loading batch requests...
                             </Typography>
@@ -5329,7 +5356,7 @@ function App() {
                         </TableRow>
                       ) : filteredBatchRequests.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                          <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                             <Typography variant="body2" color="text.secondary">
                               No batch requests found
                             </Typography>
@@ -5353,6 +5380,7 @@ function App() {
                             <TableCell>{row.batchDate}</TableCell>
                             <TableCell>{row.status}</TableCell>
                             <TableCell>{row.recordCount}</TableCell>
+                            <TableCell>{row.initiatedBy}</TableCell>
                             <TableCell>{row.createdDate}</TableCell>
                             <TableCell>{row.systemComments}</TableCell>
                           </TableRow>

@@ -194,6 +194,7 @@ export interface Batch {
   status: string
   statusLabel: string
   recordCount: number
+  initiatedBy: string
   createdAt: string
   systemComments: string | null
 }

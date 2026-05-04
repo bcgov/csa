@@ -289,6 +289,17 @@ describe('PollCraResponseHandler', () => {
       expect(mockContactsService.updateCsaStatus).not.toHaveBeenCalled()
     })
 
+    it('should make no contactBatchDetail update when record is accepted', async () => {
+      const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
+      setupUnprocessedFile(VALID_FILE_NAME)
+      setupParseFile([detail])
+      setupBatchDetail(100, 1, 10)
+
+      await handler.execute(mockContext)
+
+      expect(mockPrisma.contactBatchDetail.update).not.toHaveBeenCalled()
+    })
+
     it('should call aggregateBatchStatus for the batch', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
       setupUnprocessedFile(VALID_FILE_NAME)
@@ -1085,7 +1096,7 @@ describe('PollCraResponseHandler', () => {
       )
     })
 
-    it('does not pass DIN when contact already has one', async () => {
+    it('always updates DIN from WKL even when contact already has one', async () => {
       setupWeeklyFile()
       setupWeeklyParseFile([makeWklDetail({ childDin: '987654321' })])
       mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
@@ -1099,7 +1110,7 @@ describe('PollCraResponseHandler', () => {
         42,
         CSA_EVENT.CRA_WKL_APPROVED,
         'SYSTEM',
-        { additionalData: undefined },
+        { additionalData: { din: '987654321' } },
       )
     })
 

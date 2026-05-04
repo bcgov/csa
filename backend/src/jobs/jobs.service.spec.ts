@@ -36,6 +36,7 @@ describe('JobsService', () => {
               findUnique: vi.fn().mockResolvedValue(mockJobRun),
               findFirst: vi.fn().mockResolvedValue(mockJobRun),
               findMany: vi.fn().mockResolvedValue([mockJobRun]),
+              count: vi.fn().mockResolvedValue(1),
               update: vi.fn().mockResolvedValue(mockJobRun),
               updateMany: vi.fn().mockResolvedValue({ count: 1 }),
             },
@@ -87,13 +88,97 @@ describe('JobsService', () => {
   })
 
   describe('getJob', () => {
-    it('should return job with child jobs and parent', async () => {
+    it('should query job by id', async () => {
       await service.getJob(1)
 
       expect(prisma.jobRun.findUnique).toHaveBeenCalledWith({
         where: { id: 1 },
-        include: { childJobs: true, parentJob: true },
       })
+    })
+  })
+
+  describe('getJobs', () => {
+    it('should default to page=1, limit=20 and only return top-level jobs', async () => {
+      const result = await service.getJobs({})
+
+      expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
+        where: { parentJobId: null },
+        orderBy: { createdAt: 'desc' },
+        skip: 0,
+        take: 20,
+      })
+      expect(prisma.jobRun.count).toHaveBeenCalledWith({
+        where: { parentJobId: null },
+      })
+      expect(result).toEqual({
+        data: [mockJobRun],
+        total: 1,
+        page: 1,
+        limit: 20,
+      })
+    })
+
+    it('should compute skip/take from page and limit', async () => {
+      await service.getJobs({ page: 3, limit: 25 })
+
+      expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
+        where: { parentJobId: null },
+        orderBy: { createdAt: 'desc' },
+        skip: 50,
+        take: 25,
+      })
+    })
+
+    it('should add jobType filter when provided', async () => {
+      await service.getJobs({ jobType: JobType.RUN_ELIGIBILITY })
+
+      expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
+        where: { parentJobId: null, jobType: JobType.RUN_ELIGIBILITY },
+        orderBy: { createdAt: 'desc' },
+        skip: 0,
+        take: 20,
+      })
+    })
+
+    it('should add status filter when provided', async () => {
+      await service.getJobs({ status: JobStatus.FAILED })
+
+      expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
+        where: { parentJobId: null, status: JobStatus.FAILED },
+        orderBy: { createdAt: 'desc' },
+        skip: 0,
+        take: 20,
+      })
+    })
+
+    it('should combine jobType, status, page, and limit filters', async () => {
+      await service.getJobs({
+        jobType: JobType.AUTO_BATCH,
+        status: JobStatus.RUNNING,
+        page: 2,
+        limit: 10,
+      })
+
+      const expectedWhere = {
+        parentJobId: null,
+        jobType: JobType.AUTO_BATCH,
+        status: JobStatus.RUNNING,
+      }
+      expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
+        where: expectedWhere,
+        orderBy: { createdAt: 'desc' },
+        skip: 10,
+        take: 10,
+      })
+      expect(prisma.jobRun.count).toHaveBeenCalledWith({ where: expectedWhere })
+    })
+
+    it('should run findMany and count in parallel against the same where clause', async () => {
+      await service.getJobs({ jobType: JobType.AUTO_BATCH })
+
+      const findManyArgs = (prisma.jobRun.findMany as any).mock.calls[0][0]
+      const countArgs = (prisma.jobRun.count as any).mock.calls[0][0]
+      expect(findManyArgs.where).toEqual(countArgs.where)
     })
   })
 
@@ -163,6 +248,7 @@ describe('JobsService', () => {
         where: {
           status: JobStatus.FAILED,
           parentJobId: null,
+          jobTrigger: JobTrigger.CRON,
         },
         select: {
           id: true,
@@ -206,6 +292,60 @@ describe('JobsService', () => {
         },
         orderBy: { completedAt: 'desc' },
       })
+    })
+  })
+
+  describe('hasStuckOrFailedJobs', () => {
+    it('should return true when a stuck RUNNING job exists', async () => {
+      vi.spyOn(prisma.jobRun, 'findFirst').mockResolvedValueOnce({ id: 99 } as any)
+
+      const result = await service.hasStuckOrFailedJobs()
+
+      expect(result).toBe(true)
+      expect(prisma.jobRun.findFirst).toHaveBeenCalledWith({
+        where: { status: JobStatus.RUNNING, startedAt: { lt: expect.any(Date) } },
+        select: { id: true },
+      })
+    })
+
+    it('should return true when a FAILED top-level CRON job exists', async () => {
+      vi.spyOn(prisma.jobRun, 'findFirst')
+        .mockResolvedValueOnce(null) // no stuck jobs
+        .mockResolvedValueOnce({ id: 50 } as any) // failed job found
+
+      const result = await service.hasStuckOrFailedJobs()
+
+      expect(result).toBe(true)
+      expect(prisma.jobRun.findFirst).toHaveBeenCalledWith({
+        where: {
+          status: JobStatus.FAILED,
+          parentJobId: null,
+          jobTrigger: JobTrigger.CRON,
+        },
+        select: { id: true },
+      })
+    })
+
+    it('should return false when no stuck or failed jobs exist', async () => {
+      vi.spyOn(prisma.jobRun, 'findFirst')
+        .mockResolvedValueOnce(null) // no stuck jobs
+        .mockResolvedValueOnce(null) // no failed jobs
+
+      const result = await service.hasStuckOrFailedJobs()
+
+      expect(result).toBe(false)
+    })
+
+    it('should use the default 40-minute threshold', async () => {
+      vi.spyOn(prisma.jobRun, 'findFirst').mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+      const before = new Date(Date.now() - 40 * 60 * 1000)
+
+      await service.hasStuckOrFailedJobs()
+
+      const calledThreshold = (prisma.jobRun.findFirst as any).mock.calls[0][0].where.startedAt.lt
+      // threshold should be ~40 min ago (within 1 second tolerance)
+      expect(calledThreshold.getTime()).toBeGreaterThanOrEqual(before.getTime() - 1000)
+      expect(calledThreshold.getTime()).toBeLessThanOrEqual(before.getTime() + 1000)
     })
   })
 

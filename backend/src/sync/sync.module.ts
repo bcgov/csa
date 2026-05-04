@@ -19,7 +19,7 @@ import { FileStorageService } from './mis/file-storage/file-storage.service'
 import { MockFileStorageService } from './mis/file-storage/mock-file-storage.service'
 import { S3Service } from './mis/file-storage/s3.service'
 import { AutoBatchService } from './eligibility/auto-batch.service'
-import { EligibilityService } from './eligibility/eligibility.service'
+import { EligibilityModule } from './eligibility/eligibility.module'
 import { MisService } from './mis/mis.service'
 
 @Module({
@@ -32,6 +32,7 @@ import { MisService } from './mis/mis.service'
     PrismaModule,
     JobsModule,
     IcmSyncBackModule,
+    EligibilityModule,
   ],
   providers: [
     // Factory: FileStorageService (S3 or Mock based on config)
@@ -47,7 +48,6 @@ import { MisService } from './mis/mis.service'
     IcmService,
     MisService,
     AutoBatchService,
-    EligibilityService,
     AutoBatchHandler,
     IngestDataHandler,
     IngestIcmHandler,

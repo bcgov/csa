@@ -156,6 +156,12 @@ const BATCH_DETAILS_STATUS_FILTER_OPTIONS = [
   { value: 'Processed', label: 'Processed' },
 ]
 
+// Initiated By options for filter dropdown (used in Batch Requests)
+const INITIATED_BY_FILTER_OPTIONS = [
+  { value: 'Ministry', label: 'Ministry' },
+  { value: 'CRA', label: 'CRA' },
+]
+
 // Column field to display label mapping for filter menu
 const COLUMN_LABELS: Record<string, string> = {
   lastName: 'Last Name',
@@ -5940,6 +5946,50 @@ function App() {
                             batchRequestsColumnFilters['status']?.includes(option.value) || false
                           }
                           onChange={() => handleBatchRequestsFilterChange('status', option.value)}
+                        />
+                        <Typography variant="body2">{option.label}</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </>
+              ) : batchRequestsFilterAnchor.column === 'initiatedBy' ? (
+                <>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    placeholder="Search initiated by..."
+                    value={batchRequestsFilterSearchTerm}
+                    onChange={(e) => setBatchRequestsFilterSearchTerm(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Box component="span" sx={{ fontSize: '18px' }}>
+                            🔍
+                          </Box>
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{ mb: 1 }}
+                  />
+                  <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                    {INITIATED_BY_FILTER_OPTIONS.filter((option) =>
+                      option.label
+                        .toLowerCase()
+                        .includes(batchRequestsFilterSearchTerm.toLowerCase()),
+                    ).map((option) => (
+                      <Box
+                        key={option.value}
+                        sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                      >
+                        <Checkbox
+                          size="small"
+                          checked={
+                            batchRequestsColumnFilters['initiatedBy']?.includes(option.value) ||
+                            false
+                          }
+                          onChange={() =>
+                            handleBatchRequestsFilterChange('initiatedBy', option.value)
+                          }
                         />
                         <Typography variant="body2">{option.label}</Typography>
                       </Box>

@@ -2973,7 +2973,7 @@ function App() {
                     <Button
                       variant="outlined"
                       size="small"
-                      disabled={!canHoldResume || isRunningEligibilityAll}
+                      disabled={!canHoldResume || isRunningEligibilityAll || isRunningAutoBatch}
                       onClick={handleHoldResume}
                       sx={{
                         textTransform: 'none',
@@ -2988,12 +2988,16 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canUpdateEligibility || isRunningEligibilityAll}
+                      disabled={
+                        !canUpdateEligibility || isRunningEligibilityAll || isRunningAutoBatch
+                      }
                       onClick={handleCSAEligible}
                       sx={{
                         textTransform: 'none',
                         backgroundColor:
-                          canUpdateEligibility && !isRunningEligibilityAll ? '#1976d2' : undefined,
+                          canUpdateEligibility && !isRunningEligibilityAll && !isRunningAutoBatch
+                            ? '#1976d2'
+                            : undefined,
                         '&.Mui-disabled': {
                           opacity: 0.5,
                           cursor: 'not-allowed',
@@ -3005,12 +3009,16 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canUpdateNotEligible || isRunningEligibilityAll}
+                      disabled={
+                        !canUpdateNotEligible || isRunningEligibilityAll || isRunningAutoBatch
+                      }
                       onClick={handleCSANotEligible}
                       sx={{
                         textTransform: 'none',
                         backgroundColor:
-                          canUpdateNotEligible && !isRunningEligibilityAll ? '#d32f2f' : undefined,
+                          canUpdateNotEligible && !isRunningEligibilityAll && !isRunningAutoBatch
+                            ? '#d32f2f'
+                            : undefined,
                         '&.Mui-disabled': {
                           opacity: 0.5,
                           cursor: 'not-allowed',
@@ -3022,12 +3030,14 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canUpdateOver18 || isRunningEligibilityAll}
+                      disabled={!canUpdateOver18 || isRunningEligibilityAll || isRunningAutoBatch}
                       onClick={handleChildOver18}
                       sx={{
                         textTransform: 'none',
                         backgroundColor:
-                          canUpdateOver18 && !isRunningEligibilityAll ? '#ff9800' : undefined,
+                          canUpdateOver18 && !isRunningEligibilityAll && !isRunningAutoBatch
+                            ? '#ff9800'
+                            : undefined,
                         '&.Mui-disabled': {
                           opacity: 0.5,
                           cursor: 'not-allowed',
@@ -3069,7 +3079,7 @@ function App() {
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                         <TableCell padding="checkbox">
                           <Checkbox
-                            disabled={isRunningEligibilityAll}
+                            disabled={isRunningEligibilityAll || isRunningAutoBatch}
                             indeterminate={
                               selected.length > 0 &&
                               selected.length < filteredData.length &&
@@ -3413,7 +3423,9 @@ function App() {
                           <TableCell padding="checkbox">
                             <Checkbox
                               disabled={
-                                isRunningEligibilityAll || runningEligibilityContactId === row.id
+                                isRunningEligibilityAll ||
+                                isRunningAutoBatch ||
+                                runningEligibilityContactId === row.id
                               }
                               checked={selected.includes(row.id)}
                               onChange={(e) => {
@@ -5637,7 +5649,7 @@ function App() {
                         <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                           <TableCell padding="checkbox">
                             <Checkbox
-                              disabled={isRunningEligibilityAll}
+                              disabled={isRunningEligibilityAll || isRunningAutoBatch}
                               indeterminate={
                                 selectedBatchDetails.length > 0 &&
                                 selectedBatchDetails.length < filteredBatchDetails.length
@@ -5906,7 +5918,7 @@ function App() {
                             >
                               <TableCell padding="checkbox">
                                 <Checkbox
-                                  disabled={isRunningEligibilityAll}
+                                  disabled={isRunningEligibilityAll || isRunningAutoBatch}
                                   checked={selectedBatchDetails.includes(row.id)}
                                   onChange={() => {
                                     setSelectedBatchDetails((prev) =>

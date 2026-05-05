@@ -3051,6 +3051,17 @@ function App() {
                   </Box>
                 )}
 
+                {/* Auto-batch running banner */}
+                {isRunningAutoBatch && (
+                  <Box sx={{ mb: 2 }}>
+                    <Alert severity="info" sx={{ mb: 1 }}>
+                      Auto-batch is running. Please wait while all eligible contacts are being added
+                      to the batch. This banner will disappear once the job is complete.
+                    </Alert>
+                    <LinearProgress />
+                  </Box>
+                )}
+
                 {/* Table */}
                 <TableContainer component={Paper} sx={{ boxShadow: 1 }}>
                   <Table size="small">

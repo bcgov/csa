@@ -85,6 +85,7 @@ model Contact {
   prevRecipientLastName      String?   @map("prev_recipient_last_name")
   cancelReasonCode           String?   @map("cancel_reason_code")
   careEndDate                DateTime? @db.Date @map("care_end_date")
+  needsReview                Boolean   @default(false) @map("needs_review")
 
   // Relations
   contactBatchDetails        ContactBatchDetail[]

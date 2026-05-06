@@ -3,6 +3,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import CloseIcon from '@mui/icons-material/Close'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import {
   Alert,
   AppBar,
@@ -44,6 +45,7 @@ import { useAuth } from './context/AuthContext'
 import logo from './icons/image.png'
 import {
   addContactsToBatch,
+  clearReviewFlag,
   fullTextSearchContacts,
   getAllBatches,
   getAllContacts,
@@ -163,6 +165,12 @@ const INITIATED_BY_FILTER_OPTIONS = [
   { value: 'CRA', label: 'CRA' },
 ]
 
+// Review flag options for filter dropdown (used in Eligibility List)
+const REVIEW_FILTER_OPTIONS = [
+  { value: 'true', label: 'Needs Review' },
+  { value: 'false', label: 'No Review Needed' },
+]
+
 // Column field to display label mapping for filter menu
 const COLUMN_LABELS: Record<string, string> = {
   lastName: 'Last Name',
@@ -179,6 +187,7 @@ const COLUMN_LABELS: Record<string, string> = {
   cgwrks3: 'Set on Hold By',
   lastUpdated: 'Last Updated',
   lastUpdatedBy: 'Last Updated By',
+  needsReview: 'Review',
   // Batch table columns
   batchId: 'Batch ID',
   batchDate: 'Batch Date',
@@ -675,6 +684,7 @@ function App() {
     cgwrks3: [],
     lastUpdated: [],
     lastUpdatedBy: [],
+    needsReview: [],
   })
 
   // Helper function to get pre-defined filter configuration
@@ -1815,6 +1825,35 @@ function App() {
     }
   }
 
+  // Handle clearing the review flag for a contact
+  const handleClearReviewFlag = async (contactId: number, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent row click
+
+    try {
+      await clearReviewFlag(contactId)
+
+      setSnackbar({
+        open: true,
+        message: 'Review flag cleared successfully',
+        severity: 'success',
+      })
+
+      // Refresh the contacts list to reflect the change
+      if (isSearchActive && searchTerm.trim().length >= 3) {
+        await performFullTextSearch(searchTerm.trim(), currentPage)
+      } else {
+        await fetchContacts(currentPage)
+      }
+    } catch (error) {
+      console.error('Failed to clear review flag:', error)
+      setSnackbar({
+        open: true,
+        message: 'Failed to clear review flag. Please try again.',
+        severity: 'error',
+      })
+    }
+  }
+
   // Handle batch history row click
   const handleBatchHistoryRowClick = (batchHistoryId: number) => {
     setSelectedBatchHistoryId(batchHistoryId)
@@ -2265,6 +2304,7 @@ function App() {
       cgwrks3: contact.holdBy || '',
       lastUpdated: contact.lastUpdatedAt ? formatDateTimeYMDHMS(contact.lastUpdatedAt) : '',
       lastUpdatedBy: contact.lastUpdatedBy || '',
+      needsReview: contact.needsReview || false,
     }))
 
     return data
@@ -3400,6 +3440,30 @@ function App() {
                             </IconButton>
                           </Box>
                         </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <span
+                              onClick={(e) => handleSortClick(e, 'needsReview')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Review
+                            </span>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'needsReview')}
+                              sx={{
+                                padding: 0.5,
+                                color:
+                                  activeColumnFilters['needsReview'] ||
+                                  columnFilters.needsReview?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -3464,6 +3528,25 @@ function App() {
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
                           <TableCell>{row.lastUpdated}</TableCell>
                           <TableCell>{row.lastUpdatedBy}</TableCell>
+                          <TableCell align="center">
+                            {row.needsReview && (
+                              <Tooltip title="Click to clear review flag">
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => handleClearReviewFlag(row.id, e)}
+                                  sx={{
+                                    padding: 0.5,
+                                    color: '#ff9800',
+                                    '&:hover': {
+                                      backgroundColor: '#fff3e0',
+                                    },
+                                  }}
+                                >
+                                  <WarningAmberIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -3642,6 +3725,37 @@ function App() {
                                 py: 0.75,
                                 backgroundColor:
                                   activeColumnFilters['caseStatus'] === option.value
+                                    ? 'rgba(25, 118, 210, 0.08)'
+                                    : 'transparent',
+                              }}
+                            >
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </Box>
+                      </>
+                    ) : filterAnchor.column === 'needsReview' ? (
+                      <>
+                        <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                          {REVIEW_FILTER_OPTIONS.map((option) => (
+                            <MenuItem
+                              key={option.value}
+                              onClick={() => {
+                                const newFilters = {
+                                  ...activeColumnFilters,
+                                  needsReview: option.value,
+                                }
+                                setActiveColumnFilters(newFilters)
+                                performColumnFiltersSearch(newFilters, 1)
+                                setCurrentPage(1)
+                                setIsColumnFilterActive(true)
+                                handleFilterClose()
+                              }}
+                              sx={{
+                                fontSize: '0.875rem',
+                                py: 0.75,
+                                backgroundColor:
+                                  activeColumnFilters['needsReview'] === option.value
                                     ? 'rgba(25, 118, 210, 0.08)'
                                     : 'transparent',
                               }}

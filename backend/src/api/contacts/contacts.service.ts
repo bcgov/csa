@@ -440,6 +440,11 @@ export class ContactsService {
     for (const id of contactIds) {
       const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.RESUME, 'USER', { userId })
       if (transitionResult.success) {
+        // Clear the review flag when resuming from hold
+        await this.prisma.contact.update({
+          where: { id },
+          data: { needsReview: false },
+        })
         result.success.push(id)
       } else {
         const reason =
@@ -666,6 +671,12 @@ export class ContactsService {
       throw err
     }
 
+    // Clear the review flag after eligibility is run
+    await this.prisma.contact.update({
+      where: { id: contactId },
+      data: { needsReview: false },
+    })
+
     // If the eligibility run flipped csa_status, the upsert flagged
     // icm_integration_status=true. Try to push immediately; on failure
     // the flag stays set and the RETRY_FAILED cron will sweep it.
@@ -684,5 +695,32 @@ export class ContactsService {
   // '%' and '_' are wildcards, '\' is escape char
   private escapeLikePattern(input: string): string {
     return input.replace(/[%_\\]/g, '\\$&')
+  }
+
+  /**
+   * Clear the review flag for a contact
+   * @param contactId - Contact ID to clear review flag for
+   * @param userId - User performing the action
+   */
+  async clearReviewFlag(contactId: number, userId: string): Promise<{ success: boolean }> {
+    const contact = await this.prisma.contact.findUnique({
+      where: { id: contactId },
+      select: { id: true, needsReview: true },
+    })
+
+    if (!contact) {
+      throw new NotFoundException(`Contact ${contactId} not found`)
+    }
+
+    await this.prisma.contact.update({
+      where: { id: contactId },
+      data: {
+        needsReview: false,
+        lastUpdatedBy: userId,
+        lastUpdatedAt: new Date(),
+      },
+    })
+
+    return { success: true }
   }
 }

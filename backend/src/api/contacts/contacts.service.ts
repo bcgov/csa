@@ -619,6 +619,7 @@ export class ContactsService {
   }
 
   async findContactBatches(contactId: number) {
+    this.logger.log(`Fetching batch history for contact ${contactId}`)
     const contact = await this.prisma.contact.findUnique({
       where: { id: contactId },
     })

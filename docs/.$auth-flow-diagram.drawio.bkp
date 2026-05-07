@@ -1,0 +1,251 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36" version="29.6.6">
+  <diagram id="auth-flow" name="CSA Authentication Flow">
+    <mxGraphModel dx="976" dy="755" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1" value="CSA Authentication Flow" vertex="1">
+          <mxGeometry height="40" width="370" x="400" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="user" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#d5e8d4;strokeColor=#82b366;" value="User/Browser" vertex="1">
+          <mxGeometry height="80" width="40" x="60" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" value="Frontend&#xa;(React)" vertex="1">
+          <mxGeometry height="60" width="100" x="180" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="sso-keycloak" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1" value="SSO Keycloak&#xa;(BC Gov)" vertex="1">
+          <mxGeometry height="60" width="120" x="350" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="backend" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1" value="Backend&#xa;(NestJS)" vertex="1">
+          <mxGeometry height="60" width="100" x="540" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="icm-keycloak" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1" value="ICM Keycloak (APS)" vertex="1">
+          <mxGeometry height="60" width="100" x="710" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="icm-api" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1" value="ICM REST API" vertex="1">
+          <mxGeometry height="60" width="100" x="880" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="line-user" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeWidth=1;strokeColor=#999999;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="80" y="800" as="sourcePoint" />
+            <mxPoint x="80" y="180" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="line-frontend" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeWidth=1;strokeColor=#999999;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="230" y="800" as="sourcePoint" />
+            <mxPoint x="230" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="line-sso" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeWidth=1;strokeColor=#999999;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="410" y="800" as="sourcePoint" />
+            <mxPoint x="410" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="line-backend" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeWidth=1;strokeColor=#999999;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="590" y="800" as="sourcePoint" />
+            <mxPoint x="590" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="line-icm-kc" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeWidth=1;strokeColor=#999999;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="760" y="800" as="sourcePoint" />
+            <mxPoint x="760" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="line-icm-api" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;strokeWidth=1;strokeColor=#999999;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="930" y="800" as="sourcePoint" />
+            <mxPoint x="930" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="section1" parent="1" style="text;html=1;strokeColor=none;fillColor=#e1d5e7;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=12;fontStyle=1" value="1. Initial SSO Login" vertex="1">
+          <mxGeometry height="25" width="200" x="20" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="step1" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#2D7600;" value="1. Access App">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="80" y="220" as="sourcePoint" />
+            <mxPoint x="225" y="220" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step2" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#2D7600;" value="2. check-sso (silent iframe)">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="235" y="245" as="sourcePoint" />
+            <mxPoint x="405" y="245" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step3" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#994C00;dashed=1;" value="3. No session → Redirect to login">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="405" y="270" as="sourcePoint" />
+            <mxPoint x="85" y="270" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step4" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#2D7600;" value="4. User enters IDIR credentials">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="85" y="295" as="sourcePoint" />
+            <mxPoint x="405" y="295" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step5" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#2D7600;" value="5. Auth Code">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="405" y="320" as="sourcePoint" />
+            <mxPoint x="225" y="320" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step7" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;" value="6. Access Token + Refresh Token (JWT)">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint as="offset" />
+            <mxPoint x="405" y="370" as="sourcePoint" />
+            <mxPoint x="225" y="370" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step7b" parent="1" style="text;html=1;strokeColor=none;fillColor=#d5e8d4;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=10;" value="Store token in sessionStorage" vertex="1">
+          <mxGeometry height="20" width="115" x="175" y="378" as="geometry" />
+        </mxCell>
+        <mxCell id="section2" parent="1" style="text;html=1;strokeColor=none;fillColor=#fff2cc;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=12;fontStyle=1" value="2. CSA Access Verification (via ICM)" vertex="1">
+          <mxGeometry height="25" width="230" x="20" y="410" as="geometry" />
+        </mxCell>
+        <mxCell id="step8" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0000CC;" value="7. GET /admin/verify-csa-access (Bearer token)">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="235" y="445" as="sourcePoint" />
+            <mxPoint x="585" y="445" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step9" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0000CC;" value="8. Verify JWT via JWKS">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="595" y="470" as="sourcePoint" />
+            <mxPoint x="405" y="470" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step10" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;" value="9. Public key (RS256)">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint as="offset" />
+            <mxPoint x="405" y="490" as="sourcePoint" />
+            <mxPoint x="585" y="490" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step11" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC0000;" value="10. client_credentials grant">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint as="offset" />
+            <mxPoint x="595" y="515" as="sourcePoint" />
+            <mxPoint x="755" y="515" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step12" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;" value="11. ICM Bearer Token">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="755" y="535" as="sourcePoint" />
+            <mxPoint x="595" y="535" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step12b" parent="1" style="text;html=1;strokeColor=none;fillColor=#e1d5e7;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=10;" value="Cache ICM token (with refresh)" vertex="1">
+          <mxGeometry height="17" width="115" x="535" y="543" as="geometry" />
+        </mxCell>
+        <mxCell id="step13" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC0000;" value="12. Query Employee Responsibilities">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="595" y="570" as="sourcePoint" />
+            <mxPoint x="925" y="570" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step14" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;" value="13. CSA Application - RW/RO">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="925" y="595" as="sourcePoint" />
+            <mxPoint x="595" y="595" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step15" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;" value="14. { hasAccess: true, icmResponsibility }">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="585" y="620" as="sourcePoint" />
+            <mxPoint x="235" y="620" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step16" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;" value="15. App Ready!">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="225" y="645" as="sourcePoint" />
+            <mxPoint x="85" y="645" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="section3" parent="1" style="text;html=1;strokeColor=none;fillColor=#d5e8d4;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=12;fontStyle=1" value="3. Token Refresh (Every 60s)" vertex="1">
+          <mxGeometry height="25" width="190" x="20" y="670" as="geometry" />
+        </mxCell>
+        <mxCell id="step17" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#006600;dashed=1;" value="16. updateToken(70) if expiring">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="235" y="705" as="sourcePoint" />
+            <mxPoint x="405" y="705" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step18" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#006600;dashed=1;" value="17. New Access Token (via Refresh Token)">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint as="offset" />
+            <mxPoint x="405" y="730" as="sourcePoint" />
+            <mxPoint x="235" y="730" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step18b" parent="1" style="text;html=1;strokeColor=none;fillColor=#d5e8d4;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=10;" value="Update sessionStorage" vertex="1">
+          <mxGeometry height="17" width="115" x="175" y="738" as="geometry" />
+        </mxCell>
+        <mxCell id="step19" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#990000;dashed=1;" value="18. ICM refresh_token grant (if cached token expiring)">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="595" y="765" as="sourcePoint" />
+            <mxPoint x="755" y="765" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step20" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#990000;dashed=1;" value="19. New ICM Token">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="755" y="785" as="sourcePoint" />
+            <mxPoint x="595" y="785" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1" value="Legend" vertex="1">
+          <mxGeometry height="20" width="60" x="1000" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#2D7600;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1000" y="235" as="sourcePoint" />
+            <mxPoint x="1050" y="235" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg1t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" value="SSO Flow" vertex="1">
+          <mxGeometry height="20" width="60" x="1055" y="225" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0000CC;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1000" y="260" as="sourcePoint" />
+            <mxPoint x="1050" y="260" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg2t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" value="API Calls" vertex="1">
+          <mxGeometry height="20" width="60" x="1055" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC0000;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1000" y="285" as="sourcePoint" />
+            <mxPoint x="1050" y="285" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg3t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" value="ICM Auth" vertex="1">
+          <mxGeometry height="20" width="60" x="1055" y="275" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1000" y="310" as="sourcePoint" />
+            <mxPoint x="1050" y="310" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg4t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" value="Response" vertex="1">
+          <mxGeometry height="20" width="60" x="1055" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5" edge="1" parent="1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#006600;dashed=1;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1000" y="335" as="sourcePoint" />
+            <mxPoint x="1050" y="335" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg5t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" value="Refresh" vertex="1">
+          <mxGeometry height="20" width="60" x="1055" y="325" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

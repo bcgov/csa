@@ -942,6 +942,13 @@ function App() {
     performColumnFiltersSearch,
   ])
 
+  // Reset pagination to page 1 when search term changes
+  useEffect(() => {
+    if (searchTerm.trim().length >= 3) {
+      setCurrentPage(1)
+    }
+  }, [searchTerm])
+
   // Full-text search effect - triggers when searchTerm has 3+ characters
   useEffect(() => {
     const apiFilters = [

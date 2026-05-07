@@ -1,6 +1,8 @@
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import CloseIcon from '@mui/icons-material/Close'
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import {
@@ -49,6 +51,7 @@ import {
   getAllContacts,
   getBatchContacts,
   getContactBatches,
+  getLastEligibilityJob,
   getLastSuccessfulRuns,
   getRunningEligibilityJob,
   holdContacts,
@@ -329,6 +332,9 @@ function App() {
     lastEligibilityRun: null,
   })
 
+  // Last eligibility job status (regardless of success/failure)
+  const [lastEligibilityJobStatus, setLastEligibilityJobStatus] = useState<string | null>(null)
+
   // Effect to show CSA access alert from auth context
   useEffect(() => {
     if (csaAccessAlert) {
@@ -347,6 +353,11 @@ function App() {
       getLastSuccessfulRuns()
         .then(setLastSuccessfulRuns)
         .catch((err) => console.error('Failed to fetch last successful runs:', err))
+
+      // Fetch last eligibility job status (regardless of success/failure)
+      getLastEligibilityJob()
+        .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
+        .catch((err) => console.error('Failed to fetch last eligibility job:', err))
     }
   }, [isAuthenticated])
 
@@ -407,10 +418,13 @@ function App() {
           }
 
           setIsRunningEligibilityAll(false)
-          // Refresh timestamps
+          // Refresh timestamps and last job status
           getLastSuccessfulRuns()
             .then(setLastSuccessfulRuns)
             .catch((err) => console.error('Failed to refresh last successful runs:', err))
+          getLastEligibilityJob()
+            .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
+            .catch((err) => console.error('Failed to refresh last eligibility job:', err))
         }
       } catch (err) {
         console.error('Failed to check for running eligibility job:', err)
@@ -473,10 +487,13 @@ function App() {
         }
 
         setIsRunningEligibilityAll(false)
-        // Refresh timestamps
+        // Refresh timestamps and last job status
         getLastSuccessfulRuns()
           .then(setLastSuccessfulRuns)
           .catch((err) => console.error('Failed to refresh last successful runs:', err))
+        getLastEligibilityJob()
+          .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
+          .catch((err) => console.error('Failed to refresh last eligibility job:', err))
 
         return true // Job was running, action should be blocked
       }
@@ -1536,10 +1553,13 @@ function App() {
       })
     } finally {
       setIsRunningEligibilityAll(false)
-      // Refresh the last successful runs timestamps
+      // Refresh the last successful runs timestamps and last job status
       getLastSuccessfulRuns()
         .then(setLastSuccessfulRuns)
         .catch((err) => console.error('Failed to refresh last successful runs:', err))
+      getLastEligibilityJob()
+        .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
+        .catch((err) => console.error('Failed to refresh last eligibility job:', err))
     }
   }
 
@@ -2806,9 +2826,24 @@ function App() {
                       <MenuItem
                         onClick={handleRunEligibilityForAllClick}
                         disabled={isRunningEligibilityAll}
-                        sx={{ fontSize: '0.85rem' }}
+                        sx={{
+                          fontSize: '0.85rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                        }}
                       >
                         Run query on all contacts
+                        {lastEligibilityJobStatus === 'SUCCESS' && (
+                          <CheckCircleOutlineIcon
+                            sx={{ fontSize: '1rem', color: 'success.main', ml: 0.5 }}
+                          />
+                        )}
+                        {lastEligibilityJobStatus === 'FAILED' && (
+                          <ErrorOutlineIcon
+                            sx={{ fontSize: '1rem', color: 'error.main', ml: 0.5 }}
+                          />
+                        )}
                       </MenuItem>
                       {selected.length === 1 && (
                         <MenuItem

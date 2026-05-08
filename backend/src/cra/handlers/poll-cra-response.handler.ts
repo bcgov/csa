@@ -20,8 +20,9 @@ import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import type { DetailRecord04, HeaderRecord } from '../inbound/inbound-weekly.interface'
 import { WeeklyContactMatcherService } from '../inbound/weekly-contact-matcher.service'
 import { CraTransferService } from '../transfer/cra-transfer.service'
+import { parseEffectiveDate } from 'src/common/utils'
 const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
-const { STATUS: WKL_STATUS, RECEIVE_MODE } = WEEKLY_FILE
+const { STATUS: WKL_STATUS, RECEIVE_MODE, TRANSACTION_TYPE_MAP, TRANSACTION_TYPES } = WEEKLY_FILE
 
 @Injectable()
 export class PollCraResponseHandler extends BaseJob {
@@ -308,18 +309,14 @@ export class PollCraResponseHandler extends BaseJob {
       return
     }
 
-    if (detail.status === WKL_STATUS.IN_PROGRESS) {
+    if (detail.status?.toLocaleLowerCase() === WKL_STATUS.IN_PROGRESS) {
       this.recordsWklSkipped++
       return
     }
+    const wklType = TRANSACTION_TYPE_MAP[detail.transactionType]
 
-    let wklType: string
-    if (detail.transactionType === 'A') {
-      wklType = 'application'
-    } else if (detail.transactionType === 'C') {
-      wklType = 'cancellation'
-    } else {
-      this.logger.warn(`WKL: unexpected transaction type '${detail.transactionType}', skipping`)
+    if (!wklType || !TRANSACTION_TYPES.includes(wklType)) {
+      this.logger.warn(`WKL: unexpected transaction type ${detail.transactionType}, skipping`)
       this.recordsWklSkipped++
       return
     }
@@ -366,7 +363,8 @@ export class PollCraResponseHandler extends BaseJob {
     const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
 
     const din = detail.childDin?.trim()
-    const additionalData = din ? { din } : undefined
+    const effectiveDate = parseEffectiveDate(new Date())
+    const additionalData = { effectiveDate, ...(din ? { din } : {}) }
 
     if (isApproved) {
       await this.batchesService.updateBatchDetailStatus(

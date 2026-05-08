@@ -2,8 +2,22 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { pacificToday } from 'src/common/utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { PROTECTED_STATUSES, PROTECTED_STATUSES_SQL } from './eligibility.config'
 import { buildFindAgedOutContactIdsSql, buildLoadContactProfilesSql } from './eligibility.queries'
 import { EligibilityService } from './eligibility.service'
+
+describe('PROTECTED_STATUSES_SQL', () => {
+  it('should contain all protected statuses as quoted SQL literals', () => {
+    for (const status of PROTECTED_STATUSES) {
+      expect(PROTECTED_STATUSES_SQL).toContain(`'${status}'`)
+    }
+  })
+
+  it('should have same number of entries as PROTECTED_STATUSES', () => {
+    const count = PROTECTED_STATUSES_SQL.split(',').length
+    expect(count).toBe(PROTECTED_STATUSES.length)
+  })
+})
 
 describe('EligibilityService', () => {
   let service: EligibilityService

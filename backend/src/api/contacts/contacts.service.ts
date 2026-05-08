@@ -244,7 +244,8 @@ export class ContactsService {
     actor: Actor,
     options?: UpdateCsaStatusOptions,
   ): Promise<TransitionResult> {
-    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
+    const db = options?.tx ?? this.prisma
+    const contact = await db.contact.findUnique({ where: { id: contactId } })
     if (!contact) {
       return { success: false, reason: 'Contact not found' }
     }
@@ -267,6 +268,10 @@ export class ContactsService {
     const result = this.stateMachine.transitionContact(currentState, event, actor, targetState)
 
     if (!result.success) {
+      const origin = options?.origin ? ` [origin: ${options.origin}]` : ''
+      this.logger.warn(
+        `Contact ${contactId}: transition failed ${currentState} [${event}] by ${actor} — ${result.reason}${origin}`,
+      )
       return result
     }
 
@@ -322,7 +327,7 @@ export class ContactsService {
       updateData.careEndDate = null
     }
 
-    await this.prisma.contact.update({
+    await db.contact.update({
       where: { id: contactId },
       data: updateData,
     })
@@ -416,7 +421,10 @@ export class ContactsService {
     }
 
     for (const id of contactIds) {
-      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.HOLD, 'USER', { userId })
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.HOLD, 'USER', {
+        userId,
+        origin: 'ContactsService.holdContacts',
+      })
       if (transitionResult.success) {
         result.success.push(id)
       } else {
@@ -438,7 +446,10 @@ export class ContactsService {
     }
 
     for (const id of contactIds) {
-      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.RESUME, 'USER', { userId })
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.RESUME, 'USER', {
+        userId,
+        origin: 'ContactsService.resumeContacts',
+      })
       if (transitionResult.success) {
         result.success.push(id)
       } else {
@@ -497,7 +508,10 @@ export class ContactsService {
         continue
       }
 
-      const transitionResult = await this.updateCsaStatus(id, event, actor, { userId })
+      const transitionResult = await this.updateCsaStatus(id, event, actor, {
+        userId,
+        origin: 'ContactsService.updateEligibilityStatus',
+      })
       if (transitionResult.success) {
         result.success.push(id)
       } else {
@@ -550,6 +564,7 @@ export class ContactsService {
 
       const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.SET_NOT_ELIGIBLE, 'USER', {
         userId,
+        origin: 'ContactsService.updateNotEligibleStatus',
       })
       if (transitionResult.success) {
         result.success.push(id)
@@ -603,7 +618,10 @@ export class ContactsService {
         continue
       }
 
-      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.AGE_OUT, 'USER', { userId })
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.AGE_OUT, 'USER', {
+        userId,
+        origin: 'ContactsService.updateChildOver18',
+      })
       if (transitionResult.success) {
         result.success.push(id)
       } else {

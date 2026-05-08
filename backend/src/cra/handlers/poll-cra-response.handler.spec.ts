@@ -894,7 +894,7 @@ describe('PollCraResponseHandler', () => {
       careStartDate: '20250101',
       careEndDate: '        ',
       careEndReasonCode: '  ',
-      status: WKL_STATUS.COMPLETED ,
+      status: WKL_STATUS.COMPLETED,
       completionDate: '20250420',
       ...overrides,
     })

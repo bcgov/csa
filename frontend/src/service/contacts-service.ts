@@ -217,6 +217,7 @@ export interface ContactBatchDetail {
     batchDate: string
     status: string
     statusLabel: string
+    systemComments: string | null
   }
 }
 

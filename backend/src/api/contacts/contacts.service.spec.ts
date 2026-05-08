@@ -1373,7 +1373,7 @@ describe('ContactsService', () => {
         where: { contactId: 1 },
         include: {
           batch: {
-            select: { id: true, batchDate: true, status: true },
+            select: { id: true, batchDate: true, status: true, systemComments: true },
           },
           contact: {
             select: { effectiveDate: true, careEndDate: true },

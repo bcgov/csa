@@ -894,7 +894,7 @@ describe('PollCraResponseHandler', () => {
       careStartDate: '20250101',
       careEndDate: '        ',
       careEndReasonCode: '  ',
-      status: WKL_STATUS.COMPLETED as const,
+      status: WKL_STATUS.COMPLETED ,
       completionDate: '20250420',
       ...overrides,
     })
@@ -1080,7 +1080,7 @@ describe('PollCraResponseHandler', () => {
 
     it('passes DIN as additionalData when contact.din is blank', async () => {
       setupWeeklyFile()
-      setupWeeklyParseFile([makeWklDetail({ childDin: '987654321' })])
+      setupWeeklyParseFile([makeWklDetail({ childDin: '987654321', effectiveDate: '20250501' })])
       mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
         ...mockMatchedDetail,
         contact: { din: null },
@@ -1098,7 +1098,7 @@ describe('PollCraResponseHandler', () => {
 
     it('always updates DIN from WKL even when contact already has one', async () => {
       setupWeeklyFile()
-      setupWeeklyParseFile([makeWklDetail({ childDin: '987654321' })])
+      setupWeeklyParseFile([makeWklDetail({ childDin: '987654321', effectiveDate: '20250501' })])
       mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
         ...mockMatchedDetail,
         contact: { din: 'EXISTING123' },
@@ -1110,7 +1110,7 @@ describe('PollCraResponseHandler', () => {
         42,
         CSA_EVENT.CRA_WKL_APPROVED,
         'SYSTEM',
-        { additionalData: { din: '987654321' } },
+        { additionalData: { din: '987654321', effectiveDate: '20250501' } },
       )
     })
 

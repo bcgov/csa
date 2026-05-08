@@ -519,6 +519,13 @@ function App() {
     return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
   }
 
+  // Helper function to extract only the most recent system comment (first line)
+  const getMostRecentComment = (comments: string | null): string => {
+    if (!comments) return ''
+    const firstLine = comments.split('\n')[0]
+    return firstLine || ''
+  }
+
   // Batch history state for selected contact
   const [contactBatchHistory, setContactBatchHistory] = useState<ContactBatchDetail[]>([])
   const [loadingBatchHistory, setLoadingBatchHistory] = useState(false)
@@ -1969,7 +1976,7 @@ function App() {
       batchRequestStatus: item.batch.statusLabel || item.batch.status || '',
       transactionType: capitalize(item.transactionType) || '',
       batchDetailStatus: item.statusLabel || item.status || '',
-      systemComments: item.systemComments || '',
+      systemComments: getMostRecentComment(item.systemComments),
     }))
     const values = transformedData.map((row) => row[column as keyof typeof row])
     return Array.from(new Set(values)).filter((v) => v !== undefined && v !== '')
@@ -2023,7 +2030,7 @@ function App() {
         case 'createdDate':
           return formatDateTimeYMD(batch.createdAt)
         case 'systemComments':
-          return batch.systemComments || ''
+          return getMostRecentComment(batch.systemComments)
         default:
           return ''
       }
@@ -2272,7 +2279,7 @@ function App() {
       transactionType: capitalize(item.transactionType) || '',
       effectiveDate: item.effectiveDate ? formatDateYMD(item.effectiveDate) : '',
       batchDetailStatus: item.statusLabel || item.status || '',
-      systemComments: item.systemComments || '',
+      systemComments: getMostRecentComment(item.systemComments),
     }))
 
     // Apply global search across all columns
@@ -2356,7 +2363,7 @@ function App() {
       recordCount: batch.recordCount,
       initiatedBy: batch.initiatedBy || '',
       createdDate: formatDateTimeYMD(batch.createdAt),
-      systemComments: batch.systemComments || '',
+      systemComments: getMostRecentComment(batch.systemComments),
     }))
 
     // Apply global search across all columns
@@ -2431,7 +2438,7 @@ function App() {
           ? `${detail.cancelReasonCode} - ${detail.cancelReasonLabel}`
           : detail.cancelReasonCode || '',
       status: detail.statusLabel || detail.status || '',
-      systemComments: detail.systemComments || '',
+      systemComments: getMostRecentComment(detail.systemComments),
       addedBy: detail.createdBy || '',
     }))
   }, [batchDetails])

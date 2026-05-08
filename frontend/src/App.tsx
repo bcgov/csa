@@ -54,6 +54,7 @@ import {
   holdContacts,
   removeContactFromBatch,
   resumeContacts,
+  runAutoBatchWithPolling,
   runEligibilityForAllWithPolling,
   runEligibilityForContact,
   updateEligibilityStatus,
@@ -154,6 +155,12 @@ const BATCH_DETAILS_STATUS_FILTER_OPTIONS = [
   { value: 'In Progress', label: 'In Progress' },
   { value: 'Error', label: 'Error' },
   { value: 'Processed', label: 'Processed' },
+]
+
+// Initiated By options for filter dropdown (used in Batch Requests)
+const INITIATED_BY_FILTER_OPTIONS = [
+  { value: 'Ministry', label: 'Ministry' },
+  { value: 'CRA', label: 'CRA' },
 ]
 
 // Column field to display label mapping for filter menu
@@ -322,6 +329,12 @@ function App() {
     null,
   )
   const [confirmRunAllDialogOpen, setConfirmRunAllDialogOpen] = useState(false)
+
+  // Add to Batch dropdown menu state
+  const [addToBatchMenuAnchor, setAddToBatchMenuAnchor] = useState<null | HTMLElement>(null)
+  const addToBatchMenuOpen = Boolean(addToBatchMenuAnchor)
+  const [isRunningAutoBatch, setIsRunningAutoBatch] = useState(false)
+  const [confirmAutoBatchDialogOpen, setConfirmAutoBatchDialogOpen] = useState(false)
 
   // Last successful job runs state
   const [lastSuccessfulRuns, setLastSuccessfulRuns] = useState<LastSuccessfulRuns>({
@@ -1679,6 +1692,112 @@ function App() {
     }
   }
 
+  // Add to Batch dropdown menu handlers
+  const handleAddToBatchMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setAddToBatchMenuAnchor(event.currentTarget)
+  }
+
+  const handleAddToBatchMenuClose = () => {
+    setAddToBatchMenuAnchor(null)
+  }
+
+  const handleAddSelectedToBatch = () => {
+    handleAddToBatchMenuClose()
+    handleAddToBatch()
+  }
+
+  const handleAutoBatchAllClick = () => {
+    handleAddToBatchMenuClose()
+    setConfirmAutoBatchDialogOpen(true)
+  }
+
+  const handleConfirmAutoBatchDialogClose = () => {
+    setConfirmAutoBatchDialogOpen(false)
+  }
+
+  const handleAutoBatchAll = async () => {
+    setConfirmAutoBatchDialogOpen(false)
+    setIsRunningAutoBatch(true)
+    try {
+      setSnackbar({
+        open: true,
+        message: 'Starting auto-batch job...',
+        severity: 'info',
+      })
+
+      const job: JobRun = await runAutoBatchWithPolling((status) => {
+        if (status === 'RUNNING') {
+          setSnackbar({
+            open: true,
+            message: 'Auto-batch job is running...',
+            severity: 'info',
+          })
+        }
+      })
+
+      if (job.status === 'SUCCESS') {
+        const metadata = job.metadata as {
+          application?: number
+          cancellation?: number
+          batchId?: number
+        } | null
+        const application = metadata?.application ?? 0
+        const cancellation = metadata?.cancellation ?? 0
+        const total = application + cancellation
+
+        const message =
+          total > 0
+            ? `Auto-batch complete: ${application} application, ${cancellation} cancellation contacts added to batch`
+            : 'Auto-batch complete: No eligible contacts found to batch'
+        setSnackbar({
+          open: true,
+          message,
+          severity: total > 0 ? 'success' : 'info',
+        })
+
+        // Refresh the contacts list and batch tables
+        if (total > 0) {
+          if (isSearchActive && searchTerm.trim().length >= 3) {
+            await performFullTextSearch(searchTerm.trim(), currentPage)
+          } else {
+            await fetchContacts(currentPage)
+          }
+
+          // Refresh Batch Requests table
+          const updatedBatches = await getAllBatches()
+          setBatches(updatedBatches)
+
+          // Refresh Batch Details table for the currently selected batch
+          if (selectedBatch) {
+            const updatedDetails = await getBatchContacts(selectedBatch)
+            setBatchDetails(updatedDetails)
+          }
+        }
+      } else {
+        // Job failed
+        const errorMessage = job.error || 'Auto-batch job failed'
+        throw new Error(errorMessage)
+      }
+    } catch (error: any) {
+      console.error('Auto-batch error:', error)
+      let rawMessage =
+        error?.response?.data?.message || error?.message || 'Failed to run auto-batch job'
+
+      // Handle 409 Conflict (job already running)
+      if (error?.response?.status === 409) {
+        rawMessage = 'An auto-batch job is already running. Please wait for it to complete.'
+      }
+
+      setSnackbar({
+        open: true,
+        message: rawMessage,
+        severity: 'error',
+      })
+    } finally {
+      setIsRunningAutoBatch(false)
+    }
+  }
+
   // Fetch batch history for selected contact
   const handleContactClick = async (contactId: number) => {
     setSelectedChild(contactId)
@@ -2816,8 +2935,8 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canAddToBatch || isRunningEligibilityAll}
-                      onClick={handleAddToBatch}
+                      onClick={handleAddToBatchMenuOpen}
+                      disabled={isRunningEligibilityAll || isRunningAutoBatch}
                       sx={{
                         textTransform: 'none',
                         '&.Mui-disabled': {
@@ -2826,12 +2945,35 @@ function App() {
                         },
                       }}
                     >
-                      Add to Batch
+                      {isRunningAutoBatch ? 'Running Auto-batch...' : 'Add to Batch'}
+                      <Box component="span" sx={{ ml: 0.5 }}>
+                        ▾
+                      </Box>
                     </Button>
+                    <Menu
+                      anchorEl={addToBatchMenuAnchor}
+                      open={addToBatchMenuOpen}
+                      onClose={handleAddToBatchMenuClose}
+                    >
+                      <MenuItem
+                        onClick={handleAddSelectedToBatch}
+                        disabled={!canAddToBatch || isRunningEligibilityAll || isRunningAutoBatch}
+                        sx={{ fontSize: '0.85rem' }}
+                      >
+                        Add selected items to batch
+                      </MenuItem>
+                      <MenuItem
+                        onClick={handleAutoBatchAllClick}
+                        disabled={isRunningEligibilityAll || isRunningAutoBatch}
+                        sx={{ fontSize: '0.85rem' }}
+                      >
+                        Auto-batch all contacts
+                      </MenuItem>
+                    </Menu>
                     <Button
                       variant="outlined"
                       size="small"
-                      disabled={!canHoldResume || isRunningEligibilityAll}
+                      disabled={!canHoldResume || isRunningEligibilityAll || isRunningAutoBatch}
                       onClick={handleHoldResume}
                       sx={{
                         textTransform: 'none',
@@ -2846,12 +2988,16 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canUpdateEligibility || isRunningEligibilityAll}
+                      disabled={
+                        !canUpdateEligibility || isRunningEligibilityAll || isRunningAutoBatch
+                      }
                       onClick={handleCSAEligible}
                       sx={{
                         textTransform: 'none',
                         backgroundColor:
-                          canUpdateEligibility && !isRunningEligibilityAll ? '#1976d2' : undefined,
+                          canUpdateEligibility && !isRunningEligibilityAll && !isRunningAutoBatch
+                            ? '#1976d2'
+                            : undefined,
                         '&.Mui-disabled': {
                           opacity: 0.5,
                           cursor: 'not-allowed',
@@ -2863,12 +3009,16 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canUpdateNotEligible || isRunningEligibilityAll}
+                      disabled={
+                        !canUpdateNotEligible || isRunningEligibilityAll || isRunningAutoBatch
+                      }
                       onClick={handleCSANotEligible}
                       sx={{
                         textTransform: 'none',
                         backgroundColor:
-                          canUpdateNotEligible && !isRunningEligibilityAll ? '#d32f2f' : undefined,
+                          canUpdateNotEligible && !isRunningEligibilityAll && !isRunningAutoBatch
+                            ? '#d32f2f'
+                            : undefined,
                         '&.Mui-disabled': {
                           opacity: 0.5,
                           cursor: 'not-allowed',
@@ -2880,12 +3030,14 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canUpdateOver18 || isRunningEligibilityAll}
+                      disabled={!canUpdateOver18 || isRunningEligibilityAll || isRunningAutoBatch}
                       onClick={handleChildOver18}
                       sx={{
                         textTransform: 'none',
                         backgroundColor:
-                          canUpdateOver18 && !isRunningEligibilityAll ? '#ff9800' : undefined,
+                          canUpdateOver18 && !isRunningEligibilityAll && !isRunningAutoBatch
+                            ? '#ff9800'
+                            : undefined,
                         '&.Mui-disabled': {
                           opacity: 0.5,
                           cursor: 'not-allowed',
@@ -2909,6 +3061,17 @@ function App() {
                   </Box>
                 )}
 
+                {/* Auto-batch running banner */}
+                {isRunningAutoBatch && (
+                  <Box sx={{ mb: 2 }}>
+                    <Alert severity="info" sx={{ mb: 1 }}>
+                      Auto-batch is running. Please wait while all eligible contacts are being added
+                      to the batch. This banner will disappear once the job is complete.
+                    </Alert>
+                    <LinearProgress />
+                  </Box>
+                )}
+
                 {/* Table */}
                 <TableContainer component={Paper} sx={{ boxShadow: 1 }}>
                   <Table size="small">
@@ -2916,7 +3079,7 @@ function App() {
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                         <TableCell padding="checkbox">
                           <Checkbox
-                            disabled={isRunningEligibilityAll}
+                            disabled={isRunningEligibilityAll || isRunningAutoBatch}
                             indeterminate={
                               selected.length > 0 &&
                               selected.length < filteredData.length &&
@@ -3260,7 +3423,9 @@ function App() {
                           <TableCell padding="checkbox">
                             <Checkbox
                               disabled={
-                                isRunningEligibilityAll || runningEligibilityContactId === row.id
+                                isRunningEligibilityAll ||
+                                isRunningAutoBatch ||
+                                runningEligibilityContactId === row.id
                               }
                               checked={selected.includes(row.id)}
                               onChange={(e) => {
@@ -5484,7 +5649,7 @@ function App() {
                         <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                           <TableCell padding="checkbox">
                             <Checkbox
-                              disabled={isRunningEligibilityAll}
+                              disabled={isRunningEligibilityAll || isRunningAutoBatch}
                               indeterminate={
                                 selectedBatchDetails.length > 0 &&
                                 selectedBatchDetails.length < filteredBatchDetails.length
@@ -5753,7 +5918,7 @@ function App() {
                             >
                               <TableCell padding="checkbox">
                                 <Checkbox
-                                  disabled={isRunningEligibilityAll}
+                                  disabled={isRunningEligibilityAll || isRunningAutoBatch}
                                   checked={selectedBatchDetails.includes(row.id)}
                                   onChange={() => {
                                     setSelectedBatchDetails((prev) =>
@@ -5940,6 +6105,50 @@ function App() {
                             batchRequestsColumnFilters['status']?.includes(option.value) || false
                           }
                           onChange={() => handleBatchRequestsFilterChange('status', option.value)}
+                        />
+                        <Typography variant="body2">{option.label}</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </>
+              ) : batchRequestsFilterAnchor.column === 'initiatedBy' ? (
+                <>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    placeholder="Search initiated by..."
+                    value={batchRequestsFilterSearchTerm}
+                    onChange={(e) => setBatchRequestsFilterSearchTerm(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Box component="span" sx={{ fontSize: '18px' }}>
+                            🔍
+                          </Box>
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{ mb: 1 }}
+                  />
+                  <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                    {INITIATED_BY_FILTER_OPTIONS.filter((option) =>
+                      option.label
+                        .toLowerCase()
+                        .includes(batchRequestsFilterSearchTerm.toLowerCase()),
+                    ).map((option) => (
+                      <Box
+                        key={option.value}
+                        sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                      >
+                        <Checkbox
+                          size="small"
+                          checked={
+                            batchRequestsColumnFilters['initiatedBy']?.includes(option.value) ||
+                            false
+                          }
+                          onChange={() =>
+                            handleBatchRequestsFilterChange('initiatedBy', option.value)
+                          }
                         />
                         <Typography variant="body2">{option.label}</Typography>
                       </Box>
@@ -6181,6 +6390,30 @@ function App() {
             Cancel
           </Button>
           <Button onClick={handleRunEligibilityForAll} variant="contained" autoFocus>
+            Ok
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirmation Dialog for Auto-batch All Contacts */}
+      <Dialog
+        open={confirmAutoBatchDialogOpen}
+        onClose={handleConfirmAutoBatchDialogClose}
+        aria-labelledby="confirm-auto-batch-dialog-title"
+        aria-describedby="confirm-auto-batch-dialog-description"
+      >
+        <DialogTitle id="confirm-auto-batch-dialog-title">Confirm Auto-batch</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="confirm-auto-batch-dialog-description">
+            Are you sure you want to auto-batch all eligible contacts? This will automatically add
+            all contacts with eligible statuses to the pending batch.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleConfirmAutoBatchDialogClose} color="inherit">
+            Cancel
+          </Button>
+          <Button onClick={handleAutoBatchAll} variant="contained" autoFocus>
             Ok
           </Button>
         </DialogActions>

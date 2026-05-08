@@ -20,7 +20,11 @@ import { enrichLabels, isEligibleAge, pacificToday } from 'src/common/utils'
 import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
 import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
-import { ALLOWED_FILTER_SORT_FIELDS, BULK_OPERATION_SKIP_REASONS } from './constants'
+import {
+  ALLOWED_FILTER_SORT_FIELDS,
+  BULK_OPERATION_SKIP_REASONS,
+  TRANSACTION_TYPES,
+} from './constants'
 import { ContactDto } from './dto/contact.dto'
 import type {
   BulkOperationResponse,
@@ -615,6 +619,7 @@ export class ContactsService {
   }
 
   async findContactBatches(contactId: number) {
+    this.logger.log(`Fetching batch history for contact with id ${contactId}`)
     const contact = await this.prisma.contact.findUnique({
       where: { id: contactId },
     })
@@ -632,16 +637,31 @@ export class ContactsService {
             status: true,
           },
         },
+        contact: {
+          select: {
+            effectiveDate: true,
+            careEndDate: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     })
 
-    return details.map((detail) =>
-      enrichLabels({
+    return details.map((detail) => {
+      // Compute effectiveDate based on transaction type:
+      // - Application: Legal Authority's Effective Date (contact.effectiveDate)
+      // - Cancellation: Child's Care End Date (contact.careEndDate)
+      const effectiveDate =
+        detail.transactionType === TRANSACTION_TYPES.CANCELLATION
+          ? detail.contact.careEndDate
+          : detail.contact.effectiveDate
+
+      return enrichLabels({
         ...detail,
+        effectiveDate,
         batch: enrichLabels(detail.batch),
-      }),
-    )
+      })
+    })
   }
 
   async runContactEligibility(

@@ -1352,6 +1352,7 @@ describe('ContactsService', () => {
           transactionType: 'application',
           status: 'approved',
           batch: { id: 5, batchDate: new Date('2026-01-15'), status: 'processed' },
+          contact: { effectiveDate: new Date('2025-06-01'), careEndDate: null },
         },
       ]
 
@@ -1363,6 +1364,7 @@ describe('ContactsService', () => {
       expect(result).toEqual([
         {
           ...batchDetails[0],
+          effectiveDate: '2025-06-01',
           statusLabel: 'Approved',
           batch: { ...batchDetails[0].batch, batchDate: '2026-01-15', statusLabel: 'Processed' },
         },
@@ -1373,9 +1375,35 @@ describe('ContactsService', () => {
           batch: {
             select: { id: true, batchDate: true, status: true },
           },
+          contact: {
+            select: { effectiveDate: true, careEndDate: true },
+          },
         },
         orderBy: { createdAt: 'desc' },
       })
+    })
+
+    it('should use careEndDate as effectiveDate for cancellation transactions', async () => {
+      const contact = { id: 1, firstName: 'John', lastName: 'Doe' }
+      const batchDetails = [
+        {
+          id: 2,
+          contactId: 1,
+          batchId: 6,
+          transactionType: 'cancellation',
+          status: 'approved',
+          batch: { id: 6, batchDate: new Date('2026-02-20'), status: 'processed' },
+          contact: { effectiveDate: new Date('2025-06-01'), careEndDate: new Date('2026-01-15') },
+        },
+      ]
+
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      vi.spyOn(prisma.contactBatchDetail, 'findMany').mockResolvedValue(batchDetails as any)
+
+      const result = await service.findContactBatches(1)
+
+      // For cancellation, effectiveDate should be careEndDate
+      expect(result[0].effectiveDate).toEqual('2026-01-15')
     })
 
     it('should throw NotFoundException if contact not found', async () => {

@@ -553,6 +553,20 @@ export const getRunningEligibilityJob = async (): Promise<JobRun | null> => {
 }
 
 /**
+ * Get the most recent eligibility job run (regardless of status)
+ * Returns the most recent job if found, null otherwise
+ */
+export const getLastEligibilityJob = async (): Promise<JobRun | null> => {
+  const response = await APIService.getAxiosInstance().get<JobsResponse>('/jobs', {
+    params: {
+      jobType: 'RUN_ELIGIBILITY',
+      limit: 1,
+    },
+  })
+  return response.data.data.length > 0 ? response.data.data[0] : null
+}
+
+/**
  * Wait for a running eligibility job to complete
  * @param jobId - The job ID to monitor
  * @param onProgress - Optional callback for progress updates

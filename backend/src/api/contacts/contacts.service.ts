@@ -635,6 +635,7 @@ export class ContactsService {
             id: true,
             batchDate: true,
             status: true,
+            systemComments: true,
           },
         },
         contact: {

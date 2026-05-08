@@ -1976,7 +1976,7 @@ function App() {
       batchRequestStatus: item.batch.statusLabel || item.batch.status || '',
       transactionType: capitalize(item.transactionType) || '',
       batchDetailStatus: item.statusLabel || item.status || '',
-      systemComments: getMostRecentComment(item.systemComments),
+      systemComments: getMostRecentComment(item.batch.systemComments),
     }))
     const values = transformedData.map((row) => row[column as keyof typeof row])
     return Array.from(new Set(values)).filter((v) => v !== undefined && v !== '')
@@ -2279,7 +2279,7 @@ function App() {
       transactionType: capitalize(item.transactionType) || '',
       effectiveDate: item.effectiveDate ? formatDateYMD(item.effectiveDate) : '',
       batchDetailStatus: item.statusLabel || item.status || '',
-      systemComments: getMostRecentComment(item.systemComments),
+      systemComments: getMostRecentComment(item.batch.systemComments),
     }))
 
     // Apply global search across all columns

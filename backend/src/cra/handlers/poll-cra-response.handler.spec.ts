@@ -1143,7 +1143,10 @@ describe('PollCraResponseHandler', () => {
         42,
         CSA_EVENT.CRA_WKL_REFUSED,
         'SYSTEM',
-        { additionalData: { careEndDate: expect.any(Date) } },
+        {
+          additionalData: { careEndDate: expect.any(Date), din: '123456789' },
+          origin: 'PollCraResponseHandler.processWeeklyDetail',
+        },
       )
     })
 

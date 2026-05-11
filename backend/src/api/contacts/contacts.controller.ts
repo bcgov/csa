@@ -191,10 +191,7 @@ export class ContactsController {
   @HttpCode(200)
   @ApiResponse({ status: 200, description: 'Review flag cleared successfully' })
   @ApiResponse({ status: 404, description: 'Contact not found' })
-  async clearReviewFlag(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() userId: string,
-  ) {
+  async clearReviewFlag(@Param('id', ParseIntPipe) id: number, @CurrentUser() userId: string) {
     return this.contactsService.clearReviewFlag(id, userId)
   }
 }

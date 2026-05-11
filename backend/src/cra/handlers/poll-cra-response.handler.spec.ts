@@ -11,8 +11,6 @@ import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import type { ResponseFileType } from '../inbound/inbound-file.service'
 import { DETAIL_OUTCOME } from '../inbound/inbound.interface'
 import { PollCraResponseHandler } from './poll-cra-response.handler'
-import { parseEffectiveDate } from 'src/common/utils'
-
 vi.mock('fs', () => ({
   existsSync: vi.fn().mockReturnValue(true),
   mkdirSync: vi.fn(),
@@ -1083,7 +1081,7 @@ describe('PollCraResponseHandler', () => {
       expect(result.metadata.records_wkl_skipped).toBe(1)
     })
 
-    it('passes DIN as additionalData when contact.din is blank', async () => {
+    it('passes DIN and effectiveDate as additionalData when contact.din is blank', async () => {
       setupWeeklyFile()
       setupWeeklyParseFile([makeWklDetail({ childDin: '987654321' })])
       mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
@@ -1098,7 +1096,7 @@ describe('PollCraResponseHandler', () => {
         CSA_EVENT.CRA_WKL_APPROVED,
         'SYSTEM',
         {
-          additionalData: { din: '987654321' },
+          additionalData: { effectiveDate: expect.any(Date), din: '987654321' },
           origin: 'PollCraResponseHandler.processWeeklyDetail',
         },
       )
@@ -1119,7 +1117,7 @@ describe('PollCraResponseHandler', () => {
         CSA_EVENT.CRA_WKL_APPROVED,
         'SYSTEM',
         {
-          additionalData: { din: '987654321' },
+          additionalData: { effectiveDate: expect.any(Date), din: '987654321' },
           origin: 'PollCraResponseHandler.processWeeklyDetail',
         },
       )

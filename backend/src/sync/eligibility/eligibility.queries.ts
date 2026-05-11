@@ -1,4 +1,5 @@
 import { CSA_STATUS_LABELS } from 'src/common/state-machine/constants/csa-status.constants'
+import { PROTECTED_STATUSES_SQL } from './eligibility.config'
 
 const ICM_STATUS_CASE = `CASE UPPER(TRIM(cases.X_CSA_PAY_STATUS))\n${Object.entries(
   CSA_STATUS_LABELS,
@@ -439,7 +440,7 @@ export function buildFindAgedOutContactIdsSql(cutoffDate: Date): {
   const sql = `
     SELECT person_id_icm
     FROM csa.contacts
-    WHERE csa_status IN ('eligible', 'in_pay', 'not_eligible_out_of_pay')
+    WHERE csa_status NOT IN (${PROTECTED_STATUSES_SQL})
       AND date_of_birth IS NOT NULL
       AND date_of_birth < $1::DATE
   `

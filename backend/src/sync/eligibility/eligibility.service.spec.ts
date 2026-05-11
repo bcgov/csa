@@ -282,7 +282,7 @@ describe('EligibilityService', () => {
     await service.run(threshold)
 
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
-      expect.stringContaining('csa_status IN'),
+      expect.stringContaining('csa_status NOT IN'),
       expect.any(Date),
     )
   })
@@ -291,7 +291,7 @@ describe('EligibilityService', () => {
     await service.run(null)
 
     expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalledWith(
-      expect.stringContaining('csa_status IN'),
+      expect.stringContaining('csa_status NOT IN'),
       expect.any(Date),
     )
   })
@@ -477,6 +477,52 @@ describe('EligibilityService', () => {
     expect(result.skipped).toBe(1)
     expect(result.statusChanges).toBe(0)
   })
+
+  it.each([
+    { csaStatus: 'eligible_tbd', label: 'eligible_tbd' },
+    { csaStatus: 'not_eligible_in_pay', label: 'not_eligible_in_pay' },
+    { csaStatus: 'not_eligible_ip_tbd', label: 'not_eligible_ip_tbd' },
+  ])(
+    'should transition $label contact to over_18 when over 18 (full load)',
+    async ({ csaStatus }) => {
+      mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+        makeOver18Contact({ csaStatus, existingContactId: 99 }),
+      ])
+
+      const result = await service.run(null)
+
+      expect(result.processed).toBe(1)
+      expect(result.statusChanges).toBe(1)
+      expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
+      const upsertSql = mockPrisma.$executeRawUnsafe.mock.calls[0][0] as string
+      expect(upsertSql).toContain('over_18')
+    },
+  )
+
+  it.each([
+    { csaStatus: 'eligible_tbd', label: 'eligible_tbd' },
+    { csaStatus: 'not_eligible_in_pay', label: 'not_eligible_in_pay' },
+    { csaStatus: 'not_eligible_ip_tbd', label: 'not_eligible_ip_tbd' },
+  ])(
+    'should transition $label contact to over_18 when picked up by aged-out query (incremental)',
+    async ({ csaStatus }) => {
+      const threshold = new Date('2026-02-12T10:00:00Z')
+      const personIdIcm = 'ICM-AGED'
+
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([{ person_id_icm: personIdIcm }]) // aged-out query
+        .mockResolvedValueOnce([
+          makeOver18Contact({ csaStatus, existingContactId: 99, personIdIcm }),
+        ]) // profile query
+
+      const result = await service.run(threshold)
+
+      expect(result.processed).toBe(1)
+      expect(result.statusChanges).toBe(1)
+      const upsertSql = mockPrisma.$executeRawUnsafe.mock.calls[0][0] as string
+      expect(upsertSql).toContain('over_18')
+    },
+  )
 })
 
 describe('buildLoadContactProfilesSql', () => {
@@ -580,14 +626,12 @@ describe('buildLoadContactProfilesSql', () => {
 })
 
 describe('buildFindAgedOutContactIdsSql', () => {
-  it('should query contacts with transitionable statuses and DOB before cutoff', () => {
+  it('should query contacts NOT in protected statuses with DOB before cutoff', () => {
     const cutoff = new Date('2008-03-01')
     const { sql, params } = buildFindAgedOutContactIdsSql(cutoff)
 
-    expect(sql).toContain('csa_status IN')
-    expect(sql).toContain("'eligible'")
-    expect(sql).toContain("'in_pay'")
-    expect(sql).toContain("'not_eligible_out_of_pay'")
+    expect(sql).toContain('csa_status NOT IN')
+    expect(sql).toContain(PROTECTED_STATUSES_SQL)
     expect(sql).toContain('date_of_birth < $1')
     expect(sql).toContain('date_of_birth IS NOT NULL')
     expect(params).toEqual([cutoff])

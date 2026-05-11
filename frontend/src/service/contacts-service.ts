@@ -217,6 +217,7 @@ export interface ContactBatchDetail {
     batchDate: string
     status: string
     statusLabel: string
+    systemComments: string | null
   }
 }
 
@@ -315,6 +316,19 @@ export const removeContactFromBatch = async (
   const response = await APIService.getAxiosInstance().delete(
     `/batches/pending/contacts/${contactId}`,
   )
+  return response.data
+}
+
+/**
+ * Remove multiple contacts from pending batch
+ * @param contactIds - Array of contact IDs to remove
+ */
+export const removeContactsFromBatch = async (
+  contactIds: number[],
+): Promise<BulkOperationResponse & { batch: { recordCount: number } }> => {
+  const response = await APIService.getAxiosInstance().post('/batches/pending/contacts/remove', {
+    contactIds,
+  })
   return response.data
 }
 

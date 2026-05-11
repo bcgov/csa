@@ -160,7 +160,7 @@ export class SendCraFileHandler extends BaseJob {
         detail.contactId,
         CSA_EVENT.SEND_TO_CRA,
         UPDATED_BY.SYSTEM,
-        { additionalData: { csaSentDate: now } },
+        { additionalData: { csaSentDate: now }, origin: 'SendCraFileHandler' },
       )
     }
 

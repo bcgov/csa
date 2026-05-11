@@ -31,4 +31,8 @@ export interface BulkOperationResponse {
 export interface UpdateCsaStatusOptions {
   userId?: string
   additionalData?: Record<string, unknown>
+  // Prisma interactive transaction client — using any because Prisma doesn't export a usable TransactionClient type with @prisma/adapter-pg
+  tx?: any
+  // Caller context for logging (e.g. 'BatchesService.addContactsToPendingBatch')
+  origin?: string
 }

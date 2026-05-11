@@ -3409,6 +3409,30 @@ function App() {
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
+                              onClick={(e) => handleSortClick(e, 'needsReview')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Review
+                            </span>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'needsReview')}
+                              sx={{
+                                padding: 0.5,
+                                color:
+                                  activeColumnFilters['needsReview'] ||
+                                  columnFilters.needsReview?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <span
                               onClick={(e) => handleSortClick(e, 'lastUpdated')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
@@ -3432,30 +3456,6 @@ function App() {
                                 color:
                                   activeColumnFilters['lastUpdatedBy'] ||
                                   columnFilters.lastUpdatedBy?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'needsReview')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Review
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'needsReview')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['needsReview'] ||
-                                  columnFilters.needsReview?.length > 0
                                     ? '#1976d2'
                                     : 'inherit',
                               }}
@@ -3526,8 +3526,6 @@ function App() {
                           <TableCell>{row.caseStatus}</TableCell>
                           <TableCell>{row.legacyFile}</TableCell>
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
-                          <TableCell>{row.lastUpdated}</TableCell>
-                          <TableCell>{row.lastUpdatedBy}</TableCell>
                           <TableCell align="center">
                             {row.needsReview && (
                               <Tooltip title="Click to clear review flag">
@@ -3547,6 +3545,8 @@ function App() {
                               </Tooltip>
                             )}
                           </TableCell>
+                          <TableCell>{row.lastUpdated}</TableCell>
+                          <TableCell>{row.lastUpdatedBy}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

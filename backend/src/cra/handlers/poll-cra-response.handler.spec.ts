@@ -1123,6 +1123,30 @@ describe('PollCraResponseHandler', () => {
       )
     })
 
+    it('uses careEndDate (not effectiveDate) in additionalData for cancellation transactions', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([
+        makeWklDetail({
+          transactionType: 'C' as const,
+          careEndDate: '20250601',
+          status: WKL_STATUS.ABANDONED,
+        }),
+      ])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
+        ...mockMatchedDetail,
+        transactionType: 'cancellation',
+      })
+
+      await handler.execute(mockContext)
+
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        42,
+        CSA_EVENT.CRA_WKL_REFUSED,
+        'SYSTEM',
+        { additionalData: { careEndDate: expect.any(Date) } },
+      )
+    })
+
     it('logs warning on transaction type mismatch but still processes', async () => {
       setupWeeklyFile()
       setupWeeklyParseFile([makeWklDetail({ transactionType: 'C' as const })])

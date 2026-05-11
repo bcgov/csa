@@ -363,12 +363,16 @@ export class PollCraResponseHandler extends BaseJob {
     const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
 
     const din = detail.childDin?.trim()
-    const effectiveDate =
+    const careDate =
       wklType === 'cancellation'
         ? parseWklDate(detail.careEndDate)
         : parseWklDate(detail.careStartDate)
     const additionalData: Record<string, unknown> = {
-      ...(effectiveDate ? { effectiveDate } : {}),
+      ...(careDate
+        ? wklType === 'cancellation'
+          ? { careEndDate: careDate }
+          : { effectiveDate: careDate }
+        : {}),
       ...(din ? { din } : {}),
     }
 
@@ -439,12 +443,16 @@ export class PollCraResponseHandler extends BaseJob {
       detail.status?.toLowerCase() === WKL_STATUS.UPDATED
     const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
     const din = detail.childDin?.trim()
-    const effectiveDate =
+    const careDate =
       wklType === 'cancellation'
         ? parseWklDate(detail.careEndDate)
         : parseWklDate(detail.careStartDate)
     const additionalData: Record<string, unknown> = {
-      ...(effectiveDate ? { effectiveDate } : {}),
+      ...(careDate
+        ? wklType === 'cancellation'
+          ? { careEndDate: careDate }
+          : { effectiveDate: careDate }
+        : {}),
       ...(din ? { din } : {}),
     }
 

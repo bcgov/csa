@@ -239,6 +239,7 @@ describe('PollCraResponseHandler', () => {
         1,
         CSA_EVENT.CRA_FILE_REJECTED,
         'SYSTEM',
+        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
     })
 
@@ -371,6 +372,7 @@ describe('PollCraResponseHandler', () => {
         1,
         CSA_EVENT.CRA_RSP_REJECTED,
         'SYSTEM',
+        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
     })
 
@@ -511,6 +513,7 @@ describe('PollCraResponseHandler', () => {
         1,
         CSA_EVENT.CRA_RSP_REJECTED,
         'SYSTEM',
+        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
     })
 
@@ -554,6 +557,7 @@ describe('PollCraResponseHandler', () => {
         1,
         CSA_EVENT.CRA_RSP_REJECTED,
         'SYSTEM',
+        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
     })
 
@@ -1093,7 +1097,13 @@ describe('PollCraResponseHandler', () => {
         42,
         CSA_EVENT.CRA_WKL_APPROVED,
         'SYSTEM',
-        { additionalData: { din: '987654321', effectiveDate: parseEffectiveDate(new Date()) } },
+        {
+          additionalData: {
+            din: '987654321',
+            effectiveDate: parseEffectiveDate(new Date()),
+          },
+          origin: 'PollCraResponseHandler.processWeeklyDetail',
+        },
       )
     })
 
@@ -1111,7 +1121,13 @@ describe('PollCraResponseHandler', () => {
         42,
         CSA_EVENT.CRA_WKL_APPROVED,
         'SYSTEM',
-        { additionalData: { din: '987654321', effectiveDate: parseEffectiveDate(new Date()) } },
+        {
+          additionalData: {
+            din: '987654321',
+            effectiveDate: parseEffectiveDate(new Date()),
+          },
+          origin: 'PollCraResponseHandler.processWeeklyDetail',
+        },
       )
     })
 

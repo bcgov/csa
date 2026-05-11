@@ -11,7 +11,7 @@ import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import type { ResponseFileType } from '../inbound/inbound-file.service'
 import { DETAIL_OUTCOME } from '../inbound/inbound.interface'
 import { PollCraResponseHandler } from './poll-cra-response.handler'
-import { parseEffectiveDate, parseWklDate } from 'src/common/utils'
+import { parseEffectiveDate } from 'src/common/utils'
 
 vi.mock('fs', () => ({
   existsSync: vi.fn().mockReturnValue(true),

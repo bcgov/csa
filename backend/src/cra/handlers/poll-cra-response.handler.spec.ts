@@ -11,6 +11,7 @@ import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import type { ResponseFileType } from '../inbound/inbound-file.service'
 import { DETAIL_OUTCOME } from '../inbound/inbound.interface'
 import { PollCraResponseHandler } from './poll-cra-response.handler'
+import { parseEffectiveDate, parseWklDate } from 'src/common/utils'
 
 vi.mock('fs', () => ({
   existsSync: vi.fn().mockReturnValue(true),
@@ -1080,7 +1081,7 @@ describe('PollCraResponseHandler', () => {
 
     it('passes DIN as additionalData when contact.din is blank', async () => {
       setupWeeklyFile()
-      setupWeeklyParseFile([makeWklDetail({ childDin: '987654321', effectiveDate: '20250501' })])
+      setupWeeklyParseFile([makeWklDetail({ childDin: '987654321' })])
       mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
         ...mockMatchedDetail,
         contact: { din: null },
@@ -1092,13 +1093,13 @@ describe('PollCraResponseHandler', () => {
         42,
         CSA_EVENT.CRA_WKL_APPROVED,
         'SYSTEM',
-        { additionalData: { din: '987654321' } },
+        { additionalData: { din: '987654321', effectiveDate: parseEffectiveDate(new Date()) } },
       )
     })
 
     it('always updates DIN from WKL even when contact already has one', async () => {
       setupWeeklyFile()
-      setupWeeklyParseFile([makeWklDetail({ childDin: '987654321', effectiveDate: '20250501' })])
+      setupWeeklyParseFile([makeWklDetail({ childDin: '987654321' })])
       mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
         ...mockMatchedDetail,
         contact: { din: 'EXISTING123' },
@@ -1110,7 +1111,7 @@ describe('PollCraResponseHandler', () => {
         42,
         CSA_EVENT.CRA_WKL_APPROVED,
         'SYSTEM',
-        { additionalData: { din: '987654321', effectiveDate: '20250501' } },
+        { additionalData: { din: '987654321', effectiveDate: parseEffectiveDate(new Date()) } },
       )
     })
 

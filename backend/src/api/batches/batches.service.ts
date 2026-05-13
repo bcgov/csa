@@ -22,7 +22,7 @@ import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/cons
 import { ContactsService } from '../contacts/contacts.service'
 import { BulkOperationResponse } from '../contacts/interfaces'
 
-const { WEEKLY_FILE, BATCH_INITIATED_BY, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
+const { BATCH_INITIATED_BY, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
 class TransitionSkipError extends Error {
   constructor(public readonly reason: string) {
@@ -636,6 +636,9 @@ export class BatchesService {
       )
       return existingDetail
     }
+    this.logger.log(
+      `Creating batch detail for contact ${contactId} in batch ${batchId} with CRA status ${craStatus}`,
+    )
     const now = new Date()
     const snapshot = {
       ...craMatchingSnapshot,
@@ -648,7 +651,7 @@ export class BatchesService {
           contactId,
           batchId,
           transactionType,
-          status: WEEKLY_FILE.STATUS[craStatus.toUpperCase()],
+          status: this.mapCraStatus(craStatus),
           craMatchingSnapshot: snapshot,
           createdAt: now,
           createdBy: UPDATED_BY.SYSTEM,
@@ -673,5 +676,12 @@ export class BatchesService {
         },
       })
     })
+  }
+
+  private mapCraStatus(craStatus: string): string {
+    const status = craStatus.trim().toLowerCase()
+    if (status === 'approved' || status === 'update') return BATCH_DETAIL_STATUS.APPROVED
+    if (status === 'refused') return BATCH_DETAIL_STATUS.REFUSED
+    return BATCH_DETAIL_STATUS.IN_PROGRESS
   }
 }

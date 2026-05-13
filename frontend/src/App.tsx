@@ -1546,13 +1546,15 @@ function App() {
           severity: statusChanges > 0 ? 'success' : 'info',
         })
 
-        // Refresh the list if there were changes
-        if (statusChanges > 0) {
-          if (isSearchActive && searchTerm.trim().length >= 3) {
-            await performFullTextSearch(searchTerm.trim(), currentPage)
-          } else {
-            await fetchContacts(currentPage)
-          }
+        // Always refresh the list after eligibility completes to pick up review flag changes
+        // (on_hold contacts may have needs_review set without status changes)
+        // Preserve current filters/search state when refreshing
+        if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+          await performColumnFiltersSearch(activeColumnFilters, currentPage)
+        } else if (isSearchActive && searchTerm.trim().length >= 3) {
+          await performFullTextSearch(searchTerm.trim(), currentPage)
+        } else {
+          await fetchContacts(currentPage)
         }
       } else {
         // Job failed

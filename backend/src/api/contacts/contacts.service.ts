@@ -20,7 +20,11 @@ import { enrichLabels, isEligibleAge, pacificToday } from 'src/common/utils'
 import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
 import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
-import { ALLOWED_FILTER_SORT_FIELDS, BULK_OPERATION_SKIP_REASONS } from './constants'
+import {
+  ALLOWED_FILTER_SORT_FIELDS,
+  BULK_OPERATION_SKIP_REASONS,
+  TRANSACTION_TYPES,
+} from './constants'
 import { ContactDto } from './dto/contact.dto'
 import type {
   BulkOperationResponse,
@@ -244,7 +248,8 @@ export class ContactsService {
     actor: Actor,
     options?: UpdateCsaStatusOptions,
   ): Promise<TransitionResult> {
-    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
+    const db = options?.tx ?? this.prisma
+    const contact = await db.contact.findUnique({ where: { id: contactId } })
     if (!contact) {
       return { success: false, reason: 'Contact not found' }
     }
@@ -267,6 +272,10 @@ export class ContactsService {
     const result = this.stateMachine.transitionContact(currentState, event, actor, targetState)
 
     if (!result.success) {
+      const origin = options?.origin ? ` [origin: ${options.origin}]` : ''
+      this.logger.warn(
+        `Contact ${contactId}: transition failed ${currentState} [${event}] by ${actor} — ${result.reason}${origin}`,
+      )
       return result
     }
 
@@ -322,7 +331,7 @@ export class ContactsService {
       updateData.careEndDate = null
     }
 
-    await this.prisma.contact.update({
+    await db.contact.update({
       where: { id: contactId },
       data: updateData,
     })
@@ -416,7 +425,10 @@ export class ContactsService {
     }
 
     for (const id of contactIds) {
-      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.HOLD, 'USER', { userId })
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.HOLD, 'USER', {
+        userId,
+        origin: 'ContactsService.holdContacts',
+      })
       if (transitionResult.success) {
         result.success.push(id)
       } else {
@@ -438,7 +450,10 @@ export class ContactsService {
     }
 
     for (const id of contactIds) {
-      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.RESUME, 'USER', { userId })
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.RESUME, 'USER', {
+        userId,
+        origin: 'ContactsService.resumeContacts',
+      })
       if (transitionResult.success) {
         // Clear the review flag when resuming from hold
         await this.prisma.contact.update({
@@ -502,7 +517,10 @@ export class ContactsService {
         continue
       }
 
-      const transitionResult = await this.updateCsaStatus(id, event, actor, { userId })
+      const transitionResult = await this.updateCsaStatus(id, event, actor, {
+        userId,
+        origin: 'ContactsService.updateEligibilityStatus',
+      })
       if (transitionResult.success) {
         result.success.push(id)
       } else {
@@ -555,6 +573,7 @@ export class ContactsService {
 
       const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.SET_NOT_ELIGIBLE, 'USER', {
         userId,
+        origin: 'ContactsService.updateNotEligibleStatus',
       })
       if (transitionResult.success) {
         result.success.push(id)
@@ -608,7 +627,10 @@ export class ContactsService {
         continue
       }
 
-      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.AGE_OUT, 'USER', { userId })
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.AGE_OUT, 'USER', {
+        userId,
+        origin: 'ContactsService.updateChildOver18',
+      })
       if (transitionResult.success) {
         result.success.push(id)
       } else {
@@ -620,6 +642,7 @@ export class ContactsService {
   }
 
   async findContactBatches(contactId: number) {
+    this.logger.log(`Fetching batch history for contact with id ${contactId}`)
     const contact = await this.prisma.contact.findUnique({
       where: { id: contactId },
     })
@@ -635,18 +658,34 @@ export class ContactsService {
             id: true,
             batchDate: true,
             status: true,
+            systemComments: true,
+          },
+        },
+        contact: {
+          select: {
+            effectiveDate: true,
+            careEndDate: true,
           },
         },
       },
       orderBy: { createdAt: 'desc' },
     })
 
-    return details.map((detail) =>
-      enrichLabels({
+    return details.map((detail) => {
+      // Compute effectiveDate based on transaction type:
+      // - Application: Legal Authority's Effective Date (contact.effectiveDate)
+      // - Cancellation: Child's Care End Date (contact.careEndDate)
+      const effectiveDate =
+        detail.transactionType === TRANSACTION_TYPES.CANCELLATION
+          ? detail.contact.careEndDate
+          : detail.contact.effectiveDate
+
+      return enrichLabels({
         ...detail,
+        effectiveDate,
         batch: enrichLabels(detail.batch),
-      }),
-    )
+      })
+    })
   }
 
   async runContactEligibility(

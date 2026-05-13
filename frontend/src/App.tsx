@@ -1,6 +1,8 @@
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import CloseIcon from '@mui/icons-material/Close'
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
@@ -51,10 +53,12 @@ import {
   getAllContacts,
   getBatchContacts,
   getContactBatches,
+  getLastEligibilityJob,
   getLastSuccessfulRuns,
   getRunningEligibilityJob,
   holdContacts,
   removeContactFromBatch,
+  removeContactsFromBatch,
   resumeContacts,
   runAutoBatchWithPolling,
   runEligibilityForAllWithPolling,
@@ -351,6 +355,9 @@ function App() {
     lastEligibilityRun: null,
   })
 
+  // Last eligibility job status (regardless of success/failure)
+  const [lastEligibilityJobStatus, setLastEligibilityJobStatus] = useState<string | null>(null)
+
   // Effect to show CSA access alert from auth context
   useEffect(() => {
     if (csaAccessAlert) {
@@ -369,6 +376,11 @@ function App() {
       getLastSuccessfulRuns()
         .then(setLastSuccessfulRuns)
         .catch((err) => console.error('Failed to fetch last successful runs:', err))
+
+      // Fetch last eligibility job status (regardless of success/failure)
+      getLastEligibilityJob()
+        .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
+        .catch((err) => console.error('Failed to fetch last eligibility job:', err))
     }
   }, [isAuthenticated])
 
@@ -429,10 +441,13 @@ function App() {
           }
 
           setIsRunningEligibilityAll(false)
-          // Refresh timestamps
+          // Refresh timestamps and last job status
           getLastSuccessfulRuns()
             .then(setLastSuccessfulRuns)
             .catch((err) => console.error('Failed to refresh last successful runs:', err))
+          getLastEligibilityJob()
+            .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
+            .catch((err) => console.error('Failed to refresh last eligibility job:', err))
         }
       } catch (err) {
         console.error('Failed to check for running eligibility job:', err)
@@ -495,10 +510,13 @@ function App() {
         }
 
         setIsRunningEligibilityAll(false)
-        // Refresh timestamps
+        // Refresh timestamps and last job status
         getLastSuccessfulRuns()
           .then(setLastSuccessfulRuns)
           .catch((err) => console.error('Failed to refresh last successful runs:', err))
+        getLastEligibilityJob()
+          .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
+          .catch((err) => console.error('Failed to refresh last eligibility job:', err))
 
         return true // Job was running, action should be blocked
       }
@@ -522,6 +540,13 @@ function App() {
     }).formatToParts(date)
     const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
     return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
+  }
+
+  // Helper function to extract only the most recent system comment (first line)
+  const getMostRecentComment = (comments: string | null): string => {
+    if (!comments) return ''
+    const firstLine = comments.split('\n')[0]
+    return firstLine || ''
   }
 
   // Batch history state for selected contact
@@ -964,6 +989,13 @@ function App() {
     fetchContacts,
     performColumnFiltersSearch,
   ])
+
+  // Reset pagination to page 1 when search term changes
+  useEffect(() => {
+    if (searchTerm.trim().length >= 3) {
+      setCurrentPage(1)
+    }
+  }, [searchTerm])
 
   // Full-text search effect - triggers when searchTerm has 3+ characters
   useEffect(() => {
@@ -1552,10 +1584,13 @@ function App() {
       })
     } finally {
       setIsRunningEligibilityAll(false)
-      // Refresh the last successful runs timestamps
+      // Refresh the last successful runs timestamps and last job status
       getLastSuccessfulRuns()
         .then(setLastSuccessfulRuns)
         .catch((err) => console.error('Failed to refresh last successful runs:', err))
+      getLastEligibilityJob()
+        .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
+        .catch((err) => console.error('Failed to refresh last eligibility job:', err))
     }
   }
 
@@ -1965,18 +2000,21 @@ function App() {
         })
         .filter((id): id is number => id !== undefined)
 
-      // Remove each selected contact from the batch
-      const removePromises = contactIds.map((contactId) => removeContactFromBatch(contactId))
+      const result = await removeContactsFromBatch(contactIds)
 
-      const results = await Promise.all(removePromises)
+      const updatedRecordCount = result.batch?.recordCount ?? 0
+      const removedCount = result.success.length
+      const skippedCount = result.skipped.length
 
-      // Get the updated record count from the first result
-      const updatedRecordCount = results[0]?.recordCount ?? 0
+      const message =
+        skippedCount > 0
+          ? `Removed ${removedCount} contact${removedCount !== 1 ? 's' : ''} from batch (${skippedCount} skipped). Record count: ${updatedRecordCount}`
+          : `Successfully removed ${removedCount} contact${removedCount !== 1 ? 's' : ''} from batch. Record count: ${updatedRecordCount}`
 
       setSnackbar({
         open: true,
-        message: `Successfully removed ${selectedBatchDetails.length} contact${selectedBatchDetails.length > 1 ? 's' : ''} from batch. New record count: ${updatedRecordCount}`,
-        severity: 'success',
+        message,
+        severity: skippedCount > 0 ? 'warning' : 'success',
       })
 
       // Refresh the eligibility list to reflect updated CSA status
@@ -2100,7 +2138,7 @@ function App() {
       batchRequestStatus: item.batch.statusLabel || item.batch.status || '',
       transactionType: capitalize(item.transactionType) || '',
       batchDetailStatus: item.statusLabel || item.status || '',
-      systemComments: item.systemComments || '',
+      systemComments: getMostRecentComment(item.batch.systemComments),
     }))
     const values = transformedData.map((row) => row[column as keyof typeof row])
     return Array.from(new Set(values)).filter((v) => v !== undefined && v !== '')
@@ -2154,7 +2192,7 @@ function App() {
         case 'createdDate':
           return formatDateTimeYMD(batch.createdAt)
         case 'systemComments':
-          return batch.systemComments || ''
+          return getMostRecentComment(batch.systemComments)
         default:
           return ''
       }
@@ -2404,7 +2442,7 @@ function App() {
       transactionType: capitalize(item.transactionType) || '',
       effectiveDate: item.effectiveDate ? formatDateYMD(item.effectiveDate) : '',
       batchDetailStatus: item.statusLabel || item.status || '',
-      systemComments: item.systemComments || '',
+      systemComments: getMostRecentComment(item.batch.systemComments),
     }))
 
     // Apply global search across all columns
@@ -2488,7 +2526,7 @@ function App() {
       recordCount: batch.recordCount,
       initiatedBy: batch.initiatedBy || '',
       createdDate: formatDateTimeYMD(batch.createdAt),
-      systemComments: batch.systemComments || '',
+      systemComments: getMostRecentComment(batch.systemComments),
     }))
 
     // Apply global search across all columns
@@ -2563,7 +2601,7 @@ function App() {
           ? `${detail.cancelReasonCode} - ${detail.cancelReasonLabel}`
           : detail.cancelReasonCode || '',
       status: detail.statusLabel || detail.status || '',
-      systemComments: detail.systemComments || '',
+      systemComments: getMostRecentComment(detail.systemComments),
       addedBy: detail.createdBy || '',
     }))
   }, [batchDetails])
@@ -2958,9 +2996,24 @@ function App() {
                       <MenuItem
                         onClick={handleRunEligibilityForAllClick}
                         disabled={isRunningEligibilityAll}
-                        sx={{ fontSize: '0.85rem' }}
+                        sx={{
+                          fontSize: '0.85rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                        }}
                       >
                         Run query on all contacts
+                        {lastEligibilityJobStatus === 'SUCCESS' && (
+                          <CheckCircleOutlineIcon
+                            sx={{ fontSize: '1rem', color: 'success.main', ml: 0.5 }}
+                          />
+                        )}
+                        {lastEligibilityJobStatus === 'FAILED' && (
+                          <ErrorOutlineIcon
+                            sx={{ fontSize: '1rem', color: 'error.main', ml: 0.5 }}
+                          />
+                        )}
                       </MenuItem>
                       {selected.length === 1 && (
                         <MenuItem

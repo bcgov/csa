@@ -219,6 +219,7 @@ export interface ContactBatchDetail {
     batchDate: string
     status: string
     statusLabel: string
+    systemComments: string | null
   }
 }
 
@@ -317,6 +318,19 @@ export const removeContactFromBatch = async (
   const response = await APIService.getAxiosInstance().delete(
     `/batches/pending/contacts/${contactId}`,
   )
+  return response.data
+}
+
+/**
+ * Remove multiple contacts from pending batch
+ * @param contactIds - Array of contact IDs to remove
+ */
+export const removeContactsFromBatch = async (
+  contactIds: number[],
+): Promise<BulkOperationResponse & { batch: { recordCount: number } }> => {
+  const response = await APIService.getAxiosInstance().post('/batches/pending/contacts/remove', {
+    contactIds,
+  })
   return response.data
 }
 
@@ -557,6 +571,20 @@ export const getRunningEligibilityJob = async (): Promise<JobRun | null> => {
     params: {
       jobType: 'RUN_ELIGIBILITY',
       status: 'RUNNING',
+      limit: 1,
+    },
+  })
+  return response.data.data.length > 0 ? response.data.data[0] : null
+}
+
+/**
+ * Get the most recent eligibility job run (regardless of status)
+ * Returns the most recent job if found, null otherwise
+ */
+export const getLastEligibilityJob = async (): Promise<JobRun | null> => {
+  const response = await APIService.getAxiosInstance().get<JobsResponse>('/jobs', {
+    params: {
+      jobType: 'RUN_ELIGIBILITY',
       limit: 1,
     },
   })

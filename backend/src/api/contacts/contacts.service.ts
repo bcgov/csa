@@ -17,10 +17,15 @@ import {
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { enrichLabels, isEligibleAge, pacificToday } from 'src/common/utils'
+import { getCancelReasonLabel } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
 import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
-import { ALLOWED_FILTER_SORT_FIELDS, BULK_OPERATION_SKIP_REASONS } from './constants'
+import {
+  ALLOWED_FILTER_SORT_FIELDS,
+  BULK_OPERATION_SKIP_REASONS,
+  TRANSACTION_TYPES,
+} from './constants'
 import { ContactDto } from './dto/contact.dto'
 import type {
   BulkOperationResponse,
@@ -630,18 +635,41 @@ export class ContactsService {
             id: true,
             batchDate: true,
             status: true,
+            systemComments: true,
+          },
+        },
+        contact: {
+          select: {
+            effectiveDate: true,
+            careEndDate: true,
+            cancelReasonCode: true,
           },
         },
       },
       orderBy: { createdAt: 'desc' },
     })
 
-    return details.map((detail) =>
-      enrichLabels({
+    return details.map((detail) => {
+      // Compute effectiveDate based on transaction type:
+      // - Application: Legal Authority's Effective Date (contact.effectiveDate)
+      // - Cancellation: Child's Care End Date (contact.careEndDate)
+      const effectiveDate =
+        detail.transactionType === TRANSACTION_TYPES.CANCELLATION
+          ? detail.contact.careEndDate
+          : detail.contact.effectiveDate
+
+      const cancelReasonCode = detail.contact.cancelReasonCode
+      const cancelReasonLabel = getCancelReasonLabel(cancelReasonCode, detail.transactionType)
+
+      return enrichLabels({
         ...detail,
+        effectiveDate,
+        cancelReasonCode:
+          detail.transactionType === TRANSACTION_TYPES.CANCELLATION ? cancelReasonCode : null,
+        cancelReasonLabel,
         batch: enrichLabels(detail.batch),
-      }),
-    )
+      })
+    })
   }
 
   async runContactEligibility(

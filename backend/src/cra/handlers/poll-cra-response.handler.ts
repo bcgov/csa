@@ -20,7 +20,6 @@ import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import type { DetailRecord04, HeaderRecord } from '../inbound/inbound-weekly.interface'
 import { WeeklyContactMatcherService } from '../inbound/weekly-contact-matcher.service'
 import { CraTransferService } from '../transfer/cra-transfer.service'
-import { parseEffectiveDate } from 'src/common/utils'
 import { parseWklDate } from 'src/common/utils'
 const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
 const { STATUS: WKL_STATUS, RECEIVE_MODE, TRANSACTION_TYPE_MAP, TRANSACTION_TYPES } = WEEKLY_FILE
@@ -358,10 +357,16 @@ export class PollCraResponseHandler extends BaseJob {
       )
     }
 
-    const isApproved =
-      detail.status?.toLowerCase() === WKL_STATUS.COMPLETED ||
-      detail.status?.toLowerCase() === WKL_STATUS.UPDATED
-    const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
+    const status = detail.status?.trim().toLowerCase()
+
+    const isApproved = status === WKL_STATUS.COMPLETED || status === WKL_STATUS.UPDATED
+
+    const isRefused = status === WKL_STATUS.ABANDONED
+
+    this.logger.log(
+      `Processing WKL detail for contactId ${batchDetail.contactId}, transaction type ${wklType}, status ${detail.status}, ` +
+        `isApproved: ${isApproved}, isRefused: ${isRefused}`,
+    )
 
     const din = detail.childDin?.trim()
     const careDate =
@@ -417,6 +422,10 @@ export class PollCraResponseHandler extends BaseJob {
     caseNumber: string,
     header: HeaderRecord,
   ): Promise<void> {
+    this.logger.log(
+      `Processing unmatched WKL detail for contactId ${contactId} (case ${caseNumber}), ` +
+        `transaction type ${wklType}, status ${detail.status}`,
+    )
     if (!this.unmatchedWklBatchId) {
       const batch = await this.batchesService.createWklBatchForUnmatchedRecords(header)
       this.unmatchedWklBatchId = batch.id
@@ -492,5 +501,9 @@ export class PollCraResponseHandler extends BaseJob {
       this.recordsWklUnmatchedSkipped++
       return
     }
+    this.logger.log(
+      `Finished processing unmatched WKL detail for contactId ${contactId} (case ${caseNumber}), ` +
+        `transaction type ${wklType}, status ${detail.status}, approved: ${isApproved}, refused: ${isRefused}`,
+    )
   }
 }

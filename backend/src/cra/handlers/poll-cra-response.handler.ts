@@ -20,9 +20,8 @@ import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import type { DetailRecord04, HeaderRecord } from '../inbound/inbound-weekly.interface'
 import { WeeklyContactMatcherService } from '../inbound/weekly-contact-matcher.service'
 import { CraTransferService } from '../transfer/cra-transfer.service'
-import { parseWklDate } from 'src/common/utils'
 const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
-const { STATUS: WKL_STATUS, RECEIVE_MODE, TRANSACTION_TYPE_MAP, TRANSACTION_TYPES } = WEEKLY_FILE
+const { STATUS: WKL_STATUS, RECEIVE_MODE } = WEEKLY_FILE
 
 @Injectable()
 export class PollCraResponseHandler extends BaseJob {
@@ -275,7 +274,6 @@ export class PollCraResponseHandler extends BaseJob {
         batchDetail.contactId,
         CSA_EVENT.CRA_FILE_REJECTED,
         UPDATED_BY.SYSTEM,
-        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
       this.recordsRejected++
     } else if (outcome === DETAIL_OUTCOME.REJECTED) {
@@ -290,7 +288,6 @@ export class PollCraResponseHandler extends BaseJob {
         batchDetail.contactId,
         CSA_EVENT.CRA_RSP_REJECTED,
         UPDATED_BY.SYSTEM,
-        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
       this.recordsRejected++
     } else {
@@ -309,14 +306,18 @@ export class PollCraResponseHandler extends BaseJob {
       return
     }
 
-    if (detail.status?.toLocaleLowerCase() === WKL_STATUS.IN_PROGRESS) {
+    if (detail.status === WKL_STATUS.IN_PROGRESS) {
       this.recordsWklSkipped++
       return
     }
-    const wklType = TRANSACTION_TYPE_MAP[detail.transactionType]
 
-    if (!wklType || !TRANSACTION_TYPES.includes(wklType)) {
-      this.logger.warn(`WKL: unexpected transaction type ${detail.transactionType}, skipping`)
+    let wklType: string
+    if (detail.transactionType === 'A') {
+      wklType = 'application'
+    } else if (detail.transactionType === 'C') {
+      wklType = 'cancellation'
+    } else {
+      this.logger.warn(`WKL: unexpected transaction type '${detail.transactionType}', skipping`)
       this.recordsWklSkipped++
       return
     }
@@ -363,18 +364,7 @@ export class PollCraResponseHandler extends BaseJob {
     const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
 
     const din = detail.childDin?.trim()
-    const careDate =
-      wklType === 'cancellation'
-        ? parseWklDate(detail.careEndDate)
-        : parseWklDate(detail.careStartDate)
-    const additionalData: Record<string, unknown> = {
-      ...(careDate
-        ? wklType === 'cancellation'
-          ? { careEndDate: careDate }
-          : { effectiveDate: careDate }
-        : {}),
-      ...(din ? { din } : {}),
-    }
+    const additionalData = din ? { din } : undefined
 
     if (isApproved) {
       await this.batchesService.updateBatchDetailStatus(
@@ -385,7 +375,7 @@ export class PollCraResponseHandler extends BaseJob {
         batchDetail.contactId,
         CSA_EVENT.CRA_WKL_APPROVED,
         UPDATED_BY.SYSTEM,
-        { additionalData, origin: 'PollCraResponseHandler.processWeeklyDetail' },
+        { additionalData },
       )
       this.recordsWklApproved++
     } else if (isRefused) {
@@ -397,7 +387,7 @@ export class PollCraResponseHandler extends BaseJob {
         batchDetail.contactId,
         CSA_EVENT.CRA_WKL_REFUSED,
         UPDATED_BY.SYSTEM,
-        { additionalData, origin: 'PollCraResponseHandler.processWeeklyDetail' },
+        { additionalData },
       )
       this.recordsWklRefused++
     } else {
@@ -443,18 +433,7 @@ export class PollCraResponseHandler extends BaseJob {
       detail.status?.toLowerCase() === WKL_STATUS.UPDATED
     const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
     const din = detail.childDin?.trim()
-    const careDate =
-      wklType === 'cancellation'
-        ? parseWklDate(detail.careEndDate)
-        : parseWklDate(detail.careStartDate)
-    const additionalData: Record<string, unknown> = {
-      ...(careDate
-        ? wklType === 'cancellation'
-          ? { careEndDate: careDate }
-          : { effectiveDate: careDate }
-        : {}),
-      ...(din ? { din } : {}),
-    }
+    const additionalData = din ? { din } : undefined
 
     if (isApproved) {
       const nextState =

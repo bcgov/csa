@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
-import { PrismaService } from 'src/common/database/prisma.service'
 import { AppLogger } from 'src/common/logger/app-logger'
+import { PrismaService } from 'src/common/database/prisma.service'
 import {
   getAgeCutoffDate,
   isEligibleAge,
@@ -9,11 +9,7 @@ import {
   parseISODatePacific,
 } from 'src/common/utils'
 import { CANCEL_REASON } from './cancellation/cancellation-reason.constants'
-import {
-  ELIGIBILITY_CONFIG,
-  PROTECTED_STATUSES,
-  PROTECTED_STATUSES_SQL,
-} from './eligibility.config'
+import { ELIGIBILITY_CONFIG, PROTECTED_STATUSES } from './eligibility.config'
 import { EligibilityInputError } from './eligibility.errors'
 import { buildFindAgedOutContactIdsSql, buildLoadContactProfilesSql } from './eligibility.queries'
 import {
@@ -410,11 +406,11 @@ const UPSERT_SQL = `
   INSERT INTO contacts (
     ${COL_LIST},
     icm_integration_status,
-    created_at, created_by, last_updated_at, last_updated_by, needs_review
+    created_at, created_by, last_updated_at, last_updated_by
   )
   SELECT
     ${SELECT_LIST},
-    true, NOW(), 'SYSTEM', NOW(), 'SYSTEM', false
+    true, NOW(), 'SYSTEM', NOW(), 'SYSTEM'
   FROM unnest(${UNNEST_PARAMS})
   AS t(${COL_LIST})
   ON CONFLICT (person_id_icm) DO UPDATE SET
@@ -434,13 +430,7 @@ const UPSERT_SQL = `
     last_updated_by = CASE
       WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN 'SYSTEM'
       ELSE contacts.last_updated_by
-    END,
-    needs_review = CASE
-      WHEN contacts.csa_status = 'on_hold' THEN true
-      ELSE contacts.needs_review
     END
-  WHERE contacts.csa_status NOT IN (${PROTECTED_STATUSES_SQL})
-     OR EXCLUDED.csa_status = contacts.csa_status
 `
 
 @Injectable()
@@ -495,6 +485,7 @@ export class EligibilityService {
       statusChanges: 0,
       newContacts: 0,
       skipped: 0,
+      userSetPreserved: 0,
       stepCounts: { step7: 0, step8: 0, step9: 0, step10: 0, noChange: 0 },
     }
 
@@ -529,6 +520,20 @@ export class EligibilityService {
         continue
       }
 
+      // User-set status: preserve unless overridden by system
+      if (profile.lastUpdatedBy && profile.lastUpdatedBy !== 'SYSTEM') {
+        updates.push({
+          profile,
+          result: {
+            newStatus: profile.csaStatus,
+            cancelReasonCode: profile.cancelReasonCode,
+            careEndDate: profile.careEndDate,
+          },
+        })
+        stats.userSetPreserved++
+        continue
+      }
+
       const result = runEligibility(profile, RULES, referenceDate)
       if (!result) continue
 
@@ -554,7 +559,7 @@ export class EligibilityService {
     }
 
     this.logger.log(
-      `Eligibility complete: ${stats.processed} processed, ${stats.statusChanges} updated, ${stats.newContacts} new, ${stats.skipped} skipped`,
+      `Eligibility complete: ${stats.processed} processed, ${stats.statusChanges} updated, ${stats.newContacts} new, ${stats.skipped} skipped, ${stats.userSetPreserved} user-set preserved`,
     )
 
     return stats
@@ -596,6 +601,9 @@ export class EligibilityService {
       ])
       return { previousStatus, newStatus: profile.csaStatus }
     }
+
+    // No user-set protection here: runForContact is the escape hatch
+    // for manually re-evaluating a contact's eligibility
 
     if (!profile.dateOfBirth) {
       throw new EligibilityInputError(`Contact ${personIdIcm} has no date of birth in staging`)
@@ -758,6 +766,7 @@ export class EligibilityService {
           ? new Date(raw.csaStatusEffectiveDate)
           : null,
         existingContactId: raw.existingContactId,
+        lastUpdatedBy: raw.lastUpdatedBy ?? null,
         din: raw.din ?? null,
         csaSentDate: raw.csaSentDate ? new Date(raw.csaSentDate) : null,
         misLegalAuthCode: raw.misLegalAuthCode,

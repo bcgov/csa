@@ -11,6 +11,7 @@ import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import type { ResponseFileType } from '../inbound/inbound-file.service'
 import { DETAIL_OUTCOME } from '../inbound/inbound.interface'
 import { PollCraResponseHandler } from './poll-cra-response.handler'
+
 vi.mock('fs', () => ({
   existsSync: vi.fn().mockReturnValue(true),
   mkdirSync: vi.fn(),
@@ -237,7 +238,6 @@ describe('PollCraResponseHandler', () => {
         1,
         CSA_EVENT.CRA_FILE_REJECTED,
         'SYSTEM',
-        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
     })
 
@@ -370,7 +370,6 @@ describe('PollCraResponseHandler', () => {
         1,
         CSA_EVENT.CRA_RSP_REJECTED,
         'SYSTEM',
-        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
     })
 
@@ -511,7 +510,6 @@ describe('PollCraResponseHandler', () => {
         1,
         CSA_EVENT.CRA_RSP_REJECTED,
         'SYSTEM',
-        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
     })
 
@@ -555,7 +553,6 @@ describe('PollCraResponseHandler', () => {
         1,
         CSA_EVENT.CRA_RSP_REJECTED,
         'SYSTEM',
-        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
     })
 
@@ -897,7 +894,7 @@ describe('PollCraResponseHandler', () => {
       careStartDate: '20250101',
       careEndDate: '        ',
       careEndReasonCode: '  ',
-      status: WKL_STATUS.COMPLETED,
+      status: WKL_STATUS.COMPLETED as const,
       completionDate: '20250420',
       ...overrides,
     })
@@ -1081,7 +1078,7 @@ describe('PollCraResponseHandler', () => {
       expect(result.metadata.records_wkl_skipped).toBe(1)
     })
 
-    it('passes DIN and effectiveDate as additionalData when contact.din is blank', async () => {
+    it('passes DIN as additionalData when contact.din is blank', async () => {
       setupWeeklyFile()
       setupWeeklyParseFile([makeWklDetail({ childDin: '987654321' })])
       mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
@@ -1095,10 +1092,7 @@ describe('PollCraResponseHandler', () => {
         42,
         CSA_EVENT.CRA_WKL_APPROVED,
         'SYSTEM',
-        {
-          additionalData: { effectiveDate: expect.any(Date), din: '987654321' },
-          origin: 'PollCraResponseHandler.processWeeklyDetail',
-        },
+        { additionalData: { din: '987654321' } },
       )
     })
 
@@ -1116,37 +1110,7 @@ describe('PollCraResponseHandler', () => {
         42,
         CSA_EVENT.CRA_WKL_APPROVED,
         'SYSTEM',
-        {
-          additionalData: { effectiveDate: expect.any(Date), din: '987654321' },
-          origin: 'PollCraResponseHandler.processWeeklyDetail',
-        },
-      )
-    })
-
-    it('uses careEndDate (not effectiveDate) in additionalData for cancellation transactions', async () => {
-      setupWeeklyFile()
-      setupWeeklyParseFile([
-        makeWklDetail({
-          transactionType: 'C' as const,
-          careEndDate: '20250601',
-          status: WKL_STATUS.ABANDONED,
-        }),
-      ])
-      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
-        ...mockMatchedDetail,
-        transactionType: 'cancellation',
-      })
-
-      await handler.execute(mockContext)
-
-      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
-        42,
-        CSA_EVENT.CRA_WKL_REFUSED,
-        'SYSTEM',
-        {
-          additionalData: { careEndDate: expect.any(Date), din: '123456789' },
-          origin: 'PollCraResponseHandler.processWeeklyDetail',
-        },
+        { additionalData: { din: '987654321' } },
       )
     })
 

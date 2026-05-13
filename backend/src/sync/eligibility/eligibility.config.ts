@@ -12,9 +12,6 @@ export const PROTECTED_STATUSES = [
   CSA_STATUS.OVER_18,
 ] as const
 
-// SQL-safe literal list — values come from CSA_STATUS constants (not user input), safe to interpolate
-export const PROTECTED_STATUSES_SQL = PROTECTED_STATUSES.map((s) => `'${s}'`).join(', ')
-
 export const ELIGIBILITY_CONFIG = {
   // Step 1A: Age threshold
   MAX_ELIGIBLE_AGE: 18,

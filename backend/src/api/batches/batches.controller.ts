@@ -11,7 +11,6 @@ import {
 } from '@nestjs/common'
 import { ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { AddContactsDto } from '../batches/dto/add-contact.dto'
-import { RemoveContactsDto } from '../batches/dto/remove-contacts.dto'
 import { CurrentUser } from '../common/decorators'
 import { CSAGuard } from '../common/guards/csa.guard'
 import { BatchesService } from './batches.service'
@@ -51,13 +50,6 @@ export class BatchesController {
     @CurrentUser() userId: string,
   ) {
     await this.batchesService.removeContactFromPendingBatch(contactId, userId)
-  }
-
-  @Post('pending/contacts/remove')
-  @ApiBody({ type: RemoveContactsDto })
-  @ApiResponse({ status: 200, description: 'Contacts removed from pending batch' })
-  async removeContactsFromPending(@Body() dto: RemoveContactsDto, @CurrentUser() userId: string) {
-    return this.batchesService.removeContactsFromPendingBatch(dto.contactIds, userId)
   }
 
   @Get(':id')

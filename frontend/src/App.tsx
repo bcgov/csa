@@ -1,11 +1,8 @@
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import CloseIcon from '@mui/icons-material/Close'
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
-import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import {
   Alert,
   AppBar,
@@ -47,18 +44,15 @@ import { useAuth } from './context/AuthContext'
 import logo from './icons/image.png'
 import {
   addContactsToBatch,
-  clearReviewFlag,
   fullTextSearchContacts,
   getAllBatches,
   getAllContacts,
   getBatchContacts,
   getContactBatches,
-  getLastEligibilityJob,
   getLastSuccessfulRuns,
   getRunningEligibilityJob,
   holdContacts,
   removeContactFromBatch,
-  removeContactsFromBatch,
   resumeContacts,
   runAutoBatchWithPolling,
   runEligibilityForAllWithPolling,
@@ -169,12 +163,6 @@ const INITIATED_BY_FILTER_OPTIONS = [
   { value: 'CRA', label: 'CRA' },
 ]
 
-// Review flag options for filter dropdown (used in Eligibility List)
-const REVIEW_FILTER_OPTIONS = [
-  { value: 'true', label: 'Needs Review' },
-  { value: 'false', label: 'No Review Needed' },
-]
-
 // Column field to display label mapping for filter menu
 const COLUMN_LABELS: Record<string, string> = {
   lastName: 'Last Name',
@@ -191,7 +179,6 @@ const COLUMN_LABELS: Record<string, string> = {
   cgwrks3: 'Set on Hold By',
   lastUpdated: 'Last Updated',
   lastUpdatedBy: 'Last Updated By',
-  needsReview: 'Review',
   // Batch table columns
   batchId: 'Batch ID',
   batchDate: 'Batch Date',
@@ -355,9 +342,6 @@ function App() {
     lastEligibilityRun: null,
   })
 
-  // Last eligibility job status (regardless of success/failure)
-  const [lastEligibilityJobStatus, setLastEligibilityJobStatus] = useState<string | null>(null)
-
   // Effect to show CSA access alert from auth context
   useEffect(() => {
     if (csaAccessAlert) {
@@ -376,11 +360,6 @@ function App() {
       getLastSuccessfulRuns()
         .then(setLastSuccessfulRuns)
         .catch((err) => console.error('Failed to fetch last successful runs:', err))
-
-      // Fetch last eligibility job status (regardless of success/failure)
-      getLastEligibilityJob()
-        .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
-        .catch((err) => console.error('Failed to fetch last eligibility job:', err))
     }
   }, [isAuthenticated])
 
@@ -441,13 +420,10 @@ function App() {
           }
 
           setIsRunningEligibilityAll(false)
-          // Refresh timestamps and last job status
+          // Refresh timestamps
           getLastSuccessfulRuns()
             .then(setLastSuccessfulRuns)
             .catch((err) => console.error('Failed to refresh last successful runs:', err))
-          getLastEligibilityJob()
-            .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
-            .catch((err) => console.error('Failed to refresh last eligibility job:', err))
         }
       } catch (err) {
         console.error('Failed to check for running eligibility job:', err)
@@ -510,13 +486,10 @@ function App() {
         }
 
         setIsRunningEligibilityAll(false)
-        // Refresh timestamps and last job status
+        // Refresh timestamps
         getLastSuccessfulRuns()
           .then(setLastSuccessfulRuns)
           .catch((err) => console.error('Failed to refresh last successful runs:', err))
-        getLastEligibilityJob()
-          .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
-          .catch((err) => console.error('Failed to refresh last eligibility job:', err))
 
         return true // Job was running, action should be blocked
       }
@@ -540,13 +513,6 @@ function App() {
     }).formatToParts(date)
     const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
     return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
-  }
-
-  // Helper function to extract only the most recent system comment (first line)
-  const getMostRecentComment = (comments: string | null): string => {
-    if (!comments) return ''
-    const firstLine = comments.split('\n')[0]
-    return firstLine || ''
   }
 
   // Batch history state for selected contact
@@ -709,7 +675,6 @@ function App() {
     cgwrks3: [],
     lastUpdated: [],
     lastUpdatedBy: [],
-    needsReview: [],
   })
 
   // Helper function to get pre-defined filter configuration
@@ -989,13 +954,6 @@ function App() {
     fetchContacts,
     performColumnFiltersSearch,
   ])
-
-  // Reset pagination to page 1 when search term changes
-  useEffect(() => {
-    if (searchTerm.trim().length >= 3) {
-      setCurrentPage(1)
-    }
-  }, [searchTerm])
 
   // Full-text search effect - triggers when searchTerm has 3+ characters
   useEffect(() => {
@@ -1546,15 +1504,13 @@ function App() {
           severity: statusChanges > 0 ? 'success' : 'info',
         })
 
-        // Always refresh the list after eligibility completes to pick up review flag changes
-        // (on_hold contacts may have needs_review set without status changes)
-        // Preserve current filters/search state when refreshing
-        if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
-          await performColumnFiltersSearch(activeColumnFilters, currentPage)
-        } else if (isSearchActive && searchTerm.trim().length >= 3) {
-          await performFullTextSearch(searchTerm.trim(), currentPage)
-        } else {
-          await fetchContacts(currentPage)
+        // Refresh the list if there were changes
+        if (statusChanges > 0) {
+          if (isSearchActive && searchTerm.trim().length >= 3) {
+            await performFullTextSearch(searchTerm.trim(), currentPage)
+          } else {
+            await fetchContacts(currentPage)
+          }
         }
       } else {
         // Job failed
@@ -1586,13 +1542,10 @@ function App() {
       })
     } finally {
       setIsRunningEligibilityAll(false)
-      // Refresh the last successful runs timestamps and last job status
+      // Refresh the last successful runs timestamps
       getLastSuccessfulRuns()
         .then(setLastSuccessfulRuns)
         .catch((err) => console.error('Failed to refresh last successful runs:', err))
-      getLastEligibilityJob()
-        .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
-        .catch((err) => console.error('Failed to refresh last eligibility job:', err))
     }
   }
 
@@ -1862,35 +1815,6 @@ function App() {
     }
   }
 
-  // Handle clearing the review flag for a contact
-  const handleClearReviewFlag = async (contactId: number, e: React.MouseEvent) => {
-    e.stopPropagation() // Prevent row click
-
-    try {
-      await clearReviewFlag(contactId)
-
-      setSnackbar({
-        open: true,
-        message: 'Review flag cleared successfully',
-        severity: 'success',
-      })
-
-      // Refresh the contacts list to reflect the change
-      if (isSearchActive && searchTerm.trim().length >= 3) {
-        await performFullTextSearch(searchTerm.trim(), currentPage)
-      } else {
-        await fetchContacts(currentPage)
-      }
-    } catch (error) {
-      console.error('Failed to clear review flag:', error)
-      setSnackbar({
-        open: true,
-        message: 'Failed to clear review flag. Please try again.',
-        severity: 'error',
-      })
-    }
-  }
-
   // Handle batch history row click
   const handleBatchHistoryRowClick = (batchHistoryId: number) => {
     setSelectedBatchHistoryId(batchHistoryId)
@@ -2002,21 +1926,18 @@ function App() {
         })
         .filter((id): id is number => id !== undefined)
 
-      const result = await removeContactsFromBatch(contactIds)
+      // Remove each selected contact from the batch
+      const removePromises = contactIds.map((contactId) => removeContactFromBatch(contactId))
 
-      const updatedRecordCount = result.batch?.recordCount ?? 0
-      const removedCount = result.success.length
-      const skippedCount = result.skipped.length
+      const results = await Promise.all(removePromises)
 
-      const message =
-        skippedCount > 0
-          ? `Removed ${removedCount} contact${removedCount !== 1 ? 's' : ''} from batch (${skippedCount} skipped). Record count: ${updatedRecordCount}`
-          : `Successfully removed ${removedCount} contact${removedCount !== 1 ? 's' : ''} from batch. Record count: ${updatedRecordCount}`
+      // Get the updated record count from the first result
+      const updatedRecordCount = results[0]?.recordCount ?? 0
 
       setSnackbar({
         open: true,
-        message,
-        severity: skippedCount > 0 ? 'warning' : 'success',
+        message: `Successfully removed ${selectedBatchDetails.length} contact${selectedBatchDetails.length > 1 ? 's' : ''} from batch. New record count: ${updatedRecordCount}`,
+        severity: 'success',
       })
 
       // Refresh the eligibility list to reflect updated CSA status
@@ -2140,7 +2061,7 @@ function App() {
       batchRequestStatus: item.batch.statusLabel || item.batch.status || '',
       transactionType: capitalize(item.transactionType) || '',
       batchDetailStatus: item.statusLabel || item.status || '',
-      systemComments: getMostRecentComment(item.batch.systemComments),
+      systemComments: item.systemComments || '',
     }))
     const values = transformedData.map((row) => row[column as keyof typeof row])
     return Array.from(new Set(values)).filter((v) => v !== undefined && v !== '')
@@ -2194,7 +2115,7 @@ function App() {
         case 'createdDate':
           return formatDateTimeYMD(batch.createdAt)
         case 'systemComments':
-          return getMostRecentComment(batch.systemComments)
+          return batch.systemComments || ''
         default:
           return ''
       }
@@ -2344,7 +2265,6 @@ function App() {
       cgwrks3: contact.holdBy || '',
       lastUpdated: contact.lastUpdatedAt ? formatDateTimeYMDHMS(contact.lastUpdatedAt) : '',
       lastUpdatedBy: contact.lastUpdatedBy || '',
-      needsReview: contact.needsReview || false,
     }))
 
     return data
@@ -2444,7 +2364,7 @@ function App() {
       transactionType: capitalize(item.transactionType) || '',
       effectiveDate: item.effectiveDate ? formatDateYMD(item.effectiveDate) : '',
       batchDetailStatus: item.statusLabel || item.status || '',
-      systemComments: getMostRecentComment(item.batch.systemComments),
+      systemComments: item.systemComments || '',
     }))
 
     // Apply global search across all columns
@@ -2528,7 +2448,7 @@ function App() {
       recordCount: batch.recordCount,
       initiatedBy: batch.initiatedBy || '',
       createdDate: formatDateTimeYMD(batch.createdAt),
-      systemComments: getMostRecentComment(batch.systemComments),
+      systemComments: batch.systemComments || '',
     }))
 
     // Apply global search across all columns
@@ -2603,7 +2523,7 @@ function App() {
           ? `${detail.cancelReasonCode} - ${detail.cancelReasonLabel}`
           : detail.cancelReasonCode || '',
       status: detail.statusLabel || detail.status || '',
-      systemComments: getMostRecentComment(detail.systemComments),
+      systemComments: detail.systemComments || '',
       addedBy: detail.createdBy || '',
     }))
   }, [batchDetails])
@@ -2998,24 +2918,9 @@ function App() {
                       <MenuItem
                         onClick={handleRunEligibilityForAllClick}
                         disabled={isRunningEligibilityAll}
-                        sx={{
-                          fontSize: '0.85rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.5,
-                        }}
+                        sx={{ fontSize: '0.85rem' }}
                       >
                         Run query on all contacts
-                        {lastEligibilityJobStatus === 'SUCCESS' && (
-                          <CheckCircleOutlineIcon
-                            sx={{ fontSize: '1rem', color: 'success.main', ml: 0.5 }}
-                          />
-                        )}
-                        {lastEligibilityJobStatus === 'FAILED' && (
-                          <ErrorOutlineIcon
-                            sx={{ fontSize: '1rem', color: 'error.main', ml: 0.5 }}
-                          />
-                        )}
                       </MenuItem>
                       {selected.length === 1 && (
                         <MenuItem
@@ -3464,30 +3369,6 @@ function App() {
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
-                              onClick={(e) => handleSortClick(e, 'needsReview')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Review
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'needsReview')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['needsReview'] ||
-                                  columnFilters.needsReview?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
                               onClick={(e) => handleSortClick(e, 'lastUpdated')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
@@ -3581,25 +3462,6 @@ function App() {
                           <TableCell>{row.caseStatus}</TableCell>
                           <TableCell>{row.legacyFile}</TableCell>
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
-                          <TableCell align="center">
-                            {row.needsReview && (
-                              <Tooltip title="Click to clear review flag">
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => handleClearReviewFlag(row.id, e)}
-                                  sx={{
-                                    padding: 0.5,
-                                    color: '#ff9800',
-                                    '&:hover': {
-                                      backgroundColor: '#fff3e0',
-                                    },
-                                  }}
-                                >
-                                  <WarningAmberIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            )}
-                          </TableCell>
                           <TableCell>{row.lastUpdated}</TableCell>
                           <TableCell>{row.lastUpdatedBy}</TableCell>
                         </TableRow>
@@ -3780,37 +3642,6 @@ function App() {
                                 py: 0.75,
                                 backgroundColor:
                                   activeColumnFilters['caseStatus'] === option.value
-                                    ? 'rgba(25, 118, 210, 0.08)'
-                                    : 'transparent',
-                              }}
-                            >
-                              {option.label}
-                            </MenuItem>
-                          ))}
-                        </Box>
-                      </>
-                    ) : filterAnchor.column === 'needsReview' ? (
-                      <>
-                        <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
-                          {REVIEW_FILTER_OPTIONS.map((option) => (
-                            <MenuItem
-                              key={option.value}
-                              onClick={() => {
-                                const newFilters = {
-                                  ...activeColumnFilters,
-                                  needsReview: option.value,
-                                }
-                                setActiveColumnFilters(newFilters)
-                                performColumnFiltersSearch(newFilters, 1)
-                                setCurrentPage(1)
-                                setIsColumnFilterActive(true)
-                                handleFilterClose()
-                              }}
-                              sx={{
-                                fontSize: '0.875rem',
-                                py: 0.75,
-                                backgroundColor:
-                                  activeColumnFilters['needsReview'] === option.value
                                     ? 'rgba(25, 118, 210, 0.08)'
                                     : 'transparent',
                               }}

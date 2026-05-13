@@ -15,8 +15,7 @@ vi.mock('src/common/logger/logger.config', () => ({
   customLogger: false,
 }))
 
-// Skipped: ValidationPipe requires class-transformer which isn't available in unit test environment
-describe.skip('main', () => {
+describe('main', () => {
   let app: NestExpressApplication
 
   beforeAll(async () => {

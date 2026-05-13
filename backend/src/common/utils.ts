@@ -145,15 +145,6 @@ export function parseWklDate(dateStr: string): Date | undefined {
   return new Date(`${y}-${m}-${d}`)
 }
 
-export function parseEffectiveDate(date: Date | string | null): string {
-  if (!date) return ''
-  const dateValue = typeof date === 'string' ? new Date(date) : date
-  const year = dateValue.getUTCFullYear()
-  const month = String(dateValue.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(dateValue.getUTCDate()).padStart(2, '0')
-  return `${year}${month}${day}`
-}
-
 export function pacificToday(): Date {
   const isoDate = DateTime.now().setZone(PACIFIC_ZONE).toISODate()!
   return new Date(isoDate)

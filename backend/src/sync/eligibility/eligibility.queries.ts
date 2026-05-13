@@ -1,5 +1,4 @@
 import { CSA_STATUS_LABELS } from 'src/common/state-machine/constants/csa-status.constants'
-import { PROTECTED_STATUSES_SQL } from './eligibility.config'
 
 const ICM_STATUS_CASE = `CASE UPPER(TRIM(cases.X_CSA_PAY_STATUS))\n${Object.entries(
   CSA_STATUS_LABELS,
@@ -9,53 +8,53 @@ const ICM_STATUS_CASE = `CASE UPPER(TRIM(cases.X_CSA_PAY_STATUS))\n${Object.entr
 
 const CHANGED_CONTACTS_CTE = `
     changed_contacts AS (
-      -- ICM: cases with recent ingested_at
+      -- ICM: cases with recent data changes
       SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
-      WHERE cases.ingested_at >= $1
+      WHERE cases.data_changed_at >= $1
 
       UNION
 
-      -- ICM: placements with recent ingested_at
+      -- ICM: placements with recent data changes
       SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
-      WHERE icm_plc.ingested_at >= $1
+      WHERE icm_plc.data_changed_at >= $1
 
       UNION
 
-      -- ICM: legal authority with recent ingested_at (joins on CONTACT_ROW_ID)
+      -- ICM: legal authority with recent data changes (joins on CONTACT_ROW_ID)
       SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
-      WHERE legal_auth.ingested_at >= $1
+      WHERE legal_auth.data_changed_at >= $1
 
       UNION
 
-      -- ICM: legal authority admin with recent ingested_at (via legal authority on CONTACT_ROW_ID)
+      -- ICM: legal authority admin with recent data changes (via legal authority on CONTACT_ROW_ID)
       SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
       INNER JOIN stg_icm_legal_authority_admin legal_admin ON legal_admin.LGL_AUTH_CD = COALESCE(legal_auth.EFF_LGL_STATUS, legal_auth.LGL_AUTH_CD)
-      WHERE legal_admin.ingested_at >= $1
+      WHERE legal_admin.data_changed_at >= $1
 
       UNION
 
-      -- ICM: orders with recent ingested_at
+      -- ICM: orders with recent data changes
       SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
       INNER JOIN stg_icm_orders icm_ord ON icm_ord.AGREEMENT_ROW_ID = icm_plc.AGREEMENT_ROW_ID
-      WHERE icm_ord.ingested_at >= $1
+      WHERE icm_ord.data_changed_at >= $1
 
       UNION
 
-      -- ICM: agreements with recent ingested_at
+      -- ICM: agreements with recent data changes
       SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
       INNER JOIN stg_icm_agreement icm_agr ON icm_agr.ROW_ID = icm_plc.AGREEMENT_ROW_ID
-      WHERE icm_agr.ingested_at >= $1
+      WHERE icm_agr.data_changed_at >= $1
 
       UNION
 
@@ -99,13 +98,10 @@ const CHANGED_CONTACTS_CTE = `
  *
  * When threshold is null (full load), no filtering is applied.
  *
- * Deduplication (BL-24): A person (X_CONTACT_NUM) may have multiple case rows in
+ * Deduplication: A person (X_CONTACT_NUM) may have multiple case rows in
  * stg_icm_cases (different CONTACT_ROW_IDs). Aggregation CTEs group by X_CONTACT_NUM
  * so arrays combine data across all cases. DISTINCT ON in the final SELECT
- * picks the most relevant case row per person for scalar fields, prioritising:
- *   1. Open status
- *   2. Admin Re-open status
- *   3. Most recently updated (closed) case
+ * picks one case row per person for scalar fields.
  *
  * Join topology (matches ICM/MIS data model):
  *  ICM: Cases -[CaseId]-> N Placements -[AgreementID]-> 1 Agreement -[AgreementID]-> N Orders
@@ -390,6 +386,7 @@ export function buildLoadContactProfilesSql(
     legal_auth.EXPIRY_DT         AS "legalExpiryDate",
     legal_auth.START_DT          AS "effectiveDate",
     master_contacts.id               AS "existingContactId",
+    master_contacts.last_updated_by   AS "lastUpdatedBy",
     COALESCE(master_contacts.csa_status, ${ICM_STATUS_CASE}) AS "csaStatus",
     COALESCE(master_contacts.csa_status_effective_date, (cases.X_CSA_EFF_DATE::timestamp AT TIME ZONE 'America/Vancouver')) AS "csaStatusEffectiveDate",
     cases.PERSON_ID_MIS              AS "personIdMis",
@@ -419,13 +416,7 @@ export function buildLoadContactProfilesSql(
   LEFT JOIN mis_payments_agg mis_pay ON mis_pay.X_CONTACT_NUM = cases.X_CONTACT_NUM
   LEFT JOIN mis_contracts_agg mis_con ON mis_con.X_CONTACT_NUM = cases.X_CONTACT_NUM
   LEFT JOIN mis_placements_agg mis_plc ON mis_plc.X_CONTACT_NUM = cases.X_CONTACT_NUM
-  ORDER BY cases.X_CONTACT_NUM,
-    CASE UPPER(TRIM(cases.STATUS_CD))
-      WHEN 'OPEN' THEN 1
-      WHEN 'ADMIN RE-OPEN' THEN 2
-      ELSE 3
-    END,
-    cases.LAST_UPD::TIMESTAMP DESC NULLS LAST
+  ORDER BY cases.X_CONTACT_NUM
 `
 
   let params: unknown[]
@@ -449,7 +440,7 @@ export function buildFindAgedOutContactIdsSql(cutoffDate: Date): {
   const sql = `
     SELECT person_id_icm
     FROM csa.contacts
-    WHERE csa_status NOT IN (${PROTECTED_STATUSES_SQL})
+    WHERE csa_status IN ('eligible', 'in_pay', 'not_eligible_out_of_pay')
       AND date_of_birth IS NOT NULL
       AND date_of_birth < $1::DATE
   `

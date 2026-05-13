@@ -73,8 +73,6 @@ export interface Contact {
   isOver18?: boolean
   // Hold fields
   holdBy?: string
-  // Review flag for On Hold records with staging data changes
-  needsReview?: boolean
 }
 
 export interface PaginatedContactsResponse {
@@ -219,7 +217,6 @@ export interface ContactBatchDetail {
     batchDate: string
     status: string
     statusLabel: string
-    systemComments: string | null
   }
 }
 
@@ -322,19 +319,6 @@ export const removeContactFromBatch = async (
 }
 
 /**
- * Remove multiple contacts from pending batch
- * @param contactIds - Array of contact IDs to remove
- */
-export const removeContactsFromBatch = async (
-  contactIds: number[],
-): Promise<BulkOperationResponse & { batch: { recordCount: number } }> => {
-  const response = await APIService.getAxiosInstance().post('/batches/pending/contacts/remove', {
-    contactIds,
-  })
-  return response.data
-}
-
-/**
  * Update eligibility status for multiple contacts
  * @param contactIds - Array of contact IDs to update
  * @param action - Action to perform (e.g., 'ELIGIBLE')
@@ -404,15 +388,6 @@ export const updateOver18Status = async (
     contactIds,
     action,
   })
-  return response.data
-}
-
-/**
- * Clear the review flag for a contact
- * @param contactId - Contact ID to clear review flag for
- */
-export const clearReviewFlag = async (contactId: number): Promise<{ success: boolean }> => {
-  const response = await APIService.getAxiosInstance().patch(`/contacts/${contactId}/review-flag`)
   return response.data
 }
 
@@ -571,20 +546,6 @@ export const getRunningEligibilityJob = async (): Promise<JobRun | null> => {
     params: {
       jobType: 'RUN_ELIGIBILITY',
       status: 'RUNNING',
-      limit: 1,
-    },
-  })
-  return response.data.data.length > 0 ? response.data.data[0] : null
-}
-
-/**
- * Get the most recent eligibility job run (regardless of status)
- * Returns the most recent job if found, null otherwise
- */
-export const getLastEligibilityJob = async (): Promise<JobRun | null> => {
-  const response = await APIService.getAxiosInstance().get<JobsResponse>('/jobs', {
-    params: {
-      jobType: 'RUN_ELIGIBILITY',
       limit: 1,
     },
   })

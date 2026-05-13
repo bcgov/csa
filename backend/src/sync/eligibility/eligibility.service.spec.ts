@@ -557,6 +557,17 @@ describe('buildLoadContactProfilesSql', () => {
     expect(sql).not.toMatch(/LEFT JOIN.*CASE_ROW_ID = cases\.ROW_ID/)
   })
 
+  it('should prioritise Open > Admin Re-open > most recently updated case for multi-case children (BL-24)', () => {
+    const { sql } = buildLoadContactProfilesSql(null)
+
+    // ORDER BY must include case status priority after X_CONTACT_NUM
+    expect(sql).toContain("WHEN 'OPEN' THEN 1")
+    expect(sql).toContain("WHEN 'ADMIN RE-OPEN' THEN 2")
+
+    // Must tiebreak closed cases by LAST_UPD descending (cast to TIMESTAMP for correct ordering)
+    expect(sql).toContain('cases.LAST_UPD::TIMESTAMP DESC NULLS LAST')
+  })
+
   it('should join legal authority on CONTACT_ROW_ID (PersonIcmId), not ROW_ID (CaseId)', () => {
     const { sql } = buildLoadContactProfilesSql(null)
 

@@ -58,6 +58,12 @@ export const CRA_DATA_HANDLING_CONSTANT = {
       IN_PROGRESS: 'in-progress',
       UPDATED: 'updated',
     },
+    TRANSACTION_TYPE_MAP: {
+      A: 'application',
+      C: 'cancellation',
+      U: 'update',
+    } as const,
+    TRANSACTION_TYPES: ['application', 'cancellation', 'update'] as const,
   },
   // CRA spec: fileStatCd is 9(02). 2-digit zero-padded string
   FILE_STAT_CODE: {

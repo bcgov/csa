@@ -411,13 +411,13 @@ describe('SendCraFileHandler', () => {
         1,
         CSA_EVENT.SEND_TO_CRA,
         'SYSTEM',
-        { additionalData: { csaSentDate: expect.any(Date) } },
+        { additionalData: { csaSentDate: expect.any(Date) }, origin: 'SendCraFileHandler' },
       )
       expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
         2,
         CSA_EVENT.SEND_TO_CRA,
         'SYSTEM',
-        { additionalData: { csaSentDate: expect.any(Date) } },
+        { additionalData: { csaSentDate: expect.any(Date) }, origin: 'SendCraFileHandler' },
       )
     })
 

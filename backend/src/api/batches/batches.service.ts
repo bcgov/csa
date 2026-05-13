@@ -17,6 +17,7 @@ import {
   CANCEL_REASON,
   getCancelReasonLabel,
 } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
+import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
 import { ContactsService } from '../contacts/contacts.service'
 import { BulkOperationResponse } from '../contacts/interfaces'
@@ -24,6 +25,23 @@ import { BulkOperationResponse } from '../contacts/interfaces'
 const { WEEKLY_FILE, BATCH_INITIATED_BY, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
 export interface AddContactsResult extends BulkOperationResponse {
+  batch: {
+    id: number
+    batchDate: Date | null
+    status: string
+    recordCount: number
+    createdAt: Date
+    systemComments: string | null
+  }
+}
+
+class TransitionSkipError extends Error {
+  constructor(public readonly reason: string) {
+    super(reason)
+  }
+}
+
+export interface BatchOperationResult extends BulkOperationResponse {
   batch: {
     id: number
     batchDate: Date | null
@@ -46,7 +64,16 @@ export class BatchesService {
     private prisma: PrismaService,
     private stateMachine: StateMachineService,
     private contactsService: ContactsService,
+    private icmSyncBackService: IcmSyncBackService,
   ) {}
+
+  private fireAndForgetSync(contactId: number): void {
+    this.icmSyncBackService.syncSingleContact(contactId).catch((err) => {
+      this.logger.warn(
+        `Immediate ICM sync failed for contact ${contactId}: ${(err as Error).message}`,
+      )
+    })
+  }
 
   async findAll() {
     const batches = await this.prisma.batch.findMany({
@@ -339,6 +366,8 @@ export class BatchesService {
           })
         })
         result.success.push(contactId)
+
+        this.fireAndForgetSync(contactId)
       } catch (error) {
         this.logger.error(
           `Failed to add contact ${contactId} to batch: ${(error as Error).message}`,
@@ -498,19 +527,95 @@ export class BatchesService {
       )
     }
 
-    await this.prisma.$transaction([
-      this.prisma.contactBatchDetail.delete({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.contactBatchDetail.delete({
         where: { id: detail.id },
-      }),
-      this.prisma.batch.update({
+      })
+      const actualCount = await tx.contactBatchDetail.count({
+        where: { batchId: pendingBatch.id },
+      })
+      await tx.batch.update({
         where: { id: pendingBatch.id },
-        data: {
-          recordCount: {
-            decrement: 1,
-          },
-        },
+        data: { recordCount: actualCount },
+      })
+    })
+
+    this.fireAndForgetSync(contactId)
+  }
+
+  async removeContactsFromPendingBatch(
+    contactIds: number[],
+    userId: string,
+  ): Promise<BatchOperationResult> {
+    const pendingBatch = await this.prisma.batch.findFirst({
+      where: { status: BATCH_STATUS.PENDING },
+    })
+
+    if (!pendingBatch) {
+      throw new NotFoundException('No pending batch exists')
+    }
+
+    const result: BatchOperationResult = {
+      batch: enrichLabels(pendingBatch),
+      success: [],
+      skipped: [],
+    }
+
+    for (const contactId of contactIds) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const detail = await tx.contactBatchDetail.findFirst({
+            where: {
+              batchId: pendingBatch.id,
+              contactId,
+            },
+          })
+
+          if (!detail) {
+            throw new TransitionSkipError(BULK_OPERATION_SKIP_REASONS.NOT_FOUND)
+          }
+
+          const transition = await this.contactsService.updateCsaStatus(
+            contactId,
+            CSA_EVENT.REMOVE_FROM_BATCH,
+            'USER',
+            { userId, tx, origin: 'BatchesService.removeContactsFromPendingBatch' },
+          )
+
+          if (!transition.success) {
+            throw new TransitionSkipError(BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION)
+          }
+
+          await tx.contactBatchDetail.delete({
+            where: { id: detail.id },
+          })
+        })
+        result.success.push(contactId)
+
+        this.fireAndForgetSync(contactId)
+      } catch (error) {
+        if (error instanceof TransitionSkipError) {
+          result.skipped.push({ id: contactId, reason: error.reason })
+        } else {
+          this.logger.error(
+            `Failed to remove contact ${contactId} from batch: ${(error as Error).message}`,
+          )
+          result.skipped.push({ id: contactId, reason: 'error' })
+        }
+      }
+    }
+
+    const actualCount = await this.prisma.contactBatchDetail.count({
+      where: { batchId: pendingBatch.id },
+    })
+    result.batch = enrichLabels(
+      await this.prisma.batch.update({
+        where: { id: pendingBatch.id },
+        data: { recordCount: actualCount },
       }),
-    ])
+    )
+
+    return result
   }
 
   async createBatchDetailsForWklUnmatchedRecords(

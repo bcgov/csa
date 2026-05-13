@@ -779,7 +779,8 @@ describe('ContactsService', () => {
 
       expect(result.success).toEqual([1, 2])
       expect(result.skipped).toEqual([])
-      expect(updateSpy).toHaveBeenCalledTimes(2)
+      // 2 calls per contact: 1 for status transition + 1 for clearing needsReview flag
+      expect(updateSpy).toHaveBeenCalledTimes(4)
     })
 
     it('should skip not found contacts', async () => {

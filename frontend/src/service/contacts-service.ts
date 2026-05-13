@@ -73,6 +73,8 @@ export interface Contact {
   isOver18?: boolean
   // Hold fields
   holdBy?: string
+  // Review flag for On Hold records with staging data changes
+  needsReview?: boolean
 }
 
 export interface PaginatedContactsResponse {
@@ -402,6 +404,15 @@ export const updateOver18Status = async (
     contactIds,
     action,
   })
+  return response.data
+}
+
+/**
+ * Clear the review flag for a contact
+ * @param contactId - Contact ID to clear review flag for
+ */
+export const clearReviewFlag = async (contactId: number): Promise<{ success: boolean }> => {
+  const response = await APIService.getAxiosInstance().patch(`/contacts/${contactId}/review-flag`)
   return response.data
 }
 

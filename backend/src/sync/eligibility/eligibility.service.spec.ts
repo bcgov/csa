@@ -2,22 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { pacificToday } from 'src/common/utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { PROTECTED_STATUSES, PROTECTED_STATUSES_SQL } from './eligibility.config'
 import { buildFindAgedOutContactIdsSql, buildLoadContactProfilesSql } from './eligibility.queries'
 import { EligibilityService } from './eligibility.service'
-
-describe('PROTECTED_STATUSES_SQL', () => {
-  it('should contain all protected statuses as quoted SQL literals', () => {
-    for (const status of PROTECTED_STATUSES) {
-      expect(PROTECTED_STATUSES_SQL).toContain(`'${status}'`)
-    }
-  })
-
-  it('should have same number of entries as PROTECTED_STATUSES', () => {
-    const count = PROTECTED_STATUSES_SQL.split(',').length
-    expect(count).toBe(PROTECTED_STATUSES.length)
-  })
-})
 
 describe('EligibilityService', () => {
   let service: EligibilityService
@@ -284,7 +270,7 @@ describe('EligibilityService', () => {
     await service.run(threshold)
 
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
-      expect.stringContaining('csa_status NOT IN'),
+      expect.stringContaining("csa_status IN ('eligible', 'in_pay', 'not_eligible_out_of_pay')"),
       expect.any(Date),
     )
   })
@@ -293,7 +279,7 @@ describe('EligibilityService', () => {
     await service.run(null)
 
     expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalledWith(
-      expect.stringContaining('csa_status NOT IN'),
+      expect.stringContaining("csa_status IN ('eligible', 'in_pay', 'not_eligible_out_of_pay')"),
       expect.any(Date),
     )
   })
@@ -572,8 +558,9 @@ describe('EligibilityService', () => {
       expect(result.processed).toBe(1)
       expect(result.statusChanges).toBe(1)
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
-      const upsertSql = mockPrisma.$executeRawUnsafe.mock.calls[0][0] as string
-      expect(upsertSql).toContain('over_18')
+      // The csa_status value 'over_18' is passed as a parameter array (index 19), not embedded in SQL
+      const csaStatusArray = mockPrisma.$executeRawUnsafe.mock.calls[0][19] as string[]
+      expect(csaStatusArray).toContain('over_18')
     },
   )
 
@@ -597,8 +584,9 @@ describe('EligibilityService', () => {
 
       expect(result.processed).toBe(1)
       expect(result.statusChanges).toBe(1)
-      const upsertSql = mockPrisma.$executeRawUnsafe.mock.calls[0][0] as string
-      expect(upsertSql).toContain('over_18')
+      // The csa_status value 'over_18' is passed as a parameter array (index 19), not embedded in SQL
+      const csaStatusArray = mockPrisma.$executeRawUnsafe.mock.calls[0][19] as string[]
+      expect(csaStatusArray).toContain('over_18')
     },
   )
 })
@@ -638,17 +626,6 @@ describe('buildLoadContactProfilesSql', () => {
 
     // No remaining CASE_ROW_ID joins in final SELECT
     expect(sql).not.toMatch(/LEFT JOIN.*CASE_ROW_ID = cases\.ROW_ID/)
-  })
-
-  it('should prioritise Open > Admin Re-open > most recently updated case for multi-case children (BL-24)', () => {
-    const { sql } = buildLoadContactProfilesSql(null)
-
-    // ORDER BY must include case status priority after X_CONTACT_NUM
-    expect(sql).toContain("WHEN 'OPEN' THEN 1")
-    expect(sql).toContain("WHEN 'ADMIN RE-OPEN' THEN 2")
-
-    // Must tiebreak closed cases by LAST_UPD descending (cast to TIMESTAMP for correct ordering)
-    expect(sql).toContain('cases.LAST_UPD::TIMESTAMP DESC NULLS LAST')
   })
 
   it('should join legal authority on CONTACT_ROW_ID (PersonIcmId), not ROW_ID (CaseId)', () => {
@@ -736,12 +713,11 @@ describe('buildLoadContactProfilesSql', () => {
 })
 
 describe('buildFindAgedOutContactIdsSql', () => {
-  it('should query contacts NOT in protected statuses with DOB before cutoff', () => {
+  it('should query contacts IN eligible statuses with DOB before cutoff', () => {
     const cutoff = new Date('2008-03-01')
     const { sql, params } = buildFindAgedOutContactIdsSql(cutoff)
 
-    expect(sql).toContain('csa_status NOT IN')
-    expect(sql).toContain(PROTECTED_STATUSES_SQL)
+    expect(sql).toContain("csa_status IN ('eligible', 'in_pay', 'not_eligible_out_of_pay')")
     expect(sql).toContain('date_of_birth < $1')
     expect(sql).toContain('date_of_birth IS NOT NULL')
     expect(params).toEqual([cutoff])

@@ -21,6 +21,7 @@ import type { DetailRecord04, HeaderRecord } from '../inbound/inbound-weekly.int
 import { WeeklyContactMatcherService } from '../inbound/weekly-contact-matcher.service'
 import { CraTransferService } from '../transfer/cra-transfer.service'
 import { parseEffectiveDate } from 'src/common/utils'
+import { parseWklDate } from 'src/common/utils'
 const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
 const { STATUS: WKL_STATUS, RECEIVE_MODE, TRANSACTION_TYPE_MAP, TRANSACTION_TYPES } = WEEKLY_FILE
 
@@ -363,8 +364,18 @@ export class PollCraResponseHandler extends BaseJob {
     const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
 
     const din = detail.childDin?.trim()
-    const effectiveDate = parseEffectiveDate(new Date())
-    const additionalData = { effectiveDate, ...(din ? { din } : {}) }
+    const careDate =
+      wklType === 'cancellation'
+        ? parseWklDate(detail.careEndDate)
+        : parseWklDate(detail.careStartDate)
+    const additionalData: Record<string, unknown> = {
+      ...(careDate
+        ? wklType === 'cancellation'
+          ? { careEndDate: careDate }
+          : { effectiveDate: careDate }
+        : {}),
+      ...(din ? { din } : {}),
+    }
 
     if (isApproved) {
       await this.batchesService.updateBatchDetailStatus(
@@ -433,7 +444,18 @@ export class PollCraResponseHandler extends BaseJob {
       detail.status?.toLowerCase() === WKL_STATUS.UPDATED
     const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
     const din = detail.childDin?.trim()
-    const additionalData = din ? { din } : undefined
+    const careDate =
+      wklType === 'cancellation'
+        ? parseWklDate(detail.careEndDate)
+        : parseWklDate(detail.careStartDate)
+    const additionalData: Record<string, unknown> = {
+      ...(careDate
+        ? wklType === 'cancellation'
+          ? { careEndDate: careDate }
+          : { effectiveDate: careDate }
+        : {}),
+      ...(din ? { din } : {}),
+    }
 
     if (isApproved) {
       const nextState =

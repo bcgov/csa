@@ -98,10 +98,13 @@ const CHANGED_CONTACTS_CTE = `
  *
  * When threshold is null (full load), no filtering is applied.
  *
- * Deduplication: A person (X_CONTACT_NUM) may have multiple case rows in
+ * Deduplication (BL-24): A person (X_CONTACT_NUM) may have multiple case rows in
  * stg_icm_cases (different CONTACT_ROW_IDs). Aggregation CTEs group by X_CONTACT_NUM
  * so arrays combine data across all cases. DISTINCT ON in the final SELECT
- * picks one case row per person for scalar fields.
+ * picks the most relevant case row per person for scalar fields, prioritising:
+ *   1. Open status
+ *   2. Admin Re-open status
+ *   3. Most recently updated (closed) case
  *
  * Join topology (matches ICM/MIS data model):
  *  ICM: Cases -[CaseId]-> N Placements -[AgreementID]-> 1 Agreement -[AgreementID]-> N Orders
@@ -415,7 +418,13 @@ export function buildLoadContactProfilesSql(
   LEFT JOIN mis_payments_agg mis_pay ON mis_pay.X_CONTACT_NUM = cases.X_CONTACT_NUM
   LEFT JOIN mis_contracts_agg mis_con ON mis_con.X_CONTACT_NUM = cases.X_CONTACT_NUM
   LEFT JOIN mis_placements_agg mis_plc ON mis_plc.X_CONTACT_NUM = cases.X_CONTACT_NUM
-  ORDER BY cases.X_CONTACT_NUM
+  ORDER BY cases.X_CONTACT_NUM,
+    CASE UPPER(TRIM(cases.STATUS_CD))
+      WHEN 'OPEN' THEN 1
+      WHEN 'ADMIN RE-OPEN' THEN 2
+      ELSE 3
+    END,
+    cases.LAST_UPD::TIMESTAMP DESC NULLS LAST
 `
 
   let params: unknown[]

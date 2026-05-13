@@ -89,6 +89,7 @@ describe('EligibilityService', () => {
         effectiveLegalStatus: 'Active',
         legalExpiryDate: null,
         existingContactId: null,
+        lastUpdatedBy: null,
         csaStatus: null,
         personIdMis: 'MIS-1',
         isIneligible: false,
@@ -136,6 +137,7 @@ describe('EligibilityService', () => {
       effectiveLegalStatus: null,
       legalExpiryDate: null,
       existingContactId: null,
+      lastUpdatedBy: null,
       csaStatus: 'eligible',
       personIdMis: 'MIS-1',
       isIneligible: false,
@@ -327,6 +329,7 @@ describe('EligibilityService', () => {
       effectiveLegalStatus: 'Active',
       legalExpiryDate: null,
       existingContactId: null,
+      lastUpdatedBy: null,
       csaStatus: null,
       personIdMis: 'MIS-E',
       isIneligible: false,
@@ -399,6 +402,7 @@ describe('EligibilityService', () => {
       effectiveLegalStatus: null,
       legalExpiryDate: null,
       existingContactId: 50,
+      lastUpdatedBy: null,
       csaStatus: 'in_pay',
       personIdMis: 'MIS-C',
       isIneligible: false,
@@ -463,9 +467,88 @@ describe('EligibilityService', () => {
     expect(result.skipped).toBe(1)
     expect(result.statusChanges).toBe(0)
   })
+
+  it('should preserve user-set status when last_updated_by is not SYSTEM', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+      makeEligibleContact({
+        csaStatus: 'not_eligible_out_of_pay',
+        existingContactId: 99,
+        lastUpdatedBy: 'john.doe',
+      }),
+    ])
+
+    const result = await service.run(null)
+
+    expect(result.processed).toBe(1)
+    expect(result.statusChanges).toBe(0)
+    expect(result.userSetPreserved).toBe(1)
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1) // still upserts data
+  })
+
+  it('should overwrite status when last_updated_by is SYSTEM', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+      makeEligibleContact({
+        csaStatus: 'not_eligible_out_of_pay',
+        existingContactId: 99,
+        lastUpdatedBy: 'SYSTEM',
+      }),
+    ])
+
+    const result = await service.run(null)
+
+    expect(result.processed).toBe(1)
+    expect(result.statusChanges).toBe(1)
+  })
+
+  it('should overwrite status when last_updated_by is null (new contact)', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeEligibleContact({ lastUpdatedBy: null })])
+
+    const result = await service.run(null)
+
+    expect(result.processed).toBe(1)
+    expect(result.statusChanges).toBe(1)
+  })
+
+  it('should apply PROTECTED_STATUSES before user-set check', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+      makeOver18Contact({
+        csaStatus: 'on_hold',
+        existingContactId: 99,
+        lastUpdatedBy: 'SYSTEM',
+      }),
+    ])
+
+    const result = await service.run(null)
+
+    expect(result.processed).toBe(1)
+    expect(result.statusChanges).toBe(0)
+    // on_hold is protected regardless of last_updated_by
+  })
+
+  it('should bypass user-set protection in runForContact (escape hatch)', async () => {
+    mockPrisma.$queryRawUnsafe.mockReset().mockResolvedValueOnce([
+      makeEligibleContact({
+        csaStatus: 'not_eligible_out_of_pay',
+        existingContactId: 99,
+        lastUpdatedBy: 'jane.doe',
+      }),
+    ])
+
+    const result = await service.runForContact('ICM-ELIG')
+
+    expect(result.previousStatus).toBe('not_eligible_out_of_pay')
+    // runForContact re-evaluates eligibility regardless of who set the status
+    expect(result.newStatus).toBe('eligible')
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('buildLoadContactProfilesSql', () => {
+  it('should include last_updated_by in profile query', () => {
+    const { sql } = buildLoadContactProfilesSql(null)
+    expect(sql).toContain('last_updated_by')
+  })
+
   it('should include changed_contacts CTE when threshold provided', () => {
     const { sql, params } = buildLoadContactProfilesSql(new Date('2026-02-12'))
     expect(sql).toContain('changed_contacts')
@@ -555,6 +638,22 @@ describe('buildLoadContactProfilesSql', () => {
     expect(sql).not.toContain('ANY($2::TEXT[])')
     expect(sql).toContain('changed_contacts')
     expect(params).toEqual([new Date('2026-02-12')])
+  })
+
+  it('should use data_changed_at instead of ingested_at in changed_contacts CTE', () => {
+    const { sql } = buildLoadContactProfilesSql(new Date('2026-02-12'))
+    // ICM branches should use data_changed_at
+    expect(sql).toContain('cases.data_changed_at >= $1')
+    expect(sql).toContain('icm_plc.data_changed_at >= $1')
+    expect(sql).toContain('legal_auth.data_changed_at >= $1')
+    expect(sql).toContain('legal_admin.data_changed_at >= $1')
+    expect(sql).toContain('icm_ord.data_changed_at >= $1')
+    expect(sql).toContain('icm_agr.data_changed_at >= $1')
+    // Should NOT use ingested_at for ICM change detection
+    expect(sql).not.toMatch(/cases\.ingested_at\s*>=/)
+    expect(sql).not.toMatch(/icm_plc\.ingested_at\s*>=/)
+    // MIS branches should still use last_updated_date (unchanged)
+    expect(sql).toContain('mis_plc.last_updated_date')
   })
 
   it('should ignore agedOutContactIds in full load mode', () => {

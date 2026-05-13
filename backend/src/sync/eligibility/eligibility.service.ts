@@ -485,6 +485,7 @@ export class EligibilityService {
       statusChanges: 0,
       newContacts: 0,
       skipped: 0,
+      userSetPreserved: 0,
       stepCounts: { step7: 0, step8: 0, step9: 0, step10: 0, noChange: 0 },
     }
 
@@ -519,6 +520,20 @@ export class EligibilityService {
         continue
       }
 
+      // User-set status: preserve unless overridden by system
+      if (profile.lastUpdatedBy && profile.lastUpdatedBy !== 'SYSTEM') {
+        updates.push({
+          profile,
+          result: {
+            newStatus: profile.csaStatus,
+            cancelReasonCode: profile.cancelReasonCode,
+            careEndDate: profile.careEndDate,
+          },
+        })
+        stats.userSetPreserved++
+        continue
+      }
+
       const result = runEligibility(profile, RULES, referenceDate)
       if (!result) continue
 
@@ -544,7 +559,7 @@ export class EligibilityService {
     }
 
     this.logger.log(
-      `Eligibility complete: ${stats.processed} processed, ${stats.statusChanges} updated, ${stats.newContacts} new, ${stats.skipped} skipped`,
+      `Eligibility complete: ${stats.processed} processed, ${stats.statusChanges} updated, ${stats.newContacts} new, ${stats.skipped} skipped, ${stats.userSetPreserved} user-set preserved`,
     )
 
     return stats
@@ -586,6 +601,9 @@ export class EligibilityService {
       ])
       return { previousStatus, newStatus: profile.csaStatus }
     }
+
+    // No user-set protection here: runForContact is the escape hatch
+    // for manually re-evaluating a contact's eligibility
 
     if (!profile.dateOfBirth) {
       throw new EligibilityInputError(`Contact ${personIdIcm} has no date of birth in staging`)
@@ -748,6 +766,7 @@ export class EligibilityService {
           ? new Date(raw.csaStatusEffectiveDate)
           : null,
         existingContactId: raw.existingContactId,
+        lastUpdatedBy: raw.lastUpdatedBy ?? null,
         din: raw.din ?? null,
         csaSentDate: raw.csaSentDate ? new Date(raw.csaSentDate) : null,
         misLegalAuthCode: raw.misLegalAuthCode,

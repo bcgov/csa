@@ -6225,16 +6225,15 @@ function App() {
         <DialogTitle id="confirm-run-all-dialog-title">Confirm Eligibility Query</DialogTitle>
         <DialogContent>
           <DialogContentText id="confirm-run-all-dialog-description">
-            Are you sure you want to run the eligibility query on all contacts? This operation may
-            take several minutes to complete.
+            CSA Eligibility Query will be run for all children. Do you wish to proceed?
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleConfirmRunAllDialogClose} color="inherit">
-            Cancel
+            No
           </Button>
           <Button onClick={handleRunEligibilityForAll} variant="contained" autoFocus>
-            Ok
+            Yes
           </Button>
         </DialogActions>
       </Dialog>

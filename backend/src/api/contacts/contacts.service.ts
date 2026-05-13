@@ -17,6 +17,7 @@ import {
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { enrichLabels, isEligibleAge, pacificToday } from 'src/common/utils'
+import { getCancelReasonLabel } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
 import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
@@ -660,6 +661,7 @@ export class ContactsService {
           select: {
             effectiveDate: true,
             careEndDate: true,
+            cancelReasonCode: true,
           },
         },
       },
@@ -675,9 +677,15 @@ export class ContactsService {
           ? detail.contact.careEndDate
           : detail.contact.effectiveDate
 
+      const cancelReasonCode = detail.contact.cancelReasonCode
+      const cancelReasonLabel = getCancelReasonLabel(cancelReasonCode, detail.transactionType)
+
       return enrichLabels({
         ...detail,
         effectiveDate,
+        cancelReasonCode:
+          detail.transactionType === TRANSACTION_TYPES.CANCELLATION ? cancelReasonCode : null,
+        cancelReasonLabel,
         batch: enrichLabels(detail.batch),
       })
     })

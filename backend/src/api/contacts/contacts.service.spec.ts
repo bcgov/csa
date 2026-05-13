@@ -1329,6 +1329,17 @@ describe('ContactsService', () => {
       expect(icmSync).toHaveBeenCalledWith(1)
     })
 
+    it('should not call syncSingleContact for USER actor when tx is provided', async () => {
+      const contact = { id: 1, csaStatus: 'eligible', resumeStatus: null }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+      const icmSync = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
+
+      await service.updateCsaStatus(1, 'ADD_TO_BATCH', 'USER', { userId: 'user1', tx: prisma })
+
+      expect(icmSync).not.toHaveBeenCalled()
+    })
+
     it('should not call syncSingleContact for SYSTEM actor', async () => {
       const contact = { id: 1, csaStatus: 'eligible', resumeStatus: null }
       vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)

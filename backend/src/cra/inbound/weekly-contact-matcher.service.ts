@@ -130,6 +130,7 @@ export class WeeklyContactMatcherService {
 
     // Step 1: DIN match
     if (din) {
+      this.logger.log(`Weekly Unmatched Records: Attempting DIN match for ${din}`)
       const dinMatches = await this.prisma.contact.findMany({
         where: { din },
         select: { id: true, din: true, csaStatus: true, caseNumber: true },
@@ -139,19 +140,30 @@ export class WeeklyContactMatcherService {
         this.logger.warn(`WKL contact match: multiple contacts with DIN ${din}, skipping`)
         return null
       }
-      this.logger.log(`WKL contact match: DIN ${din} not found, falling back to child details`)
     }
+    this.logger.log(`WKL contact match: DIN ${din} not found, falling back to child details`)
 
     // Step 2: Child details match against contacts table
+    const birthCountry = wklDetail.childBirthCountry.trim()
     const detailMatches = await this.prisma.contact.findMany({
       where: {
         firstName: wklDetail.childGivenName.trim(),
         lastName: wklDetail.childSurName.trim(),
-        gender: wklDetail.childSex.trim(),
-        dateOfBirth: parseWklDate(wklDetail.childBirthDate),
-        birthCity: wklDetail.childBirthCity.trim(),
-        birthProvince: wklDetail.childBirthProv.trim(),
-        birthCountry: wklDetail.childBirthCountry.trim(),
+        gender: this.mapWeeklyFileGender(wklDetail.childSex.trim()),
+        dateOfBirth: parseWklDate(wklDetail.childBirthDate.trim()),
+        ...(wklDetail.childBirthCity.trim() && {
+          birthCity: wklDetail.childBirthCity.trim(),
+        }),
+        ...(wklDetail.childBirthProv.trim() && {
+          birthProvince: wklDetail.childBirthProv.trim(),
+        }),
+        ...(birthCountry === 'CA'
+          ? {
+              OR: [{ birthCountry: 'CA' }, { birthCountry: '' }, { birthCountry: null }],
+            }
+          : {
+              birthCountry,
+            }),
       },
       select: { id: true, din: true, csaStatus: true, caseNumber: true },
     })
@@ -179,6 +191,17 @@ export class WeeklyContactMatcherService {
       childBirthProv: detail.childBirthProv.trim(),
       childBirthCountry: detail.childBirthCountry.trim(),
       ccraDinNum: detail.childDin?.trim(),
+    }
+  }
+
+  mapWeeklyFileGender(wklGender: string): string {
+    switch (wklGender.trim()) {
+      case 'M':
+        return 'Man/Boy'
+      case 'F':
+        return 'Woman/Girl'
+      default:
+        return 'Man/Boy'
     }
   }
 }

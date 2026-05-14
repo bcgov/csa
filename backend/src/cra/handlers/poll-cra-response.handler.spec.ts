@@ -2,6 +2,7 @@ import {
   BATCH_DETAIL_EVENT,
   BATCH_DETAIL_STATUS,
   CSA_EVENT,
+  CSA_STATUS,
 } from 'src/common/state-machine/constants'
 import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
@@ -1176,6 +1177,208 @@ describe('PollCraResponseHandler', () => {
       await handler.execute(mockContext)
 
       expect(mockBatchesService.aggregateBatchStatus).toHaveBeenCalledWith(10)
+    })
+
+    describe('Update transaction type (U) treated as cancellation', () => {
+      const mockMatchedCancellation = {
+        id: 200,
+        contactId: 42,
+        batchId: 10,
+        transactionType: 'cancellation',
+        systemComments: null,
+        contact: { din: null },
+      }
+
+      it('applies CRA_WKL_APPROVED with careEndDate for U + COMPLETED', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'U' as const,
+            careEndDate: '20250601',
+            status: WKL_STATUS.COMPLETED,
+          }),
+        ])
+        mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedCancellation)
+
+        const result = await handler.execute(mockContext)
+
+        expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+          200,
+          BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
+        )
+        expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+          42,
+          CSA_EVENT.CRA_WKL_APPROVED,
+          'SYSTEM',
+          {
+            additionalData: { careEndDate: expect.any(Date), din: '123456789' },
+            origin: 'PollCraResponseHandler.processWeeklyDetail',
+          },
+        )
+        expect(result.metadata.records_wkl_approved).toBe(1)
+        expect(result.metadata.records_wkl_skipped).toBe(0)
+      })
+
+      it('applies CRA_WKL_REFUSED with careEndDate for U + ABANDONED', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'U' as const,
+            careEndDate: '20250601',
+            status: WKL_STATUS.ABANDONED,
+          }),
+        ])
+        mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedCancellation)
+
+        const result = await handler.execute(mockContext)
+
+        expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+          200,
+          BATCH_DETAIL_EVENT.CRA_WKL_REFUSED,
+        )
+        expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+          42,
+          CSA_EVENT.CRA_WKL_REFUSED,
+          'SYSTEM',
+          {
+            additionalData: { careEndDate: expect.any(Date), din: '123456789' },
+            origin: 'PollCraResponseHandler.processWeeklyDetail',
+          },
+        )
+        expect(result.metadata.records_wkl_refused).toBe(1)
+        expect(result.metadata.records_wkl_skipped).toBe(0)
+      })
+    })
+
+    describe('Unmatched WKL records (no batch detail, contact found)', () => {
+      const matchedContact = { id: 99, din: null, caseNumber: 'CASE-42' }
+      const unmatchedBatch = { id: 500 }
+      const createdBatchDetail = {
+        id: 600,
+        contactId: 99,
+        batchId: 500,
+        transactionType: 'cancellation',
+        systemComments: null,
+        contact: { din: null },
+      }
+
+      beforeEach(() => {
+        mockBatchesService.createWklBatchForUnmatchedRecords = vi
+          .fn()
+          .mockResolvedValue(unmatchedBatch)
+        mockBatchesService.createBatchDetailsForWklUnmatchedRecords = vi
+          .fn()
+          .mockResolvedValue(createdBatchDetail)
+        mockContactsService.forceUpdateCsaStatus = vi.fn().mockResolvedValue({ success: true })
+        mockWeeklyContactMatcher.buildWklMatchingSnapshot = vi.fn().mockReturnValue({
+          childGivenName: 'JOHN',
+          childSurName: 'DOE',
+          childBirthDate: '20100315',
+        })
+        mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(null)
+        mockWeeklyContactMatcher.findMatchingContact.mockResolvedValue(matchedContact)
+      })
+
+      it('creates batch + detail, fires CRA_WKL_APPROVED, and forces NOT_ELIGIBLE_OUT_OF_PAY for cancellation + COMPLETED', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'C' as const,
+            careEndDate: '20250601',
+            status: WKL_STATUS.COMPLETED,
+          }),
+        ])
+
+        const result = await handler.execute(mockContext)
+
+        expect(mockBatchesService.createWklBatchForUnmatchedRecords).toHaveBeenCalledTimes(1)
+        expect(mockBatchesService.createBatchDetailsForWklUnmatchedRecords).toHaveBeenCalledWith(
+          500,
+          99,
+          'cancellation',
+          WKL_STATUS.COMPLETED,
+          'CASE-42',
+          expect.any(Object),
+        )
+        expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+          600,
+          BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
+        )
+        expect(mockContactsService.forceUpdateCsaStatus).toHaveBeenCalledWith(
+          99,
+          CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY,
+          { careEndDate: expect.any(Date), din: '123456789' },
+        )
+        expect(result.metadata.records_wkl_unmatched_approved).toBe(1)
+        expect(result.metadata.records_wkl_unmatched_refused).toBe(0)
+      })
+
+      it('fires CRA_WKL_REFUSED and forces CANCELLATION_REFUSED_CRA for cancellation + ABANDONED', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'C' as const,
+            careEndDate: '20250601',
+            status: WKL_STATUS.ABANDONED,
+          }),
+        ])
+
+        const result = await handler.execute(mockContext)
+
+        expect(mockBatchesService.createBatchDetailsForWklUnmatchedRecords).toHaveBeenCalledWith(
+          500,
+          99,
+          'cancellation',
+          WKL_STATUS.ABANDONED,
+          'CASE-42',
+          expect.any(Object),
+        )
+        expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+          600,
+          BATCH_DETAIL_EVENT.CRA_WKL_REFUSED,
+        )
+        expect(mockContactsService.forceUpdateCsaStatus).toHaveBeenCalledWith(
+          99,
+          CSA_STATUS.CANCELLATION_REFUSED_CRA,
+          { careEndDate: expect.any(Date), din: '123456789' },
+        )
+        expect(result.metadata.records_wkl_unmatched_refused).toBe(1)
+        expect(result.metadata.records_wkl_unmatched_approved).toBe(0)
+      })
+
+      it('reuses the same unmatched batch across multiple unmatched records in one file', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'C' as const,
+            careEndDate: '20250601',
+            status: WKL_STATUS.COMPLETED,
+          }),
+          makeWklDetail({
+            transactionType: 'C' as const,
+            careEndDate: '20250602',
+            status: WKL_STATUS.ABANDONED,
+          }),
+        ])
+
+        await handler.execute(mockContext)
+
+        expect(mockBatchesService.createWklBatchForUnmatchedRecords).toHaveBeenCalledTimes(1)
+        expect(mockBatchesService.createBatchDetailsForWklUnmatchedRecords).toHaveBeenCalledTimes(2)
+      })
+
+      it('skips unmatched records with unexpected status (no batch detail status / contact update)', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({ transactionType: 'C' as const, status: 'some-unknown' }),
+        ])
+
+        const result = await handler.execute(mockContext)
+
+        expect(mockBatchesService.updateBatchDetailStatus).not.toHaveBeenCalled()
+        expect(mockContactsService.forceUpdateCsaStatus).not.toHaveBeenCalled()
+        expect(result.metadata.records_wkl_unmatched_skipped).toBe(1)
+      })
     })
   })
 })

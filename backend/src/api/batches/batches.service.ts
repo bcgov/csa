@@ -646,12 +646,14 @@ export class BatchesService {
         parseWklDate(craMatchingSnapshot.childBirthDate) ?? craMatchingSnapshot.childBirthDate,
     }
     return await this.prisma.$transaction(async (tx) => {
+      // Start in IN_PROGRESS — the caller fires CRA_WKL_APPROVED/REFUSED
+      // next, and those events are only valid from IN_PROGRESS.
       const batchDetail = await tx.contactBatchDetail.create({
         data: {
           contactId,
           batchId,
           transactionType,
-          status: this.mapCraStatus(craStatus),
+          status: BATCH_DETAIL_STATUS.IN_PROGRESS,
           craMatchingSnapshot: snapshot,
           createdAt: now,
           createdBy: UPDATED_BY.SYSTEM,
@@ -676,12 +678,5 @@ export class BatchesService {
         },
       })
     })
-  }
-
-  private mapCraStatus(craStatus: string): string {
-    const status = craStatus.trim().toLowerCase()
-    if (status === 'approved' || status === 'update') return BATCH_DETAIL_STATUS.APPROVED
-    if (status === 'refused') return BATCH_DETAIL_STATUS.REFUSED
-    return BATCH_DETAIL_STATUS.IN_PROGRESS
   }
 }

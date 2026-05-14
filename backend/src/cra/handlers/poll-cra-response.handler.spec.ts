@@ -1177,5 +1177,76 @@ describe('PollCraResponseHandler', () => {
 
       expect(mockBatchesService.aggregateBatchStatus).toHaveBeenCalledWith(10)
     })
+
+    describe('Update transaction type (U) treated as cancellation', () => {
+      const mockMatchedCancellation = {
+        id: 200,
+        contactId: 42,
+        batchId: 10,
+        transactionType: 'cancellation',
+        systemComments: null,
+        contact: { din: null },
+      }
+
+      it('applies CRA_WKL_APPROVED with careEndDate for U + COMPLETED', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'U' as const,
+            careEndDate: '20250601',
+            status: WKL_STATUS.COMPLETED,
+          }),
+        ])
+        mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedCancellation)
+
+        const result = await handler.execute(mockContext)
+
+        expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+          200,
+          BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
+        )
+        expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+          42,
+          CSA_EVENT.CRA_WKL_APPROVED,
+          'SYSTEM',
+          {
+            additionalData: { careEndDate: expect.any(Date), din: '123456789' },
+            origin: 'PollCraResponseHandler.processWeeklyDetail',
+          },
+        )
+        expect(result.metadata.records_wkl_approved).toBe(1)
+        expect(result.metadata.records_wkl_skipped).toBe(0)
+      })
+
+      it('applies CRA_WKL_REFUSED with careEndDate for U + ABANDONED', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'U' as const,
+            careEndDate: '20250601',
+            status: WKL_STATUS.ABANDONED,
+          }),
+        ])
+        mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedCancellation)
+
+        const result = await handler.execute(mockContext)
+
+        expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+          200,
+          BATCH_DETAIL_EVENT.CRA_WKL_REFUSED,
+        )
+        expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+          42,
+          CSA_EVENT.CRA_WKL_REFUSED,
+          'SYSTEM',
+          {
+            additionalData: { careEndDate: expect.any(Date), din: '123456789' },
+            origin: 'PollCraResponseHandler.processWeeklyDetail',
+          },
+        )
+        expect(result.metadata.records_wkl_refused).toBe(1)
+        expect(result.metadata.records_wkl_skipped).toBe(0)
+      })
+    })
   })
 })

@@ -2878,14 +2878,13 @@ function App() {
                             Object.keys(activeColumnFilters).length === 0
                           }
                           onClick={() => {
-                            // Clear all column filters
+                            // Clear all column filters and sorting
+                            // Note: Don't call fetchContacts explicitly - the useEffect
+                            // watching these state variables will trigger the fetch
                             setActiveColumnFilters({})
                             setIsColumnFilterActive(false)
-                            // Clear sorting
                             setSortConfig(null)
-                            // Reset to page 1 and refresh with default data
                             setCurrentPage(1)
-                            fetchContacts(1)
                           }}
                           sx={{
                             textTransform: 'none',

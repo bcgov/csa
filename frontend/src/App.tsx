@@ -1,6 +1,7 @@
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import CloseIcon from '@mui/icons-material/Close'
+import FilterAltOffIcon from '@mui/icons-material/FilterAltOff'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import {
@@ -2865,6 +2866,39 @@ function App() {
                       }}
                       sx={{ width: '200px' }}
                     />
+                    <Tooltip title="Clear all column filters and sorting" arrow>
+                      <span>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<FilterAltOffIcon />}
+                          disabled={
+                            !isColumnFilterActive &&
+                            !sortConfig &&
+                            Object.keys(activeColumnFilters).length === 0
+                          }
+                          onClick={() => {
+                            // Clear all column filters
+                            setActiveColumnFilters({})
+                            setIsColumnFilterActive(false)
+                            // Clear sorting
+                            setSortConfig(null)
+                            // Reset to page 1 and refresh with default data
+                            setCurrentPage(1)
+                            fetchContacts(1)
+                          }}
+                          sx={{
+                            textTransform: 'none',
+                            minWidth: 'auto',
+                            '&.Mui-disabled': {
+                              opacity: 0.5,
+                            },
+                          }}
+                        >
+                          Clear Filters
+                        </Button>
+                      </span>
+                    </Tooltip>
                     <FormControl size="small" sx={{ minWidth: 250 }}>
                       <Select
                         value={preDefinedFilter}
@@ -3078,58 +3112,57 @@ function App() {
                     <TableHead>
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                         <TableCell padding="checkbox">
-                          <Checkbox
-                            disabled={isRunningEligibilityAll || isRunningAutoBatch}
-                            indeterminate={
-                              selected.length > 0 &&
-                              selected.length < filteredData.length &&
-                              filteredData.some((row) => selected.includes(row.id))
+                          <Tooltip
+                            title={
+                              selected.length > 0
+                                ? `Clear all ${selected.length} selected record(s) across all pages`
+                                : 'Select all records on this page'
                             }
-                            checked={
-                              filteredData.length > 0 &&
-                              filteredData.every((row) => selected.includes(row.id))
-                            }
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                // Select all rows on current page
-                                setSelected((prev) => {
-                                  const currentPageIds = filteredData.map((row) => row.id)
-                                  const newSelected = [...prev]
-                                  currentPageIds.forEach((id) => {
-                                    if (!newSelected.includes(id)) {
-                                      newSelected.push(id)
-                                    }
-                                  })
-                                  return newSelected
-                                })
-                                // Update cache with current page records
-                                setSelectedRecordsCache((prev) => {
-                                  const newCache = new Map(prev)
-                                  filteredData.forEach((row) => {
-                                    newCache.set(row.id, {
-                                      csaStatusRaw: row.csaStatusRaw,
-                                      isOver18: row.isOver18,
-                                    })
-                                  })
-                                  return newCache
-                                })
-                              } else {
-                                // Deselect all rows on current page
-                                setSelected((prev) => {
-                                  const currentPageIds = filteredData.map((row) => row.id)
-                                  return prev.filter((id) => !currentPageIds.includes(id))
-                                })
-                                // Remove current page records from cache
-                                setSelectedRecordsCache((prev) => {
-                                  const newCache = new Map(prev)
-                                  filteredData.forEach((row) => {
-                                    newCache.delete(row.id)
-                                  })
-                                  return newCache
-                                })
+                            arrow
+                          >
+                            <Checkbox
+                              disabled={isRunningEligibilityAll || isRunningAutoBatch}
+                              indeterminate={
+                                selected.length > 0 &&
+                                selected.length < filteredData.length &&
+                                filteredData.some((row) => selected.includes(row.id))
                               }
-                            }}
-                          />
+                              checked={
+                                filteredData.length > 0 &&
+                                filteredData.every((row) => selected.includes(row.id))
+                              }
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  // Select all rows on current page
+                                  setSelected((prev) => {
+                                    const currentPageIds = filteredData.map((row) => row.id)
+                                    const newSelected = [...prev]
+                                    currentPageIds.forEach((id) => {
+                                      if (!newSelected.includes(id)) {
+                                        newSelected.push(id)
+                                      }
+                                    })
+                                    return newSelected
+                                  })
+                                  // Update cache with current page records
+                                  setSelectedRecordsCache((prev) => {
+                                    const newCache = new Map(prev)
+                                    filteredData.forEach((row) => {
+                                      newCache.set(row.id, {
+                                        csaStatusRaw: row.csaStatusRaw,
+                                        isOver18: row.isOver18,
+                                      })
+                                    })
+                                    return newCache
+                                  })
+                                } else {
+                                  // Clear ALL selections across ALL pages
+                                  setSelected([])
+                                  setSelectedRecordsCache(new Map())
+                                }
+                              }}
+                            />
+                          </Tooltip>
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>

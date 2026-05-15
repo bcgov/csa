@@ -7,7 +7,8 @@ import { ContactsService } from 'src/api/contacts/contacts.service'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_DETAIL_EVENT, CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
 
-import { parseWklDate } from 'src/common/utils'
+import { pacificToday, parseWklDate } from 'src/common/utils'
+import { CANCEL_REASON } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
@@ -458,10 +459,12 @@ export class PollCraResponseHandler extends BaseJob {
     const din = detail.childDin?.trim()
     const careDate =
       wklType === 'cancellation'
-        ? parseWklDate(detail.careEndDate)
+        ? (parseWklDate(detail.careEndDate) ?? pacificToday())
         : parseWklDate(detail.careStartDate)
     const cancelReasonCode =
-      wklType === 'cancellation' ? detail.careEndReasonCode?.trim() : undefined
+      wklType === 'cancellation'
+        ? detail.careEndReasonCode?.trim() || CANCEL_REASON.CHILD_LEFT
+        : undefined
     const additionalData: Record<string, unknown> = {
       ...(careDate
         ? wklType === 'cancellation'

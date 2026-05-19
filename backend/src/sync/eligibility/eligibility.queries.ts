@@ -416,7 +416,13 @@ export function buildLoadContactProfilesSql(
   LEFT JOIN mis_payments_agg mis_pay ON mis_pay.X_CONTACT_NUM = cases.X_CONTACT_NUM
   LEFT JOIN mis_contracts_agg mis_con ON mis_con.X_CONTACT_NUM = cases.X_CONTACT_NUM
   LEFT JOIN mis_placements_agg mis_plc ON mis_plc.X_CONTACT_NUM = cases.X_CONTACT_NUM
-  ORDER BY cases.X_CONTACT_NUM
+  ORDER BY cases.X_CONTACT_NUM,
+    CASE UPPER(TRIM(cases.STATUS_CD))
+      WHEN 'OPEN' THEN 1
+      WHEN 'ADMIN RE-OPEN' THEN 2
+      ELSE 3
+    END,
+    cases.LAST_UPD::TIMESTAMP DESC NULLS LAST
 `
 
   let params: unknown[]

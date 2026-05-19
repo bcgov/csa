@@ -626,7 +626,6 @@ describe('buildLoadContactProfilesSql', () => {
 
     // No remaining CASE_ROW_ID joins in final SELECT
     expect(sql).not.toMatch(/LEFT JOIN.*CASE_ROW_ID = cases\.ROW_ID/)
-
   })
   it('should prioritise Open > Admin Re-open > most recently updated case for multi-case children (BL-24)', () => {
     const { sql } = buildLoadContactProfilesSql(null)

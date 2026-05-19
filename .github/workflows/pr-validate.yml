@@ -5,10 +5,11 @@ on:
     types: [edited, opened, synchronize, reopened, ready_for_review]
     branches: [dev, test, main]
     paths:
-      - "backend/**"
-      - "frontend/**"
-      - ".github/workflows/**"
-      - "backup/**"
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/**'
+      - 'backup/**'
+      - 'migrations/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number }}

@@ -7,6 +7,7 @@ import { ContactsService } from 'src/api/contacts/contacts.service'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_DETAIL_EVENT, CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
 
+import { parseWklDate } from 'src/common/utils'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
@@ -16,11 +17,10 @@ import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { InboundFileService } from '../inbound/inbound-file.service'
 import { InboundResponseService } from '../inbound/inbound-response.service'
 import { InboundWeeklyResponseService } from '../inbound/inbound-weekly-response.service'
-import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import type { DetailRecord04, HeaderRecord } from '../inbound/inbound-weekly.interface'
+import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import { WeeklyContactMatcherService } from '../inbound/weekly-contact-matcher.service'
 import { CraTransferService } from '../transfer/cra-transfer.service'
-import { parseWklDate } from 'src/common/utils'
 const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
 const { STATUS: WKL_STATUS, RECEIVE_MODE, TRANSACTION_TYPE_MAP, TRANSACTION_TYPES } = WEEKLY_FILE
 
@@ -373,6 +373,8 @@ export class PollCraResponseHandler extends BaseJob {
       wklType === 'cancellation'
         ? parseWklDate(detail.careEndDate)
         : parseWklDate(detail.careStartDate)
+    const cancelReasonCode =
+      wklType === 'cancellation' ? detail.careEndReasonCode?.trim() : undefined
     const additionalData: Record<string, unknown> = {
       ...(careDate
         ? wklType === 'cancellation'
@@ -380,6 +382,7 @@ export class PollCraResponseHandler extends BaseJob {
           : { effectiveDate: careDate }
         : {}),
       ...(din ? { din } : {}),
+      ...(cancelReasonCode ? { cancelReasonCode } : {}),
     }
 
     if (isApproved) {
@@ -457,6 +460,8 @@ export class PollCraResponseHandler extends BaseJob {
       wklType === 'cancellation'
         ? parseWklDate(detail.careEndDate)
         : parseWklDate(detail.careStartDate)
+    const cancelReasonCode =
+      wklType === 'cancellation' ? detail.careEndReasonCode?.trim() : undefined
     const additionalData: Record<string, unknown> = {
       ...(careDate
         ? wklType === 'cancellation'
@@ -464,6 +469,7 @@ export class PollCraResponseHandler extends BaseJob {
           : { effectiveDate: careDate }
         : {}),
       ...(din ? { din } : {}),
+      ...(cancelReasonCode ? { cancelReasonCode } : {}),
     }
 
     if (isApproved) {

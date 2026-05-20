@@ -29,7 +29,12 @@ describe('BatchesService', () => {
       findMany: vi.fn(),
       update: vi.fn(),
     },
-    $transaction: vi.fn(),
+    $transaction: vi.fn().mockImplementation(async (fnOrArray: any) => {
+      if (typeof fnOrArray === 'function') {
+        return fnOrArray(mockPrismaService)
+      }
+      return Promise.all(fnOrArray)
+    }),
   }
 
   const mockContactsService = {
@@ -274,6 +279,7 @@ describe('BatchesService', () => {
       mockPrismaService.$transaction.mockImplementation(async (fn: any) => fn(mockPrismaService))
       mockPrismaService.contactBatchDetail.create.mockResolvedValue({ id: 10 })
       mockPrismaService.contactBatchDetail.update.mockResolvedValue({})
+      mockPrismaService.contactBatchDetail.count.mockResolvedValue(2)
       mockPrismaService.batch.update.mockResolvedValue(updatedBatch)
 
       const result = await service.addContactsToPendingBatch([1, 2], 'user1')
@@ -288,13 +294,21 @@ describe('BatchesService', () => {
         1,
         CSA_EVENT.ADD_TO_BATCH,
         'USER',
-        { userId: 'user1' },
+        {
+          userId: 'user1',
+          tx: mockPrismaService,
+          origin: 'BatchesService.addContactsToPendingBatch',
+        },
       )
       expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
         2,
         CSA_EVENT.ADD_TO_BATCH,
         'USER',
-        { userId: 'user1' },
+        {
+          userId: 'user1',
+          tx: mockPrismaService,
+          origin: 'BatchesService.addContactsToPendingBatch',
+        },
       )
 
       // Verify transaction types: first call = application, second = cancellation
@@ -322,6 +336,7 @@ describe('BatchesService', () => {
       mockPrismaService.$transaction.mockImplementation(async (fn: any) => fn(mockPrismaService))
       mockPrismaService.contactBatchDetail.create.mockResolvedValue({ id: 10 })
       mockPrismaService.contactBatchDetail.update.mockResolvedValue({})
+      mockPrismaService.contactBatchDetail.count.mockResolvedValue(1)
       mockPrismaService.batch.update.mockResolvedValue(updatedBatch)
 
       const result = await service.addContactsToPendingBatch([1, 999], 'user1')
@@ -347,6 +362,7 @@ describe('BatchesService', () => {
       mockPrismaService.$transaction.mockImplementation(async (fn: any) => fn(mockPrismaService))
       mockPrismaService.contactBatchDetail.create.mockResolvedValue({ id: 10 })
       mockPrismaService.contactBatchDetail.update.mockResolvedValue({})
+      mockPrismaService.contactBatchDetail.count.mockResolvedValue(2)
       mockPrismaService.batch.update.mockResolvedValue({ ...pendingBatch, recordCount: 2 })
 
       const result = await service.addContactsToPendingBatch([1, 2], 'user1')
@@ -367,13 +383,13 @@ describe('BatchesService', () => {
         success: false,
         reason: 'Invalid transition',
       })
+      mockPrismaService.contactBatchDetail.count.mockResolvedValue(0)
       mockPrismaService.batch.update.mockResolvedValue(pendingBatch)
 
       const result = await service.addContactsToPendingBatch([1], 'user1')
 
       expect(result.success).toEqual([])
       expect(result.skipped).toEqual([{ id: 1, reason: 'invalid_transition' }])
-      expect(mockPrismaService.$transaction).not.toHaveBeenCalled()
     })
 
     it('should catch per-contact errors and skip', async () => {
@@ -385,6 +401,7 @@ describe('BatchesService', () => {
       ])
       mockPrismaService.contactBatchDetail.findMany.mockResolvedValue([])
       mockContactsService.updateCsaStatus.mockRejectedValue(new Error('DB error'))
+      mockPrismaService.contactBatchDetail.count.mockResolvedValue(0)
       mockPrismaService.batch.update.mockResolvedValue(pendingBatch)
 
       const result = await service.addContactsToPendingBatch([1], 'user1')
@@ -494,7 +511,7 @@ describe('BatchesService', () => {
 
       mockPrismaService.batch.findFirst.mockResolvedValue(pendingBatch)
       mockPrismaService.contactBatchDetail.findFirst.mockResolvedValue(detail)
-      mockPrismaService.$transaction.mockResolvedValue([])
+      mockPrismaService.contactBatchDetail.count.mockResolvedValue(0)
       mockContactsService.updateCsaStatus.mockResolvedValue({
         success: true,
         from: CSA_STATUS.IN_BATCH_APPLICATION,
@@ -507,7 +524,11 @@ describe('BatchesService', () => {
         100,
         CSA_EVENT.REMOVE_FROM_BATCH,
         'USER',
-        { userId: 'user1' },
+        {
+          userId: 'user1',
+          tx: mockPrismaService,
+          origin: 'BatchesService.removeContactFromPendingBatch',
+        },
       )
     })
 
@@ -525,7 +546,6 @@ describe('BatchesService', () => {
       await expect(service.removeContactFromPendingBatch(100, 'user1')).rejects.toThrow(
         'Failed to transition contact 100 on REMOVE_FROM_BATCH',
       )
-      expect(mockPrismaService.$transaction).not.toHaveBeenCalled()
     })
 
     it('should throw NotFoundException if no pending batch', async () => {
@@ -545,6 +565,110 @@ describe('BatchesService', () => {
       await expect(service.removeContactFromPendingBatch(100)).rejects.toThrow(NotFoundException)
       await expect(service.removeContactFromPendingBatch(100)).rejects.toThrow(
         'Contact 100 not found in pending batch',
+      )
+    })
+  })
+
+  describe('removeContactsFromPendingBatch', () => {
+    it('should remove multiple contacts from pending batch', async () => {
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 3 }
+      const updatedBatch = { ...pendingBatch, recordCount: 1 }
+
+      mockPrismaService.batch.findFirst.mockResolvedValue(pendingBatch)
+      mockPrismaService.$transaction.mockImplementation(async (fn: any) => fn(mockPrismaService))
+      mockPrismaService.contactBatchDetail.findFirst
+        .mockResolvedValueOnce({ id: 10, contactId: 1, batchId: 1 })
+        .mockResolvedValueOnce({ id: 11, contactId: 2, batchId: 1 })
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: true,
+        from: CSA_STATUS.IN_BATCH_APPLICATION,
+        to: CSA_STATUS.ELIGIBLE_TBD,
+      })
+      mockPrismaService.contactBatchDetail.count.mockResolvedValue(1)
+      mockPrismaService.batch.update.mockResolvedValue(updatedBatch)
+
+      const result = await service.removeContactsFromPendingBatch([1, 2], 'user1')
+
+      expect(result.success).toEqual([1, 2])
+      expect(result.skipped).toEqual([])
+      expect(result.batch.recordCount).toBe(1)
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledTimes(2)
+    })
+
+    it('should skip contacts not found in batch', async () => {
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 1 }
+      const updatedBatch = { ...pendingBatch, recordCount: 0 }
+
+      mockPrismaService.batch.findFirst.mockResolvedValue(pendingBatch)
+      mockPrismaService.$transaction.mockImplementation(async (fn: any) => fn(mockPrismaService))
+      mockPrismaService.contactBatchDetail.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 11, contactId: 2, batchId: 1 })
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: true,
+        from: CSA_STATUS.IN_BATCH_APPLICATION,
+        to: CSA_STATUS.ELIGIBLE_TBD,
+      })
+      mockPrismaService.contactBatchDetail.count.mockResolvedValue(0)
+      mockPrismaService.batch.update.mockResolvedValue(updatedBatch)
+
+      const result = await service.removeContactsFromPendingBatch([1, 2], 'user1')
+
+      expect(result.success).toEqual([2])
+      expect(result.skipped).toEqual([{ id: 1, reason: 'not_found' }])
+    })
+
+    it('should skip contacts with invalid CSA transition', async () => {
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 1 }
+
+      mockPrismaService.batch.findFirst.mockResolvedValue(pendingBatch)
+      mockPrismaService.$transaction.mockImplementation(async (fn: any) => fn(mockPrismaService))
+      mockPrismaService.contactBatchDetail.findFirst.mockResolvedValue({
+        id: 10,
+        contactId: 1,
+        batchId: 1,
+      })
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: false,
+        reason: 'Invalid transition',
+      })
+      mockPrismaService.contactBatchDetail.count.mockResolvedValue(1)
+      mockPrismaService.batch.update.mockResolvedValue(pendingBatch)
+
+      const result = await service.removeContactsFromPendingBatch([1], 'user1')
+
+      expect(result.success).toEqual([])
+      expect(result.skipped).toEqual([{ id: 1, reason: 'invalid_transition' }])
+    })
+
+    it('should catch unexpected errors and skip', async () => {
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 1 }
+
+      mockPrismaService.batch.findFirst.mockResolvedValue(pendingBatch)
+      mockPrismaService.$transaction.mockImplementation(async (fn: any) => fn(mockPrismaService))
+      mockPrismaService.contactBatchDetail.findFirst.mockResolvedValue({
+        id: 10,
+        contactId: 1,
+        batchId: 1,
+      })
+      mockContactsService.updateCsaStatus.mockRejectedValue(new Error('DB error'))
+      mockPrismaService.contactBatchDetail.count.mockResolvedValue(1)
+      mockPrismaService.batch.update.mockResolvedValue(pendingBatch)
+
+      const result = await service.removeContactsFromPendingBatch([1], 'user1')
+
+      expect(result.success).toEqual([])
+      expect(result.skipped).toEqual([{ id: 1, reason: 'error' }])
+    })
+
+    it('should throw NotFoundException if no pending batch', async () => {
+      mockPrismaService.batch.findFirst.mockResolvedValue(null)
+
+      await expect(service.removeContactsFromPendingBatch([1], 'user1')).rejects.toThrow(
+        NotFoundException,
+      )
+      await expect(service.removeContactsFromPendingBatch([1], 'user1')).rejects.toThrow(
+        'No pending batch exists',
       )
     })
   })

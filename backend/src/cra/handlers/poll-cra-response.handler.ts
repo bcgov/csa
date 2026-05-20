@@ -274,6 +274,7 @@ export class PollCraResponseHandler extends BaseJob {
         batchDetail.contactId,
         CSA_EVENT.CRA_FILE_REJECTED,
         UPDATED_BY.SYSTEM,
+        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
       this.recordsRejected++
     } else if (outcome === DETAIL_OUTCOME.REJECTED) {
@@ -288,6 +289,7 @@ export class PollCraResponseHandler extends BaseJob {
         batchDetail.contactId,
         CSA_EVENT.CRA_RSP_REJECTED,
         UPDATED_BY.SYSTEM,
+        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
       this.recordsRejected++
     } else {
@@ -375,7 +377,7 @@ export class PollCraResponseHandler extends BaseJob {
         batchDetail.contactId,
         CSA_EVENT.CRA_WKL_APPROVED,
         UPDATED_BY.SYSTEM,
-        { additionalData },
+        { additionalData, origin: 'PollCraResponseHandler.processWeeklyDetail' },
       )
       this.recordsWklApproved++
     } else if (isRefused) {
@@ -387,7 +389,7 @@ export class PollCraResponseHandler extends BaseJob {
         batchDetail.contactId,
         CSA_EVENT.CRA_WKL_REFUSED,
         UPDATED_BY.SYSTEM,
-        { additionalData },
+        { additionalData, origin: 'PollCraResponseHandler.processWeeklyDetail' },
       )
       this.recordsWklRefused++
     } else {

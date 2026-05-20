@@ -53,6 +53,7 @@ import {
   getRunningEligibilityJob,
   holdContacts,
   removeContactFromBatch,
+  removeContactsFromBatch,
   resumeContacts,
   runAutoBatchWithPolling,
   runEligibilityForAllWithPolling,
@@ -1926,18 +1927,21 @@ function App() {
         })
         .filter((id): id is number => id !== undefined)
 
-      // Remove each selected contact from the batch
-      const removePromises = contactIds.map((contactId) => removeContactFromBatch(contactId))
+      const result = await removeContactsFromBatch(contactIds)
 
-      const results = await Promise.all(removePromises)
+      const updatedRecordCount = result.batch?.recordCount ?? 0
+      const removedCount = result.success.length
+      const skippedCount = result.skipped.length
 
-      // Get the updated record count from the first result
-      const updatedRecordCount = results[0]?.recordCount ?? 0
+      const message =
+        skippedCount > 0
+          ? `Removed ${removedCount} contact${removedCount !== 1 ? 's' : ''} from batch (${skippedCount} skipped). Record count: ${updatedRecordCount}`
+          : `Successfully removed ${removedCount} contact${removedCount !== 1 ? 's' : ''} from batch. Record count: ${updatedRecordCount}`
 
       setSnackbar({
         open: true,
-        message: `Successfully removed ${selectedBatchDetails.length} contact${selectedBatchDetails.length > 1 ? 's' : ''} from batch. New record count: ${updatedRecordCount}`,
-        severity: 'success',
+        message,
+        severity: skippedCount > 0 ? 'warning' : 'success',
       })
 
       // Refresh the eligibility list to reflect updated CSA status

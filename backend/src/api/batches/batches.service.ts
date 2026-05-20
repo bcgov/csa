@@ -9,11 +9,14 @@ import {
 } from 'src/common/state-machine/constants'
 import type { TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
-import { appendSystemComment, enrichLabels, parseWklDate } from 'src/common/utils'
+import { appendSystemComment, enrichLabels, pacificToday, parseWklDate } from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 import { HeaderRecord } from 'src/cra/inbound/inbound-weekly.interface'
 import { MatchedBatchDetail } from 'src/cra/inbound/weekly-contact-matcher.service'
-import { CANCEL_REASON_LABELS } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
+import {
+  CANCEL_REASON,
+  getCancelReasonLabel,
+} from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
 import { ContactsService } from '../contacts/contacts.service'
 import { BulkOperationResponse } from '../contacts/interfaces'
@@ -172,12 +175,8 @@ export class BatchesService {
           ? detail.contact.careEndDate
           : detail.contact.effectiveDate
 
-      // Get cancellation reason label for cancellation transactions
       const cancelReasonCode = detail.contact.cancelReasonCode
-      const cancelReasonLabel =
-        cancelReasonCode && detail.transactionType === TRANSACTION_TYPES.CANCELLATION
-          ? CANCEL_REASON_LABELS[cancelReasonCode as keyof typeof CANCEL_REASON_LABELS] || null
-          : null
+      const cancelReasonLabel = getCancelReasonLabel(cancelReasonCode, detail.transactionType)
 
       return enrichLabels({
         ...detail,
@@ -254,7 +253,13 @@ export class BatchesService {
 
     const existingContacts = await this.prisma.contact.findMany({
       where: { id: { in: contactIds } },
-      select: { id: true, caseNumber: true, csaStatus: true },
+      select: {
+        id: true,
+        caseNumber: true,
+        csaStatus: true,
+        cancelReasonCode: true,
+        careEndDate: true,
+      },
     })
     const existingContactMap = new Map(existingContacts.map((c) => [c.id, c]))
 
@@ -303,6 +308,20 @@ export class BatchesService {
 
         const caseNumber = contact.caseNumber ?? ''
         await this.prisma.$transaction(async (tx) => {
+          // Per FDD BL-05: default cancellation fields when blank
+          if (transactionType === TRANSACTION_TYPES.CANCELLATION) {
+            const updates: Record<string, unknown> = {}
+            if (!contact.careEndDate) {
+              updates.careEndDate = pacificToday()
+            }
+            if (!contact.cancelReasonCode) {
+              updates.cancelReasonCode = CANCEL_REASON.CHILD_LEFT
+            }
+            if (Object.keys(updates).length > 0) {
+              await tx.contact.update({ where: { id: contactId }, data: updates })
+            }
+          }
+
           const batchDetail = await tx.contactBatchDetail.create({
             data: {
               contactId,

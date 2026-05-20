@@ -10,9 +10,30 @@ import { DetailRecord04 } from './inbound-weekly.interface'
 
 const ACTIVE_BATCH_STATUSES = [BATCH_STATUS.IN_PROGRESS, BATCH_STATUS.PARTIALLY_PROCESSED]
 
+// CRA's "First Name" field is either:
+//   A) our FirstName alone — Initial field (if present) must equal first char of our MiddleName
+//   B) our FirstName + " " + our MiddleName — Initial field is unused
+const matchesGivenName = (
+  wklGivenName: string,
+  wklInitial: string,
+  firstName: string | null | undefined,
+  middleName: string | null | undefined,
+): boolean => {
+  const wklGiven = wklGivenName.trim()
+  const wklInit = wklInitial.trim()
+  const fn = firstName ?? ''
+  const mn = middleName ?? ''
+
+  if (wklGiven === fn) {
+    return !wklInit || mn.charAt(0) === wklInit
+  }
+  return mn !== '' && wklGiven === `${fn} ${mn}`
+}
+
 interface WklChildDetails {
   childDin: string
   childGivenName: string
+  childInitial: string
   childSurName: string
   childSex: string
   childBirthDate: string
@@ -84,7 +105,12 @@ export class WeeklyContactMatcherService {
     const matches = this.candidates.filter((d) => {
       const snap = d.craMatchingSnapshot as unknown as CraMatchingSnapshot
       return (
-        snap.childGivenName === wklDetail.childGivenName.trim() &&
+        matchesGivenName(
+          wklDetail.childGivenName,
+          wklDetail.childInitial,
+          snap.childGivenName,
+          snap.childMiddleName,
+        ) &&
         snap.childSurName === wklDetail.childSurName.trim() &&
         snap.childSex === wklDetail.childSex.trim() &&
         snap.childBirthDate === wklDetail.childBirthDate.trim() &&
@@ -144,10 +170,37 @@ export class WeeklyContactMatcherService {
     this.logger.log(`WKL contact match: DIN ${din} not found, falling back to child details`)
 
     // Step 2: Child details match against contacts table
+    const wklGiven = wklDetail.childGivenName.trim()
+    const wklInit = wklDetail.childInitial?.trim() ?? ''
+    const spaceIdx = wklGiven.indexOf(' ')
+    const combinedFirst = spaceIdx >= 0 ? wklGiven.slice(0, spaceIdx) : ''
+    const combinedMiddle = spaceIdx >= 0 ? wklGiven.slice(spaceIdx + 1).trim() : ''
+
+    const namePatterns: Prisma.ContactWhereInput[] = [
+      // Pattern A: WKL FirstName === our firstName; Initial (if present) must equal middleName[0]
+      {
+        firstName: wklGiven,
+        ...(wklInit && { middleName: { startsWith: wklInit } }),
+      },
+    ]
+    if (combinedMiddle) {
+      // Pattern B: WKL FirstName === our firstName + " " + middleName
+      namePatterns.push({ firstName: combinedFirst, middleName: combinedMiddle })
+    }
+
     const birthCountry = wklDetail.childBirthCountry.trim()
     const detailMatches = await this.prisma.contact.findMany({
       where: {
-        firstName: wklDetail.childGivenName.trim(),
+        AND: [
+          { OR: namePatterns },
+          birthCountry === 'CA'
+            ? { OR: [{ birthCountry: 'CA' }, { birthCountry: '' }, { birthCountry: null }] }
+            : {
+                NOT: {
+                  OR: [{ birthCountry: 'CA' }, { birthCountry: '' }, { birthCountry: null }],
+                },
+              },
+        ],
         lastName: wklDetail.childSurName.trim(),
         gender: this.mapWeeklyFileGender(wklDetail.childSex.trim()),
         dateOfBirth: parseWklDate(wklDetail.childBirthDate.trim()),
@@ -157,13 +210,6 @@ export class WeeklyContactMatcherService {
         ...(wklDetail.childBirthProv.trim() && {
           birthProvince: wklDetail.childBirthProv.trim(),
         }),
-        ...(birthCountry === 'CA'
-          ? {
-              OR: [{ birthCountry: 'CA' }, { birthCountry: '' }, { birthCountry: null }],
-            }
-          : {
-              birthCountry,
-            }),
       },
       select: { id: true, din: true, csaStatus: true, caseNumber: true },
     })

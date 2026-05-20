@@ -1152,6 +1152,66 @@ describe('PollCraResponseHandler', () => {
       )
     })
 
+    it('includes cancelReasonCode in additionalData for cancellation transactions', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([
+        makeWklDetail({
+          transactionType: 'C' as const,
+          careEndDate: '20250601',
+          careEndReasonCode: '21',
+          status: WKL_STATUS.COMPLETED,
+        }),
+      ])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
+        ...mockMatchedDetail,
+        transactionType: 'cancellation',
+      })
+
+      await handler.execute(mockContext)
+
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        42,
+        CSA_EVENT.CRA_WKL_APPROVED,
+        'SYSTEM',
+        {
+          additionalData: {
+            careEndDate: expect.any(Date),
+            din: '123456789',
+            cancelReasonCode: '21',
+          },
+          origin: 'PollCraResponseHandler.processWeeklyDetail',
+        },
+      )
+    })
+
+    it('omits cancelReasonCode from additionalData for application transactions', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([
+        makeWklDetail({
+          transactionType: 'A' as const,
+          careStartDate: '20250101',
+          careEndReasonCode: '21', // should be ignored for applications
+          status: WKL_STATUS.COMPLETED,
+        }),
+      ])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
+
+      await handler.execute(mockContext)
+
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        42,
+        CSA_EVENT.CRA_WKL_APPROVED,
+        'SYSTEM',
+        {
+          additionalData: {
+            effectiveDate: expect.any(Date),
+            din: '123456789',
+          },
+          origin: 'PollCraResponseHandler.processWeeklyDetail',
+        },
+      )
+    })
+
     it('logs warning on transaction type mismatch but still processes', async () => {
       setupWeeklyFile()
       setupWeeklyParseFile([makeWklDetail({ transactionType: 'C' as const })])
@@ -1378,6 +1438,30 @@ describe('PollCraResponseHandler', () => {
         expect(mockBatchesService.updateBatchDetailStatus).not.toHaveBeenCalled()
         expect(mockContactsService.forceUpdateCsaStatus).not.toHaveBeenCalled()
         expect(result.metadata.records_wkl_unmatched_skipped).toBe(1)
+      })
+
+      it('includes cancelReasonCode in additionalData for unmatched cancellation records', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'C' as const,
+            careEndDate: '20250601',
+            careEndReasonCode: '22',
+            status: WKL_STATUS.COMPLETED,
+          }),
+        ])
+
+        await handler.execute(mockContext)
+
+        expect(mockContactsService.forceUpdateCsaStatus).toHaveBeenCalledWith(
+          99,
+          CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY,
+          {
+            careEndDate: expect.any(Date),
+            din: '123456789',
+            cancelReasonCode: '22',
+          },
+        )
       })
     })
   })

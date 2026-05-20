@@ -194,14 +194,14 @@ export class WeeklyContactMatcherService {
     }
   }
 
-  mapWeeklyFileGender(wklGender: string): string {
+  mapWeeklyFileGender(wklGender: string): string | { in: string[] } | null {
     switch (wklGender.trim()) {
       case 'M':
         return 'Man/Boy'
       case 'F':
         return 'Woman/Girl'
       default:
-        return 'Man/Boy'
+        return { in: ['Unknown', 'Non-Binary'] }
     }
   }
 }

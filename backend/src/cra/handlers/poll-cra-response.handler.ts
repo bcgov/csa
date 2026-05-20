@@ -20,8 +20,9 @@ import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import type { DetailRecord04, HeaderRecord } from '../inbound/inbound-weekly.interface'
 import { WeeklyContactMatcherService } from '../inbound/weekly-contact-matcher.service'
 import { CraTransferService } from '../transfer/cra-transfer.service'
+import { parseWklDate } from 'src/common/utils'
 const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
-const { STATUS: WKL_STATUS, RECEIVE_MODE } = WEEKLY_FILE
+const { STATUS: WKL_STATUS, RECEIVE_MODE, TRANSACTION_TYPE_MAP, TRANSACTION_TYPES } = WEEKLY_FILE
 
 @Injectable()
 export class PollCraResponseHandler extends BaseJob {
@@ -274,6 +275,7 @@ export class PollCraResponseHandler extends BaseJob {
         batchDetail.contactId,
         CSA_EVENT.CRA_FILE_REJECTED,
         UPDATED_BY.SYSTEM,
+        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
       this.recordsRejected++
     } else if (outcome === DETAIL_OUTCOME.REJECTED) {
@@ -288,6 +290,7 @@ export class PollCraResponseHandler extends BaseJob {
         batchDetail.contactId,
         CSA_EVENT.CRA_RSP_REJECTED,
         UPDATED_BY.SYSTEM,
+        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
       this.recordsRejected++
     } else {
@@ -306,18 +309,14 @@ export class PollCraResponseHandler extends BaseJob {
       return
     }
 
-    if (detail.status === WKL_STATUS.IN_PROGRESS) {
+    if (detail.status?.toLocaleLowerCase() === WKL_STATUS.IN_PROGRESS) {
       this.recordsWklSkipped++
       return
     }
+    const wklType = TRANSACTION_TYPE_MAP[detail.transactionType]
 
-    let wklType: string
-    if (detail.transactionType === 'A') {
-      wklType = 'application'
-    } else if (detail.transactionType === 'C') {
-      wklType = 'cancellation'
-    } else {
-      this.logger.warn(`WKL: unexpected transaction type '${detail.transactionType}', skipping`)
+    if (!wklType || !TRANSACTION_TYPES.includes(wklType)) {
+      this.logger.warn(`WKL: unexpected transaction type ${detail.transactionType}, skipping`)
       this.recordsWklSkipped++
       return
     }
@@ -358,13 +357,30 @@ export class PollCraResponseHandler extends BaseJob {
       )
     }
 
-    const isApproved =
-      detail.status?.toLowerCase() === WKL_STATUS.COMPLETED ||
-      detail.status?.toLowerCase() === WKL_STATUS.UPDATED
-    const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
+    const status = detail.status?.trim().toLowerCase()
+
+    const isApproved = status === WKL_STATUS.COMPLETED || status === WKL_STATUS.UPDATED
+
+    const isRefused = status === WKL_STATUS.ABANDONED
+
+    this.logger.log(
+      `Processing WKL detail for contactId ${batchDetail.contactId}, transaction type ${wklType}, status ${detail.status}, ` +
+        `isApproved: ${isApproved}, isRefused: ${isRefused}`,
+    )
 
     const din = detail.childDin?.trim()
-    const additionalData = din ? { din } : undefined
+    const careDate =
+      wklType === 'cancellation'
+        ? parseWklDate(detail.careEndDate)
+        : parseWklDate(detail.careStartDate)
+    const additionalData: Record<string, unknown> = {
+      ...(careDate
+        ? wklType === 'cancellation'
+          ? { careEndDate: careDate }
+          : { effectiveDate: careDate }
+        : {}),
+      ...(din ? { din } : {}),
+    }
 
     if (isApproved) {
       await this.batchesService.updateBatchDetailStatus(
@@ -375,7 +391,7 @@ export class PollCraResponseHandler extends BaseJob {
         batchDetail.contactId,
         CSA_EVENT.CRA_WKL_APPROVED,
         UPDATED_BY.SYSTEM,
-        { additionalData },
+        { additionalData, origin: 'PollCraResponseHandler.processWeeklyDetail' },
       )
       this.recordsWklApproved++
     } else if (isRefused) {
@@ -387,7 +403,7 @@ export class PollCraResponseHandler extends BaseJob {
         batchDetail.contactId,
         CSA_EVENT.CRA_WKL_REFUSED,
         UPDATED_BY.SYSTEM,
-        { additionalData },
+        { additionalData, origin: 'PollCraResponseHandler.processWeeklyDetail' },
       )
       this.recordsWklRefused++
     } else {
@@ -406,6 +422,10 @@ export class PollCraResponseHandler extends BaseJob {
     caseNumber: string,
     header: HeaderRecord,
   ): Promise<void> {
+    this.logger.log(
+      `Processing unmatched WKL detail for contactId ${contactId} (case ${caseNumber}), ` +
+        `transaction type ${wklType}, status ${detail.status}`,
+    )
     if (!this.unmatchedWklBatchId) {
       const batch = await this.batchesService.createWklBatchForUnmatchedRecords(header)
       this.unmatchedWklBatchId = batch.id
@@ -433,7 +453,18 @@ export class PollCraResponseHandler extends BaseJob {
       detail.status?.toLowerCase() === WKL_STATUS.UPDATED
     const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
     const din = detail.childDin?.trim()
-    const additionalData = din ? { din } : undefined
+    const careDate =
+      wklType === 'cancellation'
+        ? parseWklDate(detail.careEndDate)
+        : parseWklDate(detail.careStartDate)
+    const additionalData: Record<string, unknown> = {
+      ...(careDate
+        ? wklType === 'cancellation'
+          ? { careEndDate: careDate }
+          : { effectiveDate: careDate }
+        : {}),
+      ...(din ? { din } : {}),
+    }
 
     if (isApproved) {
       const nextState =
@@ -470,5 +501,9 @@ export class PollCraResponseHandler extends BaseJob {
       this.recordsWklUnmatchedSkipped++
       return
     }
+    this.logger.log(
+      `Finished processing unmatched WKL detail for contactId ${contactId} (case ${caseNumber}), ` +
+        `transaction type ${wklType}, status ${detail.status}, approved: ${isApproved}, refused: ${isRefused}`,
+    )
   }
 }

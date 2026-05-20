@@ -339,7 +339,10 @@ export class ContactsService {
 
     this.logger.log(`Contact ${contactId}: ${currentState}->${nextState} [${event}] by ${actor}`)
 
-    if (actor === 'USER') {
+    // Skip immediate sync when running inside a transaction — the caller must
+    // trigger sync after the transaction commits, otherwise syncSingleContact
+    // reads the pre-commit state and syncs a stale status to ICM.
+    if (actor === 'USER' && !options?.tx) {
       this.icmSyncBackService.syncSingleContact(contactId).catch((err) => {
         this.logger.warn(
           `Immediate ICM sync failed for contact ${contactId}: ${(err as Error).message}`,

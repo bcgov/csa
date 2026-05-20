@@ -17,6 +17,7 @@ import {
   CANCEL_REASON,
   getCancelReasonLabel,
 } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
+import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
 import { ContactsService } from '../contacts/contacts.service'
 import { BulkOperationResponse } from '../contacts/interfaces'
@@ -52,7 +53,16 @@ export class BatchesService {
     private prisma: PrismaService,
     private stateMachine: StateMachineService,
     private contactsService: ContactsService,
+    private icmSyncBackService: IcmSyncBackService,
   ) {}
+
+  private fireAndForgetSync(contactId: number): void {
+    this.icmSyncBackService.syncSingleContact(contactId).catch((err) => {
+      this.logger.warn(
+        `Immediate ICM sync failed for contact ${contactId}: ${(err as Error).message}`,
+      )
+    })
+  }
 
   async findAll() {
     const batches = await this.prisma.batch.findMany({
@@ -342,6 +352,8 @@ export class BatchesService {
           })
         })
         result.success.push(contactId)
+
+        this.fireAndForgetSync(contactId)
       } catch (error) {
         if (error instanceof TransitionSkipError) {
           result.skipped.push({ id: contactId, reason: error.reason })
@@ -516,6 +528,8 @@ export class BatchesService {
         data: { recordCount: actualCount },
       })
     })
+
+    this.fireAndForgetSync(contactId)
   }
 
   async removeContactsFromPendingBatch(
@@ -566,6 +580,8 @@ export class BatchesService {
           })
         })
         result.success.push(contactId)
+
+        this.fireAndForgetSync(contactId)
       } catch (error) {
         if (error instanceof TransitionSkipError) {
           result.skipped.push({ id: contactId, reason: error.reason })

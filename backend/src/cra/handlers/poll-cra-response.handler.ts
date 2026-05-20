@@ -357,10 +357,16 @@ export class PollCraResponseHandler extends BaseJob {
       )
     }
 
-    const isApproved =
-      detail.status?.toLowerCase() === WKL_STATUS.COMPLETED ||
-      detail.status?.toLowerCase() === WKL_STATUS.UPDATED
-    const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
+    const status = detail.status?.trim().toLowerCase()
+
+    const isApproved = status === WKL_STATUS.COMPLETED || status === WKL_STATUS.UPDATED
+
+    const isRefused = status === WKL_STATUS.ABANDONED
+
+    this.logger.log(
+      `Processing WKL detail for contactId ${batchDetail.contactId}, transaction type ${wklType}, status ${detail.status}, ` +
+        `isApproved: ${isApproved}, isRefused: ${isRefused}`,
+    )
 
     const din = detail.childDin?.trim()
     const careDate =
@@ -416,6 +422,10 @@ export class PollCraResponseHandler extends BaseJob {
     caseNumber: string,
     header: HeaderRecord,
   ): Promise<void> {
+    this.logger.log(
+      `Processing unmatched WKL detail for contactId ${contactId} (case ${caseNumber}), ` +
+        `transaction type ${wklType}, status ${detail.status}`,
+    )
     if (!this.unmatchedWklBatchId) {
       const batch = await this.batchesService.createWklBatchForUnmatchedRecords(header)
       this.unmatchedWklBatchId = batch.id
@@ -491,5 +501,9 @@ export class PollCraResponseHandler extends BaseJob {
       this.recordsWklUnmatchedSkipped++
       return
     }
+    this.logger.log(
+      `Finished processing unmatched WKL detail for contactId ${contactId} (case ${caseNumber}), ` +
+        `transaction type ${wklType}, status ${detail.status}, approved: ${isApproved}, refused: ${isRefused}`,
+    )
   }
 }

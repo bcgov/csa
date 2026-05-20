@@ -9,7 +9,11 @@ import {
   parseISODatePacific,
 } from 'src/common/utils'
 import { CANCEL_REASON } from './cancellation/cancellation-reason.constants'
-import { ELIGIBILITY_CONFIG, PROTECTED_STATUSES } from './eligibility.config'
+import {
+  ELIGIBILITY_CONFIG,
+  PROTECTED_STATUSES,
+  PROTECTED_STATUSES_SQL,
+} from './eligibility.config'
 import { EligibilityInputError } from './eligibility.errors'
 import { buildFindAgedOutContactIdsSql, buildLoadContactProfilesSql } from './eligibility.queries'
 import {
@@ -431,6 +435,8 @@ const UPSERT_SQL = `
       WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN 'SYSTEM'
       ELSE contacts.last_updated_by
     END
+  WHERE contacts.csa_status NOT IN (${PROTECTED_STATUSES_SQL})
+     OR EXCLUDED.csa_status = contacts.csa_status
 `
 
 @Injectable()

@@ -14,6 +14,11 @@ export const CANCEL_REASON_LABELS: Record<CancelReasonCode, string> = {
   '29': 'Adoption',
 }
 
+export function getCancelReasonLabel(code: string | null, transactionType: string): string | null {
+  if (!code || transactionType !== 'cancellation') return null
+  return CANCEL_REASON_LABELS[code as CancelReasonCode] || null
+}
+
 export const ICM_PLACEMENT = {
   TYPE_NON_PLACEMENT: 'NON-PLACEMENT LOCATION',
   SUBTYPE_AWOL: 'ABSENT/UNKNOWN LOCATION',

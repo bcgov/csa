@@ -51,9 +51,10 @@ export class OutboundDataService {
     this.businessNum = this.configService.get<string>('cra.businessNum')!
   }
 
-  buildMatchingSnapshot(detail: CraDetail): CraMatchingSnapshot {
+  buildMatchingSnapshot(detail: CraDetail, middleName: string | null): CraMatchingSnapshot {
     return {
       childGivenName: detail.childGivenName.trim(),
+      childMiddleName: middleName?.trim() ?? '',
       childSurName: detail.childSurName.trim(),
       childSex: detail.childSex.trim(),
       childBirthDate: detail.childBirthDate.trim(),

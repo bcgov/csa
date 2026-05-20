@@ -318,4 +318,53 @@ describe('BatchesService', () => {
       expect(batch.id).toBe(99)
     })
   })
+
+  describe('createBatchDetailsForWklUnmatchedRecords', () => {
+    const snapshot = { childGivenName: 'A', childSurName: 'B', childBirthDate: '20200101' }
+
+    beforeEach(() => {
+      mockPrisma.contactBatchDetail.findFirst = vi.fn().mockResolvedValue(null)
+      mockPrisma.contactBatchDetail.create = vi.fn().mockResolvedValue({ id: 1 })
+      mockPrisma.contactBatchDetail.update = vi.fn().mockResolvedValue({})
+      mockPrisma.contactBatchDetail.findUnique = vi.fn().mockResolvedValue({
+        id: 1,
+        contactId: 1,
+        batchId: 1,
+        transactionType: 'cancellation',
+        systemComments: null,
+        craMatchingSnapshot: snapshot,
+        contact: { din: null },
+      })
+      mockPrisma.$transaction = vi.fn().mockImplementation(async (cb: any) =>
+        cb({
+          contactBatchDetail: {
+            create: mockPrisma.contactBatchDetail.create,
+            update: mockPrisma.contactBatchDetail.update,
+            findUnique: mockPrisma.contactBatchDetail.findUnique,
+          },
+        }),
+      )
+    })
+
+    // Initial status must be IN_PROGRESS — it is the only batch detail state with
+    // valid CRA_WKL_APPROVED / CRA_WKL_REFUSED outgoing transitions, which the
+    // handler fires immediately after this method returns.
+    it.each(['Completed', 'Updated', 'Abandoned', 'In-Progress'])(
+      'creates the batch detail in IN_PROGRESS for CRA status %s',
+      async (craStatus) => {
+        await service.createBatchDetailsForWklUnmatchedRecords(
+          1,
+          1,
+          'cancellation',
+          craStatus,
+          'CASE-1',
+          snapshot,
+        )
+
+        expect(mockPrisma.contactBatchDetail.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ status: BATCH_DETAIL_STATUS.IN_PROGRESS }),
+        })
+      },
+    )
+  })
 })

@@ -10,6 +10,7 @@ const mockPrisma = {
 
 const makeSnapshot = (overrides = {}): CraMatchingSnapshot => ({
   childGivenName: 'JOHN',
+  childMiddleName: 'ROBERT',
   childSurName: 'DOE',
   childSex: 'M',
   childBirthDate: '20100315',
@@ -34,6 +35,7 @@ const makeBatchDetail = (overrides = {}) => ({
 const wklDetail = {
   childDin: '123456789',
   childGivenName: 'JOHN',
+  childInitial: '',
   childSurName: 'DOE',
   childSex: 'M',
   childBirthDate: '20100315',
@@ -145,6 +147,83 @@ describe('WeeklyContactMatcherService', () => {
       expect(result).toBeNull()
     })
 
+    describe('childGivenName variations', () => {
+      it('Pattern A: matches "FirstName" with no initial', async () => {
+        await loadWith([
+          makeBatchDetail({ craMatchingSnapshot: makeSnapshot({ ccraDinNum: 'X' }) }),
+        ])
+
+        const result = await service.findMatchingBatchDetail({
+          ...wklDetail,
+          childDin: '',
+          childGivenName: 'JOHN',
+          childInitial: '',
+        })
+
+        expect(result).not.toBeNull()
+      })
+
+      it('Pattern A: matches "FirstName" with Initial matching first char of middleName', async () => {
+        await loadWith([
+          makeBatchDetail({ craMatchingSnapshot: makeSnapshot({ ccraDinNum: 'X' }) }),
+        ])
+
+        const result = await service.findMatchingBatchDetail({
+          ...wklDetail,
+          childDin: '',
+          childGivenName: 'JOHN',
+          childInitial: 'R',
+        })
+
+        expect(result).not.toBeNull()
+      })
+
+      it('Pattern A: rejects when Initial does not match first char of middleName', async () => {
+        await loadWith([
+          makeBatchDetail({ craMatchingSnapshot: makeSnapshot({ ccraDinNum: 'X' }) }),
+        ])
+
+        const result = await service.findMatchingBatchDetail({
+          ...wklDetail,
+          childDin: '',
+          childGivenName: 'JOHN',
+          childInitial: 'A',
+        })
+
+        expect(result).toBeNull()
+      })
+
+      it('Pattern B: matches "FirstName MiddleName" combined in given-name field', async () => {
+        await loadWith([
+          makeBatchDetail({ craMatchingSnapshot: makeSnapshot({ ccraDinNum: 'X' }) }),
+        ])
+
+        const result = await service.findMatchingBatchDetail({
+          ...wklDetail,
+          childDin: '',
+          childGivenName: 'JOHN ROBERT',
+          childInitial: '',
+        })
+
+        expect(result).not.toBeNull()
+      })
+
+      it('Pattern B: rejects when combined middle name does not match snapshot', async () => {
+        await loadWith([
+          makeBatchDetail({ craMatchingSnapshot: makeSnapshot({ ccraDinNum: 'X' }) }),
+        ])
+
+        const result = await service.findMatchingBatchDetail({
+          ...wklDetail,
+          childDin: '',
+          childGivenName: 'JOHN ALICE',
+          childInitial: '',
+        })
+
+        expect(result).toBeNull()
+      })
+    })
+
     it('should include contact.din in the result', async () => {
       await loadWith([makeBatchDetail({ contact: { din: 'EXISTING_DIN' } })])
 
@@ -173,6 +252,7 @@ describe('WeeklyContactMatcherService', () => {
       const result = await service.findMatchingContact({
         childDin: 'DIN123',
         childGivenName: 'JOHN',
+        childInitial: '',
         childSurName: 'DOE',
         childSex: 'M',
         childBirthDate: '20100101',
@@ -198,6 +278,7 @@ describe('WeeklyContactMatcherService', () => {
       const result = await service.findMatchingContact({
         childDin: 'UNKNOWN',
         childGivenName: 'JANE',
+        childInitial: '',
         childSurName: 'SMITH',
         childSex: 'F',
         childBirthDate: '20120315',
@@ -215,6 +296,7 @@ describe('WeeklyContactMatcherService', () => {
       const result = await service.findMatchingContact({
         childDin: '',
         childGivenName: 'NOBODY',
+        childInitial: '',
         childSurName: 'NOONE',
         childSex: 'M',
         childBirthDate: '20000101',
@@ -224,6 +306,109 @@ describe('WeeklyContactMatcherService', () => {
       })
 
       expect(result).toBeNull()
+    })
+
+    it('should query Canada-equivalent contacts when WKL country is CA', async () => {
+      mockPrisma.contact.findMany.mockResolvedValueOnce([]) // DIN
+      mockPrisma.contact.findMany.mockResolvedValueOnce([
+        { id: 40, din: null, csaStatus: 'eligible' },
+      ])
+
+      await service.findMatchingContact({
+        childDin: 'UNKNOWN',
+        childGivenName: 'JANE',
+        childInitial: '',
+        childSurName: 'SMITH',
+        childSex: 'F',
+        childBirthDate: '20120315',
+        childBirthCity: 'VANCOUVER',
+        childBirthProv: 'BC',
+        childBirthCountry: 'CA',
+      })
+
+      const detailQuery = mockPrisma.contact.findMany.mock.calls[1][0]
+      expect(detailQuery.where.AND[1]).toEqual({
+        OR: [{ birthCountry: 'CA' }, { birthCountry: '' }, { birthCountry: null }],
+      })
+    })
+
+    it('should query non-Canada contacts when WKL country is EX', async () => {
+      mockPrisma.contact.findMany.mockResolvedValueOnce([]) // DIN
+      mockPrisma.contact.findMany.mockResolvedValueOnce([
+        { id: 50, din: null, csaStatus: 'eligible' },
+      ])
+
+      const result = await service.findMatchingContact({
+        childDin: 'UNKNOWN',
+        childGivenName: 'KENJI',
+        childInitial: '',
+        childSurName: 'TANAKA',
+        childSex: 'M',
+        childBirthDate: '20120315',
+        childBirthCity: 'TOKYO',
+        childBirthProv: '',
+        childBirthCountry: 'EX',
+      })
+
+      const detailQuery = mockPrisma.contact.findMany.mock.calls[1][0]
+      expect(detailQuery.where.AND[1]).toEqual({
+        NOT: {
+          OR: [{ birthCountry: 'CA' }, { birthCountry: '' }, { birthCountry: null }],
+        },
+      })
+      expect(result).toEqual({ id: 50, din: null, csaStatus: 'eligible' })
+    })
+
+    describe('childGivenName variations', () => {
+      it('Pattern A only: WKL has just first name, no initial', async () => {
+        mockPrisma.contact.findMany.mockResolvedValueOnce([]) // DIN
+        mockPrisma.contact.findMany.mockResolvedValueOnce([])
+
+        await service.findMatchingContact({
+          ...wklDetail,
+          childDin: 'X',
+          childGivenName: 'JOHN',
+          childInitial: '',
+        })
+
+        const detailQuery = mockPrisma.contact.findMany.mock.calls[1][0]
+        expect(detailQuery.where.AND[0].OR).toEqual([{ firstName: 'JOHN' }])
+      })
+
+      it('Pattern A: WKL has first name + initial → middleName startsWith initial', async () => {
+        mockPrisma.contact.findMany.mockResolvedValueOnce([]) // DIN
+        mockPrisma.contact.findMany.mockResolvedValueOnce([])
+
+        await service.findMatchingContact({
+          ...wklDetail,
+          childDin: 'X',
+          childGivenName: 'JOHN',
+          childInitial: 'R',
+        })
+
+        const detailQuery = mockPrisma.contact.findMany.mock.calls[1][0]
+        expect(detailQuery.where.AND[0].OR).toEqual([
+          { firstName: 'JOHN', middleName: { startsWith: 'R' } },
+        ])
+      })
+
+      it('Pattern A + B: WKL has first + middle combined in given-name field', async () => {
+        mockPrisma.contact.findMany.mockResolvedValueOnce([]) // DIN
+        mockPrisma.contact.findMany.mockResolvedValueOnce([])
+
+        await service.findMatchingContact({
+          ...wklDetail,
+          childDin: 'X',
+          childGivenName: 'JOHN ROBERT',
+          childInitial: '',
+        })
+
+        const detailQuery = mockPrisma.contact.findMany.mock.calls[1][0]
+        expect(detailQuery.where.AND[0].OR).toEqual([
+          { firstName: 'JOHN ROBERT' },
+          { firstName: 'JOHN', middleName: 'ROBERT' },
+        ])
+      })
     })
 
     it('should return null when multiple contacts match by details', async () => {
@@ -237,6 +422,7 @@ describe('WeeklyContactMatcherService', () => {
       const result = await service.findMatchingContact({
         childDin: '',
         childGivenName: 'DUP',
+        childInitial: '',
         childSurName: 'NAME',
         childSex: 'F',
         childBirthDate: '20100101',

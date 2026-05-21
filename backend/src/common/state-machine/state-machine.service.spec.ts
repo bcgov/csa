@@ -34,9 +34,9 @@ describe('StateMachineService', () => {
     })
 
     it('should return false for invalid CSA transition', () => {
-      expect(service.canTransition('csaStatus', CSA_STATUS.ELIGIBLE, CSA_EVENT.CRA_ACCEPTED)).toBe(
-        false,
-      )
+      expect(
+        service.canTransition('csaStatus', CSA_STATUS.ELIGIBLE, CSA_EVENT.CRA_RSP_REJECTED),
+      ).toBe(false)
     })
 
     it('should return true for valid Batch transition', () => {
@@ -68,9 +68,9 @@ describe('StateMachineService', () => {
     })
 
     it('should return current state for invalid transition', () => {
-      expect(service.getNextState('csaStatus', CSA_STATUS.ELIGIBLE, CSA_EVENT.CRA_ACCEPTED)).toBe(
-        CSA_STATUS.ELIGIBLE,
-      )
+      expect(
+        service.getNextState('csaStatus', CSA_STATUS.ELIGIBLE, CSA_EVENT.CRA_RSP_REJECTED),
+      ).toBe(CSA_STATUS.ELIGIBLE)
     })
 
     it('should return next state for valid Batch transition', () => {
@@ -125,7 +125,7 @@ describe('StateMachineService', () => {
     })
 
     it('should return display label for BatchDetail status', () => {
-      expect(service.getStatusLabel('batchDetail', BATCH_DETAIL_STATUS.PROCESSED)).toBe('Processed')
+      expect(service.getStatusLabel('batchDetail', BATCH_DETAIL_STATUS.APPROVED)).toBe('Approved')
     })
 
     it('should return raw value if label not found', () => {
@@ -311,7 +311,7 @@ describe('StateMachineService', () => {
     it('should return error for invalid transition', () => {
       const result = service.transitionBatchDetail(
         BATCH_DETAIL_STATUS.PENDING,
-        BATCH_DETAIL_EVENT.CRA_ACCEPTED,
+        BATCH_DETAIL_EVENT.CRA_RSP_REJECTED,
       )
 
       expect(result.success).toBe(false)

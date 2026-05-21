@@ -12,10 +12,10 @@ describe('batchDetailStatusMachine', () => {
       expect(nextState).toBe(BATCH_DETAIL_STATUS.IN_PROGRESS)
     })
 
-    it('should transition from in_progress to error on CRA_RECORD_REJECTED', () => {
+    it('should transition from in_progress to error on CRA_RSP_REJECTED', () => {
       const nextState = getNextBatchDetailState(
         BATCH_DETAIL_STATUS.IN_PROGRESS,
-        BATCH_DETAIL_EVENT.CRA_RECORD_REJECTED,
+        BATCH_DETAIL_EVENT.CRA_RSP_REJECTED,
       )
       expect(nextState).toBe(BATCH_DETAIL_STATUS.ERROR)
     })
@@ -28,18 +28,26 @@ describe('batchDetailStatusMachine', () => {
       expect(nextState).toBe(BATCH_DETAIL_STATUS.ERROR)
     })
 
-    it('should transition from in_progress to processed on CRA_ACCEPTED', () => {
+    it('should transition from in_progress to approved on CRA_WKL_APPROVED', () => {
       const nextState = getNextBatchDetailState(
         BATCH_DETAIL_STATUS.IN_PROGRESS,
-        BATCH_DETAIL_EVENT.CRA_ACCEPTED,
+        BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
       )
-      expect(nextState).toBe(BATCH_DETAIL_STATUS.PROCESSED)
+      expect(nextState).toBe(BATCH_DETAIL_STATUS.APPROVED)
+    })
+
+    it('should transition from in_progress to refused on CRA_WKL_REFUSED', () => {
+      const nextState = getNextBatchDetailState(
+        BATCH_DETAIL_STATUS.IN_PROGRESS,
+        BATCH_DETAIL_EVENT.CRA_WKL_REFUSED,
+      )
+      expect(nextState).toBe(BATCH_DETAIL_STATUS.REFUSED)
     })
 
     it('should return current state for invalid transition', () => {
       const nextState = getNextBatchDetailState(
         BATCH_DETAIL_STATUS.PENDING,
-        BATCH_DETAIL_EVENT.CRA_RECORD_REJECTED,
+        BATCH_DETAIL_EVENT.CRA_RSP_REJECTED,
       )
       expect(nextState).toBe(BATCH_DETAIL_STATUS.PENDING)
     })
@@ -54,16 +62,19 @@ describe('batchDetailStatusMachine', () => {
 
     it('should return false for invalid transition', () => {
       expect(
-        canTransitionBatchDetail(
-          BATCH_DETAIL_STATUS.PENDING,
-          BATCH_DETAIL_EVENT.CRA_RECORD_REJECTED,
-        ),
+        canTransitionBatchDetail(BATCH_DETAIL_STATUS.PENDING, BATCH_DETAIL_EVENT.CRA_RSP_REJECTED),
       ).toBe(false)
     })
 
-    it('should return false for final state', () => {
+    it('should return false for approved (terminal state)', () => {
       expect(
-        canTransitionBatchDetail(BATCH_DETAIL_STATUS.PROCESSED, BATCH_DETAIL_EVENT.SEND_TO_CRA),
+        canTransitionBatchDetail(BATCH_DETAIL_STATUS.APPROVED, BATCH_DETAIL_EVENT.SEND_TO_CRA),
+      ).toBe(false)
+    })
+
+    it('should return false for refused (terminal state)', () => {
+      expect(
+        canTransitionBatchDetail(BATCH_DETAIL_STATUS.REFUSED, BATCH_DETAIL_EVENT.SEND_TO_CRA),
       ).toBe(false)
     })
   })

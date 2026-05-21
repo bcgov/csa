@@ -1,4 +1,5 @@
 import { CSA_STATUS_LABELS } from 'src/common/state-machine/constants/csa-status.constants'
+import { PROTECTED_STATUSES_SQL } from './eligibility.config'
 
 const ICM_STATUS_CASE = `CASE UPPER(TRIM(cases.X_CSA_PAY_STATUS))\n${Object.entries(
   CSA_STATUS_LABELS,
@@ -35,7 +36,7 @@ const CHANGED_CONTACTS_CTE = `
       SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
-      INNER JOIN stg_icm_legal_authority_admin legal_admin ON legal_admin.LGL_AUTH_CD = legal_auth.LGL_AUTH_CD
+      INNER JOIN stg_icm_legal_authority_admin legal_admin ON legal_admin.LGL_AUTH_CD = COALESCE(legal_auth.EFF_LGL_STATUS, legal_auth.LGL_AUTH_CD)
       WHERE legal_admin.ingested_at >= $1
 
       UNION
@@ -128,15 +129,19 @@ const CHANGED_CONTACTS_CTE = `
 export function buildLoadContactProfilesSql(
   threshold: Date | null,
   agedOutContactIds?: string[],
+  personIdIcm?: string,
 ): {
   sql: string
   params: unknown[]
 } {
-  const isIncremental = threshold !== null
+  const isSingleContact = personIdIcm !== undefined
+  const isIncremental = !isSingleContact && threshold !== null
   const hasAgedOut = isIncremental && agedOutContactIds && agedOutContactIds.length > 0
 
   let eligibleCasesFilter = ''
-  if (isIncremental) {
+  if (isSingleContact) {
+    eligibleCasesFilter = 'WHERE cases.X_CONTACT_NUM = $1'
+  } else if (isIncremental) {
     eligibleCasesFilter = hasAgedOut
       ? 'WHERE cases.X_CONTACT_NUM IN (SELECT X_CONTACT_NUM FROM changed_contacts) OR cases.X_CONTACT_NUM = ANY($2::TEXT[])'
       : 'WHERE cases.X_CONTACT_NUM IN (SELECT X_CONTACT_NUM FROM changed_contacts)'
@@ -402,7 +407,7 @@ export function buildLoadContactProfilesSql(
   LEFT JOIN latest_legal_auth legal_auth
     ON legal_auth.X_CONTACT_NUM = cases.X_CONTACT_NUM
   LEFT JOIN unique_legal_admin legal_admin
-    ON legal_admin.LGL_AUTH_CD = legal_auth.LGL_AUTH_CD
+    ON legal_admin.LGL_AUTH_CD = COALESCE(legal_auth.EFF_LGL_STATUS, legal_auth.LGL_AUTH_CD)
   LEFT JOIN contacts master_contacts
     ON master_contacts.person_id_icm = cases.X_CONTACT_NUM
   LEFT JOIN icm_placements_agg icm_plc ON icm_plc.X_CONTACT_NUM = cases.X_CONTACT_NUM
@@ -414,10 +419,18 @@ export function buildLoadContactProfilesSql(
   ORDER BY cases.X_CONTACT_NUM
 `
 
-  return {
-    sql,
-    params: hasAgedOut ? [threshold, agedOutContactIds] : isIncremental ? [threshold] : [],
+  let params: unknown[]
+  if (isSingleContact) {
+    params = [personIdIcm]
+  } else if (hasAgedOut) {
+    params = [threshold, agedOutContactIds]
+  } else if (isIncremental) {
+    params = [threshold]
+  } else {
+    params = []
   }
+
+  return { sql, params }
 }
 
 export function buildFindAgedOutContactIdsSql(cutoffDate: Date): {
@@ -427,9 +440,9 @@ export function buildFindAgedOutContactIdsSql(cutoffDate: Date): {
   const sql = `
     SELECT person_id_icm
     FROM csa.contacts
-    WHERE csa_status IN ('eligible', 'in_pay', 'not_eligible_out_of_pay')
+    WHERE csa_status NOT IN (${PROTECTED_STATUSES_SQL})
       AND date_of_birth IS NOT NULL
-      AND date_of_birth < $1
+      AND date_of_birth < $1::DATE
   `
   return { sql, params: [cutoffDate] }
 }

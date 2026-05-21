@@ -137,6 +137,23 @@ export function normalize(value: string | null | undefined): string | undefined 
   return value?.trim().toUpperCase()
 }
 
+export function parseWklDate(dateStr: string): Date | undefined {
+  if (!dateStr || dateStr.trim().length !== 8) return undefined
+  const y = dateStr.substring(0, 4)
+  const m = dateStr.substring(4, 6)
+  const d = dateStr.substring(6, 8)
+  return new Date(`${y}-${m}-${d}`)
+}
+
+export function parseEffectiveDate(date: Date | string | null): string {
+  if (!date) return ''
+  const dateValue = typeof date === 'string' ? new Date(date) : date
+  const year = dateValue.getUTCFullYear()
+  const month = String(dateValue.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(dateValue.getUTCDate()).padStart(2, '0')
+  return `${year}${month}${day}`
+}
+
 export function pacificToday(): Date {
   const isoDate = DateTime.now().setZone(PACIFIC_ZONE).toISODate()!
   return new Date(isoDate)
@@ -160,12 +177,16 @@ export function appendSystemComment(
 }
 
 // A child is eligible through the last day of their birth month at age 18.
+// Returns Pacific midnight so formatDatePacific round-trips correctly.
 export function getAgeCutoffDate(referenceDate: Date = pacificToday()): Date {
-  return new Date(Date.UTC(referenceDate.getUTCFullYear() - 18, referenceDate.getUTCMonth(), 1))
+  const year = referenceDate.getUTCFullYear() - 18
+  const month = referenceDate.getUTCMonth() + 1
+  return DateTime.fromObject({ year, month, day: 1 }, { zone: PACIFIC_ZONE }).toJSDate()
 }
 
 export function isEligibleAge(dateOfBirth: Date, referenceDate: Date = pacificToday()): boolean {
-  return dateOfBirth >= getAgeCutoffDate(referenceDate)
+  const cutoff = getAgeCutoffDate(referenceDate)
+  return dateOfBirth.toISOString().slice(0, 10) >= cutoff.toISOString().slice(0, 10)
 }
 
 export interface S3ConnectionParams {

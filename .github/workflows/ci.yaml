@@ -2,11 +2,12 @@ name: CI (PR + Manual)
 
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, release/cra-file-transfer-enabled]
     paths:
       - "frontend/**"
       - "backend/**"
       - "migrations/**"
+      - "backup/**"
   workflow_dispatch:
     inputs:
       target_env:
@@ -30,8 +31,10 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
       migrations: ${{ steps.filter.outputs.migrations }}
+      backup: ${{ steps.filter.outputs.backup }}
       envname: ${{ steps.env.outputs.envname }}
       tag: ${{ steps.tag.outputs.tag }}
+      backup_tag: ${{ steps.tag.outputs.backup_tag }}
     steps:
       - uses: actions/checkout@v6
 
@@ -64,6 +67,7 @@ jobs:
         run: |
           set -euo pipefail
           ENV="${{ steps.env.outputs.envname }}"
+          SHA7="${GITHUB_SHA::7}"
           echo "tag=${ENV}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - id: filter
@@ -76,6 +80,8 @@ jobs:
               - 'backend/**'
             migrations:
               - 'migrations/**'
+            backup:
+              - 'backup/**'
 
   coverage-summary:
     name: Coverage Summary (report-only)
@@ -160,6 +166,23 @@ jobs:
             exit 1
           fi
           echo "Found $sql_count SQL migration file(s)."
+
+      # ---------- PVC Backup Image----------
+      - name: Backup Image - validate Docker build (no push)
+        if: needs.detect-changes.outputs.backup == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # If you use Dockerfile (recommended)
+          if [[ -f backup/Dockerfile ]]; then
+            echo "Found backup/Dockerfile. Building image (no push)..."
+            docker build -f backup/Dockerfile -t csa-backup:ci ./backup
+          else
+            echo "No backup/Dockerfile found. Skipping docker build."
+            echo "If backup is intended to ship as an image, add backup/Dockerfile."
+            exit 1
+          fi
 
 
 

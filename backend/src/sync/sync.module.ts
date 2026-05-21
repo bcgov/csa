@@ -7,6 +7,7 @@ import { icmConfig } from 'src/config/icm.config'
 import { syncConfig } from 'src/config/sync.config'
 import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
+import { AutoBatchHandler } from './handlers/auto-batch.handler'
 import { IngestDataHandler } from './handlers/ingest-data.handler'
 import { IngestIcmHandler } from './handlers/ingest-icm.handler'
 import { IngestMisHandler } from './handlers/ingest-mis.handler'
@@ -17,7 +18,8 @@ import { IcmService } from './icm/icm.service'
 import { FileStorageService } from './mis/file-storage/file-storage.service'
 import { MockFileStorageService } from './mis/file-storage/mock-file-storage.service'
 import { S3Service } from './mis/file-storage/s3.service'
-import { EligibilityService } from './eligibility/eligibility.service'
+import { AutoBatchService } from './eligibility/auto-batch.service'
+import { EligibilityModule } from './eligibility/eligibility.module'
 import { MisService } from './mis/mis.service'
 
 @Module({
@@ -30,6 +32,7 @@ import { MisService } from './mis/mis.service'
     PrismaModule,
     JobsModule,
     IcmSyncBackModule,
+    EligibilityModule,
   ],
   providers: [
     // Factory: FileStorageService (S3 or Mock based on config)
@@ -44,7 +47,8 @@ import { MisService } from './mis/mis.service'
     },
     IcmService,
     MisService,
-    EligibilityService,
+    AutoBatchService,
+    AutoBatchHandler,
     IngestDataHandler,
     IngestIcmHandler,
     IngestMisHandler,
@@ -52,6 +56,7 @@ import { MisService } from './mis/mis.service'
     SyncIcmHandler,
   ],
   exports: [
+    AutoBatchHandler,
     IngestDataHandler,
     IngestIcmHandler,
     IngestMisHandler,
@@ -62,6 +67,7 @@ import { MisService } from './mis/mis.service'
 export class SyncModule implements OnModuleInit {
   constructor(
     private readonly registry: JobRegistry,
+    private readonly autoBatchHandler: AutoBatchHandler,
     private readonly ingestDataHandler: IngestDataHandler,
     private readonly ingestIcmHandler: IngestIcmHandler,
     private readonly ingestMisHandler: IngestMisHandler,
@@ -70,6 +76,7 @@ export class SyncModule implements OnModuleInit {
   ) {}
 
   onModuleInit() {
+    this.registry.register(this.autoBatchHandler.jobType, this.autoBatchHandler)
     this.registry.register(this.ingestDataHandler.jobType, this.ingestDataHandler)
     this.registry.register(this.ingestIcmHandler.jobType, this.ingestIcmHandler)
     this.registry.register(this.ingestMisHandler.jobType, this.ingestMisHandler)

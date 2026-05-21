@@ -1,10 +1,23 @@
-import { ConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
-import { JobsService } from 'src/jobs/jobs.service'
+import { pacificToday } from 'src/common/utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { PROTECTED_STATUSES, PROTECTED_STATUSES_SQL } from './eligibility.config'
 import { buildFindAgedOutContactIdsSql, buildLoadContactProfilesSql } from './eligibility.queries'
 import { EligibilityService } from './eligibility.service'
+
+describe('PROTECTED_STATUSES_SQL', () => {
+  it('should contain all protected statuses as quoted SQL literals', () => {
+    for (const status of PROTECTED_STATUSES) {
+      expect(PROTECTED_STATUSES_SQL).toContain(`'${status}'`)
+    }
+  })
+
+  it('should have same number of entries as PROTECTED_STATUSES', () => {
+    const count = PROTECTED_STATUSES_SQL.split(',').length
+    expect(count).toBe(PROTECTED_STATUSES.length)
+  })
+})
 
 describe('EligibilityService', () => {
   let service: EligibilityService
@@ -12,8 +25,6 @@ describe('EligibilityService', () => {
     $queryRawUnsafe: ReturnType<typeof vi.fn>
     $executeRawUnsafe: ReturnType<typeof vi.fn>
   }
-  let mockJobsService: { getLastSuccessTimestamp: ReturnType<typeof vi.fn> }
-  let mockConfigService: { get: ReturnType<typeof vi.fn> }
 
   const allTablesPopulated = [
     'stg_icm_cases',
@@ -33,21 +44,8 @@ describe('EligibilityService', () => {
       $executeRawUnsafe: vi.fn().mockResolvedValue(0),
     }
 
-    mockJobsService = {
-      getLastSuccessTimestamp: vi.fn().mockResolvedValue(null), // default: full load
-    }
-
-    mockConfigService = {
-      get: vi.fn().mockReturnValue(2), // lookback days
-    }
-
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        EligibilityService,
-        { provide: PrismaService, useValue: mockPrisma },
-        { provide: JobsService, useValue: mockJobsService },
-        { provide: ConfigService, useValue: mockConfigService },
-      ],
+      providers: [EligibilityService, { provide: PrismaService, useValue: mockPrisma }],
     }).compile()
 
     service = module.get<EligibilityService>(EligibilityService)
@@ -65,19 +63,19 @@ describe('EligibilityService', () => {
     )
     mockPrisma.$queryRawUnsafe.mockReset().mockResolvedValueOnce(partiallyEmpty)
 
-    await expect(service.run()).rejects.toThrow(
+    await expect(service.run(null)).rejects.toThrow(
       'Staging validation failed: empty tables [stg_icm_cases, stg_mis_payments]',
     )
   })
 
   it('should proceed when all staging tables have data', async () => {
-    const result = await service.run()
+    const result = await service.run(null)
     expect(result.processed).toBe(0)
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(expect.stringContaining('UNION ALL'))
   })
 
   it('should return zero counts when no staging data', async () => {
-    const result = await service.run()
+    const result = await service.run(null)
     expect(result.processed).toBe(0)
     expect(result.statusChanges).toBe(0)
   })
@@ -126,7 +124,7 @@ describe('EligibilityService', () => {
       },
     ])
 
-    const result = await service.run()
+    const result = await service.run(null)
     expect(result.processed).toBe(1)
   })
 
@@ -180,7 +178,7 @@ describe('EligibilityService', () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
       makeOver18Contact({ personIdIcm: null, existingContactId: 99 }),
     ])
-    const result = await service.run()
+    const result = await service.run(null)
 
     expect(result.statusChanges).toBe(1)
     expect(result.skipped).toBe(1)
@@ -197,7 +195,7 @@ describe('EligibilityService', () => {
       makeOver18Contact({ personIdIcm: null, existingContactId: 99 }),
     ])
 
-    const result = await service.run()
+    const result = await service.run(null)
 
     expect(result.statusChanges).toBe(2)
     expect(result.skipped).toBe(1)
@@ -210,7 +208,7 @@ describe('EligibilityService', () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
       makeOver18Contact({ personIdIcm: null, existingContactId: 99 }),
     ])
-    await service.run()
+    await service.run(null)
 
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('person_id_icm'),
@@ -226,7 +224,7 @@ describe('EligibilityService', () => {
       makeOver18Contact({ personIdIcm: 'ICM-HOLD', csaStatus: 'on_hold', existingContactId: 99 }),
     ])
 
-    const result = await service.run()
+    const result = await service.run(null)
 
     expect(result.processed).toBe(1)
     expect(result.statusChanges).toBe(0)
@@ -239,7 +237,7 @@ describe('EligibilityService', () => {
       makeOver18Contact({ personIdIcm: 'ICM-ELIG', csaStatus: 'eligible', existingContactId: 88 }),
     ])
 
-    const result = await service.run()
+    const result = await service.run(null)
 
     expect(result.processed).toBe(2)
     expect(result.statusChanges).toBe(1)
@@ -247,15 +245,11 @@ describe('EligibilityService', () => {
   })
 
   it('should upsert contacts with no status transition (existing status preserved)', async () => {
-    mockPrisma.$queryRawUnsafe
-      .mockResolvedValueOnce([
-        makeEligibleContact({ csaStatus: 'eligible', existingContactId: 10 }),
-      ])
-      .mockResolvedValueOnce([{ id: 10, person_id_icm: 'ICM-ELIG' }]) // get contact DB IDs
-      .mockResolvedValueOnce([{ id: 100 }]) // find pending batch
-      .mockResolvedValueOnce([{ contact_id: 10 }]) // already in batch
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+      makeEligibleContact({ csaStatus: 'eligible', existingContactId: 10 }),
+    ])
 
-    const result = await service.run()
+    const result = await service.run(null)
 
     expect(result.processed).toBe(1)
     expect(result.statusChanges).toBe(0)
@@ -263,23 +257,19 @@ describe('EligibilityService', () => {
     expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1) // upsert only
   })
 
-  it('should pass threshold to query when last success exists', async () => {
-    const lastSuccess = new Date('2026-02-14T10:00:00Z')
-    mockJobsService.getLastSuccessTimestamp.mockResolvedValue(lastSuccess)
+  it('should pass threshold to query when threshold is provided', async () => {
+    const threshold = new Date('2026-02-12T10:00:00Z') // already computed by handler
 
-    await service.run()
+    await service.run(threshold)
 
-    const expectedThreshold = new Date(lastSuccess.getTime() - 2 * 24 * 60 * 60 * 1000)
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
       expect.stringContaining('changed_contacts'),
-      expectedThreshold,
+      threshold,
     )
   })
 
-  it('should use full load when no previous success', async () => {
-    mockJobsService.getLastSuccessTimestamp.mockResolvedValue(null)
-
-    await service.run()
+  it('should use full load when threshold is null', async () => {
+    await service.run(null)
 
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
       expect.not.stringContaining('changed_contacts'),
@@ -287,42 +277,37 @@ describe('EligibilityService', () => {
   })
 
   it('should query for aged-out contacts in incremental mode', async () => {
-    const lastSuccess = new Date('2026-02-14T10:00:00Z')
-    mockJobsService.getLastSuccessTimestamp.mockResolvedValue(lastSuccess)
+    const threshold = new Date('2026-02-12T10:00:00Z')
 
-    await service.run()
+    await service.run(threshold)
 
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
-      expect.stringContaining('csa_status IN'),
+      expect.stringContaining('csa_status NOT IN'),
       expect.any(Date),
     )
   })
 
   it('should not query for aged-out contacts in full load mode', async () => {
-    mockJobsService.getLastSuccessTimestamp.mockResolvedValue(null)
-
-    await service.run()
+    await service.run(null)
 
     expect(mockPrisma.$queryRawUnsafe).not.toHaveBeenCalledWith(
-      expect.stringContaining('csa_status IN'),
+      expect.stringContaining('csa_status NOT IN'),
       expect.any(Date),
     )
   })
 
   it('should include aged-out IDs in profile query when found', async () => {
-    const lastSuccess = new Date('2026-02-14T10:00:00Z')
-    mockJobsService.getLastSuccessTimestamp.mockResolvedValue(lastSuccess)
+    const threshold = new Date('2026-02-12T10:00:00Z')
 
     mockPrisma.$queryRawUnsafe
       .mockResolvedValueOnce([{ person_id_icm: 'AGED-1' }, { person_id_icm: 'AGED-2' }]) // aged-out query
       .mockResolvedValueOnce([]) // loadContactProfiles
 
-    await service.run()
+    await service.run(threshold)
 
-    const expectedThreshold = new Date(lastSuccess.getTime() - 2 * 24 * 60 * 60 * 1000)
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
       expect.stringContaining('ANY($2::TEXT[])'),
-      expectedThreshold,
+      threshold,
       ['AGED-1', 'AGED-2'],
     )
   })
@@ -331,8 +316,10 @@ describe('EligibilityService', () => {
 
   //contact that reaches step 7->eligible (under 18, valid placement + order)
   function makeEligibleContact(overrides: Record<string, unknown> = {}) {
-    const now = new Date()
-    const prevMonth = new Date(Date.UTC(now.getFullYear(), now.getUTCMonth() - 1, 15))
+    const todayPacific = pacificToday()
+    const prevMonth = new Date(
+      Date.UTC(todayPacific.getUTCFullYear(), todayPacific.getUTCMonth() - 1, 15),
+    )
     return {
       caseRowId: 'CASE-E',
       personIdIcm: 'ICM-ELIG',
@@ -448,133 +435,94 @@ describe('EligibilityService', () => {
     }
   }
 
-  it('should auto-batch eligible contacts as application', async () => {
-    mockPrisma.$queryRawUnsafe
-      .mockResolvedValueOnce([makeEligibleContact()]) // loadContactProfiles
-      .mockResolvedValueOnce([{ id: 1, person_id_icm: 'ICM-ELIG' }]) // get contact DB IDs
-      .mockResolvedValueOnce([{ id: 100 }]) // find pending batch
-      .mockResolvedValueOnce([]) // check already in batch
-
-    mockPrisma.$executeRawUnsafe
-      .mockResolvedValueOnce(0) // batchUpsertRows
-      .mockResolvedValueOnce(1) // insert batch details
-      .mockResolvedValueOnce(1) // update application contacts status
-      .mockResolvedValueOnce(1) // update batch record count
+  it('should process eligible contacts and upsert to master table', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeEligibleContact()])
 
     const result = await service.run()
 
-    expect(result.autoBatched.application).toBe(1)
-    expect(result.autoBatched.cancellation).toBe(0)
-    // Verify pre_batch_status is set for REMOVE_FROM_BATCH support
-    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(
-      expect.stringContaining('pre_batch_status'),
-      'in_batch_application',
-      [1],
-      'eligible',
-    )
+    expect(result.processed).toBe(1)
+    expect(result.statusChanges).toBe(1)
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1) // batchUpsertRows only
   })
 
-  it('should auto-batch not_eligible_in_pay contacts as cancellation', async () => {
-    mockPrisma.$queryRawUnsafe
-      .mockResolvedValueOnce([makeInPayCancelContact()]) // loadContactProfiles
-      .mockResolvedValueOnce([{ id: 2, person_id_icm: 'ICM-CANCEL' }]) // get contact DB IDs
-      .mockResolvedValueOnce([{ id: 100 }]) // find pending batch
-      .mockResolvedValueOnce([]) // check already in batch
-
-    mockPrisma.$executeRawUnsafe
-      .mockResolvedValueOnce(0) // batchUpsertRows
-      .mockResolvedValueOnce(1) // insert batch details
-      .mockResolvedValueOnce(1) // update cancellation contacts status
-      .mockResolvedValueOnce(1) // update batch record count
+  it('should process not_eligible_in_pay contacts and upsert to master table', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeInPayCancelContact()])
 
     const result = await service.run()
 
-    expect(result.autoBatched.application).toBe(0)
-    expect(result.autoBatched.cancellation).toBe(1)
-    // Verify pre_batch_status is set for REMOVE_FROM_BATCH support
-    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(
-      expect.stringContaining('pre_batch_status'),
-      'in_batch_cancellation',
-      [2],
-      'not_eligible_in_pay',
-    )
+    expect(result.processed).toBe(1)
+    expect(result.statusChanges).toBe(1)
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1) // batchUpsertRows only
   })
 
-  it('should create pending batch when none exists', async () => {
-    mockPrisma.$queryRawUnsafe
-      .mockResolvedValueOnce([makeEligibleContact()]) // loadContactProfiles
-      .mockResolvedValueOnce([{ id: 1, person_id_icm: 'ICM-ELIG' }]) // get contact DB IDs
-      .mockResolvedValueOnce([]) // find pending batch->none
-      .mockResolvedValueOnce([{ id: 200 }]) // INSERT batch RETURNING id
-      .mockResolvedValueOnce([]) // check already in batch
-
-    mockPrisma.$executeRawUnsafe
-      .mockResolvedValueOnce(0) // batchUpsertRows
-      .mockResolvedValueOnce(1) // insert batch details
-      .mockResolvedValueOnce(1) // update contacts status
-      .mockResolvedValueOnce(1) // update batch record count
+  it('should process mixed eligible and not_eligible_in_pay contacts in same run', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+      makeEligibleContact(),
+      makeInPayCancelContact(),
+    ])
 
     const result = await service.run()
 
-    expect(result.autoBatched.application).toBe(1)
-    // Verify batch creation SQL was called
-    expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO batches'),
-      'pending',
-    )
+    expect(result.processed).toBe(2)
+    expect(result.statusChanges).toBe(2)
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1) // batchUpsertRows only
   })
 
-  it('should skip contacts already in pending batch', async () => {
-    mockPrisma.$queryRawUnsafe
-      .mockResolvedValueOnce([makeEligibleContact()]) // loadContactProfiles
-      .mockResolvedValueOnce([{ id: 1, person_id_icm: 'ICM-ELIG' }]) // get contact DB IDs
-      .mockResolvedValueOnce([{ id: 100 }]) // find pending batch
-      .mockResolvedValueOnce([{ contact_id: 1 }]) // already in batch!
-
-    mockPrisma.$executeRawUnsafe.mockResolvedValueOnce(0) // batchUpsertRows only
-
-    const result = await service.run()
-
-    expect(result.autoBatched.application).toBe(0)
-    expect(result.autoBatched.cancellation).toBe(0)
-    // Only the upsert call, no batch detail insert
-    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
-  })
-
-  it('should handle mixed application and cancellation in same run', async () => {
-    mockPrisma.$queryRawUnsafe
-      .mockResolvedValueOnce([makeEligibleContact(), makeInPayCancelContact()]) // loadContactProfiles
-      .mockResolvedValueOnce([
-        // get contact DB IDs
-        { id: 1, person_id_icm: 'ICM-ELIG' },
-        { id: 2, person_id_icm: 'ICM-CANCEL' },
-      ])
-      .mockResolvedValueOnce([{ id: 100 }]) // find pending batch
-      .mockResolvedValueOnce([]) // check already in batch
-
-    mockPrisma.$executeRawUnsafe
-      .mockResolvedValueOnce(0) // batchUpsertRows
-      .mockResolvedValueOnce(2) // insert batch details (both)
-      .mockResolvedValueOnce(1) // update application contacts status
-      .mockResolvedValueOnce(1) // update cancellation contacts status
-      .mockResolvedValueOnce(1) // update batch record count
-
-    const result = await service.run()
-
-    expect(result.autoBatched.application).toBe(1)
-    expect(result.autoBatched.cancellation).toBe(1)
-  })
-
-  it('should not auto-batch over_18 or other non-batchable statuses', async () => {
+  it('should skip new contacts who are already over 18', async () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeOver18Contact()])
 
-    mockPrisma.$executeRawUnsafe.mockResolvedValueOnce(0) // batchUpsertRows only
-
     const result = await service.run()
 
-    expect(result.autoBatched.application).toBe(0)
-    expect(result.autoBatched.cancellation).toBe(0)
+    expect(result.processed).toBe(1)
+    expect(result.skipped).toBe(1)
+    expect(result.statusChanges).toBe(0)
   })
+
+  it.each([
+    { csaStatus: 'eligible_tbd', label: 'eligible_tbd' },
+    { csaStatus: 'not_eligible_in_pay', label: 'not_eligible_in_pay' },
+    { csaStatus: 'not_eligible_ip_tbd', label: 'not_eligible_ip_tbd' },
+  ])(
+    'should transition $label contact to over_18 when over 18 (full load)',
+    async ({ csaStatus }) => {
+      mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+        makeOver18Contact({ csaStatus, existingContactId: 99 }),
+      ])
+
+      const result = await service.run(null)
+
+      expect(result.processed).toBe(1)
+      expect(result.statusChanges).toBe(1)
+      expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
+      const upsertSql = mockPrisma.$executeRawUnsafe.mock.calls[0][0] as string
+      expect(upsertSql).toContain('over_18')
+    },
+  )
+
+  it.each([
+    { csaStatus: 'eligible_tbd', label: 'eligible_tbd' },
+    { csaStatus: 'not_eligible_in_pay', label: 'not_eligible_in_pay' },
+    { csaStatus: 'not_eligible_ip_tbd', label: 'not_eligible_ip_tbd' },
+  ])(
+    'should transition $label contact to over_18 when picked up by aged-out query (incremental)',
+    async ({ csaStatus }) => {
+      const threshold = new Date('2026-02-12T10:00:00Z')
+      const personIdIcm = 'ICM-AGED'
+
+      mockPrisma.$queryRawUnsafe
+        .mockResolvedValueOnce([{ person_id_icm: personIdIcm }]) // aged-out query
+        .mockResolvedValueOnce([
+          makeOver18Contact({ csaStatus, existingContactId: 99, personIdIcm }),
+        ]) // profile query
+
+      const result = await service.run(threshold)
+
+      expect(result.processed).toBe(1)
+      expect(result.statusChanges).toBe(1)
+      const upsertSql = mockPrisma.$executeRawUnsafe.mock.calls[0][0] as string
+      expect(upsertSql).toContain('over_18')
+    },
+  )
 })
 
 describe('buildLoadContactProfilesSql', () => {
@@ -678,14 +626,12 @@ describe('buildLoadContactProfilesSql', () => {
 })
 
 describe('buildFindAgedOutContactIdsSql', () => {
-  it('should query contacts with transitionable statuses and DOB before cutoff', () => {
+  it('should query contacts NOT in protected statuses with DOB before cutoff', () => {
     const cutoff = new Date('2008-03-01')
     const { sql, params } = buildFindAgedOutContactIdsSql(cutoff)
 
-    expect(sql).toContain('csa_status IN')
-    expect(sql).toContain("'eligible'")
-    expect(sql).toContain("'in_pay'")
-    expect(sql).toContain("'not_eligible_out_of_pay'")
+    expect(sql).toContain('csa_status NOT IN')
+    expect(sql).toContain(PROTECTED_STATUSES_SQL)
     expect(sql).toContain('date_of_birth < $1')
     expect(sql).toContain('date_of_birth IS NOT NULL')
     expect(params).toEqual([cutoff])

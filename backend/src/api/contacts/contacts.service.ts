@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
 import {
@@ -11,8 +17,15 @@ import {
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { enrichLabels, isEligibleAge, pacificToday } from 'src/common/utils'
+import { getCancelReasonLabel } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
+import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
+import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
-import { ALLOWED_FILTER_SORT_FIELDS, BULK_OPERATION_SKIP_REASONS } from './constants'
+import {
+  ALLOWED_FILTER_SORT_FIELDS,
+  BULK_OPERATION_SKIP_REASONS,
+  TRANSACTION_TYPES,
+} from './constants'
 import { ContactDto } from './dto/contact.dto'
 import type {
   BulkOperationResponse,
@@ -29,6 +42,7 @@ export class ContactsService {
     private prisma: PrismaService,
     private stateMachine: StateMachineService,
     private icmSyncBackService: IcmSyncBackService,
+    private eligibilityService: EligibilityService,
   ) {}
 
   async findAll(
@@ -235,7 +249,8 @@ export class ContactsService {
     actor: Actor,
     options?: UpdateCsaStatusOptions,
   ): Promise<TransitionResult> {
-    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
+    const db = options?.tx ?? this.prisma
+    const contact = await db.contact.findUnique({ where: { id: contactId } })
     if (!contact) {
       return { success: false, reason: 'Contact not found' }
     }
@@ -258,6 +273,10 @@ export class ContactsService {
     const result = this.stateMachine.transitionContact(currentState, event, actor, targetState)
 
     if (!result.success) {
+      const origin = options?.origin ? ` [origin: ${options.origin}]` : ''
+      this.logger.warn(
+        `Contact ${contactId}: transition failed ${currentState} [${event}] by ${actor} — ${result.reason}${origin}`,
+      )
       return result
     }
 
@@ -293,9 +312,10 @@ export class ContactsService {
     // clear preBatchStatus on all batch cycle exits
     if (
       event === CSA_EVENT.REMOVE_FROM_BATCH ||
-      event === CSA_EVENT.CRA_ACCEPTED ||
+      event === CSA_EVENT.CRA_RSP_REJECTED ||
       event === CSA_EVENT.CRA_FILE_REJECTED ||
-      event === CSA_EVENT.CRA_RECORD_REJECTED
+      event === CSA_EVENT.CRA_WKL_APPROVED ||
+      event === CSA_EVENT.CRA_WKL_REFUSED
     ) {
       updateData.preBatchStatus = null
     }
@@ -312,20 +332,55 @@ export class ContactsService {
       updateData.careEndDate = null
     }
 
-    await this.prisma.contact.update({
+    await db.contact.update({
       where: { id: contactId },
       data: updateData,
     })
 
     this.logger.log(`Contact ${contactId}: ${currentState}->${nextState} [${event}] by ${actor}`)
 
-    if (actor === 'USER') {
+    // Skip immediate sync when running inside a transaction — the caller must
+    // trigger sync after the transaction commits, otherwise syncSingleContact
+    // reads the pre-commit state and syncs a stale status to ICM.
+    if (actor === 'USER' && !options?.tx) {
       this.icmSyncBackService.syncSingleContact(contactId).catch((err) => {
         this.logger.warn(
           `Immediate ICM sync failed for contact ${contactId}: ${(err as Error).message}`,
         )
       })
     }
+
+    return { success: true, from: currentState, to: nextState }
+  }
+
+  async forceUpdateCsaStatus(
+    contactId: number,
+    nextState: string,
+    additionalData?: Record<string, unknown>,
+  ): Promise<TransitionResult> {
+    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
+    if (!contact) {
+      return { success: false, reason: 'Contact not found' }
+    }
+
+    const currentState = contact.csaStatus ?? ''
+
+    await this.prisma.contact.update({
+      where: { id: contactId },
+      data: {
+        csaStatus: nextState,
+        csaStatusEffectiveDate: new Date(),
+        icmIntegrationStatus: true,
+        lastUpdatedBy: 'SYSTEM',
+        lastUpdatedAt: new Date(),
+        preBatchStatus: null,
+        resumeStatus: null,
+        holdBy: null,
+        ...additionalData,
+      },
+    })
+
+    this.logger.log(`Contact ${contactId}: ${currentState}->${nextState} [FORCE/WKL] by SYSTEM`)
 
     return { success: true, from: currentState, to: nextState }
   }
@@ -374,7 +429,10 @@ export class ContactsService {
     }
 
     for (const id of contactIds) {
-      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.HOLD, 'USER', { userId })
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.HOLD, 'USER', {
+        userId,
+        origin: 'ContactsService.holdContacts',
+      })
       if (transitionResult.success) {
         result.success.push(id)
       } else {
@@ -396,7 +454,10 @@ export class ContactsService {
     }
 
     for (const id of contactIds) {
-      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.RESUME, 'USER', { userId })
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.RESUME, 'USER', {
+        userId,
+        origin: 'ContactsService.resumeContacts',
+      })
       if (transitionResult.success) {
         result.success.push(id)
       } else {
@@ -455,7 +516,10 @@ export class ContactsService {
         continue
       }
 
-      const transitionResult = await this.updateCsaStatus(id, event, actor, { userId })
+      const transitionResult = await this.updateCsaStatus(id, event, actor, {
+        userId,
+        origin: 'ContactsService.updateEligibilityStatus',
+      })
       if (transitionResult.success) {
         result.success.push(id)
       } else {
@@ -508,6 +572,7 @@ export class ContactsService {
 
       const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.SET_NOT_ELIGIBLE, 'USER', {
         userId,
+        origin: 'ContactsService.updateNotEligibleStatus',
       })
       if (transitionResult.success) {
         result.success.push(id)
@@ -561,7 +626,10 @@ export class ContactsService {
         continue
       }
 
-      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.AGE_OUT, 'USER', { userId })
+      const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.AGE_OUT, 'USER', {
+        userId,
+        origin: 'ContactsService.updateChildOver18',
+      })
       if (transitionResult.success) {
         result.success.push(id)
       } else {
@@ -573,6 +641,7 @@ export class ContactsService {
   }
 
   async findContactBatches(contactId: number) {
+    this.logger.log(`Fetching batch history for contact with id ${contactId}`)
     const contact = await this.prisma.contact.findUnique({
       where: { id: contactId },
     })
@@ -588,18 +657,77 @@ export class ContactsService {
             id: true,
             batchDate: true,
             status: true,
+            systemComments: true,
+          },
+        },
+        contact: {
+          select: {
+            effectiveDate: true,
+            careEndDate: true,
+            cancelReasonCode: true,
           },
         },
       },
       orderBy: { createdAt: 'desc' },
     })
 
-    return details.map((detail) =>
-      enrichLabels({
+    return details.map((detail) => {
+      // Compute effectiveDate based on transaction type:
+      // - Application: Legal Authority's Effective Date (contact.effectiveDate)
+      // - Cancellation: Child's Care End Date (contact.careEndDate)
+      const effectiveDate =
+        detail.transactionType === TRANSACTION_TYPES.CANCELLATION
+          ? detail.contact.careEndDate
+          : detail.contact.effectiveDate
+
+      const cancelReasonCode = detail.contact.cancelReasonCode
+      const cancelReasonLabel = getCancelReasonLabel(cancelReasonCode, detail.transactionType)
+
+      return enrichLabels({
         ...detail,
+        effectiveDate,
+        cancelReasonCode:
+          detail.transactionType === TRANSACTION_TYPES.CANCELLATION ? cancelReasonCode : null,
+        cancelReasonLabel,
         batch: enrichLabels(detail.batch),
-      }),
-    )
+      })
+    })
+  }
+
+  async runContactEligibility(
+    contactId: number,
+  ): Promise<{ previousStatus: string | null; newStatus: string }> {
+    const contact = await this.prisma.contact.findUnique({
+      where: { id: contactId },
+      select: { personIdIcm: true },
+    })
+
+    if (!contact) {
+      throw new NotFoundException(`Contact ${contactId} not found`)
+    }
+
+    let result: { previousStatus: string | null; newStatus: string }
+    try {
+      result = await this.eligibilityService.runForContact(contact.personIdIcm)
+    } catch (err) {
+      if (err instanceof EligibilityInputError) {
+        throw new UnprocessableEntityException(err.message)
+      }
+      throw err
+    }
+
+    // If the eligibility run flipped csa_status, the upsert flagged
+    // icm_integration_status=true. Try to push immediately; on failure
+    // the flag stays set and the RETRY_FAILED cron will sweep it.
+    if (result.previousStatus !== result.newStatus) {
+      this.icmSyncBackService.syncSingleContact(contactId).catch((err) => {
+        this.logger.warn(
+          `Immediate ICM sync failed for contact ${contactId}: ${(err as Error).message}`,
+        )
+      })
+    }
+
+    return result
   }
 
   // Escape ILIKE special characters to prevent wildcard injection

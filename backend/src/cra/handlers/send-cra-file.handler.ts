@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { readFile } from 'fs/promises'
 import { appendSystemComment, pacificToday } from 'src/common/utils'
 import type { Batch, Contact, ContactBatchDetail } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { BatchesService } from 'src/api/batches/batches.service'
 import { ContactsService } from 'src/api/contacts/contacts.service'
 import { PrismaService } from 'src/common/database/prisma.service'
@@ -120,6 +121,18 @@ export class SendCraFileHandler extends BaseJob {
       },
     })
 
+    for (let i = 0; i < this.batchDetails.length; i++) {
+      await this.prisma.contactBatchDetail.update({
+        where: { id: this.batchDetails[i].id },
+        data: {
+          craMatchingSnapshot: this.outboundDataService.buildMatchingSnapshot(
+            details[i],
+            this.batchDetails[i].contact.middleName,
+          ) as unknown as Prisma.InputJsonValue,
+        },
+      })
+    }
+
     this.logger.log(
       `Batch ${this.batch.id}: file ${fileName} sent, ${this.batchDetails.length} contacts updated`,
     )
@@ -148,7 +161,7 @@ export class SendCraFileHandler extends BaseJob {
         detail.contactId,
         CSA_EVENT.SEND_TO_CRA,
         UPDATED_BY.SYSTEM,
-        { additionalData: { csaSentDate: now } },
+        { additionalData: { csaSentDate: now }, origin: 'SendCraFileHandler' },
       )
     }
 

@@ -4,7 +4,7 @@ export interface CraResHeader {
   versionNum: string // V00.0
   processDate: string // X(8) YYYYMMDD
   businessNum: string // X(15)
-  recordCount: number // 9(08) It includes header, tailer and details count
+  recordCount?: number // 9(08) It includes header, tailer and details count
   filler?: string // 25 space
 }
 export interface CraResDetail {

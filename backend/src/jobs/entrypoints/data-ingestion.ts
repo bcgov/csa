@@ -7,7 +7,7 @@ import { JobTrigger } from '../enums/job-trigger.enum'
 import { JobType } from '../enums/job-type.enum'
 import { JobRunner } from '../job-runner.service'
 
-// Orchestrates: INGEST_ICM, INGEST_MIS, RUN_ELIGIBILITY, SYNC_ICM
+// Orchestrates: INGEST_ICM, INGEST_MIS in parallel
 async function bootstrap() {
   const logger = new AppLogger('DataIngestionJob')
 

@@ -15,7 +15,7 @@ describe('csaStatusMachine', () => {
     })
 
     it('should return current state for invalid transition', () => {
-      const nextState = getNextCsaState(CSA_STATUS.ELIGIBLE, CSA_EVENT.CRA_ACCEPTED)
+      const nextState = getNextCsaState(CSA_STATUS.ELIGIBLE, CSA_EVENT.CRA_RSP_REJECTED)
       expect(nextState).toBe(CSA_STATUS.ELIGIBLE)
     })
   })
@@ -27,13 +27,13 @@ describe('csaStatusMachine', () => {
     })
 
     it('should return false for invalid transition', () => {
-      const canTransition = canTransitionCsa(CSA_STATUS.ELIGIBLE, CSA_EVENT.CRA_ACCEPTED)
+      const canTransition = canTransitionCsa(CSA_STATUS.ELIGIBLE, CSA_EVENT.CRA_RSP_REJECTED)
       expect(canTransition).toBe(false)
     })
   })
 
   describe('application flow', () => {
-    it('should handle full application flow: eligible -> inBatch -> batchSent -> inPay', () => {
+    it('should handle application flow: eligible -> inBatch -> batchSent', () => {
       let state = CSA_STATUS.ELIGIBLE as string
 
       state = getNextCsaState(state, CSA_EVENT.ADD_TO_BATCH) as string
@@ -41,16 +41,13 @@ describe('csaStatusMachine', () => {
 
       state = getNextCsaState(state, CSA_EVENT.SEND_TO_CRA) as string
       expect(state).toBe(CSA_STATUS.BATCH_SENT_APPLICATION)
-
-      state = getNextCsaState(state, CSA_EVENT.CRA_ACCEPTED) as string
-      expect(state).toBe(CSA_STATUS.IN_PAY)
     })
 
-    it('should handle CRA record-level rejection flow', () => {
+    it('should handle CRA response rejection flow', () => {
       let state = CSA_STATUS.BATCH_SENT_APPLICATION as string
 
-      state = getNextCsaState(state, CSA_EVENT.CRA_RECORD_REJECTED) as string
-      expect(state).toBe(CSA_STATUS.APPLICATION_REFUSED_CRA)
+      state = getNextCsaState(state, CSA_EVENT.CRA_RSP_REJECTED) as string
+      expect(state).toBe(CSA_STATUS.CRA_ERROR_APPLICATION)
 
       // Can retry by adding to batch again
       state = getNextCsaState(state, CSA_EVENT.ADD_TO_BATCH) as string
@@ -73,6 +70,16 @@ describe('csaStatusMachine', () => {
       const state = getNextCsaState(CSA_STATUS.CANCELLATION_REFUSED_CRA, CSA_EVENT.HOLD)
       expect(state).toBe(CSA_STATUS.ON_HOLD)
     })
+
+    it('should transition to on_hold from cra_error_application', () => {
+      const state = getNextCsaState(CSA_STATUS.CRA_ERROR_APPLICATION, CSA_EVENT.HOLD)
+      expect(state).toBe(CSA_STATUS.ON_HOLD)
+    })
+
+    it('should transition to on_hold from cra_error_cancellation', () => {
+      const state = getNextCsaState(CSA_STATUS.CRA_ERROR_CANCELLATION, CSA_EVENT.HOLD)
+      expect(state).toBe(CSA_STATUS.ON_HOLD)
+    })
   })
 
   describe('resume flow', () => {
@@ -83,6 +90,8 @@ describe('csaStatusMachine', () => {
       expect(targets).toContain(CSA_STATUS.APPLICATION_REFUSED_CRA)
       expect(targets).toContain(CSA_STATUS.NOT_ELIGIBLE_IP_TBD)
       expect(targets).toContain(CSA_STATUS.CANCELLATION_REFUSED_CRA)
+      expect(targets).toContain(CSA_STATUS.CRA_ERROR_APPLICATION)
+      expect(targets).toContain(CSA_STATUS.CRA_ERROR_CANCELLATION)
     })
 
     it('should have valid resume targets matching holdable states', () => {
@@ -95,11 +104,13 @@ describe('csaStatusMachine', () => {
       expect(resumeTargets).toContain(CSA_STATUS.APPLICATION_REFUSED_CRA)
       expect(resumeTargets).toContain(CSA_STATUS.NOT_ELIGIBLE_IP_TBD)
       expect(resumeTargets).toContain(CSA_STATUS.CANCELLATION_REFUSED_CRA)
+      expect(resumeTargets).toContain(CSA_STATUS.CRA_ERROR_APPLICATION)
+      expect(resumeTargets).toContain(CSA_STATUS.CRA_ERROR_CANCELLATION)
     })
   })
 
   describe('cancellation flow', () => {
-    it('should handle full cancellation flow', () => {
+    it('should handle cancellation flow: not_eligible_in_pay -> inBatch -> batchSent', () => {
       let state = CSA_STATUS.NOT_ELIGIBLE_IN_PAY as string
 
       state = getNextCsaState(state, CSA_EVENT.ADD_TO_BATCH) as string
@@ -107,9 +118,17 @@ describe('csaStatusMachine', () => {
 
       state = getNextCsaState(state, CSA_EVENT.SEND_TO_CRA) as string
       expect(state).toBe(CSA_STATUS.BATCH_SENT_CANCELLATION)
+    })
 
-      state = getNextCsaState(state, CSA_EVENT.CRA_ACCEPTED) as string
-      expect(state).toBe(CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY)
+    it('should handle CRA response rejection in cancellation flow', () => {
+      let state = CSA_STATUS.BATCH_SENT_CANCELLATION as string
+
+      state = getNextCsaState(state, CSA_EVENT.CRA_RSP_REJECTED) as string
+      expect(state).toBe(CSA_STATUS.CRA_ERROR_CANCELLATION)
+
+      // Can retry by adding to batch again
+      state = getNextCsaState(state, CSA_EVENT.ADD_TO_BATCH) as string
+      expect(state).toBe(CSA_STATUS.IN_BATCH_CANCELLATION)
     })
   })
 
@@ -135,12 +154,55 @@ describe('csaStatusMachine', () => {
     })
   })
 
+  describe('WKL disposition flow', () => {
+    it('should transition batch_sent_application to in_pay on CRA_WKL_APPROVED', () => {
+      const state = getNextCsaState(CSA_STATUS.BATCH_SENT_APPLICATION, CSA_EVENT.CRA_WKL_APPROVED)
+      expect(state).toBe(CSA_STATUS.IN_PAY)
+    })
+
+    it('should transition batch_sent_application to application_refused_cra on CRA_WKL_REFUSED', () => {
+      const state = getNextCsaState(CSA_STATUS.BATCH_SENT_APPLICATION, CSA_EVENT.CRA_WKL_REFUSED)
+      expect(state).toBe(CSA_STATUS.APPLICATION_REFUSED_CRA)
+    })
+
+    it('should transition batch_sent_cancellation to not_eligible_out_of_pay on CRA_WKL_APPROVED', () => {
+      const state = getNextCsaState(CSA_STATUS.BATCH_SENT_CANCELLATION, CSA_EVENT.CRA_WKL_APPROVED)
+      expect(state).toBe(CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY)
+    })
+
+    it('should transition batch_sent_cancellation to cancellation_refused_cra on CRA_WKL_REFUSED', () => {
+      const state = getNextCsaState(CSA_STATUS.BATCH_SENT_CANCELLATION, CSA_EVENT.CRA_WKL_REFUSED)
+      expect(state).toBe(CSA_STATUS.CANCELLATION_REFUSED_CRA)
+    })
+
+    it('should handle full application WKL approved flow', () => {
+      let state = CSA_STATUS.ELIGIBLE as string
+      state = getNextCsaState(state, CSA_EVENT.ADD_TO_BATCH) as string
+      expect(state).toBe(CSA_STATUS.IN_BATCH_APPLICATION)
+      state = getNextCsaState(state, CSA_EVENT.SEND_TO_CRA) as string
+      expect(state).toBe(CSA_STATUS.BATCH_SENT_APPLICATION)
+      state = getNextCsaState(state, CSA_EVENT.CRA_WKL_APPROVED) as string
+      expect(state).toBe(CSA_STATUS.IN_PAY)
+    })
+
+    it('should handle full cancellation WKL refused flow', () => {
+      let state = CSA_STATUS.NOT_ELIGIBLE_IN_PAY as string
+      state = getNextCsaState(state, CSA_EVENT.ADD_TO_BATCH) as string
+      expect(state).toBe(CSA_STATUS.IN_BATCH_CANCELLATION)
+      state = getNextCsaState(state, CSA_EVENT.SEND_TO_CRA) as string
+      expect(state).toBe(CSA_STATUS.BATCH_SENT_CANCELLATION)
+      state = getNextCsaState(state, CSA_EVENT.CRA_WKL_REFUSED) as string
+      expect(state).toBe(CSA_STATUS.CANCELLATION_REFUSED_CRA)
+    })
+  })
+
   describe('remove from batch', () => {
     it('should return array of valid targets for REMOVE_FROM_BATCH from in_batch_application', () => {
       const targets = getNextCsaState(CSA_STATUS.IN_BATCH_APPLICATION, CSA_EVENT.REMOVE_FROM_BATCH)
       expect(Array.isArray(targets)).toBe(true)
       expect(targets).toContain(CSA_STATUS.ELIGIBLE_TBD)
       expect(targets).toContain(CSA_STATUS.APPLICATION_REFUSED_CRA)
+      expect(targets).toContain(CSA_STATUS.CRA_ERROR_APPLICATION)
     })
 
     it('should return array of valid targets for REMOVE_FROM_BATCH from in_batch_cancellation', () => {
@@ -148,6 +210,7 @@ describe('csaStatusMachine', () => {
       expect(Array.isArray(targets)).toBe(true)
       expect(targets).toContain(CSA_STATUS.NOT_ELIGIBLE_IP_TBD)
       expect(targets).toContain(CSA_STATUS.CANCELLATION_REFUSED_CRA)
+      expect(targets).toContain(CSA_STATUS.CRA_ERROR_CANCELLATION)
     })
   })
 })

@@ -124,7 +124,8 @@ export class OutboundFileService {
       this.padRight(detail.filler3 || '', 1) +
       this.padRight(detail.cancelEndDate, 8) +
       this.padRight(detail.cancelReasonCode, 2) +
-      this.padRight(detail.ccraDinNum, 9)
+      this.padRight(detail.ccraDinNum, 9) +
+      this.padRight(detail.filler3 || '', 15)
     )
   }
 

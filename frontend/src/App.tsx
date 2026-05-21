@@ -1,6 +1,8 @@
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import CloseIcon from '@mui/icons-material/Close'
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import {
@@ -9,9 +11,15 @@ import {
   Box,
   Button,
   Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   FormControl,
   IconButton,
   InputAdornment,
+  LinearProgress,
   Menu,
   MenuItem,
   Pagination,
@@ -33,6 +41,7 @@ import {
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
+import { getRuntimeConfig } from './config/keycloak.config'
 import { useAuth } from './context/AuthContext'
 import logo from './icons/image.png'
 import {
@@ -42,25 +51,53 @@ import {
   getAllContacts,
   getBatchContacts,
   getContactBatches,
+  getLastEligibilityJob,
+  getLastSuccessfulRuns,
+  getRunningEligibilityJob,
   holdContacts,
   removeContactFromBatch,
+  removeContactsFromBatch,
   resumeContacts,
+  runEligibilityForAllWithPolling,
+  runEligibilityForContact,
   updateEligibilityStatus,
   updateNotEligibleStatusAlt,
   updateOver18Status,
+  waitForEligibilityJobCompletion,
   type Batch,
   type BatchContactDetail,
   type Contact,
   type ContactBatchDetail,
+  type ContactEligibilityResult,
+  type JobRun,
+  type LastSuccessfulRuns,
 } from './service/contacts-service'
+import type { AppEnvironment } from './types/runtime-config'
+
+// Environment-based toolbar background colors
+const getEnvBackgroundColor = (env?: AppEnvironment): string => {
+  switch (env) {
+    case 'DEV':
+      return '#f5e6c8' // Light yellow/tan
+    case 'TEST':
+      return '#f8e0e6' // Light pink
+    case 'PRE-PROD':
+      return '#d4e5f7' // Light blue
+    case 'PROD':
+    default:
+      return '#ffffff' // White (no color)
+  }
+}
 
 // Valid CSA statuses for Hold/Resume button
 // Maps to backend CSA_STATUSES constants
 const VALID_CSA_STATUSES = [
   'eligible_tbd', // Eligible - TBD
   'application_refused_cra', // Application Refused - CRA
+  'cra_error_application', // CRA Error - Application
   'not_eligible_ip_tbd', // Not Eligible - IP - TBD
   'cancellation_refused_cra', // Cancellation Refused - CRA
+  'cra_error_cancellation', // CRA Error - Cancellation
   'on_hold', // On Hold
 ]
 
@@ -69,9 +106,11 @@ const VALID_BATCH_STATUSES = [
   'eligible', // Eligible
   'eligible_tbd', // Eligible - TBD
   'application_refused_cra', // Application Refused - CRA
+  'cra_error_application', // CRA Error - Application
   'not_eligible_in_pay', // Not Eligible - In Pay
   'not_eligible_ip_tbd', // Not Eligible - IP - TBD
   'cancellation_refused_cra', // Cancellation Refused - CRA
+  'cra_error_cancellation', // CRA Error - Cancellation
 ]
 
 // CSA Status options for filter dropdown
@@ -83,12 +122,14 @@ const CSA_STATUS_FILTER_OPTIONS = [
   { value: 'in_batch_application', label: 'In Batch - Application' },
   { value: 'batch_sent_application', label: 'Batch Sent - Application' },
   { value: 'application_refused_cra', label: 'Application Refused - CRA' },
+  { value: 'cra_error_application', label: 'CRA Error - Application' },
   { value: 'in_pay', label: 'In Pay' },
   { value: 'not_eligible_in_pay', label: 'Not Eligible - In Pay' },
   { value: 'not_eligible_ip_tbd', label: 'Not Eligible - IP - TBD' },
   { value: 'in_batch_cancellation', label: 'In Batch - Cancellation' },
   { value: 'batch_sent_cancellation', label: 'Batch Sent - Cancellation' },
   { value: 'cancellation_refused_cra', label: 'Cancellation Refused - CRA' },
+  { value: 'cra_error_cancellation', label: 'CRA Error - Cancellation' },
   { value: 'over_18', label: 'Over 18' },
 ]
 
@@ -123,7 +164,8 @@ const BATCH_DETAILS_STATUS_FILTER_OPTIONS = [
 const COLUMN_LABELS: Record<string, string> = {
   lastName: 'Last Name',
   firstName: 'First Name',
-  middleName: 'Middle Name',
+  middleName: 'Middle Name(s)',
+  givenName: 'First Name',
   dob: 'Date Of Birth',
   din: 'DIN',
   csaStatus: 'CSA Status',
@@ -141,9 +183,18 @@ const COLUMN_LABELS: Record<string, string> = {
   status: 'Status',
   transactionType: 'Transaction Type',
   recordCount: 'Record Count',
+  initiatedBy: 'Initiated By',
   createdBy: 'Created By',
   contactId: 'Contact ID',
   icmNumber: 'ICM Number',
+  // Batch Details columns
+  cancellationReason: 'Reason for Cancellation',
+  systemComments: 'System Comments',
+  addedBy: 'Added By',
+  effectiveDate: 'Effective Date',
+  // Batch History columns
+  batchRequestStatus: 'Batch Request Status',
+  batchDetailStatus: 'Batch Detail Status',
 }
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
@@ -174,6 +225,39 @@ const formatDateTimeYMDHMS = (dateString: string): string => {
   }).formatToParts(date)
   const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
   return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
+}
+
+// Parse formatted date string (YYYY-MMM-DD or YYYY-MMM-DD HH:MM:SS) back to Date for sorting
+const parseFormattedDate = (dateStr: string): Date | null => {
+  if (!dateStr) return null
+  const months: Record<string, number> = {
+    Jan: 0,
+    Feb: 1,
+    Mar: 2,
+    Apr: 3,
+    May: 4,
+    Jun: 5,
+    Jul: 6,
+    Aug: 7,
+    Sep: 8,
+    Oct: 9,
+    Nov: 10,
+    Dec: 11,
+  }
+  // Handle both "YYYY-MMM-DD" and "YYYY-MMM-DD HH:MM:SS" formats
+  const match = dateStr.match(/^(\d{4})-(\w{3})-(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/)
+  if (!match) return null
+  const [, year, month, day, hour = '0', minute = '0', second = '0'] = match
+  const monthNum = months[month]
+  if (monthNum === undefined) return null
+  return new Date(
+    parseInt(year),
+    monthNum,
+    parseInt(day),
+    parseInt(hour),
+    parseInt(minute),
+    parseInt(second),
+  )
 }
 
 // Capitalize first letter of a string
@@ -234,6 +318,24 @@ function App() {
     severity: 'success',
   })
 
+  // Run Eligibility Query dropdown menu state
+  const [eligibilityMenuAnchor, setEligibilityMenuAnchor] = useState<null | HTMLElement>(null)
+  const eligibilityMenuOpen = Boolean(eligibilityMenuAnchor)
+  const [isRunningEligibilityAll, setIsRunningEligibilityAll] = useState(false)
+  const [runningEligibilityContactId, setRunningEligibilityContactId] = useState<number | null>(
+    null,
+  )
+  const [confirmRunAllDialogOpen, setConfirmRunAllDialogOpen] = useState(false)
+
+  // Last successful job runs state
+  const [lastSuccessfulRuns, setLastSuccessfulRuns] = useState<LastSuccessfulRuns>({
+    lastDataIngestion: null,
+    lastEligibilityRun: null,
+  })
+
+  // Last eligibility job status (regardless of success/failure)
+  const [lastEligibilityJobStatus, setLastEligibilityJobStatus] = useState<string | null>(null)
+
   // Effect to show CSA access alert from auth context
   useEffect(() => {
     if (csaAccessAlert) {
@@ -245,6 +347,185 @@ function App() {
       clearCsaAccessAlert()
     }
   }, [csaAccessAlert, clearCsaAccessAlert])
+
+  // Fetch last successful job runs on mount
+  useEffect(() => {
+    if (isAuthenticated) {
+      getLastSuccessfulRuns()
+        .then(setLastSuccessfulRuns)
+        .catch((err) => console.error('Failed to fetch last successful runs:', err))
+
+      // Fetch last eligibility job status (regardless of success/failure)
+      getLastEligibilityJob()
+        .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
+        .catch((err) => console.error('Failed to fetch last eligibility job:', err))
+    }
+  }, [isAuthenticated])
+
+  // Check for running eligibility job on page load and resume monitoring
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    const checkAndResumeRunningJob = async () => {
+      try {
+        const runningJob = await getRunningEligibilityJob()
+        if (runningJob) {
+          // Found a running job - lock the UI and wait for completion
+          setIsRunningEligibilityAll(true)
+          setSnackbar({
+            open: true,
+            message: 'Eligibility query is running in the background...',
+            severity: 'info',
+          })
+
+          // Wait for the job to complete
+          const completedJob = await waitForEligibilityJobCompletion(runningJob.id, (status) => {
+            if (status === 'RUNNING') {
+              setSnackbar({
+                open: true,
+                message: 'Eligibility query is still running...',
+                severity: 'info',
+              })
+            }
+          })
+
+          // Handle completion
+          if (completedJob.status === 'SUCCESS') {
+            const metadata = completedJob.metadata as {
+              processed?: number
+              statusChanges?: number
+              skipped?: number
+            } | null
+            const processed = metadata?.processed ?? 0
+            const statusChanges = metadata?.statusChanges ?? 0
+            const skipped = metadata?.skipped ?? 0
+
+            setSnackbar({
+              open: true,
+              message: `Eligibility complete: ${processed} processed, ${statusChanges} updated, ${skipped} skipped`,
+              severity: statusChanges > 0 ? 'success' : 'info',
+            })
+
+            // Refresh the page to get updated data if there were changes
+            if (statusChanges > 0) {
+              window.location.reload()
+            }
+          } else {
+            setSnackbar({
+              open: true,
+              message: completedJob.error || 'Eligibility query failed',
+              severity: 'error',
+            })
+          }
+
+          setIsRunningEligibilityAll(false)
+          // Refresh timestamps and last job status
+          getLastSuccessfulRuns()
+            .then(setLastSuccessfulRuns)
+            .catch((err) => console.error('Failed to refresh last successful runs:', err))
+          getLastEligibilityJob()
+            .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
+            .catch((err) => console.error('Failed to refresh last eligibility job:', err))
+        }
+      } catch (err) {
+        console.error('Failed to check for running eligibility job:', err)
+      }
+    }
+
+    checkAndResumeRunningJob()
+  }, [isAuthenticated])
+
+  // Helper function to check for running eligibility job before data modifications
+  // Returns true if a job is running (action should be blocked), false otherwise
+  const checkAndHandleRunningEligibilityJob = async (): Promise<boolean> => {
+    try {
+      const runningJob = await getRunningEligibilityJob()
+      if (runningJob) {
+        // Found a running job - lock the UI and wait for completion
+        setIsRunningEligibilityAll(true)
+        setSnackbar({
+          open: true,
+          message: 'An eligibility query is currently running. Please wait...',
+          severity: 'info',
+        })
+
+        // Wait for the job to complete
+        const completedJob = await waitForEligibilityJobCompletion(runningJob.id, (status) => {
+          if (status === 'RUNNING') {
+            setSnackbar({
+              open: true,
+              message: 'Eligibility query is still running...',
+              severity: 'info',
+            })
+          }
+        })
+
+        // Handle completion
+        if (completedJob.status === 'SUCCESS') {
+          const metadata = completedJob.metadata as {
+            processed?: number
+            statusChanges?: number
+            skipped?: number
+          } | null
+          const statusChanges = metadata?.statusChanges ?? 0
+
+          setSnackbar({
+            open: true,
+            message: 'Eligibility query completed. Please try your action again.',
+            severity: 'success',
+          })
+
+          // Refresh the page to get updated data if there were changes
+          if (statusChanges > 0) {
+            window.location.reload()
+          }
+        } else {
+          setSnackbar({
+            open: true,
+            message: completedJob.error || 'Eligibility query failed',
+            severity: 'error',
+          })
+        }
+
+        setIsRunningEligibilityAll(false)
+        // Refresh timestamps and last job status
+        getLastSuccessfulRuns()
+          .then(setLastSuccessfulRuns)
+          .catch((err) => console.error('Failed to refresh last successful runs:', err))
+        getLastEligibilityJob()
+          .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
+          .catch((err) => console.error('Failed to refresh last eligibility job:', err))
+
+        return true // Job was running, action should be blocked
+      }
+      return false // No job running, can proceed
+    } catch (err) {
+      console.error('Failed to check for running eligibility job:', err)
+      return false // On error, allow the action to proceed
+    }
+  }
+
+  // Helper function to format date for display (matches table date format)
+  const formatJobTimestamp = (date: Date | null): string => {
+    if (!date) return '--'
+    const parts = new Intl.DateTimeFormat('en-US', {
+      ...DATE_FORMAT,
+      timeZone: 'America/Vancouver',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(date)
+    const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
+    return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
+  }
+
+  // Helper function to extract only the most recent system comment (first line)
+  const getMostRecentComment = (comments: string | null): string => {
+    if (!comments) return ''
+    const firstLine = comments.split('\n')[0]
+    return firstLine || ''
+  }
 
   // Batch history state for selected contact
   const [contactBatchHistory, setContactBatchHistory] = useState<ContactBatchDetail[]>([])
@@ -301,16 +582,17 @@ function App() {
     direction: 'asc' | 'desc'
   } | null>(null)
 
-  // Batch History search and filter states
+  // Batch History search, filter, and sort states
   const [batchHistorySearchTerm, setBatchHistorySearchTerm] = useState('')
   const [batchHistoryColumnFilters, setBatchHistoryColumnFilters] = useState<
     Record<string, string[]>
   >({
     batchId: [],
-    createdDate: [],
     batchDate: [],
-    status: [],
+    batchRequestStatus: [],
     transactionType: [],
+    batchDetailStatus: [],
+    systemComments: [],
   })
   const [batchHistoryFilterAnchor, setBatchHistoryFilterAnchor] = useState<FilterAnchor>({
     element: null,
@@ -318,8 +600,16 @@ function App() {
   })
   const [batchHistoryFilterSearchTerm, setBatchHistoryFilterSearchTerm] = useState('')
   const [selectedBatchHistoryId, setSelectedBatchHistoryId] = useState<number | null>(null)
+  const [batchHistorySortAnchor, setBatchHistorySortAnchor] = useState<SortAnchor>({
+    element: null,
+    column: '',
+  })
+  const [batchHistorySortConfig, setBatchHistorySortConfig] = useState<{
+    column: string
+    direction: 'asc' | 'desc'
+  } | null>(null)
 
-  // Batch Requests search and filter states
+  // Batch Requests search, filter, and sort states
   const [batchRequestsSearchTerm, setBatchRequestsSearchTerm] = useState('')
   const [batchRequestsColumnFilters, setBatchRequestsColumnFilters] = useState<
     Record<string, string[]>
@@ -328,6 +618,7 @@ function App() {
     batchDate: [],
     status: [],
     recordCount: [],
+    initiatedBy: [],
     createdDate: [],
     systemComments: [],
   })
@@ -336,8 +627,16 @@ function App() {
     column: '',
   })
   const [batchRequestsFilterSearchTerm, setBatchRequestsFilterSearchTerm] = useState('')
+  const [batchRequestsSortAnchor, setBatchRequestsSortAnchor] = useState<SortAnchor>({
+    element: null,
+    column: '',
+  })
+  const [batchRequestsSortConfig, setBatchRequestsSortConfig] = useState<{
+    column: string
+    direction: 'asc' | 'desc'
+  } | null>(null)
 
-  // Batch Details search and filter states
+  // Batch Details search, filter, and sort states
   const [batchDetailsSearchTerm, setBatchDetailsSearchTerm] = useState('')
   const [batchDetailsColumnFilters, setBatchDetailsColumnFilters] = useState<
     Record<string, string[]>
@@ -345,15 +644,26 @@ function App() {
     lastName: [],
     middleName: [],
     givenName: [],
+    caseNumber: [],
     transactionType: [],
+    cancellationReason: [],
     status: [],
     systemComments: [],
+    addedBy: [],
   })
   const [batchDetailsFilterAnchor, setBatchDetailsFilterAnchor] = useState<FilterAnchor>({
     element: null,
     column: '',
   })
   const [batchDetailsFilterSearchTerm, setBatchDetailsFilterSearchTerm] = useState('')
+  const [batchDetailsSortAnchor, setBatchDetailsSortAnchor] = useState<SortAnchor>({
+    element: null,
+    column: '',
+  })
+  const [batchDetailsSortConfig, setBatchDetailsSortConfig] = useState<{
+    column: string
+    direction: 'asc' | 'desc'
+  } | null>(null)
 
   // Pagination states for batch tables
   const [batchRequestsPage, setBatchRequestsPage] = useState(1)
@@ -391,6 +701,8 @@ function App() {
             { key: 'csaStatus', op: 'eq', value: 'not_eligible_ip_tbd' },
             { key: 'csaStatus', op: 'eq', value: 'eligible' },
             { key: 'csaStatus', op: 'eq', value: 'not_eligible_in_pay' },
+            { key: 'csaStatus', op: 'eq', value: 'cra_error_application' },
+            { key: 'csaStatus', op: 'eq', value: 'cra_error_cancellation' },
           ],
         },
       ]
@@ -443,7 +755,7 @@ function App() {
         // Apply filter based on selected pre-defined filter
         // Note: csaStatus values must match database format (snake_case)
         if (preDefinedFilter === 'Pending User review/action') {
-          // csaStatus = 'on_hold' OR 'eligible_tbd' OR 'not_eligible_ip_tbd' OR 'eligible' OR 'not_eligible_in_pay'
+          // csaStatus = 'on_hold' OR 'eligible_tbd' OR 'not_eligible_ip_tbd' OR 'eligible' OR 'not_eligible_in_pay' OR 'cra_error_application' OR 'cra_error_cancellation'
           filter = [
             {
               OR: [
@@ -452,6 +764,8 @@ function App() {
                 { key: 'csaStatus', op: 'eq', value: 'not_eligible_ip_tbd' },
                 { key: 'csaStatus', op: 'eq', value: 'eligible' },
                 { key: 'csaStatus', op: 'eq', value: 'not_eligible_in_pay' },
+                { key: 'csaStatus', op: 'eq', value: 'cra_error_application' },
+                { key: 'csaStatus', op: 'eq', value: 'cra_error_cancellation' },
               ],
             },
           ]
@@ -572,7 +886,16 @@ function App() {
           }
         }
 
-        const response = await getAllContacts(page, recordsPerPage, combinedFilter)
+        // Build sort parameter if sortConfig is set
+        let sort: Array<{ [key: string]: 'asc' | 'desc' }> | undefined
+        if (sortConfig) {
+          const backendField = columnToFieldMapping[sortConfig.column]
+          if (backendField) {
+            sort = [{ [backendField]: sortConfig.direction }]
+          }
+        }
+
+        const response = await getAllContacts(page, recordsPerPage, combinedFilter, sort)
         setContacts(response.data)
         setTotalPages(response.totalPages)
         setTotalRecords(response.total)
@@ -584,7 +907,7 @@ function App() {
         setLoadingContacts(false)
       }
     },
-    [preDefinedFilter, recordsPerPage, columnToFieldMapping, getPreDefinedFilterConfig],
+    [preDefinedFilter, recordsPerPage, columnToFieldMapping, getPreDefinedFilterConfig, sortConfig],
   )
 
   // Function to perform full-text search
@@ -643,6 +966,13 @@ function App() {
     fetchContacts,
     performColumnFiltersSearch,
   ])
+
+  // Reset pagination to page 1 when search term changes
+  useEffect(() => {
+    if (searchTerm.trim().length >= 3) {
+      setCurrentPage(1)
+    }
+  }, [searchTerm])
 
   // Full-text search effect - triggers when searchTerm has 3+ characters
   useEffect(() => {
@@ -830,6 +1160,9 @@ function App() {
   const handleHoldResume = async () => {
     if (selected.length === 0) return
 
+    // Check if eligibility job is running
+    if (await checkAndHandleRunningEligibilityJob()) return
+
     try {
       // Separate selected contacts into hold and resume groups
       const toHold: number[] = []
@@ -933,6 +1266,9 @@ function App() {
   const handleCSAEligible = async () => {
     if (selected.length === 0) return
 
+    // Check if eligibility job is running
+    if (await checkAndHandleRunningEligibilityJob()) return
+
     try {
       const response = await updateEligibilityStatus(selected, 'ELIGIBLE')
 
@@ -997,6 +1333,9 @@ function App() {
   // CSA Not Eligible handler
   const handleCSANotEligible = async () => {
     if (selected.length === 0) return
+
+    // Check if eligibility job is running
+    if (await checkAndHandleRunningEligibilityJob()) return
 
     try {
       const response = await updateNotEligibleStatusAlt(selected, 'SET_NOT_ELIGIBLE')
@@ -1065,6 +1404,9 @@ function App() {
   const handleChildOver18 = async () => {
     if (selected.length === 0) return
 
+    // Check if eligibility job is running
+    if (await checkAndHandleRunningEligibilityJob()) return
+
     try {
       const response = await updateOver18Status(selected, 'AGE_OUT')
 
@@ -1126,6 +1468,169 @@ function App() {
     }
   }
 
+  // Run Eligibility Query menu handlers
+  const handleEligibilityMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setEligibilityMenuAnchor(event.currentTarget)
+  }
+
+  const handleEligibilityMenuClose = () => {
+    setEligibilityMenuAnchor(null)
+  }
+
+  const handleRunEligibilityForAllClick = () => {
+    handleEligibilityMenuClose()
+    setConfirmRunAllDialogOpen(true)
+  }
+
+  const handleConfirmRunAllDialogClose = () => {
+    setConfirmRunAllDialogOpen(false)
+  }
+
+  const handleRunEligibilityForAll = async () => {
+    setConfirmRunAllDialogOpen(false)
+    setIsRunningEligibilityAll(true)
+    try {
+      setSnackbar({
+        open: true,
+        message: 'Starting eligibility query job...',
+        severity: 'info',
+      })
+
+      const job: JobRun = await runEligibilityForAllWithPolling((status) => {
+        if (status === 'RUNNING') {
+          setSnackbar({
+            open: true,
+            message: 'Eligibility query is running...',
+            severity: 'info',
+          })
+        }
+      })
+
+      if (job.status === 'SUCCESS') {
+        const metadata = job.metadata as {
+          processed?: number
+          statusChanges?: number
+          skipped?: number
+        } | null
+        const processed = metadata?.processed ?? 0
+        const statusChanges = metadata?.statusChanges ?? 0
+        const skipped = metadata?.skipped ?? 0
+
+        const message = `Eligibility complete: ${processed} processed, ${statusChanges} updated, ${skipped} skipped`
+        setSnackbar({
+          open: true,
+          message,
+          severity: statusChanges > 0 ? 'success' : 'info',
+        })
+
+        // Refresh the list if there were changes
+        if (statusChanges > 0) {
+          if (isSearchActive && searchTerm.trim().length >= 3) {
+            await performFullTextSearch(searchTerm.trim(), currentPage)
+          } else {
+            await fetchContacts(currentPage)
+          }
+        }
+      } else {
+        // Job failed
+        const errorMessage = job.error || 'Eligibility query failed'
+        throw new Error(errorMessage)
+      }
+    } catch (error: any) {
+      console.error('Run eligibility for all error:', error)
+      let rawMessage =
+        error?.response?.data?.message || error?.message || 'Failed to run eligibility query'
+
+      // Handle 409 Conflict (job already running)
+      if (error?.response?.status === 409) {
+        rawMessage = 'An eligibility query is already running. Please wait for it to complete.'
+      }
+
+      // Make staging validation errors more user-friendly
+      let errorMessage = rawMessage
+      if (rawMessage.includes('Staging validation failed: empty tables')) {
+        const tableMatch = rawMessage.match(/\[([^\]]+)\]/)
+        const tables = tableMatch ? tableMatch[1] : 'some required tables'
+        errorMessage = `Cannot run eligibility query: staging data is incomplete. Missing data in: ${tables}. Please ensure all data sources have been synced before running the eligibility query.`
+      }
+
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error',
+      })
+    } finally {
+      setIsRunningEligibilityAll(false)
+      // Refresh the last successful runs timestamps and last job status
+      getLastSuccessfulRuns()
+        .then(setLastSuccessfulRuns)
+        .catch((err) => console.error('Failed to refresh last successful runs:', err))
+      getLastEligibilityJob()
+        .then((job) => setLastEligibilityJobStatus(job?.status ?? null))
+        .catch((err) => console.error('Failed to refresh last eligibility job:', err))
+    }
+  }
+
+  const handleRunEligibilityForSelected = async () => {
+    handleEligibilityMenuClose()
+    if (selected.length !== 1) return
+
+    const contactId = selected[0]
+    setRunningEligibilityContactId(contactId)
+    try {
+      setSnackbar({
+        open: true,
+        message: 'Running eligibility query on selected contact...',
+        severity: 'info',
+      })
+
+      const result: ContactEligibilityResult = await runEligibilityForContact(contactId)
+
+      const statusChanged = result.previousStatus !== result.newStatus
+      const message = statusChanged
+        ? `Eligibility updated for contact ${contactId}: ${result.previousStatus || 'none'} → ${result.newStatus}`
+        : `No eligibility changes for contact ${contactId}`
+      setSnackbar({
+        open: true,
+        message,
+        severity: statusChanged ? 'success' : 'info',
+      })
+
+      // Refresh the list if there were changes
+      if (statusChanged) {
+        if (isSearchActive && searchTerm.trim().length >= 3) {
+          await performFullTextSearch(searchTerm.trim(), currentPage)
+        } else {
+          await fetchContacts(currentPage)
+        }
+      }
+    } catch (error: any) {
+      console.error('Run eligibility for contact error:', error)
+      const rawMessage =
+        error?.response?.data?.message || error?.message || 'Failed to run eligibility query'
+
+      // Make staging validation errors more user-friendly
+      let errorMessage = rawMessage
+      if (rawMessage.includes('Staging validation failed: empty tables')) {
+        const tableMatch = rawMessage.match(/\[([^\]]+)\]/)
+        const tables = tableMatch ? tableMatch[1] : 'some required tables'
+        errorMessage = `Cannot run eligibility query: staging data is incomplete. Missing data in: ${tables}. Please ensure all data sources have been synced before running the eligibility query.`
+      }
+
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error',
+      })
+    } finally {
+      setRunningEligibilityContactId(null)
+      // Refresh the last successful runs timestamps
+      getLastSuccessfulRuns()
+        .then(setLastSuccessfulRuns)
+        .catch((err) => console.error('Failed to refresh last successful runs:', err))
+    }
+  }
+
   const handleSnackbarClose = () => {
     setSnackbar({ ...snackbar, open: false })
   }
@@ -1133,6 +1638,9 @@ function App() {
   // Handle Add to Batch button click
   const handleAddToBatch = async () => {
     if (selected.length === 0) return
+
+    // Check if eligibility job is running
+    if (await checkAndHandleRunningEligibilityJob()) return
 
     try {
       const response = await addContactsToBatch(selected)
@@ -1232,6 +1740,9 @@ function App() {
   const handleRemoveFromBatch = async () => {
     if (!selectedBatchHistoryId || !selectedChild) return
 
+    // Check if eligibility job is running
+    if (await checkAndHandleRunningEligibilityJob()) return
+
     try {
       const result = await removeContactFromBatch(selectedChild)
 
@@ -1319,6 +1830,9 @@ function App() {
   const handleRemoveFromBatchDetails = async () => {
     if (selectedBatchDetails.length === 0) return
 
+    // Check if eligibility job is running
+    if (await checkAndHandleRunningEligibilityJob()) return
+
     try {
       // Map selected batch_contact IDs to their corresponding contact IDs
       const contactIds = selectedBatchDetails
@@ -1328,18 +1842,21 @@ function App() {
         })
         .filter((id): id is number => id !== undefined)
 
-      // Remove each selected contact from the batch
-      const removePromises = contactIds.map((contactId) => removeContactFromBatch(contactId))
+      const result = await removeContactsFromBatch(contactIds)
 
-      const results = await Promise.all(removePromises)
+      const updatedRecordCount = result.batch?.recordCount ?? 0
+      const removedCount = result.success.length
+      const skippedCount = result.skipped.length
 
-      // Get the updated record count from the first result
-      const updatedRecordCount = results[0]?.recordCount ?? 0
+      const message =
+        skippedCount > 0
+          ? `Removed ${removedCount} contact${removedCount !== 1 ? 's' : ''} from batch (${skippedCount} skipped). Record count: ${updatedRecordCount}`
+          : `Successfully removed ${removedCount} contact${removedCount !== 1 ? 's' : ''} from batch. Record count: ${updatedRecordCount}`
 
       setSnackbar({
         open: true,
-        message: `Successfully removed ${selectedBatchDetails.length} contact${selectedBatchDetails.length > 1 ? 's' : ''} from batch. New record count: ${updatedRecordCount}`,
-        severity: 'success',
+        message,
+        severity: skippedCount > 0 ? 'warning' : 'success',
       })
 
       // Refresh the eligibility list to reflect updated CSA status
@@ -1459,10 +1976,11 @@ function App() {
     // Transform API data to match the table structure, then get unique values
     const transformedData = contactBatchHistory.map((item) => ({
       batchId: String(item.batch.id),
-      createdDate: formatDateTimeYMD(item.createdAt),
       batchDate: item.batch.batchDate ? formatDateYMD(item.batch.batchDate) : '',
-      status: item.batch.statusLabel || item.batch.status || '',
+      batchRequestStatus: item.batch.statusLabel || item.batch.status || '',
       transactionType: capitalize(item.transactionType) || '',
+      batchDetailStatus: item.statusLabel || item.status || '',
+      systemComments: getMostRecentComment(item.batch.systemComments),
     }))
     const values = transformedData.map((row) => row[column as keyof typeof row])
     return Array.from(new Set(values)).filter((v) => v !== undefined && v !== '')
@@ -1516,7 +2034,7 @@ function App() {
         case 'createdDate':
           return formatDateTimeYMD(batch.createdAt)
         case 'systemComments':
-          return batch.systemComments || ''
+          return getMostRecentComment(batch.systemComments)
         default:
           return ''
       }
@@ -1561,6 +2079,48 @@ function App() {
   const handleSort = (column: string, direction: 'asc' | 'desc') => {
     setSortConfig({ column, direction })
     handleSortClose()
+  }
+
+  // Batch History sort handling functions
+  const handleBatchHistorySortClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
+    setBatchHistorySortAnchor({ element: event.currentTarget, column })
+  }
+
+  const handleBatchHistorySortClose = () => {
+    setBatchHistorySortAnchor({ element: null, column: '' })
+  }
+
+  const handleBatchHistorySort = (column: string, direction: 'asc' | 'desc') => {
+    setBatchHistorySortConfig({ column, direction })
+    handleBatchHistorySortClose()
+  }
+
+  // Batch Requests sort handling functions
+  const handleBatchRequestsSortClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
+    setBatchRequestsSortAnchor({ element: event.currentTarget, column })
+  }
+
+  const handleBatchRequestsSortClose = () => {
+    setBatchRequestsSortAnchor({ element: null, column: '' })
+  }
+
+  const handleBatchRequestsSort = (column: string, direction: 'asc' | 'desc') => {
+    setBatchRequestsSortConfig({ column, direction })
+    handleBatchRequestsSortClose()
+  }
+
+  // Batch Details sort handling functions
+  const handleBatchDetailsSortClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
+    setBatchDetailsSortAnchor({ element: event.currentTarget, column })
+  }
+
+  const handleBatchDetailsSortClose = () => {
+    setBatchDetailsSortAnchor({ element: null, column: '' })
+  }
+
+  const handleBatchDetailsSort = (column: string, direction: 'asc' | 'desc') => {
+    setBatchDetailsSortConfig({ column, direction })
+    handleBatchDetailsSortClose()
   }
 
   // Apply filters and sorting to data - always use API data
@@ -1718,10 +2278,12 @@ function App() {
     let data = contactBatchHistory.map((item) => ({
       id: item.id,
       batchId: String(item.batch.id),
-      createdDate: formatDateTimeYMD(item.createdAt),
       batchDate: item.batch.batchDate ? formatDateYMD(item.batch.batchDate) : '',
-      status: item.batch.statusLabel || item.batch.status || '',
+      batchRequestStatus: item.batch.statusLabel || item.batch.status || '',
       transactionType: capitalize(item.transactionType) || '',
+      effectiveDate: item.effectiveDate ? formatDateYMD(item.effectiveDate) : '',
+      batchDetailStatus: item.statusLabel || item.status || '',
+      systemComments: getMostRecentComment(item.batch.systemComments),
     }))
 
     // Apply global search across all columns
@@ -1730,10 +2292,12 @@ function App() {
       data = data.filter((row) => {
         return (
           row.batchId.toLowerCase().includes(searchLower) ||
-          row.createdDate.toLowerCase().includes(searchLower) ||
           row.batchDate.toLowerCase().includes(searchLower) ||
-          row.status.toLowerCase().includes(searchLower) ||
-          row.transactionType.toLowerCase().includes(searchLower)
+          row.batchRequestStatus.toLowerCase().includes(searchLower) ||
+          row.transactionType.toLowerCase().includes(searchLower) ||
+          row.effectiveDate.toLowerCase().includes(searchLower) ||
+          row.batchDetailStatus.toLowerCase().includes(searchLower) ||
+          row.systemComments.toLowerCase().includes(searchLower)
         )
       })
     }
@@ -1748,8 +2312,39 @@ function App() {
       }
     }
 
+    // Apply sorting
+    if (batchHistorySortConfig) {
+      const { column, direction } = batchHistorySortConfig
+      const dateColumns = ['batchDate', 'effectiveDate']
+      data.sort((a, b) => {
+        const aValue = String(a[column as keyof typeof a] || '')
+        const bValue = String(b[column as keyof typeof b] || '')
+
+        // Use date parsing for date columns
+        if (dateColumns.includes(column)) {
+          const aDate = parseFormattedDate(aValue)
+          const bDate = parseFormattedDate(bValue)
+          if (aDate && bDate) {
+            const comparison = aDate.getTime() - bDate.getTime()
+            return direction === 'asc' ? comparison : -comparison
+          }
+          // If one or both dates are invalid, fall back to string comparison
+          if (aDate && !bDate) return direction === 'asc' ? 1 : -1
+          if (!aDate && bDate) return direction === 'asc' ? -1 : 1
+        }
+
+        const comparison = aValue.localeCompare(bValue, undefined, { numeric: true })
+        return direction === 'asc' ? comparison : -comparison
+      })
+    }
+
     return data
-  }, [contactBatchHistory, batchHistorySearchTerm, batchHistoryColumnFilters])
+  }, [
+    contactBatchHistory,
+    batchHistorySearchTerm,
+    batchHistoryColumnFilters,
+    batchHistorySortConfig,
+  ])
 
   // Paginated batch history
   const paginatedBatchHistory = useMemo(() => {
@@ -1770,8 +2365,9 @@ function App() {
       batchDate: batch.batchDate ? formatDateYMD(batch.batchDate) : '',
       status: batch.statusLabel || batch.status,
       recordCount: batch.recordCount,
+      initiatedBy: batch.initiatedBy || '',
       createdDate: formatDateTimeYMD(batch.createdAt),
-      systemComments: batch.systemComments || '',
+      systemComments: getMostRecentComment(batch.systemComments),
     }))
 
     // Apply global search across all columns
@@ -1783,6 +2379,7 @@ function App() {
           row.batchDate.toLowerCase().includes(searchLower) ||
           row.status.toLowerCase().includes(searchLower) ||
           String(row.recordCount).toLowerCase().includes(searchLower) ||
+          row.initiatedBy.toLowerCase().includes(searchLower) ||
           row.createdDate.toLowerCase().includes(searchLower) ||
           row.systemComments.toLowerCase().includes(searchLower)
         )
@@ -1799,8 +2396,34 @@ function App() {
       }
     }
 
+    // Apply sorting
+    if (batchRequestsSortConfig) {
+      const { column, direction } = batchRequestsSortConfig
+      const dateColumns = ['batchDate', 'createdDate']
+      data.sort((a, b) => {
+        const aValue = String(a[column as keyof typeof a] || '')
+        const bValue = String(b[column as keyof typeof b] || '')
+
+        // Use date parsing for date columns
+        if (dateColumns.includes(column)) {
+          const aDate = parseFormattedDate(aValue)
+          const bDate = parseFormattedDate(bValue)
+          if (aDate && bDate) {
+            const comparison = aDate.getTime() - bDate.getTime()
+            return direction === 'asc' ? comparison : -comparison
+          }
+          // If one or both dates are invalid, fall back to string comparison
+          if (aDate && !bDate) return direction === 'asc' ? 1 : -1
+          if (!aDate && bDate) return direction === 'asc' ? -1 : 1
+        }
+
+        const comparison = aValue.localeCompare(bValue, undefined, { numeric: true })
+        return direction === 'asc' ? comparison : -comparison
+      })
+    }
+
     return data
-  }, [batches, batchRequestsSearchTerm, batchRequestsColumnFilters])
+  }, [batches, batchRequestsSearchTerm, batchRequestsColumnFilters, batchRequestsSortConfig])
 
   // Get batch details for selected batch
   const currentBatchDetails = useMemo(() => {
@@ -1809,11 +2432,18 @@ function App() {
       id: detail.id,
       contactId: detail.contactId,
       lastName: detail.contact.lastName,
-      middleName: detail.contact.middleName || '',
       givenName: detail.contact.firstName,
+      middleName: detail.contact.middleName || '',
+      caseNumber: detail.caseNumber || '',
       transactionType: capitalize(detail.transactionType),
+      effectiveDate: detail.effectiveDate ? formatDateYMD(detail.effectiveDate) : '',
+      cancellationReason:
+        detail.cancelReasonCode && detail.cancelReasonLabel
+          ? `${detail.cancelReasonCode} - ${detail.cancelReasonLabel}`
+          : detail.cancelReasonCode || '',
       status: detail.statusLabel || detail.status || '',
-      systemComments: detail.systemComments || '',
+      systemComments: getMostRecentComment(detail.systemComments),
+      addedBy: detail.createdBy || '',
     }))
   }, [batchDetails])
 
@@ -1827,11 +2457,15 @@ function App() {
       data = data.filter((row) => {
         return (
           row.lastName.toLowerCase().includes(searchLower) ||
-          row.middleName.toLowerCase().includes(searchLower) ||
           row.givenName.toLowerCase().includes(searchLower) ||
+          row.middleName.toLowerCase().includes(searchLower) ||
+          row.caseNumber.toLowerCase().includes(searchLower) ||
           row.transactionType.toLowerCase().includes(searchLower) ||
+          row.effectiveDate.toLowerCase().includes(searchLower) ||
+          row.cancellationReason.toLowerCase().includes(searchLower) ||
           row.status.toLowerCase().includes(searchLower) ||
-          row.systemComments.toLowerCase().includes(searchLower)
+          row.systemComments.toLowerCase().includes(searchLower) ||
+          row.addedBy.toLowerCase().includes(searchLower)
         )
       })
     }
@@ -1846,8 +2480,39 @@ function App() {
       }
     }
 
+    // Apply sorting
+    if (batchDetailsSortConfig) {
+      const { column, direction } = batchDetailsSortConfig
+      const dateColumns = ['effectiveDate']
+      data.sort((a, b) => {
+        const aValue = String(a[column as keyof typeof a] || '')
+        const bValue = String(b[column as keyof typeof b] || '')
+
+        // Use date parsing for date columns
+        if (dateColumns.includes(column)) {
+          const aDate = parseFormattedDate(aValue)
+          const bDate = parseFormattedDate(bValue)
+          if (aDate && bDate) {
+            const comparison = aDate.getTime() - bDate.getTime()
+            return direction === 'asc' ? comparison : -comparison
+          }
+          // If one or both dates are invalid, fall back to string comparison
+          if (aDate && !bDate) return direction === 'asc' ? 1 : -1
+          if (!aDate && bDate) return direction === 'asc' ? -1 : 1
+        }
+
+        const comparison = aValue.localeCompare(bValue, undefined, { numeric: true })
+        return direction === 'asc' ? comparison : -comparison
+      })
+    }
+
     return data
-  }, [currentBatchDetails, batchDetailsSearchTerm, batchDetailsColumnFilters])
+  }, [
+    currentBatchDetails,
+    batchDetailsSearchTerm,
+    batchDetailsColumnFilters,
+    batchDetailsSortConfig,
+  ])
 
   // Paginated batch requests
   const paginatedBatchRequests = useMemo(() => {
@@ -1898,13 +2563,27 @@ function App() {
       <AppBar
         position="static"
         sx={{
-          backgroundColor: '#ffffff',
+          backgroundColor: getEnvBackgroundColor(getRuntimeConfig()?.VITE_APP_ENV),
           boxShadow: 'none',
           borderBottom: '1px solid #e0e0e0',
           flexShrink: 0,
         }}
       >
         <Toolbar sx={{ padding: '8px 24px', justifyContent: 'center', position: 'relative' }}>
+          {getRuntimeConfig()?.VITE_APP_ENV && getRuntimeConfig()?.VITE_APP_ENV !== 'PROD' && (
+            <Typography
+              variant="body2"
+              sx={{
+                position: 'absolute',
+                left: 24,
+                color: '#666',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+              }}
+            >
+              {getRuntimeConfig()?.VITE_APP_ENV}
+            </Typography>
+          )}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <img src={logo} alt="BC Logo" style={{ height: '40px' }} />
             <Typography variant="h6" component="div" sx={{ color: '#333', fontWeight: 500 }}>
@@ -2010,17 +2689,11 @@ function App() {
               padding: '6px',
               borderBottom: '1px solid #e0e0e0',
               boxSizing: 'border-box',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
             }}
           >
-            {/* <Typography variant="h5" component="h1" sx={{
-            color: '#333',
-            fontWeight: 500,
-            textAlign: 'center',
-            marginBottom: '24px'
-          }}>
-            Children&apos;s Special Allowance
-          </Typography> */}
-
             {/* Tabs Section */}
             <Tabs
               value={selectedTab}
@@ -2041,6 +2714,24 @@ function App() {
               <Tab label="Eligibility List" />
               <Tab label="Batch Requests" />
             </Tabs>
+
+            {/* Last Successful Runs Info */}
+            <Box
+              sx={{
+                padding: '6px 12px',
+                mr: 2,
+                textAlign: 'left',
+                border: '1px solid #666',
+                borderRadius: '4px',
+              }}
+            >
+              <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
+                Last Data Fetch: {formatJobTimestamp(lastSuccessfulRuns.lastDataIngestion)}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
+                Last Eligibility Run: {formatJobTimestamp(lastSuccessfulRuns.lastEligibilityRun)}
+              </Typography>
+            </Box>
           </Box>
 
           {/* Content Section */}
@@ -2116,9 +2807,69 @@ function App() {
                       </Select>
                     </FormControl>
                     <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={handleEligibilityMenuOpen}
+                      disabled={isRunningEligibilityAll}
+                      sx={{
+                        textTransform: 'none',
+                      }}
+                    >
+                      {isRunningEligibilityAll ? 'Running Eligibility...' : 'Run Eligibility Query'}
+                      <Tooltip
+                        title="Run eligibility rules against staging data to update contact CSA status"
+                        arrow
+                      >
+                        <InfoOutlinedIcon
+                          fontSize="small"
+                          sx={{ ml: 0.5, fontSize: '16px', color: 'inherit' }}
+                        />
+                      </Tooltip>
+                      <Box component="span" sx={{ ml: 0.5 }}>
+                        ▾
+                      </Box>
+                    </Button>
+                    <Menu
+                      anchorEl={eligibilityMenuAnchor}
+                      open={eligibilityMenuOpen}
+                      onClose={handleEligibilityMenuClose}
+                    >
+                      <MenuItem
+                        onClick={handleRunEligibilityForAllClick}
+                        disabled={isRunningEligibilityAll}
+                        sx={{
+                          fontSize: '0.85rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                        }}
+                      >
+                        Run query on all contacts
+                        {lastEligibilityJobStatus === 'SUCCESS' && (
+                          <CheckCircleOutlineIcon
+                            sx={{ fontSize: '1rem', color: 'success.main', ml: 0.5 }}
+                          />
+                        )}
+                        {lastEligibilityJobStatus === 'FAILED' && (
+                          <ErrorOutlineIcon
+                            sx={{ fontSize: '1rem', color: 'error.main', ml: 0.5 }}
+                          />
+                        )}
+                      </MenuItem>
+                      {selected.length === 1 && (
+                        <MenuItem
+                          onClick={handleRunEligibilityForSelected}
+                          disabled={isRunningEligibilityAll}
+                          sx={{ fontSize: '0.85rem' }}
+                        >
+                          Run query on selected contact
+                        </MenuItem>
+                      )}
+                    </Menu>
+                    <Button
                       variant="contained"
                       size="small"
-                      disabled={!canAddToBatch}
+                      disabled={!canAddToBatch || isRunningEligibilityAll}
                       onClick={handleAddToBatch}
                       sx={{
                         textTransform: 'none',
@@ -2133,7 +2884,7 @@ function App() {
                     <Button
                       variant="outlined"
                       size="small"
-                      disabled={!canHoldResume}
+                      disabled={!canHoldResume || isRunningEligibilityAll}
                       onClick={handleHoldResume}
                       sx={{
                         textTransform: 'none',
@@ -2148,11 +2899,12 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canUpdateEligibility}
+                      disabled={!canUpdateEligibility || isRunningEligibilityAll}
                       onClick={handleCSAEligible}
                       sx={{
                         textTransform: 'none',
-                        backgroundColor: canUpdateEligibility ? '#1976d2' : undefined,
+                        backgroundColor:
+                          canUpdateEligibility && !isRunningEligibilityAll ? '#1976d2' : undefined,
                         '&.Mui-disabled': {
                           opacity: 0.5,
                           cursor: 'not-allowed',
@@ -2164,11 +2916,12 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canUpdateNotEligible}
+                      disabled={!canUpdateNotEligible || isRunningEligibilityAll}
                       onClick={handleCSANotEligible}
                       sx={{
                         textTransform: 'none',
-                        backgroundColor: canUpdateNotEligible ? '#d32f2f' : undefined,
+                        backgroundColor:
+                          canUpdateNotEligible && !isRunningEligibilityAll ? '#d32f2f' : undefined,
                         '&.Mui-disabled': {
                           opacity: 0.5,
                           cursor: 'not-allowed',
@@ -2180,11 +2933,12 @@ function App() {
                     <Button
                       variant="contained"
                       size="small"
-                      disabled={!canUpdateOver18}
+                      disabled={!canUpdateOver18 || isRunningEligibilityAll}
                       onClick={handleChildOver18}
                       sx={{
                         textTransform: 'none',
-                        backgroundColor: canUpdateOver18 ? '#ff9800' : undefined,
+                        backgroundColor:
+                          canUpdateOver18 && !isRunningEligibilityAll ? '#ff9800' : undefined,
                         '&.Mui-disabled': {
                           opacity: 0.5,
                           cursor: 'not-allowed',
@@ -2196,6 +2950,18 @@ function App() {
                   </Box>
                 </Box>
 
+                {/* Eligibility running banner */}
+                {isRunningEligibilityAll && (
+                  <Box sx={{ mb: 2 }}>
+                    <Alert severity="info" sx={{ mb: 1 }}>
+                      Eligibility Query is running. Please do not make any manual CSA transitions
+                      while the job is in progress. This banner will disappear once the job is
+                      complete.
+                    </Alert>
+                    <LinearProgress />
+                  </Box>
+                )}
+
                 {/* Table */}
                 <TableContainer component={Paper} sx={{ boxShadow: 1 }}>
                   <Table size="small">
@@ -2203,6 +2969,7 @@ function App() {
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                         <TableCell padding="checkbox">
                           <Checkbox
+                            disabled={isRunningEligibilityAll}
                             indeterminate={
                               selected.length > 0 &&
                               selected.length < filteredData.length &&
@@ -2533,12 +3300,21 @@ function App() {
                           onClick={() => handleContactClick(row.id)}
                           sx={{
                             '&:hover': { backgroundColor: '#f9f9f9' },
-                            cursor: 'pointer',
-                            backgroundColor: selectedChild === row.id ? '#e0e0e0' : 'inherit',
+                            cursor: runningEligibilityContactId === row.id ? 'wait' : 'pointer',
+                            backgroundColor:
+                              runningEligibilityContactId === row.id
+                                ? '#fff3e0'
+                                : selectedChild === row.id
+                                  ? '#e0e0e0'
+                                  : 'inherit',
+                            opacity: runningEligibilityContactId === row.id ? 0.7 : 1,
                           }}
                         >
                           <TableCell padding="checkbox">
                             <Checkbox
+                              disabled={
+                                isRunningEligibilityAll || runningEligibilityContactId === row.id
+                              }
                               checked={selected.includes(row.id)}
                               onChange={(e) => {
                                 e.stopPropagation()
@@ -2801,6 +3577,33 @@ function App() {
                     <Typography variant="body2">Sort Ascending</Typography>
                   </MenuItem>
                   <MenuItem onClick={() => handleSort(sortAnchor.column, 'desc')} sx={{ gap: 1.5 }}>
+                    <ArrowDownwardIcon fontSize="small" />
+                    <Typography variant="body2">Sort Descending</Typography>
+                  </MenuItem>
+                </Menu>
+
+                {/* Batch History Sort Menu */}
+                <Menu
+                  anchorEl={batchHistorySortAnchor.element}
+                  open={Boolean(batchHistorySortAnchor.element)}
+                  onClose={handleBatchHistorySortClose}
+                  PaperProps={{
+                    sx: {
+                      width: 200,
+                    },
+                  }}
+                >
+                  <MenuItem
+                    onClick={() => handleBatchHistorySort(batchHistorySortAnchor.column, 'asc')}
+                    sx={{ gap: 1.5 }}
+                  >
+                    <ArrowUpwardIcon fontSize="small" />
+                    <Typography variant="body2">Sort Ascending</Typography>
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => handleBatchHistorySort(batchHistorySortAnchor.column, 'desc')}
+                    sx={{ gap: 1.5 }}
+                  >
                     <ArrowDownwardIcon fontSize="small" />
                     <Typography variant="body2">Sort Descending</Typography>
                   </MenuItem>
@@ -3452,7 +4255,7 @@ function App() {
                                     variant="caption"
                                     sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
                                   >
-                                    Legal Status Code
+                                    Effective Legal Status
                                   </Typography>
                                   <Typography
                                     variant="body2"
@@ -4129,7 +4932,7 @@ function App() {
                           <Button
                             variant="contained"
                             size="small"
-                            disabled={!canRemoveFromBatch}
+                            disabled={!canRemoveFromBatch || isRunningEligibilityAll}
                             onClick={handleRemoveFromBatch}
                             sx={{
                               textTransform: 'none',
@@ -4155,7 +4958,12 @@ function App() {
                             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                               <TableCell sx={{ fontWeight: 600 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  Batch ID
+                                  <span
+                                    onClick={(e) => handleBatchHistorySortClick(e, 'batchId')}
+                                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                                  >
+                                    Batch ID
+                                  </span>
                                   <IconButton
                                     size="small"
                                     onClick={(e) => handleBatchHistoryFilterClick(e, 'batchId')}
@@ -4173,24 +4981,33 @@ function App() {
                               </TableCell>
                               <TableCell sx={{ fontWeight: 600 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  Created Date
+                                  <span
+                                    onClick={(e) => handleBatchHistorySortClick(e, 'batchDate')}
+                                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                                  >
+                                    Batch Date
+                                  </span>
                                 </Box>
                               </TableCell>
                               <TableCell sx={{ fontWeight: 600 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  Batch Date
-                                </Box>
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  Status
+                                  <span
+                                    onClick={(e) =>
+                                      handleBatchHistorySortClick(e, 'batchRequestStatus')
+                                    }
+                                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                                  >
+                                    Batch Request Status
+                                  </span>
                                   <IconButton
                                     size="small"
-                                    onClick={(e) => handleBatchHistoryFilterClick(e, 'status')}
+                                    onClick={(e) =>
+                                      handleBatchHistoryFilterClick(e, 'batchRequestStatus')
+                                    }
                                     sx={{
                                       padding: 0.5,
                                       color:
-                                        batchHistoryColumnFilters.status?.length > 0
+                                        batchHistoryColumnFilters.batchRequestStatus?.length > 0
                                           ? '#1976d2'
                                           : '#666',
                                     }}
@@ -4201,7 +5018,14 @@ function App() {
                               </TableCell>
                               <TableCell sx={{ fontWeight: 600 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  Transaction Type
+                                  <span
+                                    onClick={(e) =>
+                                      handleBatchHistorySortClick(e, 'transactionType')
+                                    }
+                                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                                  >
+                                    Transaction Type
+                                  </span>
                                   <IconButton
                                     size="small"
                                     onClick={(e) =>
@@ -4219,12 +5043,76 @@ function App() {
                                   </IconButton>
                                 </Box>
                               </TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <span
+                                    onClick={(e) => handleBatchHistorySortClick(e, 'effectiveDate')}
+                                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                                  >
+                                    Effective Date
+                                  </span>
+                                </Box>
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <span
+                                    onClick={(e) =>
+                                      handleBatchHistorySortClick(e, 'batchDetailStatus')
+                                    }
+                                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                                  >
+                                    Batch Detail Status
+                                  </span>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) =>
+                                      handleBatchHistoryFilterClick(e, 'batchDetailStatus')
+                                    }
+                                    sx={{
+                                      padding: 0.5,
+                                      color:
+                                        batchHistoryColumnFilters.batchDetailStatus?.length > 0
+                                          ? '#1976d2'
+                                          : '#666',
+                                    }}
+                                  >
+                                    <FilterListIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <span
+                                    onClick={(e) =>
+                                      handleBatchHistorySortClick(e, 'systemComments')
+                                    }
+                                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                                  >
+                                    System Comments
+                                  </span>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) =>
+                                      handleBatchHistoryFilterClick(e, 'systemComments')
+                                    }
+                                    sx={{
+                                      padding: 0.5,
+                                      color:
+                                        batchHistoryColumnFilters.systemComments?.length > 0
+                                          ? '#1976d2'
+                                          : '#666',
+                                    }}
+                                  >
+                                    <FilterListIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                              </TableCell>
                             </TableRow>
                           </TableHead>
                           <TableBody>
                             {loadingBatchHistory ? (
                               <TableRow>
-                                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                                   <Typography variant="body2" color="text.secondary">
                                     Loading batch history...
                                   </Typography>
@@ -4232,7 +5120,7 @@ function App() {
                               </TableRow>
                             ) : filteredBatchHistory.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                                   <Typography variant="body2" color="text.secondary">
                                     {selectedChild
                                       ? 'No batch history found for this contact'
@@ -4261,10 +5149,9 @@ function App() {
                                   <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
                                     {row.batchId}
                                   </TableCell>
-                                  <TableCell>{row.createdDate}</TableCell>
                                   <TableCell>{row.batchDate}</TableCell>
                                   <TableCell>
-                                    {row.status === 'Pending' && (
+                                    {row.batchRequestStatus === 'Pending' && (
                                       <Box
                                         component="span"
                                         sx={{
@@ -4283,9 +5170,12 @@ function App() {
                                         Pending
                                       </Box>
                                     )}
-                                    {row.status !== 'Pending' && row.status}
+                                    {row.batchRequestStatus !== 'Pending' && row.batchRequestStatus}
                                   </TableCell>
                                   <TableCell>{row.transactionType}</TableCell>
+                                  <TableCell>{row.effectiveDate}</TableCell>
+                                  <TableCell>{row.batchDetailStatus}</TableCell>
+                                  <TableCell>{row.systemComments}</TableCell>
                                 </TableRow>
                               ))
                             )}
@@ -4373,7 +5263,12 @@ function App() {
                       <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Batch ID
+                            <span
+                              onClick={(e) => handleBatchRequestsSortClick(e, 'batchId')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Batch ID
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleBatchRequestsFilterClick(e, 'batchId')}
@@ -4391,12 +5286,22 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Batch Date
+                            <span
+                              onClick={(e) => handleBatchRequestsSortClick(e, 'batchDate')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Batch Date
+                            </span>
                           </Box>
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Status
+                            <span
+                              onClick={(e) => handleBatchRequestsSortClick(e, 'status')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Status
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleBatchRequestsFilterClick(e, 'status')}
@@ -4414,7 +5319,12 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Record Count
+                            <span
+                              onClick={(e) => handleBatchRequestsSortClick(e, 'recordCount')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Record Count
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleBatchRequestsFilterClick(e, 'recordCount')}
@@ -4432,12 +5342,45 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Created Date
+                            <span
+                              onClick={(e) => handleBatchRequestsSortClick(e, 'initiatedBy')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Initiated By
+                            </span>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleBatchRequestsFilterClick(e, 'initiatedBy')}
+                              sx={{
+                                padding: 0.5,
+                                color:
+                                  batchRequestsColumnFilters.initiatedBy?.length > 0
+                                    ? '#1976d2'
+                                    : '#666',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
                           </Box>
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            System Comments
+                            <span
+                              onClick={(e) => handleBatchRequestsSortClick(e, 'createdDate')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Created Date
+                            </span>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <span
+                              onClick={(e) => handleBatchRequestsSortClick(e, 'systemComments')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              System Comments
+                            </span>
                             <IconButton
                               size="small"
                               onClick={(e) => handleBatchRequestsFilterClick(e, 'systemComments')}
@@ -4458,7 +5401,7 @@ function App() {
                     <TableBody>
                       {loadingBatches ? (
                         <TableRow>
-                          <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                          <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                             <Typography variant="body2" color="text.secondary">
                               Loading batch requests...
                             </Typography>
@@ -4466,7 +5409,7 @@ function App() {
                         </TableRow>
                       ) : filteredBatchRequests.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                          <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                             <Typography variant="body2" color="text.secondary">
                               No batch requests found
                             </Typography>
@@ -4490,6 +5433,7 @@ function App() {
                             <TableCell>{row.batchDate}</TableCell>
                             <TableCell>{row.status}</TableCell>
                             <TableCell>{row.recordCount}</TableCell>
+                            <TableCell>{row.initiatedBy}</TableCell>
                             <TableCell>{row.createdDate}</TableCell>
                             <TableCell>{row.systemComments}</TableCell>
                           </TableRow>
@@ -4570,7 +5514,7 @@ function App() {
                       <Button
                         variant="contained"
                         size="small"
-                        disabled={!canRemoveFromBatchDetails}
+                        disabled={!canRemoveFromBatchDetails || isRunningEligibilityAll}
                         onClick={handleRemoveFromBatchDetails}
                         sx={{
                           backgroundColor: '#d32f2f',
@@ -4593,6 +5537,7 @@ function App() {
                         <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                           <TableCell padding="checkbox">
                             <Checkbox
+                              disabled={isRunningEligibilityAll}
                               indeterminate={
                                 selectedBatchDetails.length > 0 &&
                                 selectedBatchDetails.length < filteredBatchDetails.length
@@ -4612,7 +5557,12 @@ function App() {
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              Last Name
+                              <span
+                                onClick={(e) => handleBatchDetailsSortClick(e, 'lastName')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Last Name
+                              </span>
                               <IconButton
                                 size="small"
                                 onClick={(e) => handleBatchDetailsFilterClick(e, 'lastName')}
@@ -4630,25 +5580,12 @@ function App() {
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              Middle Name(s)
-                              <IconButton
-                                size="small"
-                                onClick={(e) => handleBatchDetailsFilterClick(e, 'middleName')}
-                                sx={{
-                                  padding: 0.5,
-                                  color:
-                                    batchDetailsColumnFilters.middleName?.length > 0
-                                      ? '#1976d2'
-                                      : '#666',
-                                }}
+                              <span
+                                onClick={(e) => handleBatchDetailsSortClick(e, 'givenName')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
                               >
-                                <FilterListIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              First Name
+                                First Name
+                              </span>
                               <IconButton
                                 size="small"
                                 onClick={(e) => handleBatchDetailsFilterClick(e, 'givenName')}
@@ -4666,7 +5603,58 @@ function App() {
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              Transaction Type
+                              <span
+                                onClick={(e) => handleBatchDetailsSortClick(e, 'middleName')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Middle Name(s)
+                              </span>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleBatchDetailsFilterClick(e, 'middleName')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchDetailsColumnFilters.middleName?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleBatchDetailsSortClick(e, 'caseNumber')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Case Number
+                              </span>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleBatchDetailsFilterClick(e, 'caseNumber')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchDetailsColumnFilters.caseNumber?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleBatchDetailsSortClick(e, 'transactionType')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Transaction Type
+                              </span>
                               <IconButton
                                 size="small"
                                 onClick={(e) => handleBatchDetailsFilterClick(e, 'transactionType')}
@@ -4684,7 +5672,49 @@ function App() {
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              Status
+                              <span
+                                onClick={(e) => handleBatchDetailsSortClick(e, 'effectiveDate')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Effective Date
+                              </span>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) =>
+                                  handleBatchDetailsSortClick(e, 'cancellationReason')
+                                }
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Reason for Cancellation
+                              </span>
+                              <IconButton
+                                size="small"
+                                onClick={(e) =>
+                                  handleBatchDetailsFilterClick(e, 'cancellationReason')
+                                }
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchDetailsColumnFilters.cancellationReason?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleBatchDetailsSortClick(e, 'status')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Status
+                              </span>
                               <IconButton
                                 size="small"
                                 onClick={(e) => handleBatchDetailsFilterClick(e, 'status')}
@@ -4702,7 +5732,12 @@ function App() {
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              System Comments
+                              <span
+                                onClick={(e) => handleBatchDetailsSortClick(e, 'systemComments')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                System Comments
+                              </span>
                               <IconButton
                                 size="small"
                                 onClick={(e) => handleBatchDetailsFilterClick(e, 'systemComments')}
@@ -4718,12 +5753,35 @@ function App() {
                               </IconButton>
                             </Box>
                           </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleBatchDetailsSortClick(e, 'addedBy')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Added By
+                              </span>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleBatchDetailsFilterClick(e, 'addedBy')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchDetailsColumnFilters.addedBy?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {loadingBatchDetails ? (
                           <TableRow>
-                            <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                            <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
                               <Typography variant="body2" color="text.secondary">
                                 Loading batch details...
                               </Typography>
@@ -4731,7 +5789,7 @@ function App() {
                           </TableRow>
                         ) : filteredBatchDetails.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                            <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
                               <Typography variant="body2" color="text.secondary">
                                 {selectedBatch
                                   ? 'No contacts found in this batch'
@@ -4748,6 +5806,7 @@ function App() {
                             >
                               <TableCell padding="checkbox">
                                 <Checkbox
+                                  disabled={isRunningEligibilityAll}
                                   checked={selectedBatchDetails.includes(row.id)}
                                   onChange={() => {
                                     setSelectedBatchDetails((prev) =>
@@ -4759,11 +5818,15 @@ function App() {
                                 />
                               </TableCell>
                               <TableCell>{row.lastName}</TableCell>
-                              <TableCell>{row.middleName}</TableCell>
                               <TableCell>{row.givenName}</TableCell>
+                              <TableCell>{row.middleName}</TableCell>
+                              <TableCell>{row.caseNumber}</TableCell>
                               <TableCell>{row.transactionType}</TableCell>
+                              <TableCell>{row.effectiveDate}</TableCell>
+                              <TableCell>{row.cancellationReason}</TableCell>
                               <TableCell>{row.status}</TableCell>
                               <TableCell>{row.systemComments}</TableCell>
+                              <TableCell>{row.addedBy}</TableCell>
                             </TableRow>
                           ))
                         )}
@@ -4801,7 +5864,61 @@ function App() {
             )}
           </Box>
 
-          {/* Filter Menus - Outside tabs so they're always available */}
+          {/* Sort and Filter Menus - Outside tabs so they're always available */}
+
+          {/* Batch Requests Sort Menu */}
+          <Menu
+            anchorEl={batchRequestsSortAnchor.element}
+            open={Boolean(batchRequestsSortAnchor.element)}
+            onClose={handleBatchRequestsSortClose}
+            PaperProps={{
+              sx: {
+                width: 200,
+              },
+            }}
+          >
+            <MenuItem
+              onClick={() => handleBatchRequestsSort(batchRequestsSortAnchor.column, 'asc')}
+              sx={{ gap: 1.5 }}
+            >
+              <ArrowUpwardIcon fontSize="small" />
+              <Typography variant="body2">Sort Ascending</Typography>
+            </MenuItem>
+            <MenuItem
+              onClick={() => handleBatchRequestsSort(batchRequestsSortAnchor.column, 'desc')}
+              sx={{ gap: 1.5 }}
+            >
+              <ArrowDownwardIcon fontSize="small" />
+              <Typography variant="body2">Sort Descending</Typography>
+            </MenuItem>
+          </Menu>
+
+          {/* Batch Details Sort Menu */}
+          <Menu
+            anchorEl={batchDetailsSortAnchor.element}
+            open={Boolean(batchDetailsSortAnchor.element)}
+            onClose={handleBatchDetailsSortClose}
+            PaperProps={{
+              sx: {
+                width: 200,
+              },
+            }}
+          >
+            <MenuItem
+              onClick={() => handleBatchDetailsSort(batchDetailsSortAnchor.column, 'asc')}
+              sx={{ gap: 1.5 }}
+            >
+              <ArrowUpwardIcon fontSize="small" />
+              <Typography variant="body2">Sort Ascending</Typography>
+            </MenuItem>
+            <MenuItem
+              onClick={() => handleBatchDetailsSort(batchDetailsSortAnchor.column, 'desc')}
+              sx={{ gap: 1.5 }}
+            >
+              <ArrowDownwardIcon fontSize="small" />
+              <Typography variant="body2">Sort Descending</Typography>
+            </MenuItem>
+          </Menu>
 
           {/* Batch Requests Filter Menu */}
           <Menu
@@ -5097,6 +6214,29 @@ function App() {
           © 2026 Government of British Columbia.
         </Typography>
       </Box>
+
+      {/* Confirmation Dialog for Run Eligibility on All Contacts */}
+      <Dialog
+        open={confirmRunAllDialogOpen}
+        onClose={handleConfirmRunAllDialogClose}
+        aria-labelledby="confirm-run-all-dialog-title"
+        aria-describedby="confirm-run-all-dialog-description"
+      >
+        <DialogTitle id="confirm-run-all-dialog-title">Confirm Eligibility Query</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="confirm-run-all-dialog-description">
+            CSA Eligibility Query will be run for all children. Do you wish to proceed?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleConfirmRunAllDialogClose} color="inherit">
+            No
+          </Button>
+          <Button onClick={handleRunEligibilityForAll} variant="contained" autoFocus>
+            Yes
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar for hold/resume feedback */}
       <Snackbar

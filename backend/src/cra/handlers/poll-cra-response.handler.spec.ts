@@ -1367,7 +1367,7 @@ describe('PollCraResponseHandler', () => {
         expect(mockContactsService.forceUpdateCsaStatus).toHaveBeenCalledWith(
           99,
           CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY,
-          { careEndDate: expect.any(Date), din: '123456789' },
+          { careEndDate: expect.any(Date), din: '123456789', cancelReasonCode: '21' },
         )
         expect(result.metadata.records_wkl_unmatched_approved).toBe(1)
         expect(result.metadata.records_wkl_unmatched_refused).toBe(0)
@@ -1400,7 +1400,7 @@ describe('PollCraResponseHandler', () => {
         expect(mockContactsService.forceUpdateCsaStatus).toHaveBeenCalledWith(
           99,
           CSA_STATUS.CANCELLATION_REFUSED_CRA,
-          { careEndDate: expect.any(Date), din: '123456789' },
+          { careEndDate: expect.any(Date), din: '123456789', cancelReasonCode: '21' },
         )
         expect(result.metadata.records_wkl_unmatched_refused).toBe(1)
         expect(result.metadata.records_wkl_unmatched_approved).toBe(0)
@@ -1460,6 +1460,30 @@ describe('PollCraResponseHandler', () => {
             careEndDate: expect.any(Date),
             din: '123456789',
             cancelReasonCode: '22',
+          },
+        )
+      })
+
+      it('defaults careEndDate to today and cancelReasonCode to "21" when WKL blank for unmatched cancellation', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'C' as const,
+            careEndDate: '        ',
+            careEndReasonCode: '  ',
+            status: WKL_STATUS.COMPLETED,
+          }),
+        ])
+
+        await handler.execute(mockContext)
+
+        expect(mockContactsService.forceUpdateCsaStatus).toHaveBeenCalledWith(
+          99,
+          CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY,
+          {
+            careEndDate: expect.any(Date),
+            din: '123456789',
+            cancelReasonCode: '21',
           },
         )
       })

@@ -1,5 +1,6 @@
 export interface CraMatchingSnapshot {
   childGivenName: string
+  childMiddleName?: string
   childSurName: string
   childSex: string
   childBirthDate: string

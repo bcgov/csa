@@ -73,6 +73,8 @@ export interface Contact {
   isOver18?: boolean
   // Hold fields
   holdBy?: string
+  // Review flag for On Hold records with staging data changes
+  needsReview?: boolean
 }
 
 export interface PaginatedContactsResponse {
@@ -319,6 +321,19 @@ export const removeContactFromBatch = async (
 }
 
 /**
+ * Remove multiple contacts from pending batch
+ * @param contactIds - Array of contact IDs to remove
+ */
+export const removeContactsFromBatch = async (
+  contactIds: number[],
+): Promise<BulkOperationResponse & { batch: { recordCount: number } }> => {
+  const response = await APIService.getAxiosInstance().post('/batches/pending/contacts/remove', {
+    contactIds,
+  })
+  return response.data
+}
+
+/**
  * Update eligibility status for multiple contacts
  * @param contactIds - Array of contact IDs to update
  * @param action - Action to perform (e.g., 'ELIGIBLE')
@@ -388,6 +403,15 @@ export const updateOver18Status = async (
     contactIds,
     action,
   })
+  return response.data
+}
+
+/**
+ * Clear the review flag for a contact
+ * @param contactId - Contact ID to clear review flag for
+ */
+export const clearReviewFlag = async (contactId: number): Promise<{ success: boolean }> => {
+  const response = await APIService.getAxiosInstance().patch(`/contacts/${contactId}/review-flag`)
   return response.data
 }
 

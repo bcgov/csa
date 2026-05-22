@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
-import { AppLogger } from 'src/common/logger/app-logger'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { AppLogger } from 'src/common/logger/app-logger'
 import {
   getAgeCutoffDate,
   isEligibleAge,
@@ -9,7 +9,11 @@ import {
   parseISODatePacific,
 } from 'src/common/utils'
 import { CANCEL_REASON } from './cancellation/cancellation-reason.constants'
-import { ELIGIBILITY_CONFIG, PROTECTED_STATUSES } from './eligibility.config'
+import {
+  ELIGIBILITY_CONFIG,
+  PROTECTED_STATUSES,
+  PROTECTED_STATUSES_SQL,
+} from './eligibility.config'
 import { EligibilityInputError } from './eligibility.errors'
 import { buildFindAgedOutContactIdsSql, buildLoadContactProfilesSql } from './eligibility.queries'
 import {
@@ -406,11 +410,11 @@ const UPSERT_SQL = `
   INSERT INTO contacts (
     ${COL_LIST},
     icm_integration_status,
-    created_at, created_by, last_updated_at, last_updated_by
+    created_at, created_by, last_updated_at, last_updated_by, needs_review
   )
   SELECT
     ${SELECT_LIST},
-    true, NOW(), 'SYSTEM', NOW(), 'SYSTEM'
+    true, NOW(), 'SYSTEM', NOW(), 'SYSTEM', false
   FROM unnest(${UNNEST_PARAMS})
   AS t(${COL_LIST})
   ON CONFLICT (person_id_icm) DO UPDATE SET
@@ -430,7 +434,13 @@ const UPSERT_SQL = `
     last_updated_by = CASE
       WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN 'SYSTEM'
       ELSE contacts.last_updated_by
+    END,
+    needs_review = CASE
+      WHEN contacts.csa_status = 'on_hold' THEN true
+      ELSE contacts.needs_review
     END
+  WHERE contacts.csa_status NOT IN (${PROTECTED_STATUSES_SQL})
+     OR EXCLUDED.csa_status = contacts.csa_status
 `
 
 @Injectable()

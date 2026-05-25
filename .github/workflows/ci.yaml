@@ -14,7 +14,7 @@ on:
         description: "Target env for manual runs (feature branches default to dev)"
         type: choice
         required: false
-        options: [dev, test, prod]
+        options: [dev, test, pre-prod, prod]
         default: dev
 
 concurrency:
@@ -45,10 +45,11 @@ jobs:
 
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             case "${{ inputs.target_env }}" in
-              dev)  echo "envname=dev"  >> "$GITHUB_OUTPUT" ;;
-              test) echo "envname=test" >> "$GITHUB_OUTPUT" ;;
-              prod) echo "envname=prod" >> "$GITHUB_OUTPUT" ;;
-              *)    echo "Invalid target_env"; exit 1 ;;
+              dev)      echo "envname=dev"      >> "$GITHUB_OUTPUT" ;;
+              test)     echo "envname=test"     >> "$GITHUB_OUTPUT" ;;
+              pre-prod) echo "envname=pre-prod" >> "$GITHUB_OUTPUT" ;;
+              prod)     echo "envname=prod"     >> "$GITHUB_OUTPUT" ;;
+              *)        echo "Invalid target_env"; exit 1 ;;
             esac
             exit 0
           fi
@@ -183,8 +184,6 @@ jobs:
             echo "If backup is intended to ship as an image, add backup/Dockerfile."
             exit 1
           fi
-
-
 
       # ---------- Find cobertura XML (only if generated) ----------
       - name: Find cobertura coverage files

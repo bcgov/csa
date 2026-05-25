@@ -3,9 +3,12 @@ import { runEligibility } from './rule-runner'
 import { EligibilityRule, EligibilityContext } from './rule.interface'
 import { EligibilityResult } from '../eligibility.types'
 import { makeContact, makePlacement, makeOrder } from '../test-helpers'
+import { step1B_CancellationCheck } from './steps/step1b-cancellation-determination'
+import { step2_LegalStatusCheck } from './steps/step2-legal-status-check'
 import { step3_PlacementCheck } from './steps/step3-placement-check'
 import { step4_FetchAgreementContract } from './steps/step4-fetch-agreement-contract'
 import { step6_OrderPaymentCheck } from './steps/step6-order-payment-check'
+import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
 
 const REF_DATE = new Date('2026-02-10')
 
@@ -111,6 +114,36 @@ describe('runEligibility integration: step3 → step4 → step6', () => {
       newStatus: 'eligible',
       cancelReasonCode: null,
       careEndDate: null,
+    })
+  })
+})
+
+describe('runEligibility integration: step1B → step2 → step9 (care end date passthrough)', () => {
+  // Regression guard for the step-9 null-fallback fix:
+  // When a contact lands in Step 9's In-Pay branch via step 2 / step 6 (i.e. without a
+  // staging-derived cancellation reason), the care end date must come from
+  // determineCareEndDate(orders, placements) — pre-computed by step 1B and stashed on
+  // ctx — and NOT default to the system reference date.
+  const RULES = [step1B_CancellationCheck, step2_LegalStatusCheck]
+  const REF = new Date('2026-04-15')
+  const ORDER_END = new Date('2026-03-10')
+
+  it('step 2 routes IN_PAY contact to step 9 with care end date from step 1B compute', () => {
+    const contact = makeContact({
+      csaStatus: CSA_STATUS.IN_PAY,
+      deceased: null,
+      enrollForCsa: 'No',
+      legalExpiryDate: null,
+      orders: [makeOrder({ orderStatus: 'Closed', effectiveEndDate: ORDER_END, source: 'ICM' })],
+    })
+
+    const result = runEligibility(contact, RULES, REF)
+
+    expect(result).toEqual({
+      step: 9,
+      newStatus: CSA_STATUS.NOT_ELIGIBLE_IN_PAY,
+      cancelReasonCode: '21',
+      careEndDate: ORDER_END,
     })
   })
 })

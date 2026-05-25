@@ -56,7 +56,12 @@ export const step6_OrderPaymentCheck: EligibilityRule = {
     if (previousMonthOrders.length === 0) {
       return hasNonPlacement
         ? step8_UpdateEligibleTbd(csaStatus)
-        : step9_UpdateNotEligible(csaStatus, null, null, ctx.referenceDate)
+        : step9_UpdateNotEligible(
+            csaStatus,
+            ctx.cancelReasonCode,
+            ctx.careEndDate,
+            ctx.referenceDate,
+          )
     }
 
     let hasTypeStatusMatch = false
@@ -82,7 +87,7 @@ export const step6_OrderPaymentCheck: EligibilityRule = {
 
     return hasNonPlacement
       ? step8_UpdateEligibleTbd(csaStatus)
-      : step9_UpdateNotEligible(csaStatus, null, null, ctx.referenceDate)
+      : step9_UpdateNotEligible(csaStatus, ctx.cancelReasonCode, ctx.careEndDate, ctx.referenceDate)
   },
 }
 

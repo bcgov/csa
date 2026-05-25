@@ -71,14 +71,32 @@ export class IcmService {
       .map((e) => `${e.sourceField} = EXCLUDED.${e.sourceField}`)
       .join(', ')
 
+    // Fields eligible for change detection: exclude PK and excludeFromChangeDetection fields
+    const changeDetectFields = fieldMap.filter(
+      (e) => e.sourceField !== primaryKey && !e.excludeFromChangeDetection,
+    )
+
+    const hasChangeDetection = changeDetectFields.length > 0
+    const oldTuple = changeDetectFields.map((e) => `${stagingTable}.${e.sourceField}`).join(', ')
+    const newTuple = changeDetectFields.map((e) => `EXCLUDED.${e.sourceField}`).join(', ')
+
+    const dataChangedAtClause = hasChangeDetection
+      ? `CASE
+          WHEN (${oldTuple}) IS DISTINCT FROM (${newTuple})
+          THEN NOW()
+          ELSE ${stagingTable}.data_changed_at
+        END`
+      : 'NOW()'
+
     const sql = `
-      INSERT INTO ${stagingTable} (${colList}, ingested_at)
-      SELECT ${selectList}, NOW()
+      INSERT INTO ${stagingTable} (${colList}, ingested_at, data_changed_at)
+      SELECT ${selectList}, NOW(), NOW()
       FROM unnest(${unnestParams})
       AS t(${colList})
       ON CONFLICT (${primaryKey}) DO UPDATE SET
         ${updateSet},
-        ingested_at = NOW()
+        ingested_at = NOW(),
+        data_changed_at = ${dataChangedAtClause}
     `
 
     await this.prisma.$executeRawUnsafe(sql, ...arrays)

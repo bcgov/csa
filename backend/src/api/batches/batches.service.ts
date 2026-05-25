@@ -9,13 +9,28 @@ import {
 } from 'src/common/state-machine/constants'
 import type { TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
-import { appendSystemComment, enrichLabels } from 'src/common/utils'
-import { CANCEL_REASON_LABELS } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
+import { appendSystemComment, enrichLabels, pacificToday, parseWklDate } from 'src/common/utils'
+import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
+import { HeaderRecord } from 'src/cra/inbound/inbound-weekly.interface'
+import { MatchedBatchDetail } from 'src/cra/inbound/weekly-contact-matcher.service'
+import {
+  CANCEL_REASON,
+  getCancelReasonLabel,
+} from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
+import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
 import { ContactsService } from '../contacts/contacts.service'
 import { BulkOperationResponse } from '../contacts/interfaces'
 
-export interface AddContactsResult extends BulkOperationResponse {
+const { BATCH_INITIATED_BY, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
+
+class TransitionSkipError extends Error {
+  constructor(public readonly reason: string) {
+    super(reason)
+  }
+}
+
+export interface BatchOperationResult extends BulkOperationResponse {
   batch: {
     id: number
     batchDate: Date | null
@@ -38,7 +53,16 @@ export class BatchesService {
     private prisma: PrismaService,
     private stateMachine: StateMachineService,
     private contactsService: ContactsService,
+    private icmSyncBackService: IcmSyncBackService,
   ) {}
+
+  private fireAndForgetSync(contactId: number): void {
+    this.icmSyncBackService.syncSingleContact(contactId).catch((err) => {
+      this.logger.warn(
+        `Immediate ICM sync failed for contact ${contactId}: ${(err as Error).message}`,
+      )
+    })
+  }
 
   async findAll() {
     const batches = await this.prisma.batch.findMany({
@@ -167,12 +191,8 @@ export class BatchesService {
           ? detail.contact.careEndDate
           : detail.contact.effectiveDate
 
-      // Get cancellation reason label for cancellation transactions
       const cancelReasonCode = detail.contact.cancelReasonCode
-      const cancelReasonLabel =
-        cancelReasonCode && detail.transactionType === TRANSACTION_TYPES.CANCELLATION
-          ? CANCEL_REASON_LABELS[cancelReasonCode as keyof typeof CANCEL_REASON_LABELS] || null
-          : null
+      const cancelReasonLabel = getCancelReasonLabel(cancelReasonCode, detail.transactionType)
 
       return enrichLabels({
         ...detail,
@@ -197,6 +217,7 @@ export class BatchesService {
           batchDate: null,
           status: BATCH_STATUS.PENDING,
           recordCount: 0,
+          initiatedBy: BATCH_INITIATED_BY.MINISTRY,
           createdAt: new Date(),
         },
       })
@@ -205,13 +226,42 @@ export class BatchesService {
     return enrichLabels(pendingBatch)
   }
 
+  async createWklBatchForUnmatchedRecords(header: HeaderRecord) {
+    const existingBatch = await this.prisma.batch.findFirst({
+      where: {
+        initiatedBy: BATCH_INITIATED_BY.CRA,
+        status: BATCH_STATUS.IN_PROGRESS,
+      },
+    })
+
+    if (existingBatch) {
+      this.logger.warn(
+        `Attempted to create WKL batch for unmatched records, but batch ${existingBatch.id} is already in progress. ` +
+          `This should not happen as we check for unmatched records before creating the batch, but it could occur in rare cases of high concurrency. ` +
+          `Please review batch ${existingBatch.id} for details.`,
+      )
+      return existingBatch
+    }
+    const systemComments = appendSystemComment(`CRA initiated batch from WKL file`, null)
+    return this.prisma.batch.create({
+      data: {
+        batchDate: parseWklDate(header.processDate),
+        initiatedBy: BATCH_INITIATED_BY.CRA,
+        status: BATCH_STATUS.IN_PROGRESS,
+        recordCount: 0,
+        systemComments,
+        createdAt: new Date(),
+      },
+    })
+  }
+
   async addContactsToPendingBatch(
     contactIds: number[],
     userId: string,
-  ): Promise<AddContactsResult> {
+  ): Promise<BatchOperationResult> {
     const pendingBatch = await this.findOrCreatePendingBatch()
 
-    const result: AddContactsResult = {
+    const result: BatchOperationResult = {
       batch: pendingBatch,
       success: [],
       skipped: [],
@@ -219,7 +269,13 @@ export class BatchesService {
 
     const existingContacts = await this.prisma.contact.findMany({
       where: { id: { in: contactIds } },
-      select: { id: true, caseNumber: true, csaStatus: true },
+      select: {
+        id: true,
+        caseNumber: true,
+        csaStatus: true,
+        cancelReasonCode: true,
+        careEndDate: true,
+      },
     })
     const existingContactMap = new Map(existingContacts.map((c) => [c.id, c]))
 
@@ -245,29 +301,39 @@ export class BatchesService {
       }
 
       try {
-        const transition = await this.contactsService.updateCsaStatus(
-          contactId,
-          CSA_EVENT.ADD_TO_BATCH,
-          'USER',
-          { userId },
-        )
-
-        if (!transition.success) {
-          result.skipped.push({
-            id: contactId,
-            reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION,
-          })
-          continue
-        }
-
-        // Derive transaction type from the target state
-        const transactionType =
-          transition.to === CSA_STATUS.IN_BATCH_CANCELLATION
-            ? TRANSACTION_TYPES.CANCELLATION
-            : TRANSACTION_TYPES.APPLICATION
-
-        const caseNumber = contact.caseNumber ?? ''
         await this.prisma.$transaction(async (tx) => {
+          const transition = await this.contactsService.updateCsaStatus(
+            contactId,
+            CSA_EVENT.ADD_TO_BATCH,
+            'USER',
+            { userId, tx, origin: 'BatchesService.addContactsToPendingBatch' },
+          )
+
+          if (!transition.success) {
+            throw new TransitionSkipError(BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION)
+          }
+
+          const transactionType =
+            transition.to === CSA_STATUS.IN_BATCH_CANCELLATION
+              ? TRANSACTION_TYPES.CANCELLATION
+              : TRANSACTION_TYPES.APPLICATION
+
+          const caseNumber = contact.caseNumber ?? ''
+
+          // Per FDD BL-05: default cancellation fields when blank
+          if (transactionType === TRANSACTION_TYPES.CANCELLATION) {
+            const updates: Record<string, unknown> = {}
+            if (!contact.careEndDate) {
+              updates.careEndDate = pacificToday()
+            }
+            if (!contact.cancelReasonCode) {
+              updates.cancelReasonCode = CANCEL_REASON.CHILD_LEFT
+            }
+            if (Object.keys(updates).length > 0) {
+              await tx.contact.update({ where: { id: contactId }, data: updates })
+            }
+          }
+
           const batchDetail = await tx.contactBatchDetail.create({
             data: {
               contactId,
@@ -286,22 +352,27 @@ export class BatchesService {
           })
         })
         result.success.push(contactId)
+
+        this.fireAndForgetSync(contactId)
       } catch (error) {
-        this.logger.error(
-          `Failed to add contact ${contactId} to batch: ${(error as Error).message}`,
-        )
-        result.skipped.push({ id: contactId, reason: 'error' })
+        if (error instanceof TransitionSkipError) {
+          result.skipped.push({ id: contactId, reason: error.reason })
+        } else {
+          this.logger.error(
+            `Failed to add contact ${contactId} to batch: ${(error as Error).message}`,
+          )
+          result.skipped.push({ id: contactId, reason: 'error' })
+        }
       }
     }
 
+    const actualCount = await this.prisma.contactBatchDetail.count({
+      where: { batchId: pendingBatch.id },
+    })
     result.batch = enrichLabels(
       await this.prisma.batch.update({
         where: { id: pendingBatch.id },
-        data: {
-          recordCount: {
-            increment: result.success.length,
-          },
-        },
+        data: { recordCount: actualCount },
       }),
     )
 
@@ -314,38 +385,102 @@ export class BatchesService {
       select: { status: true },
     })
 
-    const statuses = allDetails.map((d) => d.status)
-    const hasProcessed = statuses.includes(BATCH_DETAIL_STATUS.PROCESSED)
-    const hasError = statuses.includes(BATCH_DETAIL_STATUS.ERROR)
-    const hasInProgress = statuses.includes(BATCH_DETAIL_STATUS.IN_PROGRESS)
+    if (allDetails.length === 0) return
 
-    if (hasInProgress) {
-      this.logger.log(`Batch ${batchId}: some details still in_progress, batch stays in_progress`)
+    const batchRecord = await this.prisma.batch.findUnique({
+      where: { id: batchId },
+      select: { initiatedBy: true },
+    })
+    if (batchRecord?.initiatedBy === BATCH_INITIATED_BY.CRA) {
+      await this.prisma.batch.update({
+        where: { id: batchId },
+        data: { recordCount: allDetails.length },
+      })
+    }
+
+    const statuses = allDetails.map((d) => d.status)
+    const hasApproved = statuses.includes(BATCH_DETAIL_STATUS.APPROVED)
+    const hasRefused = statuses.includes(BATCH_DETAIL_STATUS.REFUSED)
+    const hasInProgress = statuses.includes(BATCH_DETAIL_STATUS.IN_PROGRESS)
+    const hasResolved = hasApproved || hasRefused
+
+    // All in error, none resolved
+    if (!hasResolved && !hasInProgress) {
+      const batchMessage =
+        'CRA sent back Error for all transactions in Response file. Please review.'
+      const batch = await this.prisma.batch.findUnique({
+        where: { id: batchId },
+        select: { systemComments: true },
+      })
+      const systemComments = appendSystemComment(batchMessage, batch?.systemComments ?? null)
+      await this.updateBatchStatus(batchId, BATCH_EVENT.CRA_ALL_REJECTED, {
+        additionalData: { systemComments },
+      })
       return
     }
 
-    let batchEvent: string
-    let batchMessage: string | null = null
-    if (hasProcessed && hasError) {
-      batchEvent = BATCH_EVENT.CRA_PARTIAL_REJECTED
-      batchMessage = 'At least one of the child record(s) in the Batch Details is in Error.'
-    } else if (hasProcessed && !hasError) {
-      batchEvent = BATCH_EVENT.CRA_ACCEPTED
-    } else {
-      batchEvent = BATCH_EVENT.CRA_ALL_REJECTED
-      batchMessage = 'CRA sent back Error for all transactions in Response file. Please review.'
+    // Some still in progress — partially processed
+    if (hasInProgress && hasResolved) {
+      const batchMessage = this.getWklSystemComment(hasApproved, hasRefused, true)
+      const batch = await this.prisma.batch.findUnique({
+        where: { id: batchId },
+        select: { status: true, systemComments: true },
+      })
+      const systemComments = appendSystemComment(batchMessage, batch?.systemComments ?? null)
+
+      if (batch?.status === BATCH_STATUS.IN_PROGRESS) {
+        await this.updateBatchStatus(batchId, BATCH_EVENT.CRA_PARTIALLY_PROCESSED, {
+          additionalData: { systemComments },
+        })
+      } else {
+        // Already partially_processed, just update comments
+        await this.prisma.batch.update({
+          where: { id: batchId },
+          data: { systemComments },
+        })
+      }
+      return
     }
 
+    // Nothing in progress, has resolved — all processed
+    if (!hasInProgress && hasResolved) {
+      const batchMessage = this.getWklSystemComment(hasApproved, hasRefused, false)
+      const batch = await this.prisma.batch.findUnique({
+        where: { id: batchId },
+        select: { systemComments: true },
+      })
+      const systemComments = appendSystemComment(batchMessage, batch?.systemComments ?? null)
+      await this.updateBatchStatus(batchId, BATCH_EVENT.CRA_ALL_PROCESSED, {
+        additionalData: { systemComments },
+      })
+      return
+    }
+
+    // All still in progress — acknowledgement received, no status change
+    this.logger.log(`Batch ${batchId}: RSP acknowledgement received, all details still in_progress`)
     const batch = await this.prisma.batch.findUnique({
       where: { id: batchId },
       select: { systemComments: true },
     })
-
-    const systemComments = appendSystemComment(batchMessage, batch?.systemComments ?? null)
-
-    await this.updateBatchStatus(batchId, batchEvent, {
-      additionalData: systemComments != null ? { systemComments } : {},
+    const systemComments = appendSystemComment(
+      'CRA Acknowledgement received.',
+      batch?.systemComments ?? null,
+    )
+    await this.prisma.batch.update({
+      where: { id: batchId },
+      data: { systemComments },
     })
+  }
+
+  private getWklSystemComment(
+    hasApproved: boolean,
+    hasRefused: boolean,
+    isPartial: boolean,
+  ): string {
+    const suffix = isPartial ? ' so far.' : '.'
+    if (hasApproved && hasRefused) return `Some accepted, some refused by CRA${suffix}`
+    if (hasApproved) return `All accepted by CRA${suffix}`
+    return `All refused by CRA${suffix}`
   }
 
   async removeContactFromPendingBatch(contactId: number, userId?: string): Promise<void> {
@@ -357,42 +492,192 @@ export class BatchesService {
       throw new NotFoundException('No pending batch exists')
     }
 
-    const detail = await this.prisma.contactBatchDetail.findFirst({
-      where: {
-        batchId: pendingBatch.id,
+    await this.prisma.$transaction(async (tx) => {
+      const detail = await tx.contactBatchDetail.findFirst({
+        where: {
+          batchId: pendingBatch.id,
+          contactId,
+        },
+      })
+
+      if (!detail) {
+        throw new NotFoundException(`Contact ${contactId} not found in pending batch`)
+      }
+
+      const transition = await this.contactsService.updateCsaStatus(
         contactId,
-      },
+        CSA_EVENT.REMOVE_FROM_BATCH,
+        'USER',
+        { userId, tx, origin: 'BatchesService.removeContactFromPendingBatch' },
+      )
+
+      if (!transition.success) {
+        throw new BadRequestException(
+          `Failed to transition contact ${contactId} on REMOVE_FROM_BATCH: ${transition.reason}`,
+        )
+      }
+
+      await tx.contactBatchDetail.delete({
+        where: { id: detail.id },
+      })
+      const actualCount = await tx.contactBatchDetail.count({
+        where: { batchId: pendingBatch.id },
+      })
+      await tx.batch.update({
+        where: { id: pendingBatch.id },
+        data: { recordCount: actualCount },
+      })
     })
 
-    if (!detail) {
-      throw new NotFoundException(`Contact ${contactId} not found in pending batch`)
+    this.fireAndForgetSync(contactId)
+  }
+
+  async removeContactsFromPendingBatch(
+    contactIds: number[],
+    userId: string,
+  ): Promise<BatchOperationResult> {
+    const pendingBatch = await this.prisma.batch.findFirst({
+      where: { status: BATCH_STATUS.PENDING },
+    })
+
+    if (!pendingBatch) {
+      throw new NotFoundException('No pending batch exists')
     }
 
-    const transition = await this.contactsService.updateCsaStatus(
-      contactId,
-      CSA_EVENT.REMOVE_FROM_BATCH,
-      'USER',
-      { userId },
+    const result: BatchOperationResult = {
+      batch: enrichLabels(pendingBatch),
+      success: [],
+      skipped: [],
+    }
+
+    for (const contactId of contactIds) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const detail = await tx.contactBatchDetail.findFirst({
+            where: {
+              batchId: pendingBatch.id,
+              contactId,
+            },
+          })
+
+          if (!detail) {
+            throw new TransitionSkipError(BULK_OPERATION_SKIP_REASONS.NOT_FOUND)
+          }
+
+          const transition = await this.contactsService.updateCsaStatus(
+            contactId,
+            CSA_EVENT.REMOVE_FROM_BATCH,
+            'USER',
+            { userId, tx, origin: 'BatchesService.removeContactsFromPendingBatch' },
+          )
+
+          if (!transition.success) {
+            throw new TransitionSkipError(BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION)
+          }
+
+          await tx.contactBatchDetail.delete({
+            where: { id: detail.id },
+          })
+        })
+        result.success.push(contactId)
+
+        this.fireAndForgetSync(contactId)
+      } catch (error) {
+        if (error instanceof TransitionSkipError) {
+          result.skipped.push({ id: contactId, reason: error.reason })
+        } else {
+          this.logger.error(
+            `Failed to remove contact ${contactId} from batch: ${(error as Error).message}`,
+          )
+          result.skipped.push({ id: contactId, reason: 'error' })
+        }
+      }
+    }
+
+    const actualCount = await this.prisma.contactBatchDetail.count({
+      where: { batchId: pendingBatch.id },
+    })
+    result.batch = enrichLabels(
+      await this.prisma.batch.update({
+        where: { id: pendingBatch.id },
+        data: { recordCount: actualCount },
+      }),
     )
 
-    if (!transition.success) {
-      throw new BadRequestException(
-        `Failed to transition contact ${contactId} on REMOVE_FROM_BATCH: ${transition.reason}`,
-      )
-    }
+    return result
+  }
 
-    await this.prisma.$transaction([
-      this.prisma.contactBatchDetail.delete({
-        where: { id: detail.id },
-      }),
-      this.prisma.batch.update({
-        where: { id: pendingBatch.id },
+  async createBatchDetailsForWklUnmatchedRecords(
+    batchId: number,
+    contactId: number,
+    transactionType: string,
+    craStatus: string,
+    caseNumber: string,
+    craMatchingSnapshot: any,
+  ): Promise<MatchedBatchDetail> {
+    const existingDetail = await this.prisma.contactBatchDetail.findFirst({
+      where: {
+        batchId,
+        contactId,
+      },
+      select: {
+        id: true,
+        contactId: true,
+        batchId: true,
+        transactionType: true,
+        systemComments: true,
+        craMatchingSnapshot: true,
+        contact: { select: { din: true } },
+      },
+    })
+    if (existingDetail) {
+      this.logger.warn(
+        `Attempted to create WKL batch detail for contact ${contactId} in batch ${batchId}, but it already exists. ` +
+          `Please review batch detail ${existingDetail.id} for details.`,
+      )
+      return existingDetail
+    }
+    this.logger.log(
+      `Creating batch detail for contact ${contactId} in batch ${batchId} with CRA status ${craStatus}`,
+    )
+    const now = new Date()
+    const snapshot = {
+      ...craMatchingSnapshot,
+      childBirthDate:
+        parseWklDate(craMatchingSnapshot.childBirthDate) ?? craMatchingSnapshot.childBirthDate,
+    }
+    return await this.prisma.$transaction(async (tx) => {
+      // Start in IN_PROGRESS — the caller fires CRA_WKL_APPROVED/REFUSED
+      // next, and those events are only valid from IN_PROGRESS.
+      const batchDetail = await tx.contactBatchDetail.create({
         data: {
-          recordCount: {
-            decrement: 1,
-          },
+          contactId,
+          batchId,
+          transactionType,
+          status: BATCH_DETAIL_STATUS.IN_PROGRESS,
+          craMatchingSnapshot: snapshot,
+          createdAt: now,
+          createdBy: UPDATED_BY.SYSTEM,
+          lastUpdatedAt: now,
+          lastUpdatedBy: UPDATED_BY.SYSTEM,
         },
-      }),
-    ])
+      })
+      await tx.contactBatchDetail.update({
+        where: { id: batchDetail.id },
+        data: { referenceNumber: `${caseNumber}-${batchDetail.id}` },
+      })
+      return await tx.contactBatchDetail.findUnique({
+        where: { id: batchDetail.id },
+        select: {
+          id: true,
+          contactId: true,
+          batchId: true,
+          transactionType: true,
+          systemComments: true,
+          craMatchingSnapshot: true,
+          contact: { select: { din: true } },
+        },
+      })
+    })
   }
 }

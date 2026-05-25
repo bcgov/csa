@@ -2,17 +2,19 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   HttpException,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
 } from '@nestjs/common'
 import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
-import { ContactIdsDto, ContactIdsWithActionDto } from '../common/dto/contact-ids.dto'
 import { CurrentUser } from '../common/decorators'
+import { ContactIdsDto, ContactIdsWithActionDto } from '../common/dto/contact-ids.dto'
 import { CSAGuard } from '../common/guards/csa.guard'
 import { ContactsService } from './contacts.service'
 import { ContactDto } from './dto/contact.dto'
@@ -174,5 +176,22 @@ export class ContactsController {
   @ApiResponse({ status: 404, description: 'Contact not found' })
   async findContactBatches(@Param('id', ParseIntPipe) id: number) {
     return this.contactsService.findContactBatches(id)
+  }
+
+  @Post(':id/run-eligibility')
+  @HttpCode(200)
+  @ApiResponse({ status: 200, description: 'Eligibility result with previous and new status' })
+  @ApiResponse({ status: 404, description: 'Contact not found' })
+  @ApiResponse({ status: 422, description: 'Contact not found in staging tables' })
+  async runEligibility(@Param('id', ParseIntPipe) id: number) {
+    return this.contactsService.runContactEligibility(id)
+  }
+
+  @Patch(':id/review-flag')
+  @HttpCode(200)
+  @ApiResponse({ status: 200, description: 'Review flag cleared successfully' })
+  @ApiResponse({ status: 404, description: 'Contact not found' })
+  async clearReviewFlag(@Param('id', ParseIntPipe) id: number, @CurrentUser() userId: string) {
+    return this.contactsService.clearReviewFlag(id, userId)
   }
 }

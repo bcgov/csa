@@ -85,6 +85,7 @@ model Contact {
   prevRecipientLastName      String?   @map("prev_recipient_last_name")
   cancelReasonCode           String?   @map("cancel_reason_code")
   careEndDate                DateTime? @db.Date @map("care_end_date")
+  needsReview                Boolean   @default(false) @map("needs_review")
 
   // Relations
   contactBatchDetails        ContactBatchDetail[]
@@ -101,6 +102,7 @@ model Batch {
   createdAt           DateTime             @map("created_at") @db.Timestamptz()
   updatedAt           DateTime             @map("updated_at") @db.Timestamptz() @updatedAt
   systemComments      String?              @map("system_comments")
+  initiatedBy         String               @map("initiated_by")
   contactBatchDetails ContactBatchDetail[]
   transferFiles       TransferFile[]
 
@@ -119,9 +121,10 @@ model ContactBatchDetail {
   createdBy       String   @map("created_by")
   lastUpdatedAt   DateTime @map("last_updated_at") @db.Timestamptz() @updatedAt
   lastUpdatedBy   String   @map("last_updated_by")
-  status          String?
-  batch           Batch    @relation(fields: [batchId], references: [id])
-  contact         Contact  @relation(fields: [contactId], references: [id])
+  status              String?
+  craMatchingSnapshot Json?    @map("cra_matching_snapshot") @db.JsonB
+  batch               Batch    @relation(fields: [batchId], references: [id])
+  contact             Contact  @relation(fields: [contactId], references: [id])
 
   @@unique([contactId, batchId], name: "contact_batch_unique")
   @@map("contact_batch_details")

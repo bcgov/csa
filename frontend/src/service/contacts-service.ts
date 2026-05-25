@@ -73,6 +73,8 @@ export interface Contact {
   isOver18?: boolean
   // Hold fields
   holdBy?: string
+  // Review flag for On Hold records with staging data changes
+  needsReview?: boolean
 }
 
 export interface PaginatedContactsResponse {
@@ -194,6 +196,7 @@ export interface Batch {
   status: string
   statusLabel: string
   recordCount: number
+  initiatedBy: string
   createdAt: string
   systemComments: string | null
 }
@@ -203,6 +206,7 @@ export interface ContactBatchDetail {
   contactId: number
   batchId: number
   transactionType: string
+  effectiveDate: string | null
   systemComments: string | null
   createdAt: string
   createdBy: string
@@ -317,6 +321,19 @@ export const removeContactFromBatch = async (
 }
 
 /**
+ * Remove multiple contacts from pending batch
+ * @param contactIds - Array of contact IDs to remove
+ */
+export const removeContactsFromBatch = async (
+  contactIds: number[],
+): Promise<BulkOperationResponse & { batch: { recordCount: number } }> => {
+  const response = await APIService.getAxiosInstance().post('/batches/pending/contacts/remove', {
+    contactIds,
+  })
+  return response.data
+}
+
+/**
  * Update eligibility status for multiple contacts
  * @param contactIds - Array of contact IDs to update
  * @param action - Action to perform (e.g., 'ELIGIBLE')
@@ -387,4 +404,290 @@ export const updateOver18Status = async (
     action,
   })
   return response.data
+}
+
+/**
+ * Clear the review flag for a contact
+ * @param contactId - Contact ID to clear review flag for
+ */
+export const clearReviewFlag = async (contactId: number): Promise<{ success: boolean }> => {
+  const response = await APIService.getAxiosInstance().patch(`/contacts/${contactId}/review-flag`)
+  return response.data
+}
+
+/**
+ * Eligibility run result
+ */
+export interface EligibilityRunResult {
+  processed: number
+  statusChanges: number
+  newContacts: number
+  skipped: number
+  stepCounts: {
+    step7: number
+    step8: number
+    step9: number
+    step10: number
+    noChange: number
+  }
+}
+
+/**
+ * Result from running eligibility for a single contact
+ */
+export interface ContactEligibilityResult {
+  previousStatus: string | null
+  newStatus: string
+}
+
+/**
+ * Run eligibility query for a specific contact
+ * @param contactId - Contact ID to run eligibility for
+ */
+export const runEligibilityForContact = async (
+  contactId: number,
+): Promise<ContactEligibilityResult> => {
+  const response = await APIService.getAxiosInstance().post(
+    `/contacts/${contactId}/run-eligibility`,
+  )
+  return response.data
+}
+
+/**
+ * Run eligibility query for all contacts (via jobs API)
+ * Returns the job run ID for tracking
+ */
+export const startEligibilityJob = async (): Promise<{ jobRunId: number }> => {
+  const response = await APIService.getAxiosInstance().post('/jobs/run-eligibility')
+  return response.data
+}
+
+/**
+ * Get job status by ID
+ */
+export const getJobStatus = async (jobId: number): Promise<JobRun> => {
+  const response = await APIService.getAxiosInstance().get<JobRun>(`/jobs/${jobId}`)
+  return response.data
+}
+
+/**
+ * Run eligibility query for all contacts and poll until complete
+ * @param onProgress - Optional callback for progress updates
+ */
+export const runEligibilityForAllWithPolling = async (
+  onProgress?: (status: string) => void,
+): Promise<JobRun> => {
+  // Start the job
+  const { jobRunId } = await startEligibilityJob()
+
+  // Poll for completion
+  const pollInterval = 10000 // 10 seconds
+  const maxAttempts = 60 // 10 minutes max
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const job = await getJobStatus(jobRunId)
+
+    if (onProgress) {
+      onProgress(job.status)
+    }
+
+    if (job.status === 'SUCCESS' || job.status === 'FAILED') {
+      return job
+    }
+
+    // Wait before next poll
+    await new Promise((resolve) => setTimeout(resolve, pollInterval))
+  }
+
+  throw new Error('Eligibility job timed out')
+}
+
+/**
+ * Job run details
+ */
+export interface JobRun {
+  id: number
+  jobType: string
+  status: string
+  jobTrigger: string
+  retryCount: number | null
+  error: string | null
+  metadata: Record<string, unknown> | null
+  createdAt: string
+  startedAt: string | null
+  completedAt: string | null
+}
+
+export interface JobsResponse {
+  data: JobRun[]
+  total: number
+  page: number
+  limit: number
+}
+
+/**
+ * Get last successful job run for a specific job type
+ */
+export const getLastSuccessfulJob = async (jobType: string): Promise<JobRun | null> => {
+  const response = await APIService.getAxiosInstance().get<JobsResponse>('/jobs', {
+    params: {
+      jobType,
+      status: 'SUCCESS',
+      limit: 1,
+    },
+  })
+  return response.data.data.length > 0 ? response.data.data[0] : null
+}
+
+/**
+ * Get last successful runs for data ingestion and eligibility
+ */
+export interface LastSuccessfulRuns {
+  lastDataIngestion: Date | null
+  lastEligibilityRun: Date | null
+}
+
+export const getLastSuccessfulRuns = async (): Promise<LastSuccessfulRuns> => {
+  const [dataIngestionJob, eligibilityJob] = await Promise.all([
+    getLastSuccessfulJob('INGEST_DATA'),
+    getLastSuccessfulJob('RUN_ELIGIBILITY'),
+  ])
+
+  return {
+    lastDataIngestion: dataIngestionJob?.completedAt
+      ? new Date(dataIngestionJob.completedAt)
+      : null,
+    lastEligibilityRun: eligibilityJob?.completedAt ? new Date(eligibilityJob.completedAt) : null,
+  }
+}
+
+/**
+ * Check if there's a running eligibility job
+ * Returns the running job if found, null otherwise
+ */
+export const getRunningEligibilityJob = async (): Promise<JobRun | null> => {
+  const response = await APIService.getAxiosInstance().get<JobsResponse>('/jobs', {
+    params: {
+      jobType: 'RUN_ELIGIBILITY',
+      status: 'RUNNING',
+      limit: 1,
+    },
+  })
+  return response.data.data.length > 0 ? response.data.data[0] : null
+}
+
+/**
+ * Wait for a running eligibility job to complete
+ * @param jobId - The job ID to monitor
+ * @param onProgress - Optional callback for progress updates
+ */
+export const waitForEligibilityJobCompletion = async (
+  jobId: number,
+  onProgress?: (status: string) => void,
+): Promise<JobRun> => {
+  const pollInterval = 10000 // 10 seconds
+  const maxAttempts = 60 // 10 minutes max
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const job = await getJobStatus(jobId)
+
+    if (onProgress) {
+      onProgress(job.status)
+    }
+
+    if (job.status === 'SUCCESS' || job.status === 'FAILED') {
+      return job
+    }
+
+    // Wait before next poll
+    await new Promise((resolve) => setTimeout(resolve, pollInterval))
+  }
+
+  throw new Error('Eligibility job timed out')
+}
+
+/**
+ * Wait for a running auto-batch job to complete
+ * @param jobId - The job ID to monitor
+ * @param onProgress - Optional callback for progress updates
+ */
+export const waitForAutoBatchJobCompletion = async (
+  jobId: number,
+  onProgress?: (status: string) => void,
+): Promise<JobRun> => {
+  const pollInterval = 5000 // 5 seconds
+  const maxAttempts = 60 // 5 minutes max
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const job = await getJobStatus(jobId)
+
+    if (onProgress) {
+      onProgress(job.status)
+    }
+
+    if (job.status === 'SUCCESS' || job.status === 'FAILED') {
+      return job
+    }
+
+    // Wait before next poll
+    await new Promise((resolve) => setTimeout(resolve, pollInterval))
+  }
+
+  throw new Error('Auto-batch job timed out')
+}
+
+/**
+ * Start auto-batch job for all eligible contacts
+ * Returns the job run ID for tracking
+ */
+export const startAutoBatchJob = async (): Promise<{ jobRunId: number }> => {
+  const response = await APIService.getAxiosInstance().post('/jobs/auto-batch')
+  return response.data
+}
+
+/**
+ * Check if there's a running auto-batch job
+ * Returns the running job if found, null otherwise
+ */
+export const getRunningAutoBatchJob = async (): Promise<JobRun | null> => {
+  const response = await APIService.getAxiosInstance().get<JobsResponse>('/jobs', {
+    params: {
+      jobType: 'AUTO_BATCH',
+      status: 'RUNNING',
+      limit: 1,
+    },
+  })
+  return response.data.data.length > 0 ? response.data.data[0] : null
+}
+
+/**
+ * Run auto-batch job for all eligible contacts and poll until complete
+ * @param onProgress - Optional callback for progress updates
+ */
+export const runAutoBatchWithPolling = async (
+  onProgress?: (status: string) => void,
+): Promise<JobRun> => {
+  // Start the job
+  const { jobRunId } = await startAutoBatchJob()
+
+  // Poll for completion
+  const pollInterval = 5000 // 5 seconds
+  const maxAttempts = 60 // 5 minutes max
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const job = await getJobStatus(jobRunId)
+
+    if (onProgress) {
+      onProgress(job.status)
+    }
+
+    if (job.status === 'SUCCESS' || job.status === 'FAILED') {
+      return job
+    }
+
+    // Wait before next poll
+    await new Promise((resolve) => setTimeout(resolve, pollInterval))
+  }
+
+  throw new Error('Auto-batch job timed out')
 }

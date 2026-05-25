@@ -31,10 +31,31 @@ export class JobsService {
     })
   }
 
+  async getJobs(filters: { jobType?: JobType; status?: JobStatus; page?: number; limit?: number }) {
+    const page = filters.page ?? 1
+    const limit = filters.limit ?? 20
+    const where = {
+      parentJobId: null, // top-level jobs only
+      ...(filters.jobType && { jobType: filters.jobType }),
+      ...(filters.status && { status: filters.status }),
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.jobRun.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.jobRun.count({ where }),
+    ])
+
+    return { data, total, page, limit }
+  }
+
   async getJob(id: number) {
     return this.prisma.jobRun.findUnique({
       where: { id },
-      include: { childJobs: true, parentJob: true },
     })
   }
 
@@ -78,6 +99,7 @@ export class JobsService {
       where: {
         status: JobStatus.FAILED,
         parentJobId: null, // skip child jobs, parent will recreate them
+        jobTrigger: JobTrigger.CRON,
       },
       select: {
         id: true,
@@ -147,5 +169,25 @@ export class JobsService {
   async getLastSuccessTimestamp(jobType: JobType): Promise<Date | null> {
     const lastJob = await this.getLastSuccessfulJob(jobType)
     return lastJob?.completedAt ?? null
+  }
+
+  async hasStuckOrFailedJobs(stuckThresholdMinutes: number = 40): Promise<boolean> {
+    const threshold = new Date(Date.now() - stuckThresholdMinutes * 60 * 1000)
+
+    const stuck = await this.prisma.jobRun.findFirst({
+      where: { status: JobStatus.RUNNING, startedAt: { lt: threshold } },
+      select: { id: true },
+    })
+    if (stuck) return true
+
+    const failed = await this.prisma.jobRun.findFirst({
+      where: {
+        status: JobStatus.FAILED,
+        parentJobId: null,
+        jobTrigger: JobTrigger.CRON,
+      },
+      select: { id: true },
+    })
+    return failed !== null
   }
 }

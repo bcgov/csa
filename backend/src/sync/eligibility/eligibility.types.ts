@@ -27,6 +27,7 @@ export interface ContactProfile {
   csaStatus: CsaStatus | null
   csaStatusEffectiveDate: Date | null
   existingContactId: number | null
+  lastUpdatedBy: string | null
   din: string | null
   csaSentDate: Date | null
 
@@ -123,7 +124,7 @@ export interface EligibilityRunResult {
   statusChanges: number
   newContacts: number
   skipped: number // rows skipped due to invalid staging data (null in required fields)
-  autoBatched: { application: number; cancellation: number }
+  userSetPreserved: number
   stepCounts: {
     step7: number
     step8: number

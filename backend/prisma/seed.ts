@@ -259,7 +259,7 @@ async function seedBatches() {
     BATCH_STATUS.PENDING,
     BATCH_STATUS.IN_PROGRESS,
     BATCH_STATUS.PROCESSED,
-    BATCH_STATUS.PROCESSED_WITH_ERRORS,
+    BATCH_STATUS.PARTIALLY_PROCESSED,
     BATCH_STATUS.ERROR,
     BATCH_STATUS.SYSTEM_ERROR,
   ]
@@ -272,6 +272,7 @@ async function seedBatches() {
       recordCount: faker.number.int({ min: 5, max: 50 }),
       createdAt: batchDate,
       updatedAt: batchDate,
+      initiatedBy: faker.helpers.arrayElement(['CRA', 'Ministry']),
       systemComments: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.5 }),
     }
   })
@@ -311,7 +312,7 @@ const STATUS_BATCH_MAP: Record<
     transactionType: TRANSACTION_TYPES.APPLICATION,
   },
   [CSA_STATUS.CANCELLATION_REFUSED_CRA]: {
-    batchStatus: BATCH_STATUS.PROCESSED_WITH_ERRORS,
+    batchStatus: BATCH_STATUS.PARTIALLY_PROCESSED,
     detailStatus: BATCH_DETAIL_STATUS.ERROR,
     transactionType: TRANSACTION_TYPES.CANCELLATION,
   },
@@ -327,12 +328,12 @@ const STATUS_BATCH_MAP: Record<
   },
   [CSA_STATUS.IN_PAY]: {
     batchStatus: BATCH_STATUS.PROCESSED,
-    detailStatus: BATCH_DETAIL_STATUS.PROCESSED,
+    detailStatus: BATCH_DETAIL_STATUS.APPROVED,
     transactionType: TRANSACTION_TYPES.APPLICATION,
   },
   [CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY]: {
     batchStatus: BATCH_STATUS.PROCESSED,
-    detailStatus: BATCH_DETAIL_STATUS.PROCESSED,
+    detailStatus: BATCH_DETAIL_STATUS.APPROVED,
     transactionType: TRANSACTION_TYPES.CANCELLATION,
   },
 }
@@ -361,7 +362,7 @@ async function seedContactBatchDetails() {
   const historicalBatches = batches.filter(
     (b) =>
       b.status === BATCH_STATUS.PROCESSED ||
-      b.status === BATCH_STATUS.PROCESSED_WITH_ERRORS ||
+      b.status === BATCH_STATUS.PARTIALLY_PROCESSED ||
       b.status === BATCH_STATUS.ERROR,
   )
 
@@ -405,8 +406,9 @@ async function seedContactBatchDetails() {
           batchId: histBatch.id,
           transactionType: faker.helpers.arrayElement(Object.values(TRANSACTION_TYPES)),
           status: faker.helpers.arrayElement([
-            BATCH_DETAIL_STATUS.PROCESSED,
+            BATCH_DETAIL_STATUS.APPROVED,
             BATCH_DETAIL_STATUS.ERROR,
+            BATCH_DETAIL_STATUS.REFUSED,
           ]),
           systemComments: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.3 }),
           createdAt: histBatch.createdAt,

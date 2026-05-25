@@ -31,7 +31,6 @@ Swagger documentation is available at http://localhost:3000/api when the server 
 
 ## Testing
 **Run unit tests:** `npm test`
-
 **Run tests with coverage:** `npm run test:cov`
 
 ## Mock API

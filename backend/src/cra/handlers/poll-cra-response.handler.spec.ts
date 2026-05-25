@@ -2,6 +2,7 @@ import {
   BATCH_DETAIL_EVENT,
   BATCH_DETAIL_STATUS,
   CSA_EVENT,
+  CSA_STATUS,
 } from 'src/common/state-machine/constants'
 import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
@@ -22,7 +23,8 @@ vi.mock('fs/promises', () => ({
 }))
 
 const DESTINATION_ID = CRA_DATA_HANDLING_CONSTANT.DESTINATION_ID
-const { TRAN_STAT_CODE, FILE_STAT_CODE } = CRA_DATA_HANDLING_CONSTANT
+const { TRAN_STAT_CODE, FILE_STAT_CODE, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
+const { STATUS: WKL_STATUS } = WEEKLY_FILE
 
 const mockContext: JobContext = {
   jobRunId: 1,
@@ -58,6 +60,7 @@ describe('PollCraResponseHandler', () => {
   let mockBatchesService: any
   let mockContactsService: any
   let mockIcmSyncBackService: any
+  let mockWeeklyContactMatcher: any
 
   beforeEach(() => {
     mockCraTransferService = {
@@ -113,6 +116,7 @@ describe('PollCraResponseHandler', () => {
       },
       contact: {
         findUnique: vi.fn(),
+        update: vi.fn().mockResolvedValue({}),
       },
       batch: {
         findUnique: vi.fn().mockResolvedValue({ systemComments: null }),
@@ -138,6 +142,12 @@ describe('PollCraResponseHandler', () => {
       }),
     }
 
+    mockWeeklyContactMatcher = {
+      loadCandidates: vi.fn().mockResolvedValue(undefined),
+      findMatchingBatchDetail: vi.fn(),
+      findMatchingContact: vi.fn(),
+    }
+
     handler = new PollCraResponseHandler(
       mockCraTransferService,
       mockInboundFileService,
@@ -147,6 +157,7 @@ describe('PollCraResponseHandler', () => {
       mockBatchesService,
       mockContactsService,
       mockIcmSyncBackService as any,
+      mockWeeklyContactMatcher,
     )
   })
 
@@ -228,6 +239,7 @@ describe('PollCraResponseHandler', () => {
         1,
         CSA_EVENT.CRA_FILE_REJECTED,
         'SYSTEM',
+        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
     })
 
@@ -277,6 +289,17 @@ describe('PollCraResponseHandler', () => {
       await handler.execute(mockContext)
 
       expect(mockContactsService.updateCsaStatus).not.toHaveBeenCalled()
+    })
+
+    it('should make no contactBatchDetail update when record is accepted', async () => {
+      const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
+      setupUnprocessedFile(VALID_FILE_NAME)
+      setupParseFile([detail])
+      setupBatchDetail(100, 1, 10)
+
+      await handler.execute(mockContext)
+
+      expect(mockPrisma.contactBatchDetail.update).not.toHaveBeenCalled()
     })
 
     it('should call aggregateBatchStatus for the batch', async () => {
@@ -349,6 +372,7 @@ describe('PollCraResponseHandler', () => {
         1,
         CSA_EVENT.CRA_RSP_REJECTED,
         'SYSTEM',
+        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
     })
 
@@ -489,6 +513,7 @@ describe('PollCraResponseHandler', () => {
         1,
         CSA_EVENT.CRA_RSP_REJECTED,
         'SYSTEM',
+        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
     })
 
@@ -532,6 +557,7 @@ describe('PollCraResponseHandler', () => {
         1,
         CSA_EVENT.CRA_RSP_REJECTED,
         'SYSTEM',
+        { origin: 'PollCraResponseHandler.processResponseDetail' },
       )
     })
 
@@ -592,7 +618,7 @@ describe('PollCraResponseHandler', () => {
       setupBatchDetail(101, 2, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.APPROVED },
         { status: BATCH_DETAIL_STATUS.ERROR },
       ])
 
@@ -662,7 +688,7 @@ describe('PollCraResponseHandler', () => {
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.APPROVED },
       ])
 
       await handler.execute(mockContext)
@@ -687,7 +713,7 @@ describe('PollCraResponseHandler', () => {
       setupBatchDetail(200, 2, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.APPROVED },
       ])
 
       await handler.execute(mockContext)
@@ -710,7 +736,7 @@ describe('PollCraResponseHandler', () => {
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.APPROVED },
       ])
 
       const result1 = await handler.execute(mockContext)
@@ -760,7 +786,7 @@ describe('PollCraResponseHandler', () => {
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.APPROVED },
       ])
 
       await handler.execute(mockContext)
@@ -775,7 +801,7 @@ describe('PollCraResponseHandler', () => {
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.APPROVED },
       ])
 
       await handler.execute(mockContext)
@@ -811,7 +837,7 @@ describe('PollCraResponseHandler', () => {
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.PROCESSED },
+        { status: BATCH_DETAIL_STATUS.APPROVED },
       ])
 
       const result = await handler.execute(mockContext)
@@ -820,43 +846,17 @@ describe('PollCraResponseHandler', () => {
     })
   })
 
-  describe('Batch acknowledgement comment', () => {
-    it('should set "CRA Acknowledgement received." on batch when accepted records exist and batch is in_progress', async () => {
+  describe('Batch system comments', () => {
+    it('should delegate batch comments to aggregateBatchStatus, not set them directly', async () => {
       const detail = makeDetail({ referenceNum: '100', tranStatCd: TRAN_STAT_CODE.TRAN_ACCEPTED })
       setupUnprocessedFile(VALID_FILE_NAME)
       setupParseFile([detail])
       setupBatchDetail(100, 1, 10)
       mockPrisma.contact.findUnique.mockResolvedValue({ id: 1, din: null })
-      mockPrisma.batch.findUnique.mockResolvedValue({ status: 'in_progress', systemComments: null })
-      mockPrisma.batch.update = vi.fn().mockResolvedValue({})
 
       await handler.execute(mockContext)
 
-      expect(mockPrisma.batch.update).toHaveBeenCalledWith({
-        where: { id: 10 },
-        data: {
-          systemComments: expect.stringContaining('CRA Acknowledgement received.'),
-        },
-      })
-    })
-
-    it('should NOT set acknowledgement comment when all records are rejected', async () => {
-      const detail = makeDetail({
-        referenceNum: '100',
-        tranStatCd: TRAN_STAT_CODE.TRAN_REJECTED,
-        rejectCd1: '007',
-      })
-      setupUnprocessedFile(VALID_FILE_NAME)
-      setupParseFile([detail])
-      setupBatchDetail(100, 1, 10)
-      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
-        { status: BATCH_DETAIL_STATUS.ERROR },
-      ])
-      mockPrisma.batch.update = vi.fn().mockResolvedValue({})
-
-      await handler.execute(mockContext)
-
-      expect(mockPrisma.batch.update).not.toHaveBeenCalled()
+      expect(mockBatchesService.aggregateBatchStatus).toHaveBeenCalledWith(10)
     })
   })
 
@@ -882,24 +882,48 @@ describe('PollCraResponseHandler', () => {
       setupUnprocessedFile(fileName, id)
     }
 
-    function setupWeeklyParseFile(detailCount = 1) {
-      const details = Array.from({ length: detailCount }, (_, i) => ({
-        tranCode: '6137',
-        recordTypeCode: '04',
-        childDin: `00000000${i}`,
-        transactionType: 'A',
-      }))
+    const makeWklDetail = (overrides = {}) => ({
+      tranCode: '6137',
+      recordTypeCode: '04',
+      transactionType: 'A' as const,
+      receiveMode: 'E',
+      childDin: '123456789',
+      childGivenName: 'JOHN                          ',
+      childInitial: ' ',
+      childSurName: 'DOE                           ',
+      childSex: 'M',
+      childBirthDate: '20100315',
+      childBirthCity: 'VANCOUVER                   ',
+      childBirthProv: 'BC',
+      childBirthCountry: 'CA',
+      careStartDate: '20250101',
+      careEndDate: '        ',
+      careEndReasonCode: '  ',
+      status: WKL_STATUS.COMPLETED,
+      completionDate: '20250420',
+      ...overrides,
+    })
+
+    function setupWeeklyParseFile(details: any[]) {
       mockInboundWeeklyResponseService.parseWeeklyResponseFile.mockReturnValue({
         header: { tranCode: '6136', recordTypeCode: '00' },
         details,
-        trailer: { tranCode: '6138', recordTypeCode: '00', recordCount: detailCount + 2 },
+        trailer: { tranCode: '6138', recordTypeCode: '00', recordCount: details.length + 2 },
       })
-      return details
+    }
+
+    const mockMatchedDetail = {
+      id: 200,
+      contactId: 42,
+      batchId: 10,
+      transactionType: 'application',
+      systemComments: null,
+      contact: { din: null },
     }
 
     it('routes WKL filenames to InboundWeeklyResponseService and does not call the RSP parser', async () => {
       setupWeeklyFile()
-      setupWeeklyParseFile(2)
+      setupWeeklyParseFile([makeWklDetail(), makeWklDetail()])
 
       await handler.execute(mockContext)
 
@@ -911,19 +935,17 @@ describe('PollCraResponseHandler', () => {
 
     it('does not drive any RSP-branch side effects for weekly details', async () => {
       setupWeeklyFile()
-      setupWeeklyParseFile(3)
+      setupWeeklyParseFile([makeWklDetail(), makeWklDetail(), makeWklDetail()])
 
       await handler.execute(mockContext)
 
       expect(mockInboundResponseService.classifyDetail).not.toHaveBeenCalled()
-      expect(mockBatchesService.updateBatchDetailStatus).not.toHaveBeenCalled()
-      expect(mockContactsService.updateCsaStatus).not.toHaveBeenCalled()
       expect(mockPrisma.contactBatchDetail.findUnique).not.toHaveBeenCalled()
     })
 
     it('persists isDetailsProcessed=true and referenceNumbers=[] for the weekly file', async () => {
       setupWeeklyFile()
-      setupWeeklyParseFile(2)
+      setupWeeklyParseFile([makeWklDetail(), makeWklDetail()])
 
       await handler.execute(mockContext)
 
@@ -939,7 +961,8 @@ describe('PollCraResponseHandler', () => {
 
     it('does not increment accept/reject/recycle counters for weekly files', async () => {
       setupWeeklyFile()
-      setupWeeklyParseFile(4)
+      setupWeeklyParseFile([makeWklDetail(), makeWklDetail(), makeWklDetail(), makeWklDetail()])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
 
       const result = await handler.execute(mockContext)
 
@@ -962,6 +985,508 @@ describe('PollCraResponseHandler', () => {
         data: { isValid: false, isDetailsProcessed: true },
       })
       expect(mockInboundResponseService.parseFile).not.toHaveBeenCalled()
+    })
+
+    it('applies CRA_WKL_APPROVED for completed records', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([makeWklDetail({ status: WKL_STATUS.COMPLETED })])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
+
+      const result = await handler.execute(mockContext)
+
+      expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+        200,
+        BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
+      )
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        42,
+        CSA_EVENT.CRA_WKL_APPROVED,
+        'SYSTEM',
+        expect.objectContaining({ additionalData: expect.anything() }),
+      )
+      expect(result.metadata.records_wkl_approved).toBe(1)
+      expect(result.metadata.records_wkl_refused).toBe(0)
+    })
+
+    it('applies CRA_WKL_APPROVED for updated records', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([makeWklDetail({ status: WKL_STATUS.UPDATED })])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
+
+      await handler.execute(mockContext)
+
+      expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+        200,
+        BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
+      )
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        42,
+        CSA_EVENT.CRA_WKL_APPROVED,
+        'SYSTEM',
+        expect.objectContaining({ additionalData: expect.anything() }),
+      )
+    })
+
+    it('applies CRA_WKL_REFUSED for abandoned records', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([makeWklDetail({ status: WKL_STATUS.ABANDONED })])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
+
+      const result = await handler.execute(mockContext)
+
+      expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+        200,
+        BATCH_DETAIL_EVENT.CRA_WKL_REFUSED,
+      )
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        42,
+        CSA_EVENT.CRA_WKL_REFUSED,
+        'SYSTEM',
+        expect.objectContaining({ additionalData: expect.anything() }),
+      )
+      expect(result.metadata.records_wkl_refused).toBe(1)
+      expect(result.metadata.records_wkl_approved).toBe(0)
+    })
+
+    it('skips in-progress records without making any service calls', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([makeWklDetail({ status: WKL_STATUS.IN_PROGRESS })])
+
+      const result = await handler.execute(mockContext)
+
+      expect(mockWeeklyContactMatcher.findMatchingBatchDetail).not.toHaveBeenCalled()
+      expect(mockBatchesService.updateBatchDetailStatus).not.toHaveBeenCalled()
+      expect(mockContactsService.updateCsaStatus).not.toHaveBeenCalled()
+      expect(result.metadata.records_wkl_skipped).toBe(1)
+    })
+
+    it('skips records with unexpected status', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([makeWklDetail({ status: 'some-unknown-value' })])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
+
+      const result = await handler.execute(mockContext)
+
+      expect(mockBatchesService.updateBatchDetailStatus).not.toHaveBeenCalled()
+      expect(mockContactsService.updateCsaStatus).not.toHaveBeenCalled()
+      expect(result.metadata.records_wkl_skipped).toBe(1)
+    })
+
+    it('skips when no matching batch detail is found', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([makeWklDetail()])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(null)
+
+      const result = await handler.execute(mockContext)
+
+      expect(mockBatchesService.updateBatchDetailStatus).not.toHaveBeenCalled()
+      expect(result.metadata.records_wkl_skipped).toBe(1)
+    })
+
+    it('passes DIN and effectiveDate as additionalData when contact.din is blank', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([makeWklDetail({ childDin: '987654321' })])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
+        ...mockMatchedDetail,
+        contact: { din: null },
+      })
+
+      await handler.execute(mockContext)
+
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        42,
+        CSA_EVENT.CRA_WKL_APPROVED,
+        'SYSTEM',
+        {
+          additionalData: { effectiveDate: expect.any(Date), din: '987654321' },
+          origin: 'PollCraResponseHandler.processWeeklyDetail',
+        },
+      )
+    })
+
+    it('always updates DIN from WKL even when contact already has one', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([makeWklDetail({ childDin: '987654321' })])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
+        ...mockMatchedDetail,
+        contact: { din: 'EXISTING123' },
+      })
+
+      await handler.execute(mockContext)
+
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        42,
+        CSA_EVENT.CRA_WKL_APPROVED,
+        'SYSTEM',
+        {
+          additionalData: { effectiveDate: expect.any(Date), din: '987654321' },
+          origin: 'PollCraResponseHandler.processWeeklyDetail',
+        },
+      )
+    })
+
+    it('uses careEndDate (not effectiveDate) in additionalData for cancellation transactions', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([
+        makeWklDetail({
+          transactionType: 'C' as const,
+          careEndDate: '20250601',
+          status: WKL_STATUS.ABANDONED,
+        }),
+      ])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
+        ...mockMatchedDetail,
+        transactionType: 'cancellation',
+      })
+
+      await handler.execute(mockContext)
+
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        42,
+        CSA_EVENT.CRA_WKL_REFUSED,
+        'SYSTEM',
+        {
+          additionalData: { careEndDate: expect.any(Date), din: '123456789' },
+          origin: 'PollCraResponseHandler.processWeeklyDetail',
+        },
+      )
+    })
+
+    it('includes cancelReasonCode in additionalData for cancellation transactions', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([
+        makeWklDetail({
+          transactionType: 'C' as const,
+          careEndDate: '20250601',
+          careEndReasonCode: '21',
+          status: WKL_STATUS.COMPLETED,
+        }),
+      ])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
+        ...mockMatchedDetail,
+        transactionType: 'cancellation',
+      })
+
+      await handler.execute(mockContext)
+
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        42,
+        CSA_EVENT.CRA_WKL_APPROVED,
+        'SYSTEM',
+        {
+          additionalData: {
+            careEndDate: expect.any(Date),
+            din: '123456789',
+            cancelReasonCode: '21',
+          },
+          origin: 'PollCraResponseHandler.processWeeklyDetail',
+        },
+      )
+    })
+
+    it('omits cancelReasonCode from additionalData for application transactions', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([
+        makeWklDetail({
+          transactionType: 'A' as const,
+          careStartDate: '20250101',
+          careEndReasonCode: '21', // should be ignored for applications
+          status: WKL_STATUS.COMPLETED,
+        }),
+      ])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
+
+      await handler.execute(mockContext)
+
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        42,
+        CSA_EVENT.CRA_WKL_APPROVED,
+        'SYSTEM',
+        {
+          additionalData: {
+            effectiveDate: expect.any(Date),
+            din: '123456789',
+          },
+          origin: 'PollCraResponseHandler.processWeeklyDetail',
+        },
+      )
+    })
+
+    it('logs warning on transaction type mismatch but still processes', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([makeWklDetail({ transactionType: 'C' as const })])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue({
+        ...mockMatchedDetail,
+        transactionType: 'application',
+      })
+
+      const result = await handler.execute(mockContext)
+
+      expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+        200,
+        BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
+      )
+      expect(result.metadata.records_wkl_approved).toBe(1)
+    })
+
+    it('calls aggregateBatchStatus for batches affected by WKL processing', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([makeWklDetail()])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
+
+      await handler.execute(mockContext)
+
+      expect(mockBatchesService.aggregateBatchStatus).toHaveBeenCalledWith(10)
+    })
+
+    describe('Update transaction type (U) treated as cancellation', () => {
+      const mockMatchedCancellation = {
+        id: 200,
+        contactId: 42,
+        batchId: 10,
+        transactionType: 'cancellation',
+        systemComments: null,
+        contact: { din: null },
+      }
+
+      it('applies CRA_WKL_APPROVED with careEndDate for U + COMPLETED', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'U' as const,
+            careEndDate: '20250601',
+            status: WKL_STATUS.COMPLETED,
+          }),
+        ])
+        mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedCancellation)
+
+        const result = await handler.execute(mockContext)
+
+        expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+          200,
+          BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
+        )
+        expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+          42,
+          CSA_EVENT.CRA_WKL_APPROVED,
+          'SYSTEM',
+          {
+            additionalData: { careEndDate: expect.any(Date), din: '123456789' },
+            origin: 'PollCraResponseHandler.processWeeklyDetail',
+          },
+        )
+        expect(result.metadata.records_wkl_approved).toBe(1)
+        expect(result.metadata.records_wkl_skipped).toBe(0)
+      })
+
+      it('applies CRA_WKL_REFUSED with careEndDate for U + ABANDONED', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'U' as const,
+            careEndDate: '20250601',
+            status: WKL_STATUS.ABANDONED,
+          }),
+        ])
+        mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedCancellation)
+
+        const result = await handler.execute(mockContext)
+
+        expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+          200,
+          BATCH_DETAIL_EVENT.CRA_WKL_REFUSED,
+        )
+        expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+          42,
+          CSA_EVENT.CRA_WKL_REFUSED,
+          'SYSTEM',
+          {
+            additionalData: { careEndDate: expect.any(Date), din: '123456789' },
+            origin: 'PollCraResponseHandler.processWeeklyDetail',
+          },
+        )
+        expect(result.metadata.records_wkl_refused).toBe(1)
+        expect(result.metadata.records_wkl_skipped).toBe(0)
+      })
+    })
+
+    describe('Unmatched WKL records (no batch detail, contact found)', () => {
+      const matchedContact = { id: 99, din: null, caseNumber: 'CASE-42' }
+      const unmatchedBatch = { id: 500 }
+      const createdBatchDetail = {
+        id: 600,
+        contactId: 99,
+        batchId: 500,
+        transactionType: 'cancellation',
+        systemComments: null,
+        contact: { din: null },
+      }
+
+      beforeEach(() => {
+        mockBatchesService.createWklBatchForUnmatchedRecords = vi
+          .fn()
+          .mockResolvedValue(unmatchedBatch)
+        mockBatchesService.createBatchDetailsForWklUnmatchedRecords = vi
+          .fn()
+          .mockResolvedValue(createdBatchDetail)
+        mockContactsService.forceUpdateCsaStatus = vi.fn().mockResolvedValue({ success: true })
+        mockWeeklyContactMatcher.buildWklMatchingSnapshot = vi.fn().mockReturnValue({
+          childGivenName: 'JOHN',
+          childSurName: 'DOE',
+          childBirthDate: '20100315',
+        })
+        mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(null)
+        mockWeeklyContactMatcher.findMatchingContact.mockResolvedValue(matchedContact)
+      })
+
+      it('creates batch + detail, fires CRA_WKL_APPROVED, and forces NOT_ELIGIBLE_OUT_OF_PAY for cancellation + COMPLETED', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'C' as const,
+            careEndDate: '20250601',
+            status: WKL_STATUS.COMPLETED,
+          }),
+        ])
+
+        const result = await handler.execute(mockContext)
+
+        expect(mockBatchesService.createWklBatchForUnmatchedRecords).toHaveBeenCalledTimes(1)
+        expect(mockBatchesService.createBatchDetailsForWklUnmatchedRecords).toHaveBeenCalledWith(
+          500,
+          99,
+          'cancellation',
+          WKL_STATUS.COMPLETED,
+          'CASE-42',
+          expect.any(Object),
+        )
+        expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+          600,
+          BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
+        )
+        expect(mockContactsService.forceUpdateCsaStatus).toHaveBeenCalledWith(
+          99,
+          CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY,
+          { careEndDate: expect.any(Date), din: '123456789', cancelReasonCode: '21' },
+        )
+        expect(result.metadata.records_wkl_unmatched_approved).toBe(1)
+        expect(result.metadata.records_wkl_unmatched_refused).toBe(0)
+      })
+
+      it('fires CRA_WKL_REFUSED and forces CANCELLATION_REFUSED_CRA for cancellation + ABANDONED', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'C' as const,
+            careEndDate: '20250601',
+            status: WKL_STATUS.ABANDONED,
+          }),
+        ])
+
+        const result = await handler.execute(mockContext)
+
+        expect(mockBatchesService.createBatchDetailsForWklUnmatchedRecords).toHaveBeenCalledWith(
+          500,
+          99,
+          'cancellation',
+          WKL_STATUS.ABANDONED,
+          'CASE-42',
+          expect.any(Object),
+        )
+        expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+          600,
+          BATCH_DETAIL_EVENT.CRA_WKL_REFUSED,
+        )
+        expect(mockContactsService.forceUpdateCsaStatus).toHaveBeenCalledWith(
+          99,
+          CSA_STATUS.CANCELLATION_REFUSED_CRA,
+          { careEndDate: expect.any(Date), din: '123456789', cancelReasonCode: '21' },
+        )
+        expect(result.metadata.records_wkl_unmatched_refused).toBe(1)
+        expect(result.metadata.records_wkl_unmatched_approved).toBe(0)
+      })
+
+      it('reuses the same unmatched batch across multiple unmatched records in one file', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'C' as const,
+            careEndDate: '20250601',
+            status: WKL_STATUS.COMPLETED,
+          }),
+          makeWklDetail({
+            transactionType: 'C' as const,
+            careEndDate: '20250602',
+            status: WKL_STATUS.ABANDONED,
+          }),
+        ])
+
+        await handler.execute(mockContext)
+
+        expect(mockBatchesService.createWklBatchForUnmatchedRecords).toHaveBeenCalledTimes(1)
+        expect(mockBatchesService.createBatchDetailsForWklUnmatchedRecords).toHaveBeenCalledTimes(2)
+      })
+
+      it('skips unmatched records with unexpected status (no batch detail status / contact update)', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({ transactionType: 'C' as const, status: 'some-unknown' }),
+        ])
+
+        const result = await handler.execute(mockContext)
+
+        expect(mockBatchesService.updateBatchDetailStatus).not.toHaveBeenCalled()
+        expect(mockContactsService.forceUpdateCsaStatus).not.toHaveBeenCalled()
+        expect(result.metadata.records_wkl_unmatched_skipped).toBe(1)
+      })
+
+      it('includes cancelReasonCode in additionalData for unmatched cancellation records', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'C' as const,
+            careEndDate: '20250601',
+            careEndReasonCode: '22',
+            status: WKL_STATUS.COMPLETED,
+          }),
+        ])
+
+        await handler.execute(mockContext)
+
+        expect(mockContactsService.forceUpdateCsaStatus).toHaveBeenCalledWith(
+          99,
+          CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY,
+          {
+            careEndDate: expect.any(Date),
+            din: '123456789',
+            cancelReasonCode: '22',
+          },
+        )
+      })
+
+      it('defaults careEndDate to today and cancelReasonCode to "21" when WKL blank for unmatched cancellation', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({
+            transactionType: 'C' as const,
+            careEndDate: '        ',
+            careEndReasonCode: '  ',
+            status: WKL_STATUS.COMPLETED,
+          }),
+        ])
+
+        await handler.execute(mockContext)
+
+        expect(mockContactsService.forceUpdateCsaStatus).toHaveBeenCalledWith(
+          99,
+          CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY,
+          {
+            careEndDate: expect.any(Date),
+            din: '123456789',
+            cancelReasonCode: '21',
+          },
+        )
+      })
     })
   })
 })

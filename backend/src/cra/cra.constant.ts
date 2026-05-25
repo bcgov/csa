@@ -17,6 +17,10 @@ export const CRA_DATA_HANDLING_CONSTANT = {
   UPDATED_BY: {
     SYSTEM: 'SYSTEM',
   },
+  BATCH_INITIATED_BY: {
+    MINISTRY: 'Ministry',
+    CRA: 'CRA',
+  },
 
   REQUEST_FILE: {
     HEADER_TRAN_CODE: 6133,
@@ -48,6 +52,18 @@ export const CRA_DATA_HANDLING_CONSTANT = {
       ELECTQRONIC: 'E',
       PAPER: ' ',
     },
+    STATUS: {
+      COMPLETED: 'completed',
+      ABANDONED: 'abandoned',
+      IN_PROGRESS: 'in-progress',
+      UPDATED: 'updated',
+    },
+    TRANSACTION_TYPE_MAP: {
+      A: 'application',
+      C: 'cancellation',
+      U: 'cancellation',
+    } as const,
+    TRANSACTION_TYPES: ['application', 'cancellation'] as const,
   },
   // CRA spec: fileStatCd is 9(02). 2-digit zero-padded string
   FILE_STAT_CODE: {
@@ -136,7 +152,7 @@ export const CRA_DATA_HANDLING_CONSTANT = {
       '040':
         'The payments for this child automatically cease in the month after the child turns 18.',
       '041': 'A cancellation form cannot be submitted for a newborn child.',
-      '043': 'Child found on the database, but the current Caregiver is not the Applicant.',
+      '043': 'Child found on the database but is not currently under your care.',
       '044':
         'This child cannot be processed at this time, please try again tomorrow or contact your Canada Revenue Agency tax centre.',
       '998': 'The transaction is being recycled. It will be processed in the next scheduled run.',

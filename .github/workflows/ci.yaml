@@ -2,7 +2,7 @@ name: CI (PR + Manual)
 
 on:
   pull_request:
-    branches: [dev, release/cra-file-transfer-enabled]
+    branches: [dev]
     paths:
       - "frontend/**"
       - "backend/**"

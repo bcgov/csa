@@ -779,7 +779,8 @@ describe('ContactsService', () => {
 
       expect(result.success).toEqual([1, 2])
       expect(result.skipped).toEqual([])
-      expect(updateSpy).toHaveBeenCalledTimes(2)
+      // 2 calls per contact: 1 for status transition + 1 for clearing needsReview flag
+      expect(updateSpy).toHaveBeenCalledTimes(4)
     })
 
     it('should skip not found contacts', async () => {
@@ -1423,7 +1424,6 @@ describe('ContactsService', () => {
 
       const result = await service.findContactBatches(1)
 
-      // For cancellation, effectiveDate should be careEndDate
       expect(result[0].effectiveDate).toEqual('2026-01-15')
       expect(result[0].cancelReasonCode).toEqual('21')
       expect(result[0].cancelReasonLabel).toEqual('Child Left')

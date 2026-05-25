@@ -7,6 +7,8 @@ import { ContactsService } from 'src/api/contacts/contacts.service'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_DETAIL_EVENT, CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
 
+import { pacificToday, parseWklDate } from 'src/common/utils'
+import { CANCEL_REASON } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
@@ -16,11 +18,10 @@ import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { InboundFileService } from '../inbound/inbound-file.service'
 import { InboundResponseService } from '../inbound/inbound-response.service'
 import { InboundWeeklyResponseService } from '../inbound/inbound-weekly-response.service'
-import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import type { DetailRecord04, HeaderRecord } from '../inbound/inbound-weekly.interface'
+import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import { WeeklyContactMatcherService } from '../inbound/weekly-contact-matcher.service'
 import { CraTransferService } from '../transfer/cra-transfer.service'
-import { parseWklDate } from 'src/common/utils'
 const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
 const { STATUS: WKL_STATUS, RECEIVE_MODE, TRANSACTION_TYPE_MAP, TRANSACTION_TYPES } = WEEKLY_FILE
 
@@ -357,16 +358,24 @@ export class PollCraResponseHandler extends BaseJob {
       )
     }
 
-    const isApproved =
-      detail.status?.toLowerCase() === WKL_STATUS.COMPLETED ||
-      detail.status?.toLowerCase() === WKL_STATUS.UPDATED
-    const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
+    const status = detail.status?.trim().toLowerCase()
+
+    const isApproved = status === WKL_STATUS.COMPLETED || status === WKL_STATUS.UPDATED
+
+    const isRefused = status === WKL_STATUS.ABANDONED
+
+    this.logger.log(
+      `Processing WKL detail for contactId ${batchDetail.contactId}, transaction type ${wklType}, status ${detail.status}, ` +
+        `isApproved: ${isApproved}, isRefused: ${isRefused}`,
+    )
 
     const din = detail.childDin?.trim()
     const careDate =
       wklType === 'cancellation'
         ? parseWklDate(detail.careEndDate)
         : parseWklDate(detail.careStartDate)
+    const cancelReasonCode =
+      wklType === 'cancellation' ? detail.careEndReasonCode?.trim() : undefined
     const additionalData: Record<string, unknown> = {
       ...(careDate
         ? wklType === 'cancellation'
@@ -374,6 +383,7 @@ export class PollCraResponseHandler extends BaseJob {
           : { effectiveDate: careDate }
         : {}),
       ...(din ? { din } : {}),
+      ...(cancelReasonCode ? { cancelReasonCode } : {}),
     }
 
     if (isApproved) {
@@ -416,6 +426,10 @@ export class PollCraResponseHandler extends BaseJob {
     caseNumber: string,
     header: HeaderRecord,
   ): Promise<void> {
+    this.logger.log(
+      `Processing unmatched WKL detail for contactId ${contactId} (case ${caseNumber}), ` +
+        `transaction type ${wklType}, status ${detail.status}`,
+    )
     if (!this.unmatchedWklBatchId) {
       const batch = await this.batchesService.createWklBatchForUnmatchedRecords(header)
       this.unmatchedWklBatchId = batch.id
@@ -445,8 +459,12 @@ export class PollCraResponseHandler extends BaseJob {
     const din = detail.childDin?.trim()
     const careDate =
       wklType === 'cancellation'
-        ? parseWklDate(detail.careEndDate)
+        ? (parseWklDate(detail.careEndDate) ?? pacificToday())
         : parseWklDate(detail.careStartDate)
+    const cancelReasonCode =
+      wklType === 'cancellation'
+        ? detail.careEndReasonCode?.trim() || CANCEL_REASON.CHILD_LEFT
+        : undefined
     const additionalData: Record<string, unknown> = {
       ...(careDate
         ? wklType === 'cancellation'
@@ -454,6 +472,7 @@ export class PollCraResponseHandler extends BaseJob {
           : { effectiveDate: careDate }
         : {}),
       ...(din ? { din } : {}),
+      ...(cancelReasonCode ? { cancelReasonCode } : {}),
     }
 
     if (isApproved) {
@@ -491,5 +510,9 @@ export class PollCraResponseHandler extends BaseJob {
       this.recordsWklUnmatchedSkipped++
       return
     }
+    this.logger.log(
+      `Finished processing unmatched WKL detail for contactId ${contactId} (case ${caseNumber}), ` +
+        `transaction type ${wklType}, status ${detail.status}, approved: ${isApproved}, refused: ${isRefused}`,
+    )
   }
 }

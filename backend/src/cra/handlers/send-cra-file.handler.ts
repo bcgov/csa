@@ -127,6 +127,7 @@ export class SendCraFileHandler extends BaseJob {
         data: {
           craMatchingSnapshot: this.outboundDataService.buildMatchingSnapshot(
             details[i],
+            this.batchDetails[i].contact.middleName,
           ) as unknown as Prisma.InputJsonValue,
         },
       })

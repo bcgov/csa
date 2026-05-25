@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_STATUS, CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
+import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { ContactsService } from '../../contacts/contacts.service'
 import { BatchesService } from '../batches.service'
 
@@ -27,6 +28,7 @@ describe('BatchesService', () => {
     },
     contact: {
       findMany: vi.fn(),
+      update: vi.fn(),
     },
     $transaction: vi.fn().mockImplementation(async (fnOrArray: any) => {
       if (typeof fnOrArray === 'function') {
@@ -40,6 +42,10 @@ describe('BatchesService', () => {
     updateCsaStatus: vi.fn(),
   }
 
+  const mockIcmSyncBackService = {
+    syncSingleContact: vi.fn().mockResolvedValue(true),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -47,6 +53,7 @@ describe('BatchesService', () => {
         StateMachineService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: ContactsService, useValue: mockContactsService },
+        { provide: IcmSyncBackService, useValue: mockIcmSyncBackService },
       ],
     }).compile()
 
@@ -246,8 +253,20 @@ describe('BatchesService', () => {
       vi.spyOn(service, 'findOrCreatePendingBatch').mockResolvedValue(pendingBatch as any)
 
       mockPrismaService.contact.findMany.mockResolvedValue([
-        { id: 1, caseNumber: 'C1', csaStatus: 'eligible' },
-        { id: 2, caseNumber: 'C2', csaStatus: 'not_eligible_in_pay' },
+        {
+          id: 1,
+          caseNumber: 'C1',
+          csaStatus: 'eligible',
+          cancelReasonCode: null,
+          careEndDate: null,
+        },
+        {
+          id: 2,
+          caseNumber: 'C2',
+          csaStatus: 'not_eligible_in_pay',
+          cancelReasonCode: null,
+          careEndDate: null,
+        },
       ])
       mockPrismaService.contactBatchDetail.findMany.mockResolvedValue([])
 
@@ -304,6 +323,11 @@ describe('BatchesService', () => {
       expect(firstCreateCall.data.transactionType).toBe('application')
       const secondCreateCall = mockPrismaService.contactBatchDetail.create.mock.calls[1][0]
       expect(secondCreateCall.data.transactionType).toBe('cancellation')
+
+      // Verify ICM sync fired for each successful contact after transaction commit
+      expect(mockIcmSyncBackService.syncSingleContact).toHaveBeenCalledTimes(2)
+      expect(mockIcmSyncBackService.syncSingleContact).toHaveBeenCalledWith(1)
+      expect(mockIcmSyncBackService.syncSingleContact).toHaveBeenCalledWith(2)
     })
 
     it('should skip contacts not found', async () => {
@@ -377,6 +401,7 @@ describe('BatchesService', () => {
 
       expect(result.success).toEqual([])
       expect(result.skipped).toEqual([{ id: 1, reason: 'invalid_transition' }])
+      expect(mockIcmSyncBackService.syncSingleContact).not.toHaveBeenCalled()
     })
 
     it('should catch per-contact errors and skip', async () => {
@@ -395,6 +420,125 @@ describe('BatchesService', () => {
 
       expect(result.success).toEqual([])
       expect(result.skipped).toEqual([{ id: 1, reason: 'error' }])
+    })
+
+    it('should default cancelReasonCode and careEndDate when blank for cancellation contacts', async () => {
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 0 }
+
+      vi.spyOn(service, 'findOrCreatePendingBatch').mockResolvedValue(pendingBatch as any)
+      mockPrismaService.contact.findMany.mockResolvedValue([
+        {
+          id: 1,
+          caseNumber: 'C1',
+          csaStatus: 'cra_error_cancellation',
+          cancelReasonCode: null,
+          careEndDate: null,
+        },
+      ])
+      mockPrismaService.contactBatchDetail.findMany.mockResolvedValue([])
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: true,
+        from: CSA_STATUS.CRA_ERROR_CANCELLATION,
+        to: CSA_STATUS.IN_BATCH_CANCELLATION,
+      })
+      mockPrismaService.$transaction.mockImplementation(async (fn: any) => fn(mockPrismaService))
+      mockPrismaService.contactBatchDetail.create.mockResolvedValue({ id: 10 })
+      mockPrismaService.contactBatchDetail.update.mockResolvedValue({})
+      mockPrismaService.contactBatchDetail.count.mockResolvedValue(1)
+      mockPrismaService.batch.update.mockResolvedValue({ ...pendingBatch, recordCount: 1 })
+
+      await service.addContactsToPendingBatch([1], 'user1')
+
+      expect(mockPrismaService.contact.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { careEndDate: expect.any(Date), cancelReasonCode: '21' },
+      })
+    })
+
+    it('should not overwrite cancelReasonCode and careEndDate when already populated', async () => {
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 0 }
+
+      vi.spyOn(service, 'findOrCreatePendingBatch').mockResolvedValue(pendingBatch as any)
+      mockPrismaService.contact.findMany.mockResolvedValue([
+        {
+          id: 1,
+          caseNumber: 'C1',
+          csaStatus: 'cancellation_refused_cra',
+          cancelReasonCode: '14',
+          careEndDate: new Date('2026-01-15'),
+        },
+      ])
+      mockPrismaService.contactBatchDetail.findMany.mockResolvedValue([])
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: true,
+        from: CSA_STATUS.CANCELLATION_REFUSED_CRA,
+        to: CSA_STATUS.IN_BATCH_CANCELLATION,
+      })
+      mockPrismaService.$transaction.mockImplementation(async (fn: any) => fn(mockPrismaService))
+      mockPrismaService.contactBatchDetail.create.mockResolvedValue({ id: 10 })
+      mockPrismaService.contactBatchDetail.update.mockResolvedValue({})
+      mockPrismaService.contactBatchDetail.count.mockResolvedValue(1)
+      mockPrismaService.batch.update.mockResolvedValue({ ...pendingBatch, recordCount: 1 })
+
+      await service.addContactsToPendingBatch([1], 'user1')
+
+      expect(mockPrismaService.contact.update).not.toHaveBeenCalled()
+    })
+
+    it('should not default cancellation fields for application contacts', async () => {
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 0 }
+
+      vi.spyOn(service, 'findOrCreatePendingBatch').mockResolvedValue(pendingBatch as any)
+      mockPrismaService.contact.findMany.mockResolvedValue([
+        {
+          id: 1,
+          caseNumber: 'C1',
+          csaStatus: 'eligible',
+          cancelReasonCode: null,
+          careEndDate: null,
+        },
+      ])
+      mockPrismaService.contactBatchDetail.findMany.mockResolvedValue([])
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: true,
+        from: CSA_STATUS.ELIGIBLE,
+        to: CSA_STATUS.IN_BATCH_APPLICATION,
+      })
+      mockPrismaService.$transaction.mockImplementation(async (fn: any) => fn(mockPrismaService))
+      mockPrismaService.contactBatchDetail.create.mockResolvedValue({ id: 10 })
+      mockPrismaService.contactBatchDetail.update.mockResolvedValue({})
+      mockPrismaService.contactBatchDetail.count.mockResolvedValue(1)
+      mockPrismaService.batch.update.mockResolvedValue({ ...pendingBatch, recordCount: 1 })
+
+      await service.addContactsToPendingBatch([1], 'user1')
+
+      expect(mockPrismaService.contact.update).not.toHaveBeenCalled()
+    })
+
+    it('should not fail if ICM sync rejects', async () => {
+      const pendingBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 0 }
+
+      vi.spyOn(service, 'findOrCreatePendingBatch').mockResolvedValue(pendingBatch as any)
+      mockPrismaService.contact.findMany.mockResolvedValue([
+        { id: 1, caseNumber: 'C1', csaStatus: 'eligible' },
+      ])
+      mockPrismaService.contactBatchDetail.findMany.mockResolvedValue([])
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: true,
+        from: CSA_STATUS.ELIGIBLE,
+        to: CSA_STATUS.IN_BATCH_APPLICATION,
+      })
+      mockPrismaService.$transaction.mockImplementation(async (fn: any) => fn(mockPrismaService))
+      mockPrismaService.contactBatchDetail.create.mockResolvedValue({ id: 10 })
+      mockPrismaService.contactBatchDetail.update.mockResolvedValue({})
+      mockPrismaService.contactBatchDetail.count.mockResolvedValue(1)
+      mockPrismaService.batch.update.mockResolvedValue({ ...pendingBatch, recordCount: 1 })
+      mockIcmSyncBackService.syncSingleContact.mockRejectedValue(new Error('ICM down'))
+
+      const result = await service.addContactsToPendingBatch([1], 'user1')
+
+      expect(result.success).toEqual([1])
+      expect(mockIcmSyncBackService.syncSingleContact).toHaveBeenCalledWith(1)
     })
   })
 
@@ -424,6 +568,9 @@ describe('BatchesService', () => {
           origin: 'BatchesService.removeContactFromPendingBatch',
         },
       )
+
+      // Verify ICM sync fired after transaction commit
+      expect(mockIcmSyncBackService.syncSingleContact).toHaveBeenCalledWith(100)
     })
 
     it('should throw and not delete batch detail if CSA transition fails', async () => {
@@ -487,6 +634,11 @@ describe('BatchesService', () => {
       expect(result.skipped).toEqual([])
       expect(result.batch.recordCount).toBe(1)
       expect(mockContactsService.updateCsaStatus).toHaveBeenCalledTimes(2)
+
+      // Verify ICM sync fired for each successful contact
+      expect(mockIcmSyncBackService.syncSingleContact).toHaveBeenCalledTimes(2)
+      expect(mockIcmSyncBackService.syncSingleContact).toHaveBeenCalledWith(1)
+      expect(mockIcmSyncBackService.syncSingleContact).toHaveBeenCalledWith(2)
     })
 
     it('should skip contacts not found in batch', async () => {
@@ -510,6 +662,10 @@ describe('BatchesService', () => {
 
       expect(result.success).toEqual([2])
       expect(result.skipped).toEqual([{ id: 1, reason: 'not_found' }])
+
+      // Sync only called for the successful contact
+      expect(mockIcmSyncBackService.syncSingleContact).toHaveBeenCalledTimes(1)
+      expect(mockIcmSyncBackService.syncSingleContact).toHaveBeenCalledWith(2)
     })
 
     it('should skip contacts with invalid CSA transition', async () => {
@@ -533,6 +689,7 @@ describe('BatchesService', () => {
 
       expect(result.success).toEqual([])
       expect(result.skipped).toEqual([{ id: 1, reason: 'invalid_transition' }])
+      expect(mockIcmSyncBackService.syncSingleContact).not.toHaveBeenCalled()
     })
 
     it('should catch unexpected errors and skip', async () => {

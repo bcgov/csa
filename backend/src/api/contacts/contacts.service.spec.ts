@@ -1329,6 +1329,17 @@ describe('ContactsService', () => {
       expect(icmSync).toHaveBeenCalledWith(1)
     })
 
+    it('should not call syncSingleContact for USER actor when tx is provided', async () => {
+      const contact = { id: 1, csaStatus: 'eligible', resumeStatus: null }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+      const icmSync = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
+
+      await service.updateCsaStatus(1, 'ADD_TO_BATCH', 'USER', { userId: 'user1', tx: prisma })
+
+      expect(icmSync).not.toHaveBeenCalled()
+    })
+
     it('should not call syncSingleContact for SYSTEM actor', async () => {
       const contact = { id: 1, csaStatus: 'eligible', resumeStatus: null }
       vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
@@ -1352,7 +1363,11 @@ describe('ContactsService', () => {
           transactionType: 'application',
           status: 'approved',
           batch: { id: 5, batchDate: new Date('2026-01-15'), status: 'processed' },
-          contact: { effectiveDate: new Date('2025-06-01'), careEndDate: null },
+          contact: {
+            effectiveDate: new Date('2025-06-01'),
+            careEndDate: null,
+            cancelReasonCode: null,
+          },
         },
       ]
 
@@ -1365,6 +1380,8 @@ describe('ContactsService', () => {
         {
           ...batchDetails[0],
           effectiveDate: '2025-06-01',
+          cancelReasonCode: null,
+          cancelReasonLabel: null,
           statusLabel: 'Approved',
           batch: { ...batchDetails[0].batch, batchDate: '2026-01-15', statusLabel: 'Processed' },
         },
@@ -1376,7 +1393,7 @@ describe('ContactsService', () => {
             select: { id: true, batchDate: true, status: true, systemComments: true },
           },
           contact: {
-            select: { effectiveDate: true, careEndDate: true },
+            select: { effectiveDate: true, careEndDate: true, cancelReasonCode: true },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -1393,7 +1410,11 @@ describe('ContactsService', () => {
           transactionType: 'cancellation',
           status: 'approved',
           batch: { id: 6, batchDate: new Date('2026-02-20'), status: 'processed' },
-          contact: { effectiveDate: new Date('2025-06-01'), careEndDate: new Date('2026-01-15') },
+          contact: {
+            effectiveDate: new Date('2025-06-01'),
+            careEndDate: new Date('2026-01-15'),
+            cancelReasonCode: '21',
+          },
         },
       ]
 
@@ -1404,6 +1425,8 @@ describe('ContactsService', () => {
 
       // For cancellation, effectiveDate should be careEndDate
       expect(result[0].effectiveDate).toEqual('2026-01-15')
+      expect(result[0].cancelReasonCode).toEqual('21')
+      expect(result[0].cancelReasonLabel).toEqual('Child Left')
     })
 
     it('should throw NotFoundException if contact not found', async () => {

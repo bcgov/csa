@@ -3,9 +3,9 @@ name: Analysis
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
-    branches: [dev, test, main, release/cra-file-transfer-enabled]
+    branches: [dev, test, main]
   push:
-    branches: [dev, test, main, release/cra-file-transfer-enabled]
+    branches: [dev, test, main]
   schedule:
     - cron: "0 11 * * 0" # Sundays
   workflow_dispatch:

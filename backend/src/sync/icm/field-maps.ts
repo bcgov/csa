@@ -3,6 +3,7 @@ export interface FieldMapEntry {
   sourceLabel: string
   masterField: string
   dbType?: 'timestamp' | 'date' | 'numeric'
+  excludeFromChangeDetection?: boolean
 }
 
 export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
@@ -12,6 +13,7 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
     sourceLabel: 'Last Updated Date',
     masterField: 'last_upd_case_icm',
     dbType: 'timestamp',
+    excludeFromChangeDetection: true,
   },
 
   {
@@ -49,6 +51,7 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
     sourceField: 'X_CSA_PAY_STATUS',
     sourceLabel: 'Key Player CSA Status',
     masterField: 'csa_status',
+    excludeFromChangeDetection: true,
   },
   {
     sourceField: 'X_CSA_EFF_DATE',
@@ -63,6 +66,7 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
     sourceLabel: 'Key Player Last Updated Date',
     masterField: 'last_upd_dt_contact_icm',
     dbType: 'timestamp',
+    excludeFromChangeDetection: true,
   },
   { sourceField: 'SEX_MF', sourceLabel: 'Key Player M/F', masterField: 'gender' },
   {
@@ -148,6 +152,7 @@ export const STG_ICM_PLACEMENTS_MAP: FieldMapEntry[] = [
     sourceLabel: 'Updated',
     masterField: 'last_upd_placement_icm',
     dbType: 'timestamp',
+    excludeFromChangeDetection: true,
   },
   {
     sourceField: 'X_PLACEMENT_NUM',
@@ -216,6 +221,7 @@ export const STG_LEGAL_ADMIN_MAP: FieldMapEntry[] = [
     sourceLabel: 'Updated',
     masterField: 'last_upd_dt_legal_admin',
     dbType: 'timestamp',
+    excludeFromChangeDetection: true,
   },
   { sourceField: 'X_ENROLL_CSA', sourceLabel: 'Enroll for CSA', masterField: 'enroll_for_csa' },
 ]
@@ -227,6 +233,7 @@ export const STG_LEGAL_AUTHORITY_MAP: FieldMapEntry[] = [
     sourceLabel: 'Updated',
     masterField: 'last_upd_dt_legal_authority',
     dbType: 'timestamp',
+    excludeFromChangeDetection: true,
   },
   {
     sourceField: 'LGL_AUTH_CD',
@@ -287,6 +294,7 @@ export const STG_AGREEMENT_MAP: FieldMapEntry[] = [
     sourceLabel: 'Updated',
     masterField: 'last_upd_dt_agreement',
     dbType: 'timestamp',
+    excludeFromChangeDetection: true,
   },
 ]
 
@@ -324,6 +332,7 @@ export const STG_ORDER_MAP: FieldMapEntry[] = [
     sourceLabel: 'Order Updated',
     masterField: 'last_upd_dt_order_icm',
     dbType: 'timestamp',
+    excludeFromChangeDetection: true,
   },
   { sourceField: 'ROW_ID', sourceLabel: 'Id', masterField: 'order_id_icm' },
 ]

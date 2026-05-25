@@ -34,9 +34,19 @@ export const step2_LegalStatusCheck: EligibilityRule = {
       if (normalizedEnroll === 'YES') return null
       if (normalizedEnroll === 'TBD') return step8_UpdateEligibleTbd(csaStatus)
       if (normalizedEnroll === 'NO')
-        return step9_UpdateNotEligible(csaStatus, null, null, ctx.referenceDate)
+        return step9_UpdateNotEligible(
+          csaStatus,
+          ctx.cancelReasonCode,
+          ctx.careEndDate,
+          ctx.referenceDate,
+        )
     }
 
-    return step9_UpdateNotEligible(csaStatus, null, null, ctx.referenceDate)
+    return step9_UpdateNotEligible(
+      csaStatus,
+      ctx.cancelReasonCode,
+      ctx.careEndDate,
+      ctx.referenceDate,
+    )
   },
 }

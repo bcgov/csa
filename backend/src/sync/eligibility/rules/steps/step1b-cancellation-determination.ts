@@ -12,11 +12,13 @@ import { step9_UpdateNotEligible } from './step9-update-not-eligible'
  *    - Code 22: ICM sub-type 'Absent/Unknown Location' Active OR MIS type 'AW' Active
  *    - Code 29: ICM sub-type 'Adoption Home' Active OR MIS type 'AD' Active
  *
- * 2. If cancellation triggered, computes Care End Date from
- *    order/payment end dates.
+ * 2. Computes Care End Date from order/payment end dates and stashes both
+ *    cancellation reason and care end date on ctx so downstream rules
+ *    (step 2, step 6) can pass them through to Step 9 instead of falling
+ *    back to system date when they route a contact to Step 9.
  *
- * 3. Routes to Step 9 with cancelReasonCode + careEndDate.
- *    If no cancellation condition → returns null (continue to Step 2).
+ * 3. If cancellation triggered, routes to Step 9.
+ *    Otherwise returns null (continue to Step 2).
  */
 export const step1B_CancellationCheck: EligibilityRule = {
   name: 'step1B_CancellationCheck',
@@ -38,12 +40,14 @@ export const step1B_CancellationCheck: EligibilityRule = {
         .map((placement) => ({ type: placement.rawType, status: placement.status })),
     })
 
+    ctx.cancelReasonCode = result.cancelReasonCode
+    ctx.careEndDate = determineCareEndDate(contact.orders, contact.placements)
+
     if (result.isIneligible) {
-      const careEndDate = determineCareEndDate(contact.orders, contact.placements)
       return step9_UpdateNotEligible(
         contact.csaStatus,
-        result.cancelReasonCode,
-        careEndDate,
+        ctx.cancelReasonCode,
+        ctx.careEndDate,
         ctx.referenceDate,
       )
     }

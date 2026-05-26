@@ -8,6 +8,8 @@ export interface EligibilityContext {
   eligiblePlacements?: PlacementRecord[]
   contractNumbers?: string[]
   agreementRowIds?: string[]
+  cancelReasonCode?: string | null
+  careEndDate?: Date | null
 }
 
 // A single step in the eligibility decision rules

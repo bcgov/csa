@@ -1,18 +1,18 @@
 import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-  UnprocessableEntityException,
+    BadRequestException,
+    Injectable,
+    Logger,
+    NotFoundException,
+    UnprocessableEntityException,
 } from '@nestjs/common'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
 import {
-  CRA_FILE_REJECTED_TARGET,
-  CSA_EVENT,
-  CSA_STATUS,
-  CSA_STATUS_LABELS,
-  REMOVE_FROM_BATCH_TARGET,
+    CRA_FILE_REJECTED_TARGET,
+    CSA_EVENT,
+    CSA_STATUS,
+    CSA_STATUS_LABELS,
+    REMOVE_FROM_BATCH_TARGET,
 } from 'src/common/state-machine/constants'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
@@ -22,16 +22,16 @@ import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
 import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import {
-  ALLOWED_FILTER_SORT_FIELDS,
-  BULK_OPERATION_SKIP_REASONS,
-  TRANSACTION_TYPES,
+    ALLOWED_FILTER_SORT_FIELDS,
+    BULK_OPERATION_SKIP_REASONS,
+    TRANSACTION_TYPES,
 } from './constants'
 import { ContactDto } from './dto/contact.dto'
 import type {
-  BulkOperationResponse,
-  FilterCondition,
-  FilterItem,
-  UpdateCsaStatusOptions,
+    BulkOperationResponse,
+    FilterCondition,
+    FilterItem,
+    UpdateCsaStatusOptions,
 } from './interfaces'
 
 @Injectable()
@@ -422,7 +422,11 @@ export class ContactsService {
     }
   }
 
-  async holdContacts(contactIds: number[], userId: string): Promise<BulkOperationResponse> {
+  async holdContacts(
+    contactIds: number[],
+    userId: string,
+    reason: string,
+  ): Promise<BulkOperationResponse> {
     const result: BulkOperationResponse = {
       success: [],
       skipped: [],
@@ -432,31 +436,43 @@ export class ContactsService {
       const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.HOLD, 'USER', {
         userId,
         origin: 'ContactsService.holdContacts',
+        additionalData: { holdReason: reason },
       })
       if (transitionResult.success) {
         result.success.push(id)
       } else {
-        const reason =
+        const skipReason =
           transitionResult.reason === 'Contact not found'
             ? BULK_OPERATION_SKIP_REASONS.NOT_FOUND
             : BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION
-        result.skipped.push({ id, reason })
+        result.skipped.push({ id, reason: skipReason })
       }
     }
 
     return result
   }
 
-  async resumeContacts(contactIds: number[], userId: string): Promise<BulkOperationResponse> {
+  async resumeContacts(
+    contactIds: number[],
+    userId: string,
+    reason?: string,
+  ): Promise<BulkOperationResponse> {
     const result: BulkOperationResponse = {
       success: [],
       skipped: [],
     }
 
     for (const id of contactIds) {
+      const additionalData: Record<string, unknown> = {}
+      // If reason is provided (can be empty string to clear), update holdReason
+      if (reason !== undefined) {
+        additionalData.holdReason = reason || null
+      }
+
       const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.RESUME, 'USER', {
         userId,
         origin: 'ContactsService.resumeContacts',
+        additionalData: Object.keys(additionalData).length > 0 ? additionalData : undefined,
       })
       if (transitionResult.success) {
         // Clear the review flag when resuming from hold
@@ -466,11 +482,11 @@ export class ContactsService {
         })
         result.success.push(id)
       } else {
-        const reason =
+        const skipReason =
           transitionResult.reason === 'Contact not found'
             ? BULK_OPERATION_SKIP_REASONS.NOT_FOUND
             : BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION
-        result.skipped.push({ id, reason })
+        result.skipped.push({ id, reason: skipReason })
       }
     }
 

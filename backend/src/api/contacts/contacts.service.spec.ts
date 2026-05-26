@@ -684,7 +684,7 @@ describe('ContactsService', () => {
       )
       const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
-      const result = await service.holdContacts([1, 2], 'user1')
+      const result = await service.holdContacts([1, 2], 'user1', 'Test reason')
 
       expect(result.success).toEqual([1, 2])
       expect(result.skipped).toEqual([])
@@ -700,7 +700,7 @@ describe('ContactsService', () => {
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
-      const result = await service.holdContacts([1, 999], 'user1')
+      const result = await service.holdContacts([1, 999], 'user1', 'Test reason')
 
       expect(result.success).toEqual([1])
       expect(result.skipped).toEqual([{ id: 999, reason: 'not_found' }])
@@ -719,7 +719,7 @@ describe('ContactsService', () => {
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
-      const result = await service.holdContacts([1, 2], 'user1')
+      const result = await service.holdContacts([1, 2], 'user1', 'Test reason')
 
       expect(result.success).toEqual([1])
       expect(result.skipped).toEqual([{ id: 2, reason: 'invalid_transition' }])
@@ -740,7 +740,7 @@ describe('ContactsService', () => {
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
-      const result = await service.holdContacts([1, 2, 3, 999], 'user1')
+      const result = await service.holdContacts([1, 2, 3, 999], 'user1', 'Test reason')
 
       expect(result.success).toEqual([1])
       expect(result.skipped).toEqual([

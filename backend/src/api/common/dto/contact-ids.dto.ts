@@ -1,5 +1,13 @@
-import { ApiProperty } from '@nestjs/swagger'
-import { ArrayMinSize, IsArray, IsIn, IsNumber } from 'class-validator'
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import {
+  ArrayMinSize,
+  IsArray,
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator'
 
 export class ContactIdsDto {
   @ApiProperty({ type: [Number] })
@@ -13,4 +21,19 @@ export class ContactIdsWithActionDto extends ContactIdsDto {
   @ApiProperty({ enum: ['ELIGIBLE', 'SET_NOT_ELIGIBLE', 'AGE_OUT'] })
   @IsIn(['ELIGIBLE', 'SET_NOT_ELIGIBLE', 'AGE_OUT'])
   action: string
+}
+
+export class HoldContactsDto extends ContactIdsDto {
+  @ApiProperty({ description: 'Reason for putting contacts on hold', maxLength: 255 })
+  @IsString()
+  @MaxLength(255)
+  reason: string
+}
+
+export class ResumeContactsDto extends ContactIdsDto {
+  @ApiPropertyOptional({ description: 'Optional reason for resuming contacts', maxLength: 255 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  reason?: string
 }

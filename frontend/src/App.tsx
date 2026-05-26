@@ -41,6 +41,7 @@ import {
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
+import { ON_HOLD_REASON_PRESETS, OnHoldDialog } from './components/OnHoldDialog'
 import { getRuntimeConfig } from './config/keycloak.config'
 import { useAuth } from './context/AuthContext'
 import logo from './icons/image.png'
@@ -187,6 +188,7 @@ const COLUMN_LABELS: Record<string, string> = {
   caseStatus: 'Case Status',
   legacyFile: 'Legacy File No.',
   cgwrks3: 'Set on Hold By',
+  holdReason: 'Reason',
   lastUpdated: 'Last Updated',
   lastUpdatedBy: 'Last Updated By',
   needsReview: 'Review',
@@ -346,6 +348,12 @@ function App() {
   const addToBatchMenuOpen = Boolean(addToBatchMenuAnchor)
   const [isRunningAutoBatch, setIsRunningAutoBatch] = useState(false)
   const [confirmAutoBatchDialogOpen, setConfirmAutoBatchDialogOpen] = useState(false)
+
+  // On Hold dialog state
+  const [onHoldDialogOpen, setOnHoldDialogOpen] = useState(false)
+  const [onHoldDialogMode, setOnHoldDialogMode] = useState<'hold' | 'resume'>('hold')
+  const [pendingHoldIds, setPendingHoldIds] = useState<number[]>([])
+  const [pendingResumeIds, setPendingResumeIds] = useState<number[]>([])
 
   // Last successful job runs state
   const [lastSuccessfulRuns, setLastSuccessfulRuns] = useState<LastSuccessfulRuns>({
@@ -557,6 +565,7 @@ function App() {
       caseStatus: 'caseStatus',
       legacyFile: 'legacyFileNumber',
       cgwrks3: 'holdBy',
+      holdReason: 'holdReason',
       lastUpdated: 'lastUpdatedAt',
       lastUpdatedBy: 'lastUpdatedBy',
     }),
@@ -684,6 +693,7 @@ function App() {
     caseStatus: [],
     legacyFile: [],
     cgwrks3: [],
+    holdReason: [],
     lastUpdated: [],
     lastUpdatedBy: [],
     needsReview: [],
@@ -1149,54 +1159,93 @@ function App() {
     logout()
   }
 
-  // Hold/Resume handler
+  // Hold/Resume handler - now shows dialog first
   const handleHoldResume = async () => {
     if (selected.length === 0) return
 
     // Check if eligibility job is running
     if (await checkAndHandleRunningEligibilityJob()) return
 
-    try {
-      // Separate selected contacts into hold and resume groups
-      const toHold: number[] = []
-      const toResume: number[] = []
+    // Separate selected contacts into hold and resume groups
+    const toHold: number[] = []
+    const toResume: number[] = []
 
-      selected.forEach((id) => {
-        // Check in contacts array from API
-        const contact = contacts.find((c) => c.id === id)
-        if (contact) {
-          if (contact.csaStatus === 'on_hold') {
-            toResume.push(id)
-          } else {
-            toHold.push(id)
-          }
+    selected.forEach((id) => {
+      const contact = contacts.find((c) => c.id === id)
+      if (contact) {
+        if (contact.csaStatus === 'on_hold') {
+          toResume.push(id)
+        } else {
+          toHold.push(id)
         }
-      })
+      }
+    })
 
+    // Store pending IDs and show appropriate dialog
+    setPendingHoldIds(toHold)
+    setPendingResumeIds(toResume)
+
+    if (toHold.length > 0) {
+      // Show hold dialog first (reason is required)
+      setOnHoldDialogMode('hold')
+      setOnHoldDialogOpen(true)
+    } else if (toResume.length > 0) {
+      // Only resume contacts selected, show resume dialog (reason is optional)
+      setOnHoldDialogMode('resume')
+      setOnHoldDialogOpen(true)
+    }
+  }
+
+  // Handle On Hold dialog close
+  const handleOnHoldDialogClose = () => {
+    setOnHoldDialogOpen(false)
+    setPendingHoldIds([])
+    setPendingResumeIds([])
+  }
+
+  // Handle On Hold dialog confirm
+  const handleOnHoldDialogConfirm = async (reason: string) => {
+    setOnHoldDialogOpen(false)
+
+    try {
       let totalSuccess = 0
       let totalSkipped = 0
       const skippedReasons: string[] = []
 
-      // Process hold requests
-      if (toHold.length > 0) {
-        const holdResponse = await holdContacts(toHold)
+      if (onHoldDialogMode === 'hold' && pendingHoldIds.length > 0) {
+        // Process hold requests with reason
+        const holdResponse = await holdContacts(pendingHoldIds, reason)
         totalSuccess += holdResponse.success.length
         totalSkipped += holdResponse.skipped.length
 
-        // Collect skip reasons
         holdResponse.skipped.forEach((skip) => {
           const reasonText = skip.reason.replace(/_/g, ' ')
           skippedReasons.push(`ID ${skip.id}: ${reasonText}`)
         })
-      }
 
-      // Process resume requests
-      if (toResume.length > 0) {
-        const resumeResponse = await resumeContacts(toResume)
+        // If there are also resume contacts, show resume dialog next
+        if (pendingResumeIds.length > 0) {
+          setOnHoldDialogMode('resume')
+          setOnHoldDialogOpen(true)
+          // Don't clear pendingResumeIds yet, keep for next dialog
+          setPendingHoldIds([])
+
+          // Show intermediate success message
+          if (totalSuccess > 0) {
+            setSnackbar({
+              open: true,
+              message: `${totalSuccess} contact(s) put on hold. Now processing resume...`,
+              severity: 'info',
+            })
+          }
+          return
+        }
+      } else if (onHoldDialogMode === 'resume' && pendingResumeIds.length > 0) {
+        // Process resume requests with optional reason
+        const resumeResponse = await resumeContacts(pendingResumeIds, reason || undefined)
         totalSuccess += resumeResponse.success.length
         totalSkipped += resumeResponse.skipped.length
 
-        // Collect skip reasons
         resumeResponse.skipped.forEach((skip) => {
           const reasonText = skip.reason.replace(/_/g, ' ')
           skippedReasons.push(`ID ${skip.id}: ${reasonText}`)
@@ -1218,13 +1267,14 @@ function App() {
         severity: totalSuccess > 0 ? 'success' : 'warning',
       })
 
-      // Clear selection
+      // Clear selection and pending IDs
       setSelected([])
       setSelectedRecordsCache(new Map())
+      setPendingHoldIds([])
+      setPendingResumeIds([])
 
       // Reload contacts to reflect the changes if at least one record was updated
       if (totalSuccess > 0) {
-        // Check if we're using API-based filters
         const apiFilters = [
           'All Records',
           'Pending User review/action',
@@ -1237,7 +1287,6 @@ function App() {
         ]
 
         if (apiFilters.includes(preDefinedFilter)) {
-          // Reload based on whether search is active
           if (isSearchActive && searchTerm.trim().length >= 3) {
             await performFullTextSearch(searchTerm.trim(), currentPage)
           } else {
@@ -1252,6 +1301,8 @@ function App() {
         message: 'Failed to process hold/resume request. Please try again.',
         severity: 'error',
       })
+      setPendingHoldIds([])
+      setPendingResumeIds([])
     }
   }
 
@@ -2309,6 +2360,7 @@ function App() {
       product: contact.product || '',
       isOver18: contact.isOver18 || false,
       cgwrks3: contact.holdBy || '',
+      holdReason: contact.holdReason || '',
       lastUpdated: contact.lastUpdatedAt ? formatDateTimeYMDHMS(contact.lastUpdatedAt) : '',
       lastUpdatedBy: contact.lastUpdatedBy || '',
       needsReview: contact.needsReview || false,
@@ -3447,6 +3499,30 @@ function App() {
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
+                              onClick={(e) => handleSortClick(e, 'holdReason')}
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              Reason
+                            </span>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleFilterClick(e, 'holdReason')}
+                              sx={{
+                                padding: 0.5,
+                                color:
+                                  activeColumnFilters['holdReason'] ||
+                                  columnFilters.holdReason?.length > 0
+                                    ? '#1976d2'
+                                    : 'inherit',
+                              }}
+                            >
+                              <FilterListIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <span
                               onClick={(e) => handleSortClick(e, 'needsReview')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
@@ -3564,6 +3640,7 @@ function App() {
                           <TableCell>{row.caseStatus}</TableCell>
                           <TableCell>{row.legacyFile}</TableCell>
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
+                          <TableCell>{row.holdReason || ''}</TableCell>
                           <TableCell align="center">
                             {row.needsReview && (
                               <Tooltip title="Click to clear review flag">
@@ -3768,6 +3845,56 @@ function App() {
                               }}
                             >
                               {option.label}
+                            </MenuItem>
+                          ))}
+                        </Box>
+                      </>
+                    ) : filterAnchor.column === 'holdReason' ? (
+                      <>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          placeholder="Search or type reason..."
+                          value={filterSearchTerm}
+                          onChange={(e) => setFilterSearchTerm(e.target.value)}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <Box component="span" sx={{ fontSize: '18px' }}>
+                                  🔍
+                                </Box>
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{ mb: 1 }}
+                        />
+                        <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                          {ON_HOLD_REASON_PRESETS.filter((reason) =>
+                            reason.toLowerCase().includes(filterSearchTerm.toLowerCase()),
+                          ).map((reason) => (
+                            <MenuItem
+                              key={reason}
+                              onClick={() => {
+                                const newFilters = {
+                                  ...activeColumnFilters,
+                                  holdReason: reason,
+                                }
+                                setActiveColumnFilters(newFilters)
+                                performColumnFiltersSearch(newFilters, 1)
+                                setCurrentPage(1)
+                                setIsColumnFilterActive(true)
+                                handleFilterClose()
+                              }}
+                              sx={{
+                                fontSize: '0.875rem',
+                                py: 0.75,
+                                backgroundColor:
+                                  activeColumnFilters['holdReason'] === reason
+                                    ? 'rgba(25, 118, 210, 0.08)'
+                                    : 'transparent',
+                              }}
+                            >
+                              {reason}
                             </MenuItem>
                           ))}
                         </Box>
@@ -6569,6 +6696,14 @@ function App() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* On Hold Dialog for entering reason */}
+      <OnHoldDialog
+        open={onHoldDialogOpen}
+        onClose={handleOnHoldDialogClose}
+        onConfirm={handleOnHoldDialogConfirm}
+        mode={onHoldDialogMode}
+      />
 
       {/* Snackbar for hold/resume feedback */}
       <Snackbar

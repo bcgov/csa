@@ -232,7 +232,7 @@ describe('step1B_CancellationCheck', () => {
       expect(result!.careEndDate).not.toBeNull() // Step 9 applies system date
     })
 
-    it('should NOT compute careEndDate when no cancellation triggered', () => {
+    it('should return null (continue chain) when no cancellation triggered, but stash computed careEndDate on ctx for downstream rules', () => {
       const ctx = makeCtx({
         deceased: null,
         orders: [
@@ -249,6 +249,8 @@ describe('step1B_CancellationCheck', () => {
       })
       const result = step1B_CancellationCheck.evaluate(ctx)
       expect(result).toBeNull()
+      expect(ctx.cancelReasonCode).toBeNull()
+      expect(ctx.careEndDate).toEqual(new Date('2025-06-15'))
     })
   })
 })

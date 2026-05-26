@@ -629,10 +629,11 @@ describe('buildLoadContactProfilesSql', () => {
     // Aggregation CTEs group by X_CONTACT_NUM (not CONTACT_ROW_ID)
     expect(sql).toContain('GROUP BY eligible_cases.X_CONTACT_NUM')
 
-    // Agg joins use X_CONTACT_NUM
+    // Agg joins use X_CONTACT_NUM; OOC loads agreements/orders by person id on agreement line
     expect(sql).toContain('icm_plc.X_CONTACT_NUM = cases.X_CONTACT_NUM')
     expect(sql).toContain('icm_ord.X_CONTACT_NUM = cases.X_CONTACT_NUM')
     expect(sql).toContain('icm_agr.X_CONTACT_NUM = cases.X_CONTACT_NUM')
+    expect(sql).toContain('icm_agr.X_CONTACT_NUM = eligible_cases.X_CONTACT_NUM')
 
     // No remaining CASE_ROW_ID joins in final SELECT
     expect(sql).not.toMatch(/LEFT JOIN.*CASE_ROW_ID = cases\.ROW_ID/)

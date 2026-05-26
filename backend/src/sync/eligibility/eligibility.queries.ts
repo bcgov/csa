@@ -50,12 +50,29 @@ const CHANGED_CONTACTS_CTE = `
 
       UNION
 
-      -- ICM: agreements with recent data changes
+      -- ICM: agreements with recent data changes (via placement)
       SELECT DISTINCT cases.X_CONTACT_NUM
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
       INNER JOIN stg_icm_agreement icm_agr ON icm_agr.ROW_ID = icm_plc.AGREEMENT_ROW_ID
       WHERE icm_agr.data_changed_at >= $1
+
+      UNION
+
+      -- ICM: agreements with recent data changes (via agreement line person id)
+      SELECT DISTINCT cases.X_CONTACT_NUM
+      FROM stg_icm_cases cases
+      INNER JOIN stg_icm_agreement icm_agr ON icm_agr.X_CONTACT_NUM = cases.X_CONTACT_NUM
+      WHERE icm_agr.data_changed_at >= $1
+
+      UNION
+
+      -- ICM: orders with recent data changes (via agreement person id, no placement)
+      SELECT DISTINCT cases.X_CONTACT_NUM
+      FROM stg_icm_cases cases
+      INNER JOIN stg_icm_agreement icm_agr ON icm_agr.X_CONTACT_NUM = cases.X_CONTACT_NUM
+      INNER JOIN stg_icm_orders icm_ord ON icm_ord.AGREEMENT_ROW_ID = icm_agr.ROW_ID
+      WHERE icm_ord.data_changed_at >= $1
 
       UNION
 
@@ -114,8 +131,8 @@ const CHANGED_CONTACTS_CTE = `
  *  - eligible_cases: all case rows from staging (filtered by change detection in incremental mode)
  *  - latest_legal_auth: most recent legal authority per person (DISTINCT ON X_CONTACT_NUM)
  *  - icm_placements_agg: active/interrupted/ended/closed ICM placements grouped by contact
- *  - icm_orders_agg: ICM orders grouped by contact (via placement -> agreement)
- *  - icm_agreements_agg: ICM agreements grouped by contact (via placement)
+ *  - icm_orders_agg: ICM orders grouped by contact (via placement or agreement X_CONTACT_NUM)
+ *  - icm_agreements_agg: ICM agreements grouped by contact (via placement or X_CONTACT_NUM)
  *  - mis_payments_agg: MIS payments grouped by contact (via contract -> placement -> PERSON_ID_MIS)
  *  - mis_contracts_agg: MIS contracts grouped by contact (via placement -> PERSON_ID_MIS)
  *  - mis_placements_agg: active/interrupted/ended/closed MIS placements grouped by contact (via PERSON_ID_MIS)
@@ -233,6 +250,24 @@ export function buildLoadContactProfilesSql(
         INNER JOIN stg_icm_placements icm_plc
           ON icm_ord.AGREEMENT_ROW_ID = icm_plc.AGREEMENT_ROW_ID
         INNER JOIN eligible_cases ON eligible_cases.ROW_ID = icm_plc.CASE_ROW_ID
+
+        UNION
+
+        SELECT DISTINCT
+          eligible_cases.X_CONTACT_NUM,
+          icm_ord.NAME,
+          icm_ord.STATUS_CD,
+          icm_ord.X_EFF_START_DT,
+          icm_ord.X_EFF_END_DT,
+          icm_ord.TOTAL_AMT,
+          icm_ord.X_PCMS_CONTRACT_NUM,
+          icm_ord.ORDER_NUM,
+          icm_ord.PRODUCT_NAME,
+          icm_ord.AGREEMENT_ROW_ID
+        FROM stg_icm_orders icm_ord
+        INNER JOIN stg_icm_agreement icm_agr ON icm_ord.AGREEMENT_ROW_ID = icm_agr.ROW_ID
+        INNER JOIN eligible_cases ON icm_agr.X_CONTACT_NUM = eligible_cases.X_CONTACT_NUM
+        WHERE icm_agr.X_CONTACT_NUM IS NOT NULL
       ) unique_orders
       GROUP BY X_CONTACT_NUM
     ),
@@ -247,7 +282,9 @@ export function buildLoadContactProfilesSql(
           'agreementStartDate', EFF_START_DT,
           'agreementEndDate', EFF_END_DT,
           'terminationDate', X_TERMINATION_DT,
-          'mcfdContract', X_PCMS_CONTRACT_NUM
+          'mcfdContract', X_PCMS_CONTRACT_NUM,
+          'serviceProviderName', NAME,
+          'providerId', OU_NUM
         )) AS data
       FROM (
         SELECT DISTINCT
@@ -258,11 +295,30 @@ export function buildLoadContactProfilesSql(
           icm_agr.EFF_START_DT,
           icm_agr.EFF_END_DT,
           icm_agr.X_TERMINATION_DT,
-          icm_agr.X_PCMS_CONTRACT_NUM
+          icm_agr.X_PCMS_CONTRACT_NUM,
+          icm_agr.NAME,
+          icm_agr.OU_NUM
         FROM stg_icm_agreement icm_agr
         INNER JOIN stg_icm_placements icm_plc
           ON icm_agr.ROW_ID = icm_plc.AGREEMENT_ROW_ID
         INNER JOIN eligible_cases ON eligible_cases.ROW_ID = icm_plc.CASE_ROW_ID
+
+        UNION
+
+        SELECT DISTINCT
+          eligible_cases.X_CONTACT_NUM,
+          icm_agr.ROW_ID,
+          icm_agr.AGREE_CD,
+          icm_agr.STAT_CD,
+          icm_agr.EFF_START_DT,
+          icm_agr.EFF_END_DT,
+          icm_agr.X_TERMINATION_DT,
+          icm_agr.X_PCMS_CONTRACT_NUM,
+          icm_agr.NAME,
+          icm_agr.OU_NUM
+        FROM stg_icm_agreement icm_agr
+        INNER JOIN eligible_cases ON icm_agr.X_CONTACT_NUM = eligible_cases.X_CONTACT_NUM
+        WHERE icm_agr.X_CONTACT_NUM IS NOT NULL
       ) unique_agreements
       GROUP BY X_CONTACT_NUM
     ),

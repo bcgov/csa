@@ -261,6 +261,11 @@ export const STG_LEGAL_AUTHORITY_MAP: FieldMapEntry[] = [
 ]
 
 export const STG_AGREEMENT_MAP: FieldMapEntry[] = [
+  {
+    sourceField: 'X_CONTACT_NUM',
+    sourceLabel: 'Key Player Contact Row Num',
+    masterField: 'person_id_icm',
+  },
   { sourceField: 'NAME', sourceLabel: 'Service Provider', masterField: 'service_provider_name' },
   { sourceField: 'OU_NUM', sourceLabel: 'Service Provider Id', masterField: 'provider_id' },
   {

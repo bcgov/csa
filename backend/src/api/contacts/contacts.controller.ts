@@ -141,8 +141,8 @@ export class ContactsController {
   }
 
   @Patch(':id/hold-reason')
-  @ApiResponse({ status: 200, description: 'Updated hold reason' })
-  @ApiResponse({ status: 400, description: 'Contact is not in ON_HOLD status' })
+  @ApiResponse({ status: 200, description: 'Updated or cleared hold reason' })
+  @ApiResponse({ status: 400, description: 'Reason required when contact is ON_HOLD' })
   @ApiResponse({ status: 404, description: 'Contact not found' })
   async updateHoldReason(
     @Param('id', ParseIntPipe) id: number,

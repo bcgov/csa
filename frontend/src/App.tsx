@@ -1217,6 +1217,36 @@ function App() {
     setOnHoldDialogOpen(true)
   }
 
+  // Handle clear hold reason icon click (for non-on-hold contacts)
+  const handleClearHoldReason = async (contactId: number, event: React.MouseEvent) => {
+    event.stopPropagation()
+
+    try {
+      const response = await updateHoldReason(contactId, '')
+      if (response.success) {
+        setSnackbar({
+          open: true,
+          message: 'Hold reason cleared successfully',
+          severity: 'success',
+        })
+
+        // Reload contacts to reflect the changes
+        if (isSearchActive && searchTerm.trim().length >= 3) {
+          await performFullTextSearch(searchTerm.trim(), currentPage)
+        } else {
+          await fetchContacts(currentPage)
+        }
+      }
+    } catch (error) {
+      console.error('Clear hold reason error:', error)
+      setSnackbar({
+        open: true,
+        message: 'Failed to clear hold reason. Please try again.',
+        severity: 'error',
+      })
+    }
+  }
+
   // Handle On Hold dialog confirm
   const handleOnHoldDialogConfirm = async (reason: string) => {
     setOnHoldDialogOpen(false)
@@ -3703,6 +3733,24 @@ function App() {
                                     }}
                                   >
                                     <EditIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                              {row.csaStatusRaw !== 'on_hold' && row.holdReason && (
+                                <Tooltip title="Clear hold reason">
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => handleClearHoldReason(row.id, e)}
+                                    sx={{
+                                      padding: 0.25,
+                                      color: '#9e9e9e',
+                                      '&:hover': {
+                                        backgroundColor: '#f5f5f5',
+                                        color: '#d32f2f',
+                                      },
+                                    }}
+                                  >
+                                    <CloseIcon sx={{ fontSize: 16 }} />
                                   </IconButton>
                                 </Tooltip>
                               )}

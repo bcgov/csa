@@ -3,11 +3,10 @@ import {
   ArrayMinSize,
   IsArray,
   IsIn,
-  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
-  MaxLength,
+  MaxLength
 } from 'class-validator'
 
 export class ContactIdsDto {
@@ -40,9 +39,13 @@ export class ResumeContactsDto extends ContactIdsDto {
 }
 
 export class UpdateHoldReasonDto {
-  @ApiProperty({ description: 'Reason for holding the contact', maxLength: 255 })
+  @ApiPropertyOptional({
+    description:
+      'Reason for holding the contact. Required when contact is ON_HOLD, optional otherwise to clear.',
+    maxLength: 255,
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: "'Reason' cannot be blank when the CSA Status is 'On Hold'." })
   @MaxLength(255)
-  reason: string
+  reason?: string
 }

@@ -282,13 +282,13 @@ export const resumeContacts = async (
 }
 
 /**
- * Update hold reason for a contact in ON_HOLD status
+ * Update or clear hold reason for a contact
  * @param contactId - Contact ID
- * @param reason - New hold reason (required, cannot be empty)
+ * @param reason - New hold reason (required when ON_HOLD, optional/empty to clear when not ON_HOLD)
  */
 export const updateHoldReason = async (
   contactId: number,
-  reason: string,
+  reason?: string,
 ): Promise<{ success: boolean; contact?: { id: number; holdReason: string } }> => {
   const response = await APIService.getAxiosInstance().patch(`/contacts/${contactId}/hold-reason`, {
     reason,

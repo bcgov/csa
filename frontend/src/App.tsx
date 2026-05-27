@@ -5437,6 +5437,44 @@ function App() {
                             }}
                             sx={{ width: '300px' }}
                           />
+                          <Tooltip title="Clear all filters and sorting" arrow>
+                            <span>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<FilterAltOffIcon />}
+                                disabled={
+                                  !batchHistorySearchTerm &&
+                                  !batchHistorySortConfig &&
+                                  Object.values(batchHistoryColumnFilters).every(
+                                    (arr) => arr.length === 0,
+                                  )
+                                }
+                                onClick={() => {
+                                  setBatchHistorySearchTerm('')
+                                  setBatchHistoryColumnFilters({
+                                    batchId: [],
+                                    batchDate: [],
+                                    batchRequestStatus: [],
+                                    transactionType: [],
+                                    batchDetailStatus: [],
+                                    systemComments: [],
+                                  })
+                                  setBatchHistorySortConfig(null)
+                                  setBatchHistoryPage(1)
+                                }}
+                                sx={{
+                                  textTransform: 'none',
+                                  minWidth: 'auto',
+                                  '&.Mui-disabled': {
+                                    opacity: 0.5,
+                                  },
+                                }}
+                              >
+                                Clear Filters
+                              </Button>
+                            </span>
+                          </Tooltip>
                           <Button
                             variant="contained"
                             size="small"
@@ -5735,33 +5773,74 @@ function App() {
                   <Typography variant="h6" sx={{ fontWeight: 500 }}>
                     Batch Requests
                   </Typography>
-                  <TextField
-                    size="small"
-                    placeholder="Search batch requests..."
-                    value={batchRequestsSearchTerm}
-                    onChange={(e) => setBatchRequestsSearchTerm(e.target.value)}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Box component="span" sx={{ fontSize: '18px' }}>
-                            🔍
-                          </Box>
-                        </InputAdornment>
-                      ),
-                      endAdornment: batchRequestsSearchTerm && (
-                        <InputAdornment position="end">
-                          <IconButton
-                            size="small"
-                            onClick={() => setBatchRequestsSearchTerm('')}
-                            edge="end"
-                          >
-                            <CloseIcon fontSize="small" />
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{ width: '300px' }}
-                  />
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <TextField
+                      size="small"
+                      placeholder="Search batch requests..."
+                      value={batchRequestsSearchTerm}
+                      onChange={(e) => setBatchRequestsSearchTerm(e.target.value)}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Box component="span" sx={{ fontSize: '18px' }}>
+                              🔍
+                            </Box>
+                          </InputAdornment>
+                        ),
+                        endAdornment: batchRequestsSearchTerm && (
+                          <InputAdornment position="end">
+                            <IconButton
+                              size="small"
+                              onClick={() => setBatchRequestsSearchTerm('')}
+                              edge="end"
+                            >
+                              <CloseIcon fontSize="small" />
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ width: '300px' }}
+                    />
+                    <Tooltip title="Clear all filters and sorting" arrow>
+                      <span>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<FilterAltOffIcon />}
+                          disabled={
+                            !batchRequestsSearchTerm &&
+                            !batchRequestsSortConfig &&
+                            Object.values(batchRequestsColumnFilters).every(
+                              (arr) => arr.length === 0,
+                            )
+                          }
+                          onClick={() => {
+                            setBatchRequestsSearchTerm('')
+                            setBatchRequestsColumnFilters({
+                              batchId: [],
+                              batchDate: [],
+                              status: [],
+                              recordCount: [],
+                              initiatedBy: [],
+                              createdDate: [],
+                              systemComments: [],
+                            })
+                            setBatchRequestsSortConfig(null)
+                            setBatchRequestsPage(1)
+                          }}
+                          sx={{
+                            textTransform: 'none',
+                            minWidth: 'auto',
+                            '&.Mui-disabled': {
+                              opacity: 0.5,
+                            },
+                          }}
+                        >
+                          Clear Filters
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  </Box>
                 </Box>
 
                 {/* Batch Requests Table */}
@@ -6019,6 +6098,47 @@ function App() {
                         }}
                         sx={{ width: '300px' }}
                       />
+                      <Tooltip title="Clear all filters and sorting" arrow>
+                        <span>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<FilterAltOffIcon />}
+                            disabled={
+                              !batchDetailsSearchTerm &&
+                              !batchDetailsSortConfig &&
+                              Object.values(batchDetailsColumnFilters).every(
+                                (arr) => arr.length === 0,
+                              )
+                            }
+                            onClick={() => {
+                              setBatchDetailsSearchTerm('')
+                              setBatchDetailsColumnFilters({
+                                lastName: [],
+                                middleName: [],
+                                givenName: [],
+                                caseNumber: [],
+                                transactionType: [],
+                                cancellationReason: [],
+                                status: [],
+                                systemComments: [],
+                                addedBy: [],
+                              })
+                              setBatchDetailsSortConfig(null)
+                              setBatchDetailsPage(1)
+                            }}
+                            sx={{
+                              textTransform: 'none',
+                              minWidth: 'auto',
+                              '&.Mui-disabled': {
+                                opacity: 0.5,
+                              },
+                            }}
+                          >
+                            Clear Filters
+                          </Button>
+                        </span>
+                      </Tooltip>
                       <Button
                         variant="contained"
                         size="small"

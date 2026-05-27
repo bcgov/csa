@@ -6,7 +6,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  MaxLength
+  MaxLength,
 } from 'class-validator'
 
 export class ContactIdsDto {

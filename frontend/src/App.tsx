@@ -3682,7 +3682,7 @@ function App() {
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <span>{row.holdReason || ''}</span>
-                              {row.csaStatusRaw === 'ON_HOLD' && (
+                              {row.csaStatusRaw === 'on_hold' && (
                                 <Tooltip title="Edit hold reason">
                                   <IconButton
                                     size="small"

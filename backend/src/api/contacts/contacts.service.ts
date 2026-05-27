@@ -422,7 +422,11 @@ export class ContactsService {
     }
   }
 
-  async holdContacts(contactIds: number[], userId: string): Promise<BulkOperationResponse> {
+  async holdContacts(
+    contactIds: number[],
+    userId: string,
+    reason: string,
+  ): Promise<BulkOperationResponse> {
     const result: BulkOperationResponse = {
       success: [],
       skipped: [],
@@ -432,31 +436,43 @@ export class ContactsService {
       const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.HOLD, 'USER', {
         userId,
         origin: 'ContactsService.holdContacts',
+        additionalData: { holdReason: reason },
       })
       if (transitionResult.success) {
         result.success.push(id)
       } else {
-        const reason =
+        const skipReason =
           transitionResult.reason === 'Contact not found'
             ? BULK_OPERATION_SKIP_REASONS.NOT_FOUND
             : BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION
-        result.skipped.push({ id, reason })
+        result.skipped.push({ id, reason: skipReason })
       }
     }
 
     return result
   }
 
-  async resumeContacts(contactIds: number[], userId: string): Promise<BulkOperationResponse> {
+  async resumeContacts(
+    contactIds: number[],
+    userId: string,
+    reason?: string,
+  ): Promise<BulkOperationResponse> {
     const result: BulkOperationResponse = {
       success: [],
       skipped: [],
     }
 
     for (const id of contactIds) {
+      const additionalData: Record<string, unknown> = {}
+      // If reason is provided (can be empty string to clear), update holdReason
+      if (reason !== undefined) {
+        additionalData.holdReason = reason || null
+      }
+
       const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.RESUME, 'USER', {
         userId,
         origin: 'ContactsService.resumeContacts',
+        additionalData: Object.keys(additionalData).length > 0 ? additionalData : undefined,
       })
       if (transitionResult.success) {
         // Clear the review flag when resuming from hold
@@ -466,15 +482,57 @@ export class ContactsService {
         })
         result.success.push(id)
       } else {
-        const reason =
+        const skipReason =
           transitionResult.reason === 'Contact not found'
             ? BULK_OPERATION_SKIP_REASONS.NOT_FOUND
             : BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION
-        result.skipped.push({ id, reason })
+        result.skipped.push({ id, reason: skipReason })
       }
     }
 
     return result
+  }
+
+  async updateHoldReason(
+    contactId: number,
+    reason: string | undefined,
+    userId: string,
+  ): Promise<{ success: boolean; contact?: { id: number; holdReason: string } }> {
+    const contact = await this.prisma.contact.findUnique({
+      where: { id: contactId },
+      select: { id: true, csaStatus: true },
+    })
+
+    if (!contact) {
+      throw new NotFoundException(`Contact with ID ${contactId} not found`)
+    }
+
+    const isOnHold = contact.csaStatus === CSA_STATUS.ON_HOLD
+    const hasReason = reason !== undefined && reason.trim() !== ''
+
+    // If contact is ON_HOLD, reason is required
+    if (isOnHold && !hasReason) {
+      throw new BadRequestException("'Reason' cannot be blank when the CSA Status is 'On Hold'.")
+    }
+
+    // If contact is NOT on hold and no reason provided, clear the reason
+    const newReason = hasReason ? reason!.trim() : null
+
+    const updated = await this.prisma.contact.update({
+      where: { id: contactId },
+      data: {
+        holdReason: newReason,
+        lastUpdatedBy: userId,
+        lastUpdatedAt: new Date(),
+        ...(isOnHold ? { holdBy: userId } : {}),
+      },
+      select: { id: true, holdReason: true },
+    })
+
+    const action = newReason ? 'updated' : 'cleared'
+    this.logger.log(`Hold reason ${action} for contact ${contactId} by ${userId}`)
+
+    return { success: true, contact: { id: updated.id, holdReason: updated.holdReason || '' } }
   }
 
   async updateEligibilityStatus(

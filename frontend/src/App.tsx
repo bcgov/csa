@@ -5887,7 +5887,7 @@ function App() {
                               onClick={(e) => handleBatchRequestsSortClick(e, 'status')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              Status
+                              Batch Status
                             </span>
                             <IconButton
                               size="small"
@@ -6341,7 +6341,7 @@ function App() {
                                 onClick={(e) => handleBatchDetailsSortClick(e, 'status')}
                                 style={{ cursor: 'pointer', userSelect: 'none' }}
                               >
-                                Status
+                                Record Status
                               </span>
                               <IconButton
                                 size="small"

@@ -41,7 +41,7 @@ import {
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
-import { ON_HOLD_REASON_PRESETS, OnHoldDialog } from './components/OnHoldDialog'
+import { OnHoldDialog } from './components/OnHoldDialog'
 import { getRuntimeConfig } from './config/keycloak.config'
 import { useAuth } from './context/AuthContext'
 import logo from './icons/image.png'
@@ -3854,9 +3854,22 @@ function App() {
                         <TextField
                           size="small"
                           fullWidth
-                          placeholder="Search or type reason..."
+                          placeholder="Type reason to filter..."
                           value={filterSearchTerm}
                           onChange={(e) => setFilterSearchTerm(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && filterSearchTerm.trim()) {
+                              const newFilters = {
+                                ...activeColumnFilters,
+                                holdReason: filterSearchTerm.trim(),
+                              }
+                              setActiveColumnFilters(newFilters)
+                              performColumnFiltersSearch(newFilters, 1)
+                              setCurrentPage(1)
+                              setIsColumnFilterActive(true)
+                              handleFilterClose()
+                            }
+                          }}
                           InputProps={{
                             startAdornment: (
                               <InputAdornment position="start">
@@ -3868,36 +3881,25 @@ function App() {
                           }}
                           sx={{ mb: 1 }}
                         />
-                        <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
-                          {ON_HOLD_REASON_PRESETS.filter((reason) =>
-                            reason.toLowerCase().includes(filterSearchTerm.toLowerCase()),
-                          ).map((reason) => (
-                            <MenuItem
-                              key={reason}
-                              onClick={() => {
-                                const newFilters = {
-                                  ...activeColumnFilters,
-                                  holdReason: reason,
-                                }
-                                setActiveColumnFilters(newFilters)
-                                performColumnFiltersSearch(newFilters, 1)
-                                setCurrentPage(1)
-                                setIsColumnFilterActive(true)
-                                handleFilterClose()
-                              }}
-                              sx={{
-                                fontSize: '0.875rem',
-                                py: 0.75,
-                                backgroundColor:
-                                  activeColumnFilters['holdReason'] === reason
-                                    ? 'rgba(25, 118, 210, 0.08)'
-                                    : 'transparent',
-                              }}
-                            >
-                              {reason}
-                            </MenuItem>
-                          ))}
-                        </Box>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          fullWidth
+                          disabled={!filterSearchTerm.trim()}
+                          onClick={() => {
+                            const newFilters = {
+                              ...activeColumnFilters,
+                              holdReason: filterSearchTerm.trim(),
+                            }
+                            setActiveColumnFilters(newFilters)
+                            performColumnFiltersSearch(newFilters, 1)
+                            setCurrentPage(1)
+                            setIsColumnFilterActive(true)
+                            handleFilterClose()
+                          }}
+                        >
+                          Apply Filter
+                        </Button>
                       </>
                     ) : filterAnchor.column === 'needsReview' ? (
                       <>

@@ -1,6 +1,5 @@
 import ClearIcon from '@mui/icons-material/Clear'
 import {
-  Autocomplete,
   Button,
   Dialog,
   DialogActions,
@@ -8,21 +7,10 @@ import {
   DialogContentText,
   DialogTitle,
   IconButton,
+  InputAdornment,
   TextField,
 } from '@mui/material'
 import { useState } from 'react'
-
-// Preset values for On Hold Reason
-export const ON_HOLD_REASON_PRESETS = [
-  'Pending additional documentation',
-  'Awaiting verification',
-  'Under investigation',
-  'Placement status unclear',
-  'Legal status pending',
-  'Case under review',
-  'Eligibility determination in progress',
-  'Other',
-] as const
 
 interface OnHoldDialogProps {
   open: boolean
@@ -84,53 +72,33 @@ export function OnHoldDialog({
         <DialogContentText id="on-hold-dialog-description" sx={{ mb: 2 }}>
           {description}
         </DialogContentText>
-        <Autocomplete
-          freeSolo
-          options={[...ON_HOLD_REASON_PRESETS]}
+        <TextField
+          label="Reason"
+          placeholder="Enter a reason"
+          fullWidth
+          required={isHoldMode}
           value={reason}
-          onChange={(_, newValue) => {
-            setReason(newValue || '')
-            setError('')
-          }}
-          onInputChange={(_, newInputValue) => {
-            setReason(newInputValue)
-            if (error && newInputValue.trim()) {
+          onChange={(e) => {
+            setReason(e.target.value)
+            if (error && e.target.value.trim()) {
               setError('')
             }
           }}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label="Reason"
-              placeholder="Select or type a reason"
-              fullWidth
-              required={isHoldMode}
-              error={!!error}
-              helperText={error || `${reason.length}/255 characters`}
-              inputProps={{
-                ...params.inputProps,
-                maxLength: 255,
-              }}
-              InputProps={{
-                ...params.InputProps,
-                endAdornment: (
-                  <>
-                    {reason && (
-                      <IconButton
-                        size="small"
-                        onClick={handleClear}
-                        sx={{ mr: -1 }}
-                        aria-label="Clear reason"
-                      >
-                        <ClearIcon fontSize="small" />
-                      </IconButton>
-                    )}
-                    {params.InputProps.endAdornment}
-                  </>
-                ),
-              }}
-            />
-          )}
+          error={!!error}
+          helperText={error || `${reason.length}/255 characters`}
+          inputProps={{
+            maxLength: 255,
+          }}
+          InputProps={{
+            endAdornment: reason ? (
+              <InputAdornment position="end">
+                <IconButton size="small" onClick={handleClear} aria-label="Clear reason">
+                  <ClearIcon fontSize="small" />
+                </IconButton>
+              </InputAdornment>
+            ) : null,
+          }}
+          autoFocus
         />
       </DialogContent>
       <DialogActions>

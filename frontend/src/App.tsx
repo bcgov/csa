@@ -96,9 +96,11 @@ const getEnvBackgroundColor = (env?: AppEnvironment): string => {
 // Valid CSA statuses for Hold/Resume button
 // Maps to backend CSA_STATUSES constants
 const VALID_CSA_STATUSES = [
+  'eligible', // Eligible
   'eligible_tbd', // Eligible - TBD
   'application_refused_cra', // Application Refused - CRA
   'cra_error_application', // CRA Error - Application
+  'not_eligible_in_pay', // Not Eligible - In Pay
   'not_eligible_ip_tbd', // Not Eligible - IP - TBD
   'cancellation_refused_cra', // Cancellation Refused - CRA
   'cra_error_cancellation', // CRA Error - Cancellation

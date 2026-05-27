@@ -282,6 +282,21 @@ export const resumeContacts = async (
 }
 
 /**
+ * Update hold reason for a contact in ON_HOLD status
+ * @param contactId - Contact ID
+ * @param reason - New hold reason (required, cannot be empty)
+ */
+export const updateHoldReason = async (
+  contactId: number,
+  reason: string,
+): Promise<{ success: boolean; contact?: { id: number; holdReason: string } }> => {
+  const response = await APIService.getAxiosInstance().patch(`/contacts/${contactId}/hold-reason`, {
+    reason,
+  })
+  return response.data
+}
+
+/**
  * Get batch history for a specific contact
  * @param contactId - Contact ID
  */

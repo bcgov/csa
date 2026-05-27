@@ -16,7 +16,7 @@ interface OnHoldDialogProps {
   open: boolean
   onClose: () => void
   onConfirm: (reason: string) => void
-  mode: 'hold' | 'resume'
+  mode: 'hold' | 'resume' | 'edit'
   initialReason?: string
 }
 
@@ -37,7 +37,8 @@ export function OnHoldDialog({
   }
 
   const handleConfirm = () => {
-    if (mode === 'hold' && !reason.trim()) {
+    // Both hold and edit modes require a reason
+    if ((mode === 'hold' || mode === 'edit') && !reason.trim()) {
       setError("'Reason' cannot be blank when the CSA Status is 'On Hold'.")
       return
     }
@@ -49,11 +50,25 @@ export function OnHoldDialog({
     setError('')
   }
 
-  const isHoldMode = mode === 'hold'
-  const title = isHoldMode ? 'On Hold Reason' : 'Resume - Update Reason (Optional)'
-  const description = isHoldMode
-    ? 'Please enter a reason for putting the selected contact(s) on hold. This field is required.'
-    : 'You may optionally update the reason. Leave blank to keep the existing reason, or enter a new reason to overwrite it.'
+  const isReasonRequired = mode === 'hold' || mode === 'edit'
+
+  // Set title and description based on mode
+  let title: string
+  let description: string
+
+  if (mode === 'hold') {
+    title = 'On Hold Reason'
+    description =
+      'Please enter a reason for putting the selected contact(s) on hold. This field is required.'
+  } else if (mode === 'edit') {
+    title = 'Edit On Hold Reason'
+    description =
+      'Update the reason for holding this contact. This field is required while the contact is On Hold.'
+  } else {
+    title = 'Resume - Update Reason (Optional)'
+    description =
+      'You may optionally update the reason. Leave blank to keep the existing reason, or enter a new reason to overwrite it.'
+  }
 
   return (
     <Dialog
@@ -76,7 +91,7 @@ export function OnHoldDialog({
           label="Reason"
           placeholder="Enter a reason"
           fullWidth
-          required={isHoldMode}
+          required={isReasonRequired}
           value={reason}
           onChange={(e) => {
             setReason(e.target.value)

@@ -493,6 +493,40 @@ export class ContactsService {
     return result
   }
 
+  async updateHoldReason(
+    contactId: number,
+    reason: string,
+    userId: string,
+  ): Promise<{ success: boolean; contact?: { id: number; holdReason: string } }> {
+    const contact = await this.prisma.contact.findUnique({
+      where: { id: contactId },
+      select: { id: true, csaStatus: true },
+    })
+
+    if (!contact) {
+      throw new NotFoundException(`Contact with ID ${contactId} not found`)
+    }
+
+    if (contact.csaStatus !== CSA_STATUS.ON_HOLD) {
+      throw new BadRequestException(
+        `Cannot update hold reason: Contact is not in ON_HOLD status (current status: ${contact.csaStatus})`,
+      )
+    }
+
+    const updated = await this.prisma.contact.update({
+      where: { id: contactId },
+      data: {
+        holdReason: reason,
+        holdBy: userId,
+      },
+      select: { id: true, holdReason: true },
+    })
+
+    this.logger.log(`Hold reason updated for contact ${contactId} by ${userId}`)
+
+    return { success: true, contact: { id: updated.id, holdReason: updated.holdReason || '' } }
+  }
+
   async updateEligibilityStatus(
     contactIds: number[],
     action: string,

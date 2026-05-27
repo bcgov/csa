@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsIn,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -36,4 +37,12 @@ export class ResumeContactsDto extends ContactIdsDto {
   @IsString()
   @MaxLength(255)
   reason?: string
+}
+
+export class UpdateHoldReasonDto {
+  @ApiProperty({ description: 'Reason for holding the contact', maxLength: 255 })
+  @IsString()
+  @IsNotEmpty({ message: "'Reason' cannot be blank when the CSA Status is 'On Hold'." })
+  @MaxLength(255)
+  reason: string
 }

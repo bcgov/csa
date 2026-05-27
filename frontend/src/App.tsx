@@ -1,6 +1,7 @@
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import CloseIcon from '@mui/icons-material/Close'
+import EditIcon from '@mui/icons-material/Edit'
 import FilterAltOffIcon from '@mui/icons-material/FilterAltOff'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
@@ -63,6 +64,7 @@ import {
   runEligibilityForAllWithPolling,
   runEligibilityForContact,
   updateEligibilityStatus,
+  updateHoldReason,
   updateNotEligibleStatusAlt,
   updateOver18Status,
   waitForEligibilityJobCompletion,
@@ -351,9 +353,11 @@ function App() {
 
   // On Hold dialog state
   const [onHoldDialogOpen, setOnHoldDialogOpen] = useState(false)
-  const [onHoldDialogMode, setOnHoldDialogMode] = useState<'hold' | 'resume'>('hold')
+  const [onHoldDialogMode, setOnHoldDialogMode] = useState<'hold' | 'resume' | 'edit'>('hold')
   const [pendingHoldIds, setPendingHoldIds] = useState<number[]>([])
   const [pendingResumeIds, setPendingResumeIds] = useState<number[]>([])
+  const [editingContactId, setEditingContactId] = useState<number | null>(null)
+  const [editingContactReason, setEditingContactReason] = useState<string>('')
 
   // Last successful job runs state
   const [lastSuccessfulRuns, setLastSuccessfulRuns] = useState<LastSuccessfulRuns>({
@@ -1201,6 +1205,16 @@ function App() {
     setOnHoldDialogOpen(false)
     setPendingHoldIds([])
     setPendingResumeIds([])
+    setEditingContactId(null)
+    setEditingContactReason('')
+  }
+
+  // Handle edit hold reason icon click
+  const handleEditHoldReason = (contactId: number, currentReason: string) => {
+    setEditingContactId(contactId)
+    setEditingContactReason(currentReason)
+    setOnHoldDialogMode('edit')
+    setOnHoldDialogOpen(true)
   }
 
   // Handle On Hold dialog confirm
@@ -1211,6 +1225,31 @@ function App() {
       let totalSuccess = 0
       let totalSkipped = 0
       const skippedReasons: string[] = []
+
+      // Handle edit mode
+      if (onHoldDialogMode === 'edit' && editingContactId !== null) {
+        const response = await updateHoldReason(editingContactId, reason)
+        if (response.success) {
+          setSnackbar({
+            open: true,
+            message: 'Hold reason updated successfully',
+            severity: 'success',
+          })
+
+          // Reload contacts to reflect the changes
+          await loadContacts(activeFilter)
+        } else {
+          setSnackbar({
+            open: true,
+            message: 'Failed to update hold reason',
+            severity: 'error',
+          })
+        }
+
+        setEditingContactId(null)
+        setEditingContactReason('')
+        return
+      }
 
       if (onHoldDialogMode === 'hold' && pendingHoldIds.length > 0) {
         // Process hold requests with reason
@@ -3640,7 +3679,31 @@ function App() {
                           <TableCell>{row.caseStatus}</TableCell>
                           <TableCell>{row.legacyFile}</TableCell>
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
-                          <TableCell>{row.holdReason || ''}</TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span>{row.holdReason || ''}</span>
+                              {row.csaStatusRaw === 'ON_HOLD' && (
+                                <Tooltip title="Edit hold reason">
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleEditHoldReason(row.id, row.holdReason || '')
+                                    }}
+                                    sx={{
+                                      padding: 0.25,
+                                      color: '#1976d2',
+                                      '&:hover': {
+                                        backgroundColor: '#e3f2fd',
+                                      },
+                                    }}
+                                  >
+                                    <EditIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                            </Box>
+                          </TableCell>
                           <TableCell align="center">
                             {row.needsReview && (
                               <Tooltip title="Click to clear review flag">
@@ -6705,6 +6768,7 @@ function App() {
         onClose={handleOnHoldDialogClose}
         onConfirm={handleOnHoldDialogConfirm}
         mode={onHoldDialogMode}
+        initialReason={onHoldDialogMode === 'edit' ? editingContactReason : ''}
       />
 
       {/* Snackbar for hold/resume feedback */}

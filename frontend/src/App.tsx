@@ -1237,7 +1237,11 @@ function App() {
           })
 
           // Reload contacts to reflect the changes
-          await loadContacts(activeFilter)
+          if (isSearchActive && searchTerm.trim().length >= 3) {
+            await performFullTextSearch(searchTerm.trim(), currentPage)
+          } else {
+            await fetchContacts(currentPage)
+          }
         } else {
           setSnackbar({
             open: true,

@@ -18,6 +18,7 @@ import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobRunner } from 'src/jobs/job-runner.service'
 import { JobsService } from 'src/jobs/jobs.service'
 import { OpenshiftJobLauncher } from 'src/jobs/openshift-job-launcher.service'
+import { CSAGuard } from '../common/guards/csa.guard'
 
 const PAGE_DEFAULT = 1
 const LIMIT_DEFAULT = 20
@@ -64,7 +65,7 @@ function toJobRunResponse(job: {
 
 @ApiTags('jobs')
 @Controller('jobs')
-// @UseGuards(CSAGuard) // TODO: Uncomment for production - temporarily disabled for testing
+@UseGuards(CSAGuard) // TODO: Uncomment for production - temporarily disabled for testing
 export class JobsController {
   private readonly logger = new Logger(JobsController.name)
 

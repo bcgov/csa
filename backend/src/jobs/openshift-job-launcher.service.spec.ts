@@ -1,7 +1,6 @@
 import { ConfigService } from '@nestjs/config'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import type * as k8s from '@kubernetes/client-node'
 import { JobType } from './enums/job-type.enum'
 import { OpenshiftJobLauncher } from './openshift-job-launcher.service'
 import { OPENSHIFT_CRONJOB_NAMES } from './openshift.constants'

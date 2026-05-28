@@ -1005,10 +1005,16 @@ function App() {
     const searchTimer = setTimeout(() => {
       if (searchTerm.trim().length >= 3) {
         performFullTextSearch(searchTerm.trim(), currentPage)
-      } else if (searchTerm.trim().length === 0 && !isColumnFilterActive) {
-        // If search is cleared and no column filter is active, go back to regular filter
+      } else if (searchTerm.trim().length === 0) {
+        // Search is cleared - check if column filters should be re-applied
         setIsSearchActive(false)
-        fetchContacts(currentPage)
+        if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+          // Re-apply the column filters that were active before global search
+          performColumnFiltersSearch(activeColumnFilters, currentPage)
+        } else {
+          // No column filters active, go back to regular filter
+          fetchContacts(currentPage)
+        }
       }
     }, 500)
 
@@ -1019,8 +1025,10 @@ function App() {
     preDefinedFilter,
     isAuthenticated,
     isColumnFilterActive,
+    activeColumnFilters,
     fetchContacts,
     performFullTextSearch,
+    performColumnFiltersSearch,
   ])
 
   // Column filter search effect - triggers when filterSearchTerm has enough characters

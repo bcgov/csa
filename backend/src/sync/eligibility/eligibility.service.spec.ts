@@ -667,12 +667,8 @@ describe('EligibilityService', () => {
 
     await service.runForContact('ICM-ELIG')
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('ICM-ELIG'),
-    )
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('BL-14B/14C skip'),
-    )
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('ICM-ELIG'))
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('BL-14B/14C skip'))
     warnSpy.mockRestore()
   })
 

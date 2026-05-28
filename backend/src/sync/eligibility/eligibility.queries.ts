@@ -388,6 +388,7 @@ export function buildLoadContactProfilesSql(
     legal_auth.START_DT          AS "effectiveDate",
     master_contacts.id               AS "existingContactId",
     master_contacts.last_updated_by   AS "lastUpdatedBy",
+    master_contacts.last_updated_at   AS "lastUpdatedAt",
     COALESCE(master_contacts.csa_status, ${ICM_STATUS_CASE}) AS "csaStatus",
     COALESCE(master_contacts.csa_status_effective_date, (cases.X_CSA_EFF_DATE::timestamp AT TIME ZONE 'America/Vancouver')) AS "csaStatusEffectiveDate",
     cases.PERSON_ID_MIS              AS "personIdMis",
@@ -438,6 +439,102 @@ export function buildLoadContactProfilesSql(
   }
 
   return { sql, params }
+}
+
+/**
+ * Returns whether eligibility source data in staging changed for a contact on or after `since`.
+ * Mirrors the change-detection arms in changed_contacts (BL-14B / BL-14C).
+ */
+export function buildContactHasStagingChangesSql(
+  personIdIcm: string,
+  since: Date,
+): {
+  sql: string
+  params: [Date, string]
+} {
+  const sql = `
+    SELECT EXISTS (
+      SELECT 1
+      FROM stg_icm_cases cases
+      WHERE cases.X_CONTACT_NUM = $2
+        AND cases.data_changed_at >= $1
+
+      UNION ALL
+
+      SELECT 1
+      FROM stg_icm_cases cases
+      INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
+      WHERE cases.X_CONTACT_NUM = $2
+        AND icm_plc.data_changed_at >= $1
+
+      UNION ALL
+
+      SELECT 1
+      FROM stg_icm_cases cases
+      INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
+      WHERE cases.X_CONTACT_NUM = $2
+        AND legal_auth.data_changed_at >= $1
+
+      UNION ALL
+
+      SELECT 1
+      FROM stg_icm_cases cases
+      INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
+      INNER JOIN stg_icm_legal_authority_admin legal_admin ON legal_admin.LGL_AUTH_CD = COALESCE(legal_auth.EFF_LGL_STATUS, legal_auth.LGL_AUTH_CD)
+      WHERE cases.X_CONTACT_NUM = $2
+        AND legal_admin.data_changed_at >= $1
+
+      UNION ALL
+
+      SELECT 1
+      FROM stg_icm_cases cases
+      INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
+      INNER JOIN stg_icm_orders icm_ord ON icm_ord.AGREEMENT_ROW_ID = icm_plc.AGREEMENT_ROW_ID
+      WHERE cases.X_CONTACT_NUM = $2
+        AND icm_ord.data_changed_at >= $1
+
+      UNION ALL
+
+      SELECT 1
+      FROM stg_icm_cases cases
+      INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
+      INNER JOIN stg_icm_agreement icm_agr ON icm_agr.ROW_ID = icm_plc.AGREEMENT_ROW_ID
+      WHERE cases.X_CONTACT_NUM = $2
+        AND icm_agr.data_changed_at >= $1
+
+      UNION ALL
+
+      SELECT 1
+      FROM stg_icm_cases cases
+      INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
+      WHERE cases.X_CONTACT_NUM = $2
+        AND mis_plc.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
+
+      UNION ALL
+
+      SELECT 1
+      FROM stg_icm_cases cases
+      INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
+      INNER JOIN stg_mis_contracts mis_con
+        ON mis_con.service_provider_id = mis_plc.service_provider_id
+        AND mis_con.contract_number = mis_plc.contract_number
+      WHERE cases.X_CONTACT_NUM = $2
+        AND mis_con.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
+
+      UNION ALL
+
+      SELECT 1
+      FROM stg_icm_cases cases
+      INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
+      INNER JOIN stg_mis_contracts mis_con
+        ON mis_con.service_provider_id = mis_plc.service_provider_id
+        AND mis_con.contract_number = mis_plc.contract_number
+      INNER JOIN stg_mis_payments mis_pay ON mis_pay.contract_number = mis_con.contract_number
+      WHERE cases.X_CONTACT_NUM = $2
+        AND mis_pay.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
+    ) AS "hasChanges"
+  `
+  return { sql, params: [since, personIdIcm] }
 }
 
 export function buildFindAgedOutContactIdsSql(cutoffDate: Date): {

@@ -28,6 +28,7 @@ export interface ContactProfile {
   csaStatusEffectiveDate: Date | null
   existingContactId: number | null
   lastUpdatedBy: string | null
+  lastUpdatedAt: Date | null
   din: string | null
   csaSentDate: Date | null
 

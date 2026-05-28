@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { AppLogger } from 'src/common/logger/app-logger'
+import { JobType } from 'src/jobs/enums/job-type.enum'
+import { JobsService } from 'src/jobs/jobs.service'
 import {
   getAgeCutoffDate,
   isEligibleAge,
@@ -15,7 +18,11 @@ import {
   PROTECTED_STATUSES_SQL,
 } from './eligibility.config'
 import { EligibilityInputError } from './eligibility.errors'
-import { buildFindAgedOutContactIdsSql, buildLoadContactProfilesSql } from './eligibility.queries'
+import {
+  buildContactHasStagingChangesSql,
+  buildFindAgedOutContactIdsSql,
+  buildLoadContactProfilesSql,
+} from './eligibility.queries'
 import {
   AgreementRecord,
   ContactProfile,
@@ -443,11 +450,19 @@ const UPSERT_SQL = `
      OR EXCLUDED.csa_status = contacts.csa_status
 `
 
+function isUserSetCsaStatus(lastUpdatedBy: string | null): boolean {
+  return !!lastUpdatedBy && lastUpdatedBy !== 'SYSTEM'
+}
+
 @Injectable()
 export class EligibilityService {
   private readonly logger = new AppLogger(EligibilityService.name)
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jobsService: JobsService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async validateStagingTables(): Promise<void> {
     const sql = REQUIRED_STAGING_TABLES.map(
@@ -530,18 +545,22 @@ export class EligibilityService {
         continue
       }
 
-      // User-set status: preserve unless overridden by system
-      if (profile.lastUpdatedBy && profile.lastUpdatedBy !== 'SYSTEM') {
-        updates.push({
-          profile,
-          result: {
-            newStatus: profile.csaStatus,
-            cancelReasonCode: profile.cancelReasonCode,
-            careEndDate: profile.careEndDate,
-          },
-        })
-        stats.userSetPreserved++
-        continue
+      // User-set status (BL-14B): skip when staging eligibility data is unchanged.
+      // Incremental runs only load changed contacts; full load checks since the user update.
+      if (isUserSetCsaStatus(profile.lastUpdatedBy)) {
+        const since = threshold ?? profile.lastUpdatedAt
+        const mustEvaluateAgeOut =
+          profile.dateOfBirth != null && !isEligibleAge(profile.dateOfBirth, referenceDate)
+        const includedForAgeOut = agedOutIds.includes(profile.personIdIcm)
+        if (
+          since &&
+          !mustEvaluateAgeOut &&
+          !includedForAgeOut &&
+          !(await this.hasStagingDataChanged(profile.personIdIcm, since))
+        ) {
+          stats.userSetPreserved++
+          continue
+        }
       }
 
       const result = runEligibility(profile, RULES, referenceDate)
@@ -573,6 +592,19 @@ export class EligibilityService {
     )
 
     return stats
+  }
+
+  private async computeEligibilityThreshold(): Promise<Date | null> {
+    const lastSuccess = await this.jobsService.getLastSuccessTimestamp(JobType.RUN_ELIGIBILITY)
+    if (!lastSuccess) return null
+    const lookbackDays = this.configService.get<number>('sync.eligibilityLookbackDays')!
+    return new Date(lastSuccess.getTime() - lookbackDays * 24 * 60 * 60 * 1000)
+  }
+
+  private async hasStagingDataChanged(personIdIcm: string, since: Date): Promise<boolean> {
+    const { sql, params } = buildContactHasStagingChangesSql(personIdIcm, since)
+    const rows = await this.prisma.$queryRawUnsafe<{ hasChanges: boolean }[]>(sql, ...params)
+    return rows[0]?.hasChanges === true
   }
 
   private async findAgedOutContactIds(referenceDate: Date): Promise<string[]> {
@@ -612,8 +644,27 @@ export class EligibilityService {
       return { previousStatus, newStatus: profile.csaStatus }
     }
 
-    // No user-set protection here: runForContact is the escape hatch
-    // for manually re-evaluating a contact's eligibility
+    // BL-14C: user-set status is kept unless staging eligibility data changed.
+    if (isUserSetCsaStatus(profile.lastUpdatedBy)) {
+      const threshold = await this.computeEligibilityThreshold()
+      const since = threshold ?? profile.lastUpdatedAt
+      const mustEvaluateAgeOut =
+        profile.dateOfBirth != null && !isEligibleAge(profile.dateOfBirth, referenceDate)
+      if (
+        since &&
+        !mustEvaluateAgeOut &&
+        !(await this.hasStagingDataChanged(personIdIcm, since))
+      ) {
+        this.logger.log(
+          `Skipping eligibility for ${personIdIcm}: user-set status, no staging data changes since ${since.toISOString()}`,
+        )
+        const status = previousStatus ?? profile.csaStatus
+        if (!status) {
+          throw new EligibilityInputError(`Contact ${personIdIcm} has no CSA status`)
+        }
+        return { previousStatus, newStatus: status }
+      }
+    }
 
     if (!profile.dateOfBirth) {
       throw new EligibilityInputError(`Contact ${personIdIcm} has no date of birth in staging`)
@@ -777,6 +828,7 @@ export class EligibilityService {
           : null,
         existingContactId: raw.existingContactId,
         lastUpdatedBy: raw.lastUpdatedBy ?? null,
+        lastUpdatedAt: raw.lastUpdatedAt ? new Date(raw.lastUpdatedAt) : null,
         din: raw.din ?? null,
         csaSentDate: raw.csaSentDate ? new Date(raw.csaSentDate) : null,
         misLegalAuthCode: raw.misLegalAuthCode,

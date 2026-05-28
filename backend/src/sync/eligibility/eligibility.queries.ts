@@ -7,86 +7,90 @@ const ICM_STATUS_CASE = `CASE UPPER(TRIM(cases.X_CSA_PAY_STATUS))\n${Object.entr
   .map(([code, label]) => `      WHEN '${label.toUpperCase()}' THEN '${code}'`)
   .join('\n')}\n      ELSE NULL\n    END`
 
-const CHANGED_CONTACTS_CTE = `
-    changed_contacts AS (
-      -- ICM: cases with recent data changes
-      SELECT DISTINCT cases.X_CONTACT_NUM
+/** Shared ICM/MIS arms for staging change detection ($1 = since timestamp). */
+function buildStagingDataChangedUnions(options: {
+  select: string
+  filterByPerson: boolean
+  unionAll?: boolean
+}): string {
+  const personFilter = options.filterByPerson ? 'AND cases.X_CONTACT_NUM = $2' : ''
+  const misSince = `($1 AT TIME ZONE 'America/Vancouver')::DATE`
+
+  const arms = [
+    `-- ICM: cases with recent data changes
+      SELECT ${options.select}
       FROM stg_icm_cases cases
-      WHERE cases.data_changed_at >= $1
+      WHERE cases.data_changed_at >= $1 ${personFilter}`,
 
-      UNION
-
-      -- ICM: placements with recent data changes
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- ICM: placements with recent data changes
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
-      WHERE icm_plc.data_changed_at >= $1
+      WHERE icm_plc.data_changed_at >= $1 ${personFilter}`,
 
-      UNION
-
-      -- ICM: legal authority with recent data changes (joins on CONTACT_ROW_ID)
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- ICM: legal authority with recent data changes (joins on CONTACT_ROW_ID)
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
-      WHERE legal_auth.data_changed_at >= $1
+      WHERE legal_auth.data_changed_at >= $1 ${personFilter}`,
 
-      UNION
-
-      -- ICM: legal authority admin with recent data changes (via legal authority on CONTACT_ROW_ID)
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- ICM: legal authority admin with recent data changes (via legal authority on CONTACT_ROW_ID)
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
       INNER JOIN stg_icm_legal_authority_admin legal_admin ON legal_admin.LGL_AUTH_CD = COALESCE(legal_auth.EFF_LGL_STATUS, legal_auth.LGL_AUTH_CD)
-      WHERE legal_admin.data_changed_at >= $1
+      WHERE legal_admin.data_changed_at >= $1 ${personFilter}`,
 
-      UNION
-
-      -- ICM: orders with recent data changes
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- ICM: orders with recent data changes
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
       INNER JOIN stg_icm_orders icm_ord ON icm_ord.AGREEMENT_ROW_ID = icm_plc.AGREEMENT_ROW_ID
-      WHERE icm_ord.data_changed_at >= $1
+      WHERE icm_ord.data_changed_at >= $1 ${personFilter}`,
 
-      UNION
-
-      -- ICM: agreements with recent data changes
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- ICM: agreements with recent data changes
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
       INNER JOIN stg_icm_agreement icm_agr ON icm_agr.ROW_ID = icm_plc.AGREEMENT_ROW_ID
-      WHERE icm_agr.data_changed_at >= $1
+      WHERE icm_agr.data_changed_at >= $1 ${personFilter}`,
 
-      UNION
-
-      -- MIS: placements with recent last_updated_date (via person_id_mis on cases)
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- MIS: placements with recent last_updated_date (via person_id_mis on cases)
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
-      WHERE mis_plc.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
+      WHERE mis_plc.last_updated_date::DATE >= ${misSince} ${personFilter}`,
 
-      UNION
-
-      -- MIS: contracts with recent last_updated_date (via contract_number on contracts, service_provider_id on placements)
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- MIS: contracts with recent last_updated_date (via contract_number on contracts, service_provider_id on placements)
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
       INNER JOIN stg_mis_contracts mis_con
         ON mis_con.service_provider_id = mis_plc.service_provider_id
         AND mis_con.contract_number = mis_plc.contract_number
-      WHERE mis_con.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
+      WHERE mis_con.last_updated_date::DATE >= ${misSince} ${personFilter}`,
 
-      UNION
-
-      -- MIS: payments with recent last_updated_date (via contract_number on contracts, service_provider_id on placements)
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- MIS: payments with recent last_updated_date (via contract_number on contracts, service_provider_id on placements)
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
       INNER JOIN stg_mis_contracts mis_con
         ON mis_con.service_provider_id = mis_plc.service_provider_id
         AND mis_con.contract_number = mis_plc.contract_number
       INNER JOIN stg_mis_payments mis_pay ON mis_pay.contract_number = mis_con.contract_number
-      WHERE mis_pay.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
+      WHERE mis_pay.last_updated_date::DATE >= ${misSince} ${personFilter}`,
+  ]
+
+  const union = options.unionAll ? 'UNION ALL' : 'UNION'
+  return arms.join(`\n\n      ${union}\n\n      `)
+}
+
+const CHANGED_CONTACTS_CTE = `
+    changed_contacts AS (
+      ${buildStagingDataChangedUnions({
+        select: 'DISTINCT cases.X_CONTACT_NUM',
+        filterByPerson: false,
+      })}
     ),`
 
 /**
@@ -388,7 +392,6 @@ export function buildLoadContactProfilesSql(
     legal_auth.START_DT          AS "effectiveDate",
     master_contacts.id               AS "existingContactId",
     master_contacts.last_updated_by   AS "lastUpdatedBy",
-    master_contacts.last_updated_at   AS "lastUpdatedAt",
     COALESCE(master_contacts.csa_status, ${ICM_STATUS_CASE}) AS "csaStatus",
     COALESCE(master_contacts.csa_status_effective_date, (cases.X_CSA_EFF_DATE::timestamp AT TIME ZONE 'America/Vancouver')) AS "csaStatusEffectiveDate",
     cases.PERSON_ID_MIS              AS "personIdMis",
@@ -452,86 +455,14 @@ export function buildContactHasStagingChangesSql(
   sql: string
   params: [Date, string]
 } {
+  const unions = buildStagingDataChangedUnions({
+    select: '1',
+    filterByPerson: true,
+    unionAll: true,
+  })
   const sql = `
     SELECT EXISTS (
-      SELECT 1
-      FROM stg_icm_cases cases
-      WHERE cases.X_CONTACT_NUM = $2
-        AND cases.data_changed_at >= $1
-
-      UNION ALL
-
-      SELECT 1
-      FROM stg_icm_cases cases
-      INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
-      WHERE cases.X_CONTACT_NUM = $2
-        AND icm_plc.data_changed_at >= $1
-
-      UNION ALL
-
-      SELECT 1
-      FROM stg_icm_cases cases
-      INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
-      WHERE cases.X_CONTACT_NUM = $2
-        AND legal_auth.data_changed_at >= $1
-
-      UNION ALL
-
-      SELECT 1
-      FROM stg_icm_cases cases
-      INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
-      INNER JOIN stg_icm_legal_authority_admin legal_admin ON legal_admin.LGL_AUTH_CD = COALESCE(legal_auth.EFF_LGL_STATUS, legal_auth.LGL_AUTH_CD)
-      WHERE cases.X_CONTACT_NUM = $2
-        AND legal_admin.data_changed_at >= $1
-
-      UNION ALL
-
-      SELECT 1
-      FROM stg_icm_cases cases
-      INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
-      INNER JOIN stg_icm_orders icm_ord ON icm_ord.AGREEMENT_ROW_ID = icm_plc.AGREEMENT_ROW_ID
-      WHERE cases.X_CONTACT_NUM = $2
-        AND icm_ord.data_changed_at >= $1
-
-      UNION ALL
-
-      SELECT 1
-      FROM stg_icm_cases cases
-      INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
-      INNER JOIN stg_icm_agreement icm_agr ON icm_agr.ROW_ID = icm_plc.AGREEMENT_ROW_ID
-      WHERE cases.X_CONTACT_NUM = $2
-        AND icm_agr.data_changed_at >= $1
-
-      UNION ALL
-
-      SELECT 1
-      FROM stg_icm_cases cases
-      INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
-      WHERE cases.X_CONTACT_NUM = $2
-        AND mis_plc.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
-
-      UNION ALL
-
-      SELECT 1
-      FROM stg_icm_cases cases
-      INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
-      INNER JOIN stg_mis_contracts mis_con
-        ON mis_con.service_provider_id = mis_plc.service_provider_id
-        AND mis_con.contract_number = mis_plc.contract_number
-      WHERE cases.X_CONTACT_NUM = $2
-        AND mis_con.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
-
-      UNION ALL
-
-      SELECT 1
-      FROM stg_icm_cases cases
-      INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
-      INNER JOIN stg_mis_contracts mis_con
-        ON mis_con.service_provider_id = mis_plc.service_provider_id
-        AND mis_con.contract_number = mis_plc.contract_number
-      INNER JOIN stg_mis_payments mis_pay ON mis_pay.contract_number = mis_con.contract_number
-      WHERE cases.X_CONTACT_NUM = $2
-        AND mis_pay.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
+      ${unions}
     ) AS "hasChanges"
   `
   return { sql, params: [since, personIdIcm] }

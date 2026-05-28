@@ -522,11 +522,14 @@ export class EligibilityService {
         continue
       }
 
-      // Protected statuses: preserve existing csa_status, still upsert data
+      // Protected statuses: preserve csa_status; upsert only when staging eligibility data changed.
       if (
         profile.csaStatus &&
         (PROTECTED_STATUSES as readonly string[]).includes(profile.csaStatus)
       ) {
+        if (await this.shouldSkipUpsertForUnchangedStaging(profile)) {
+          continue
+        }
         updates.push({
           profile,
           result: {
@@ -538,18 +541,16 @@ export class EligibilityService {
         continue
       }
 
-      // User-set status (BL-14B): skip when staging eligibility data is unchanged.
-      // Incremental runs only load changed contacts; full load checks since the user update.
+      // User-set status (BL-14B): skip rules and upsert when staging eligibility data is unchanged.
       if (isUserSetCsaStatus(profile.lastUpdatedBy)) {
-        const since = profile.csaStatusEffectiveDate
-        const mustEvaluateAgeOut =
-          profile.dateOfBirth != null && !isEligibleAge(profile.dateOfBirth, referenceDate)
-        const includedForAgeOut = agedOutIds.includes(profile.personIdIcm)
+        if (!profile.csaStatusEffectiveDate) {
+          this.warnUserSetWithoutEffectiveDate(profile)
+        }
         if (
-          since &&
-          !mustEvaluateAgeOut &&
-          !includedForAgeOut &&
-          !(await this.hasStagingDataChanged(profile.personIdIcm, since))
+          await this.shouldSkipUpsertForUnchangedStaging(profile, {
+            referenceDate,
+            agedOutIds,
+          })
         ) {
           stats.userSetPreserved++
           continue
@@ -558,6 +559,17 @@ export class EligibilityService {
 
       const result = runEligibility(profile, RULES, referenceDate)
       if (!result) continue
+
+      if (
+        result.newStatus === profile.csaStatus &&
+        (await this.shouldSkipUpsertForUnchangedStaging(profile, {
+          referenceDate,
+          agedOutIds,
+        }))
+      ) {
+        stats.stepCounts.noChange++
+        continue
+      }
 
       updates.push({ profile, result })
 
@@ -585,6 +597,42 @@ export class EligibilityService {
     )
 
     return stats
+  }
+
+  private warnUserSetWithoutEffectiveDate(profile: ContactProfile): void {
+    this.logger.warn(
+      `User-set CSA status for ${profile.personIdIcm} (last_updated_by=${profile.lastUpdatedBy}) but no csa_status_effective_date on master or ICM; running eligibility without BL-14B/14C skip`,
+    )
+  }
+
+  /**
+   * Skip upsert when staging eligibility data is unchanged since csa_status_effective_date.
+   * Age-out contacts are still processed when referenceDate/agedOutIds are provided.
+   */
+  private async shouldSkipUpsertForUnchangedStaging(
+    profile: ContactProfile,
+    options?: { referenceDate?: Date; agedOutIds?: string[] },
+  ): Promise<boolean> {
+    const since = profile.csaStatusEffectiveDate
+    if (!since) {
+      return false
+    }
+
+    if (options?.referenceDate && profile.dateOfBirth != null) {
+      const mustEvaluateAgeOut = !isEligibleAge(profile.dateOfBirth, options.referenceDate)
+      const includedForAgeOut = options.agedOutIds?.includes(profile.personIdIcm) ?? false
+      if (mustEvaluateAgeOut || includedForAgeOut) {
+        return false
+      }
+    }
+
+    const unchanged = !(await this.hasStagingDataChanged(profile.personIdIcm, since))
+    if (unchanged) {
+      this.logger.log(
+        `Skipping upsert for ${profile.personIdIcm}: no staging data changes since ${since.toISOString()}`,
+      )
+    }
+    return unchanged
   }
 
   private async hasStagingDataChanged(personIdIcm: string, since: Date): Promise<boolean> {
@@ -617,6 +665,9 @@ export class EligibilityService {
       profile.csaStatus &&
       (PROTECTED_STATUSES as readonly string[]).includes(profile.csaStatus)
     ) {
+      if (await this.shouldSkipUpsertForUnchangedStaging(profile)) {
+        return { previousStatus, newStatus: profile.csaStatus }
+      }
       await this.upsertContacts([
         {
           profile,
@@ -632,17 +683,10 @@ export class EligibilityService {
 
     // BL-14C: user-set status is kept unless staging eligibility data changed.
     if (isUserSetCsaStatus(profile.lastUpdatedBy)) {
-      const since = profile.csaStatusEffectiveDate
-      const mustEvaluateAgeOut =
-        profile.dateOfBirth != null && !isEligibleAge(profile.dateOfBirth, referenceDate)
-      if (
-        since &&
-        !mustEvaluateAgeOut &&
-        !(await this.hasStagingDataChanged(personIdIcm, since))
-      ) {
-        this.logger.log(
-          `Skipping eligibility for ${personIdIcm}: user-set status, no staging data changes since ${since.toISOString()}`,
-        )
+      if (!profile.csaStatusEffectiveDate) {
+        this.warnUserSetWithoutEffectiveDate(profile)
+      }
+      if (await this.shouldSkipUpsertForUnchangedStaging(profile, { referenceDate })) {
         const status = previousStatus ?? profile.csaStatus
         if (!status) {
           throw new EligibilityInputError(`Contact ${personIdIcm} has no CSA status`)
@@ -658,6 +702,17 @@ export class EligibilityService {
     const result = runEligibility(profile, RULES, referenceDate)
     if (!result) {
       throw new EligibilityInputError(`No eligibility result for contact ${personIdIcm}`)
+    }
+
+    const resolvedStatus = result.newStatus ?? previousStatus ?? profile.csaStatus
+    if (
+      result.newStatus === profile.csaStatus &&
+      (await this.shouldSkipUpsertForUnchangedStaging(profile, { referenceDate }))
+    ) {
+      if (!resolvedStatus) {
+        throw new EligibilityInputError(`Contact ${personIdIcm} has no CSA status`)
+      }
+      return { previousStatus, newStatus: resolvedStatus }
     }
 
     await this.upsertContacts([{ profile, result }])
@@ -813,7 +868,6 @@ export class EligibilityService {
           : null,
         existingContactId: raw.existingContactId,
         lastUpdatedBy: raw.lastUpdatedBy ?? null,
-        lastUpdatedAt: raw.lastUpdatedAt ? new Date(raw.lastUpdatedAt) : null,
         din: raw.din ?? null,
         csaSentDate: raw.csaSentDate ? new Date(raw.csaSentDate) : null,
         misLegalAuthCode: raw.misLegalAuthCode,

@@ -587,26 +587,6 @@ describe('EligibilityService', () => {
     expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
   })
 
-  it('should run runForContact when last_updated_by is user but CSA status was not user-set', async () => {
-    mockPrisma.$queryRawUnsafe
-      .mockReset()
-      .mockResolvedValueOnce([
-        makeEligibleContact({
-          csaStatus: 'not_eligible_in_pay',
-          existingContactId: 99,
-          lastUpdatedBy: 'fin.user',
-          lastUpdatedAt: new Date('2026-05-07T12:00:00Z'),
-          csaStatusEffectiveDate: new Date('2026-04-01T10:00:00Z'),
-        }),
-      ])
-
-    const result = await service.runForContact('ICM-ELIG')
-
-    expect(result.previousStatus).toBe('not_eligible_in_pay')
-    expect(result.newStatus).toBe('in_pay')
-    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
-  })
-
   it.each([
     { csaStatus: 'eligible_tbd', label: 'eligible_tbd' },
     { csaStatus: 'not_eligible_in_pay', label: 'not_eligible_in_pay' },

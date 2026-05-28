@@ -522,8 +522,6 @@ export class ContactsService {
       where: { id: contactId },
       data: {
         holdReason: newReason,
-        lastUpdatedBy: userId,
-        lastUpdatedAt: new Date(),
         ...(isOnHold ? { holdBy: userId } : {}),
       },
       select: { id: true, holdReason: true },
@@ -818,12 +816,10 @@ export class ContactsService {
 
     await this.prisma.contact.update({
       where: { id: contactId },
-      data: {
-        needsReview: false,
-        lastUpdatedBy: userId,
-        lastUpdatedAt: new Date(),
-      },
+      data: { needsReview: false },
     })
+
+    this.logger.log(`Review flag cleared for contact ${contactId} by ${userId}`)
 
     return { success: true }
   }

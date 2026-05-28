@@ -447,20 +447,8 @@ const UPSERT_SQL = `
      OR EXCLUDED.csa_status = contacts.csa_status
 `
 
-/** User CSA status updates set last_updated_at and csa_status_effective_date together. */
-const USER_STATUS_UPDATE_TOLERANCE_MS = 60_000
-
-function isUserSetCsaStatus(profile: ContactProfile): boolean {
-  if (!profile.lastUpdatedBy || profile.lastUpdatedBy === 'SYSTEM') {
-    return false
-  }
-  if (!profile.csaStatusEffectiveDate || !profile.lastUpdatedAt) {
-    return false
-  }
-  const delta = Math.abs(
-    profile.lastUpdatedAt.getTime() - profile.csaStatusEffectiveDate.getTime(),
-  )
-  return delta <= USER_STATUS_UPDATE_TOLERANCE_MS
+function isUserSetCsaStatus(lastUpdatedBy: string | null): boolean {
+  return !!lastUpdatedBy && lastUpdatedBy !== 'SYSTEM'
 }
 
 @Injectable()
@@ -552,7 +540,7 @@ export class EligibilityService {
 
       // User-set status (BL-14B): skip when staging eligibility data is unchanged.
       // Incremental runs only load changed contacts; full load checks since the user update.
-      if (isUserSetCsaStatus(profile)) {
+      if (isUserSetCsaStatus(profile.lastUpdatedBy)) {
         const since = profile.csaStatusEffectiveDate
         const mustEvaluateAgeOut =
           profile.dateOfBirth != null && !isEligibleAge(profile.dateOfBirth, referenceDate)
@@ -643,7 +631,7 @@ export class EligibilityService {
     }
 
     // BL-14C: user-set status is kept unless staging eligibility data changed.
-    if (isUserSetCsaStatus(profile)) {
+    if (isUserSetCsaStatus(profile.lastUpdatedBy)) {
       const since = profile.csaStatusEffectiveDate
       const mustEvaluateAgeOut =
         profile.dateOfBirth != null && !isEligibleAge(profile.dateOfBirth, referenceDate)

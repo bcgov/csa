@@ -1,8 +1,6 @@
-import { ConfigService } from '@nestjs/config'
 import { Test, TestingModule } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { pacificToday } from 'src/common/utils'
-import { JobsService } from 'src/jobs/jobs.service'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PROTECTED_STATUSES, PROTECTED_STATUSES_SQL } from './eligibility.config'
 import { buildFindAgedOutContactIdsSql, buildLoadContactProfilesSql } from './eligibility.queries'
@@ -27,8 +25,6 @@ describe('EligibilityService', () => {
     $queryRawUnsafe: ReturnType<typeof vi.fn>
     $executeRawUnsafe: ReturnType<typeof vi.fn>
   }
-  let mockJobsService: { getLastSuccessTimestamp: ReturnType<typeof vi.fn> }
-
   const allTablesPopulated = [
     'stg_icm_cases',
     'stg_icm_placements',
@@ -46,17 +42,8 @@ describe('EligibilityService', () => {
       $queryRawUnsafe: vi.fn().mockResolvedValueOnce(allTablesPopulated).mockResolvedValue([]),
       $executeRawUnsafe: vi.fn().mockResolvedValue(0),
     }
-    mockJobsService = {
-      getLastSuccessTimestamp: vi.fn().mockResolvedValue(null),
-    }
-
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        EligibilityService,
-        { provide: PrismaService, useValue: mockPrisma },
-        { provide: JobsService, useValue: mockJobsService },
-        { provide: ConfigService, useValue: { get: vi.fn().mockReturnValue(7) } },
-      ],
+      providers: [EligibilityService, { provide: PrismaService, useValue: mockPrisma }],
     }).compile()
 
     service = module.get<EligibilityService>(EligibilityService)
@@ -494,6 +481,7 @@ describe('EligibilityService', () => {
   })
 
   it('should skip user-set contact on full load when staging data unchanged since user update', async () => {
+    const userSetAt = new Date('2026-05-06T10:00:00Z')
     mockPrisma.$queryRawUnsafe
       .mockReset()
       .mockResolvedValueOnce(allTablesPopulated)
@@ -502,7 +490,8 @@ describe('EligibilityService', () => {
           csaStatus: 'not_eligible_out_of_pay',
           existingContactId: 99,
           lastUpdatedBy: 'john.doe',
-          lastUpdatedAt: new Date('2026-05-06T10:00:00Z'),
+          lastUpdatedAt: userSetAt,
+          csaStatusEffectiveDate: userSetAt,
         }),
       ])
       .mockResolvedValueOnce([{ hasChanges: false }])
@@ -555,6 +544,7 @@ describe('EligibilityService', () => {
   })
 
   it('should skip runForContact when user-set and staging data unchanged', async () => {
+    const userSetAt = new Date('2026-05-06T10:00:00Z')
     mockPrisma.$queryRawUnsafe
       .mockReset()
       .mockResolvedValueOnce([
@@ -562,7 +552,8 @@ describe('EligibilityService', () => {
           csaStatus: 'not_eligible_out_of_pay',
           existingContactId: 99,
           lastUpdatedBy: 'jane.doe',
-          lastUpdatedAt: new Date('2026-05-06T10:00:00Z'),
+          lastUpdatedAt: userSetAt,
+          csaStatusEffectiveDate: userSetAt,
         }),
       ])
       .mockResolvedValueOnce([{ hasChanges: false }])
@@ -575,6 +566,7 @@ describe('EligibilityService', () => {
   })
 
   it('should recalculate runForContact when user-set but staging data changed', async () => {
+    const userSetAt = new Date('2026-05-06T10:00:00Z')
     mockPrisma.$queryRawUnsafe
       .mockReset()
       .mockResolvedValueOnce([
@@ -582,17 +574,36 @@ describe('EligibilityService', () => {
           csaStatus: 'not_eligible_out_of_pay',
           existingContactId: 99,
           lastUpdatedBy: 'jane.doe',
-          lastUpdatedAt: new Date('2026-05-06T10:00:00Z'),
+          lastUpdatedAt: userSetAt,
+          csaStatusEffectiveDate: userSetAt,
         }),
       ])
       .mockResolvedValueOnce([{ hasChanges: true }])
-
-    mockJobsService.getLastSuccessTimestamp.mockResolvedValue(new Date('2026-05-01T00:00:00Z'))
 
     const result = await service.runForContact('ICM-ELIG')
 
     expect(result.previousStatus).toBe('not_eligible_out_of_pay')
     expect(result.newStatus).toBe('eligible')
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
+  })
+
+  it('should run runForContact when last_updated_by is user but CSA status was not user-set', async () => {
+    mockPrisma.$queryRawUnsafe
+      .mockReset()
+      .mockResolvedValueOnce([
+        makeEligibleContact({
+          csaStatus: 'not_eligible_in_pay',
+          existingContactId: 99,
+          lastUpdatedBy: 'fin.user',
+          lastUpdatedAt: new Date('2026-05-07T12:00:00Z'),
+          csaStatusEffectiveDate: new Date('2026-04-01T10:00:00Z'),
+        }),
+      ])
+
+    const result = await service.runForContact('ICM-ELIG')
+
+    expect(result.previousStatus).toBe('not_eligible_in_pay')
+    expect(result.newStatus).toBe('in_pay')
     expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
   })
 

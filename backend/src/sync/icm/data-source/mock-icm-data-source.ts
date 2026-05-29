@@ -22,8 +22,9 @@ export class MockIcmDataSource extends IcmDataSource {
     const items: IcmApiRecord[] = parsed?.items ?? []
 
     if (!lastUpdated) {
-      this.logger.log(`Loaded ${items.length} mock records for ${config.name}`)
-      return items
+      const records = config.transformItems ? config.transformItems(items) : items
+      this.logger.log(`Loaded ${records.length} mock records for ${config.name}`)
+      return records
     }
 
     const labels = Array.isArray(config.cursorLabel) ? config.cursorLabel : [config.cursorLabel]
@@ -39,10 +40,12 @@ export class MockIcmDataSource extends IcmDataSource {
       return cursorDates.some((d) => d > lastUpdated)
     })
 
+    const records = config.transformItems ? config.transformItems(filtered) : filtered
+
     this.logger.log(
-      `Loaded ${filtered.length}/${items.length} mock records for ${config.name} (after ${lastUpdated.toISOString()})`,
+      `Loaded ${records.length}/${items.length} mock records for ${config.name} (after ${lastUpdated.toISOString()})`,
     )
-    return filtered
+    return records
   }
 
   async updateContacts(contacts: IcmContactUpdatePayload[]): Promise<void> {

@@ -423,7 +423,7 @@ describe('selectPrimaryRecords', () => {
         source: 'ICM',
         rowId: 'AGR-OOC',
         agreementStatus: 'Active',
-        agreementType: 'OOC-AGR',
+        agreementType: 'Out of Care',
       })
 
       const result = selectPrimaryRecords(
@@ -437,7 +437,7 @@ describe('selectPrimaryRecords', () => {
 
       expect(result.primaryPlacement).toBeNull()
       expect(result.primaryAgreement!.rowId).toBe('AGR-OOC')
-      expect(result.primaryAgreement!.agreementType).toBe('OOC-AGR')
+      expect(result.primaryAgreement!.agreementType).toBe('Out of Care')
       expect(result.primaryOrder).toBeNull()
     })
 
@@ -446,6 +446,7 @@ describe('selectPrimaryRecords', () => {
         source: 'ICM',
         rowId: 'AGR-OOC',
         agreementStatus: 'Active',
+        agreementType: 'Out of Care',
       })
       const closedOrder = makeOrder({
         source: 'ICM',
@@ -470,17 +471,47 @@ describe('selectPrimaryRecords', () => {
       expect(result.primaryOrder!.product).toBe('Monthly Rate')
     })
 
-    it('returns blank details when no active ICM agreement exists', () => {
-      const inactiveAgreement = makeAgreement({
+    it('returns latest end date OOC agreement when no active agreement exists', () => {
+      const olderAgreement = makeAgreement({
         source: 'ICM',
-        rowId: 'AGR-ENDED',
-        agreementStatus: 'Ended',
+        rowId: 'AGR-OLD',
+        agreementStatus: 'Inactive',
+        agreementType: 'Out of Care',
+        agreementEndDate: new Date('2026-01-01T00:00:00Z'),
+      })
+      const newerAgreement = makeAgreement({
+        source: 'ICM',
+        rowId: 'AGR-NEW',
+        agreementStatus: 'Inactive',
+        agreementType: 'Out of Care',
+        agreementEndDate: new Date('2026-06-01T00:00:00Z'),
       })
 
       const result = selectPrimaryRecords(
         makeProfile({
           misLegalAuthCode: 'OPT',
-          agreements: [inactiveAgreement],
+          agreements: [olderAgreement, newerAgreement],
+        }),
+        referenceDate,
+      )
+
+      expect(result.primaryPlacement).toBeNull()
+      expect(result.primaryAgreement!.rowId).toBe('AGR-NEW')
+      expect(result.primaryOrder).toBeNull()
+    })
+
+    it('returns blank agreement when no Out of Care agreements exist', () => {
+      const fchAgreement = makeAgreement({
+        source: 'ICM',
+        rowId: 'AGR-FCH',
+        agreementStatus: 'Active',
+        agreementType: 'FCH',
+      })
+
+      const result = selectPrimaryRecords(
+        makeProfile({
+          misLegalAuthCode: 'OPT',
+          agreements: [fchAgreement],
         }),
         referenceDate,
       )
@@ -495,6 +526,7 @@ describe('selectPrimaryRecords', () => {
         source: 'ICM',
         rowId: 'AGR-OOC',
         agreementStatus: 'Active',
+        agreementType: 'Out of Care',
       })
 
       const result = selectPrimaryRecords(
@@ -511,6 +543,7 @@ describe('selectPrimaryRecords', () => {
         source: 'ICM',
         rowId: 'AGR-OOC',
         agreementStatus: 'Active',
+        agreementType: 'Out of Care',
       })
       const currentMonthOrder = makeOrder({
         source: 'ICM',

@@ -1,0 +1,27 @@
+{
+  "items": [
+    {
+      "Id": "AGR-c1d94e55",
+      "Updated": "05/26/2026 10:00:00",
+      "Agreement Type": "Out of Care",
+      "Agreement Status": "Active",
+      "AgreementLines": [
+        { "Id": "LINE-a11f8820", "ICM Person ID": "KP-mock-44001" },
+        { "Id": "LINE-b22e9931", "ICM Person ID": "KP-mock-44001" }
+      ]
+    },
+    {
+      "Id": "AGR-d2e05f66",
+      "Updated": "05/20/2026 10:00:00",
+      "Agreement Type": "Out of Care",
+      "Agreement Status": "Inactive",
+      "AgreementLines": [{ "Id": "LINE-c33f0a42", "ICM Person ID": "KP-mock-55002" }]
+    },
+    {
+      "Id": "AGR-e3f16a77",
+      "Updated": "05/26/2026 10:00:00",
+      "Agreement Type": "Out of Care",
+      "Agreement Status": "Active"
+    }
+  ]
+}

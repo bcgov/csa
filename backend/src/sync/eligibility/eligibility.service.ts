@@ -43,6 +43,7 @@ const REQUIRED_STAGING_TABLES = [
   'stg_icm_legal_authority_admin',
   'stg_icm_legal_authority',
   'stg_icm_agreement',
+  'stg_icm_agreement_line',
   'stg_icm_orders',
   'stg_mis_payments',
   'stg_mis_contracts',
@@ -127,7 +128,7 @@ function selectOocPrimaryRecords(
   primaryOrder: OrderRecord | null
   primaryAgreement: AgreementRecord | null
 } {
-  const primaryAgreement = findActiveIcmAgreement(profile.agreements)
+  const primaryAgreement = selectOocPrimaryAgreement(profile.agreements)
   const primaryOrder =
     primaryAgreement?.rowId != null
       ? findClosedIcmOrderPreviousMonth(profile.orders, primaryAgreement.rowId, referenceDate)
@@ -136,12 +137,22 @@ function selectOocPrimaryRecords(
   return { primaryPlacement: null, primaryOrder, primaryAgreement }
 }
 
-function findActiveIcmAgreement(agreements: AgreementRecord[]): AgreementRecord | null {
-  return (
-    agreements.find(
-      (agreement) =>
-        agreement.source === 'ICM' && normalize(agreement.agreementStatus) === 'ACTIVE',
-    ) ?? null
+function selectOocPrimaryAgreement(agreements: AgreementRecord[]): AgreementRecord | null {
+  const oocAgreements = agreements.filter(
+    (agreement) =>
+      agreement.source === 'ICM' && normalize(agreement.agreementType) === 'OUT OF CARE',
+  )
+
+  const active = oocAgreements.find(
+    (agreement) => normalize(agreement.agreementStatus) === 'ACTIVE',
+  )
+  if (active) return active
+
+  const withEndDate = oocAgreements.filter((agreement) => agreement.agreementEndDate != null)
+  if (withEndDate.length === 0) return null
+
+  return withEndDate.reduce((latest, current) =>
+    current.agreementEndDate!.getTime() > latest.agreementEndDate!.getTime() ? current : latest,
   )
 }
 

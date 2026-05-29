@@ -261,11 +261,6 @@ export const STG_LEGAL_AUTHORITY_MAP: FieldMapEntry[] = [
 ]
 
 export const STG_AGREEMENT_MAP: FieldMapEntry[] = [
-  {
-    sourceField: 'X_CONTACT_NUM',
-    sourceLabel: 'Key Player Contact Row Num',
-    masterField: 'person_id_icm',
-  },
   { sourceField: 'NAME', sourceLabel: 'Service Provider', masterField: 'service_provider_name' },
   { sourceField: 'OU_NUM', sourceLabel: 'Service Provider Id', masterField: 'provider_id' },
   {
@@ -299,6 +294,17 @@ export const STG_AGREEMENT_MAP: FieldMapEntry[] = [
     sourceLabel: 'Updated',
     masterField: 'last_upd_dt_agreement',
     dbType: 'timestamp',
+    excludeFromChangeDetection: true,
+  },
+]
+
+export const STG_AGREEMENT_LINE_MAP: FieldMapEntry[] = [
+  { sourceField: 'ROW_ID', sourceLabel: 'Id' },
+  { sourceField: 'AGREEMENT_ROW_ID', sourceLabel: 'Agreement Id' },
+  { sourceField: 'X_CONTACT_NUM', sourceLabel: 'ICM Person ID' },
+  {
+    sourceField: 'LAST_UPD',
+    sourceLabel: 'Updated',
     excludeFromChangeDetection: true,
   },
 ]

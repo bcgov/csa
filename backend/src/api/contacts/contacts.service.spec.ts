@@ -684,7 +684,7 @@ describe('ContactsService', () => {
       )
       const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
-      const result = await service.holdContacts([1, 2], 'user1')
+      const result = await service.holdContacts([1, 2], 'user1', 'Test reason')
 
       expect(result.success).toEqual([1, 2])
       expect(result.skipped).toEqual([])
@@ -700,7 +700,7 @@ describe('ContactsService', () => {
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
-      const result = await service.holdContacts([1, 999], 'user1')
+      const result = await service.holdContacts([1, 999], 'user1', 'Test reason')
 
       expect(result.success).toEqual([1])
       expect(result.skipped).toEqual([{ id: 999, reason: 'not_found' }])
@@ -719,7 +719,7 @@ describe('ContactsService', () => {
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
-      const result = await service.holdContacts([1, 2], 'user1')
+      const result = await service.holdContacts([1, 2], 'user1', 'Test reason')
 
       expect(result.success).toEqual([1])
       expect(result.skipped).toEqual([{ id: 2, reason: 'invalid_transition' }])
@@ -740,7 +740,7 @@ describe('ContactsService', () => {
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
-      const result = await service.holdContacts([1, 2, 3, 999], 'user1')
+      const result = await service.holdContacts([1, 2, 3, 999], 'user1', 'Test reason')
 
       expect(result.success).toEqual([1])
       expect(result.skipped).toEqual([
@@ -1434,6 +1434,50 @@ describe('ContactsService', () => {
 
       await expect(service.findContactBatches(999)).rejects.toThrow(NotFoundException)
       await expect(service.findContactBatches(999)).rejects.toThrow('Contact 999 not found')
+    })
+  })
+
+  describe('updateHoldReason', () => {
+    it('should update hold reason without updating last_updated audit fields', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'on_hold',
+      } as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({
+        id: 1,
+        holdReason: 'Reason text',
+      } as any)
+
+      await service.updateHoldReason(1, 'Reason text', 'fin.user')
+
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            holdReason: 'Reason text',
+            holdBy: 'fin.user',
+          }),
+        }),
+      )
+      const updateData = updateSpy.mock.calls[0][0].data as Record<string, unknown>
+      expect(updateData).not.toHaveProperty('lastUpdatedBy')
+      expect(updateData).not.toHaveProperty('lastUpdatedAt')
+    })
+  })
+
+  describe('clearReviewFlag', () => {
+    it('should clear needsReview without updating last_updated audit fields', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        needsReview: true,
+      } as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      await service.clearReviewFlag(1, 'fin.user')
+
+      expect(updateSpy).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { needsReview: false },
+      })
     })
   })
 

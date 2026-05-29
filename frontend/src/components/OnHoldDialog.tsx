@@ -91,6 +91,9 @@ export function OnHoldDialog({
           label="Reason"
           placeholder="Enter a reason"
           fullWidth
+          multiline
+          minRows={3}
+          maxRows={6}
           required={isReasonRequired}
           value={reason}
           onChange={(e) => {

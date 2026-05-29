@@ -1,8 +1,9 @@
+import { ConfigService } from '@nestjs/config'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import { beforeEach, describe, expect, it } from 'vitest'
 import { AdminService } from 'src/api/admin/admin.service'
 import { JwtVerificationService } from 'src/common/auth/jwt-verification.service'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { CSA_STATUS } from './constants'
 import { StateMachineController } from './state-machine.controller'
 
@@ -15,6 +16,7 @@ describe('StateMachineController', () => {
       providers: [
         { provide: AdminService, useValue: {} },
         { provide: JwtVerificationService, useValue: {} },
+        { provide: ConfigService, useValue: { get: () => undefined } },
       ],
     }).compile()
 

@@ -73,6 +73,7 @@ export interface Contact {
   isOver18?: boolean
   // Hold fields
   holdBy?: string
+  holdReason?: string
   // Review flag for On Hold records with staging data changes
   needsReview?: boolean
 }
@@ -251,10 +252,15 @@ export interface BatchContactDetail {
 /**
  * Put contacts on hold
  * @param contactIds - Array of contact IDs to put on hold
+ * @param reason - Required reason for putting contacts on hold
  */
-export const holdContacts = async (contactIds: number[]): Promise<BulkOperationResponse> => {
+export const holdContacts = async (
+  contactIds: number[],
+  reason: string,
+): Promise<BulkOperationResponse> => {
   const response = await APIService.getAxiosInstance().post('/contacts/hold', {
     contactIds,
+    reason,
   })
   return response.data
 }
@@ -262,10 +268,30 @@ export const holdContacts = async (contactIds: number[]): Promise<BulkOperationR
 /**
  * Resume contacts from hold
  * @param contactIds - Array of contact IDs to resume
+ * @param reason - Optional reason for resuming (overwrites previous reason)
  */
-export const resumeContacts = async (contactIds: number[]): Promise<BulkOperationResponse> => {
+export const resumeContacts = async (
+  contactIds: number[],
+  reason?: string,
+): Promise<BulkOperationResponse> => {
   const response = await APIService.getAxiosInstance().post('/contacts/resume', {
     contactIds,
+    reason,
+  })
+  return response.data
+}
+
+/**
+ * Update or clear hold reason for a contact
+ * @param contactId - Contact ID
+ * @param reason - New hold reason (required when ON_HOLD, optional/empty to clear when not ON_HOLD)
+ */
+export const updateHoldReason = async (
+  contactId: number,
+  reason?: string,
+): Promise<{ success: boolean; contact?: { id: number; holdReason: string } }> => {
+  const response = await APIService.getAxiosInstance().patch(`/contacts/${contactId}/hold-reason`, {
+    reason,
   })
   return response.data
 }

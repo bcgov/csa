@@ -1,6 +1,7 @@
 import type Keycloak from 'keycloak-js'
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { getRuntimeConfig, initializeKeycloak } from '../config/keycloak.config'
+import { generateMockToken, isLocalMode, MOCK_USER } from '../config/mock-auth'
 import { verifyCSAAccess } from '../service/admin-service'
 
 interface AuthContextType {
@@ -32,14 +33,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [csaAccessAlert, setCsaAccessAlert] = useState<string | null>(null)
   const [user, setUser] = useState<AuthContextType['user']>(null)
   const [keycloak, setKeycloak] = useState<Keycloak | null>(null)
+  const [mockToken, setMockToken] = useState<string | undefined>(undefined)
 
   const clearCsaAccessAlert = useCallback(() => {
     setCsaAccessAlert(null)
   }, [])
 
   useEffect(() => {
-    // Initialize Keycloak with runtime config
+    // Initialize authentication
     const initAuth = async () => {
+      // Check if running in local mode - bypass SSO completely
+      if (isLocalMode()) {
+        console.log('Running in LOCAL mode - bypassing SSO authentication')
+        const token = generateMockToken()
+        setMockToken(token)
+        sessionStorage.setItem('authToken', token)
+        setIsAuthenticated(true)
+        setHasCSAAccess(true)
+        setUser({
+          name: MOCK_USER.name,
+          email: MOCK_USER.email,
+          username: MOCK_USER.username,
+          idirUsername: MOCK_USER.idirUsername,
+          roles: MOCK_USER.roles,
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // Standard Keycloak/SSO authentication flow
       try {
         const keycloakInstance = await initializeKeycloak()
         setKeycloak(keycloakInstance)
@@ -169,6 +191,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [])
 
   const login = () => {
+    // In local mode, just set authenticated
+    if (isLocalMode()) {
+      const token = generateMockToken()
+      setMockToken(token)
+      sessionStorage.setItem('authToken', token)
+      setIsAuthenticated(true)
+      setHasCSAAccess(true)
+      setUser({
+        name: MOCK_USER.name,
+        email: MOCK_USER.email,
+        username: MOCK_USER.username,
+        idirUsername: MOCK_USER.idirUsername,
+        roles: MOCK_USER.roles,
+      })
+      return
+    }
     // Clear access denied flag to allow retry
     sessionStorage.removeItem('csaAccessDenied')
     keycloak?.login()
@@ -176,6 +214,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     sessionStorage.removeItem('authToken')
+    // In local mode, just clear state
+    if (isLocalMode()) {
+      setMockToken(undefined)
+      setIsAuthenticated(false)
+      setHasCSAAccess(null)
+      setUser(null)
+      return
+    }
     keycloak?.logout({
       redirectUri: window.location.origin,
     })
@@ -193,7 +239,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         login,
         logout,
-        token: keycloak?.token,
+        token: mockToken || keycloak?.token,
       }}
     >
       {children}

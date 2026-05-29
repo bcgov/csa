@@ -1,34 +1,38 @@
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [
-    TanStackRouterVite({
-      target: 'react',
-      autoCodeSplitting: true,
-    }),
-    react(),
-  ],
-  server: {
-    port: parseInt(process.env.PORT),
-    fs: {
-      // Allow serving files from one level up to the project root
-      allow: ['..'],
-    },
-    proxy: {
-      // Proxy API requests to the backend
-      '/api': {
-        target: process.env.BACKEND_URL || 'http://localhost:3001',
-        changeOrigin: true,
+export default defineConfig(({ mode }) => {
+  // Load env file based on mode
+  const env = loadEnv(mode, process.cwd(), '')
+
+  return {
+    plugins: [
+      TanStackRouterVite({
+        target: 'react',
+        autoCodeSplitting: true,
+      }),
+      react(),
+    ],
+    server: {
+      port: parseInt(env.PORT || '5173'),
+      fs: {
+        // Allow serving files from one level up to the project root
+        allow: ['..'],
+      },
+      proxy: {
+        // Proxy API requests to the backend
+        '/api': {
+          target: env.BACKEND_URL || 'http://localhost:3000',
+          changeOrigin: true,
+        },
       },
     },
-  },
-  resolve: {
-    // https://vitejs.dev/config/shared-options.html#resolve-alias
-    alias: {
+    resolve: {
+      // https://vitejs.dev/config/shared-options.html#resolve-alias
+      alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '~': fileURLToPath(new URL('./node_modules', import.meta.url)),
       '~bootstrap': fileURLToPath(
@@ -74,4 +78,5 @@ export default defineConfig({
       },
     },
   },
+  }
 })

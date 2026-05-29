@@ -1,8 +1,35 @@
 import Keycloak from 'keycloak-js'
 import type { RuntimeConfig } from '../types/runtime-config'
+import { isLocalMode } from './mock-auth'
+
+/**
+ * Get local development runtime config from Vite env variables
+ * Used when VITE_APP_ENV=LOCAL to avoid fetching /config.json
+ */
+function getLocalRuntimeConfig(): RuntimeConfig {
+  const config: RuntimeConfig = {
+    VITE_KEYCLOAK_URL: '', // Not needed in local mode
+    VITE_KEYCLOAK_REALM: '', // Not needed in local mode
+    VITE_KEYCLOAK_CLIENT_ID: '', // Not needed in local mode
+    VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL || '/api',
+    VITE_APP_REDIRECT: window.location.origin + '/',
+    VITE_APP_ENV: 'LOCAL',
+  }
+
+  // Cache the config
+  window.__RUNTIME_CONFIG__ = config
+  console.log('Using local development runtime configuration')
+
+  return config
+}
 
 // Load runtime configuration from /config.json served by the container
 async function loadRuntimeConfig(): Promise<RuntimeConfig> {
+  // In local mode, use Vite env variables instead of /config.json
+  if (isLocalMode()) {
+    return getLocalRuntimeConfig()
+  }
+
   try {
     const response = await fetch('/config.json')
     if (!response.ok) {
@@ -54,7 +81,17 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
 
 // Get runtime config (use cached version if available)
 function getRuntimeConfig(): RuntimeConfig | null {
-  return window.__RUNTIME_CONFIG__ || null
+  // If cached, return it
+  if (window.__RUNTIME_CONFIG__) {
+    return window.__RUNTIME_CONFIG__
+  }
+
+  // In local mode, initialize and return local config
+  if (isLocalMode()) {
+    return getLocalRuntimeConfig()
+  }
+
+  return null
 }
 
 // Initialize Keycloak with runtime configuration

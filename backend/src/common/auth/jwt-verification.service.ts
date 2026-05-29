@@ -6,13 +6,28 @@ import jwksClient from 'jwks-rsa'
 /**
  * Service for verifying JWT signatures using JWKS (JSON Web Key Set)
  * Fetches public keys from the SSO Keycloak server to verify frontend tokens
+ *
+ * When SKIP_SSO_VERIFICATION=true (local development), token signatures are not verified
+ * but the token is still decoded to extract user information.
  */
 @Injectable()
 export class JwtVerificationService {
   private readonly logger = new Logger(JwtVerificationService.name)
-  private readonly jwksClient: jwksClient.JwksClient
+  private readonly jwksClient: jwksClient.JwksClient | null = null
+  private readonly skipVerification: boolean
 
   constructor(private readonly configService: ConfigService) {
+    const nodeEnv = this.configService.get<string>('NODE_ENV')
+    this.skipVerification = nodeEnv === 'local'
+
+    if (this.skipVerification) {
+      this.logger.warn(
+        '⚠️  SSO verification is DISABLED (NODE_ENV=local). ' +
+          'This should only be used for local development!',
+      )
+      return
+    }
+
     const jwksUri = this.configService.get<string>('admin.ssoKeycloakJwksUrl')
 
     if (!jwksUri) {
@@ -37,6 +52,11 @@ export class JwtVerificationService {
    * @throws UnauthorizedException if verification fails
    */
   async verifyToken(token: string): Promise<jwt.JwtPayload> {
+    // In local development mode, skip signature verification
+    if (this.skipVerification) {
+      return this.decodeTokenWithoutVerification(token)
+    }
+
     try {
       // First decode the header to get the key ID (kid)
       const decodedHeader = jwt.decode(token, { complete: true })
@@ -79,9 +99,42 @@ export class JwtVerificationService {
   }
 
   /**
+   * Decode token without signature verification (for local development only)
+   * Still validates token structure and expiration
+   */
+  private decodeTokenWithoutVerification(token: string): jwt.JwtPayload {
+    try {
+      const decoded = jwt.decode(token, { complete: true })
+
+      if (!decoded || typeof decoded === 'string') {
+        throw new UnauthorizedException('Invalid token: Unable to decode')
+      }
+
+      const payload = decoded.payload as jwt.JwtPayload
+
+      // Check expiration even in local mode
+      if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+        throw new UnauthorizedException('Token has expired. Please login again.')
+      }
+
+      this.logger.debug('Token decoded without verification (local development mode)')
+      return payload
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error
+      }
+      this.logger.error(`Token decode error: ${error}`)
+      throw new UnauthorizedException('Invalid token format')
+    }
+  }
+
+  /**
    * Get the signing key for a given key ID
    */
   private async getSigningKey(kid: string): Promise<string> {
+    if (!this.jwksClient) {
+      throw new Error('JWKS client not initialized - SSO verification is disabled')
+    }
     try {
       const key = await this.jwksClient.getSigningKey(kid)
       return key.getPublicKey()

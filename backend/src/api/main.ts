@@ -1,6 +1,7 @@
-import type { NestExpressApplication } from '@nestjs/platform-express'
-import { bootstrap } from './app'
 import { Logger } from '@nestjs/common'
+import type { NestExpressApplication } from '@nestjs/platform-express'
+import 'dotenv/config'
+import { bootstrap } from './app'
 const logger = new Logger('NestApplication')
 bootstrap()
   .then(async (app: NestExpressApplication) => {

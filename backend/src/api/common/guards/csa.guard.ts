@@ -5,6 +5,7 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { Reflector } from '@nestjs/core'
 import { Request } from 'express'
 import { JwtVerificationService } from 'src/common/auth/jwt-verification.service'
@@ -31,16 +32,23 @@ export const SKIP_CSA_CHECK_KEY = 'skipCSACheck'
 /**
  * Guard that validates JWT token and verifies CSA access via ICM
  * Uses caching to avoid hitting ICM on every request
+ *
+ * When SKIP_SSO_VERIFICATION=true (local development), token verification is skipped
+ * and CSA access check is bypassed.
  */
 @Injectable()
 export class CSAGuard implements CanActivate {
   private readonly logger = new Logger(CSAGuard.name)
+  private readonly skipSsoVerification: boolean
 
   constructor(
     private readonly adminService: AdminService,
     private readonly reflector: Reflector,
     private readonly jwtVerificationService: JwtVerificationService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.skipSsoVerification = this.configService.get<string>('NODE_ENV') === 'local'
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // Check if route is marked to skip CSA check
@@ -73,6 +81,12 @@ export class CSAGuard implements CanActivate {
 
     // If skipCSACheck is set, only validate token (don't check ICM)
     if (skipCSACheck) {
+      return true
+    }
+
+    // In local development mode, skip ICM CSA access verification
+    if (this.skipSsoVerification) {
+      this.logger.debug(`Skipping CSA access verification for user: ${username} (local mode)`)
       return true
     }
 

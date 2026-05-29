@@ -1,6 +1,8 @@
 import { registerAs } from '@nestjs/config'
 
 export const adminConfig = registerAs('admin', () => {
+  const isLocalMode = process.env.NODE_ENV === 'local'
+
   const icmApiUrl = process.env.ICM_API_URL?.replace(/\/Employee\/?$/, '')
   const icmTrustedUsername = process.env.ICM_TRUSTED_USERNAME
   const icmUsername = process.env.ICM_API_USERNAME
@@ -16,23 +18,26 @@ export const adminConfig = registerAs('admin', () => {
       ? `${ssoKeycloakUrl.replace(/\/$/, '')}/realms/${ssoKeycloakRealm}/protocol/openid-connect/certs`
       : undefined
 
-  if (!icmApiUrl) {
-    throw new Error('ICM_API_URL is required')
-  }
-  if (!icmTrustedUsername) {
-    throw new Error('ICM_TRUSTED_USERNAME is required')
-  }
-  if (!keycloakTokenUrl) {
-    throw new Error('KEYCLOAK_TOKEN_URL is required')
-  }
-  if (!keycloakClientId) {
-    throw new Error('KEYCLOAK_CLIENT_ID is required')
-  }
-  if (!keycloakClientSecret) {
-    throw new Error('KEYCLOAK_CLIENT_SECRET is required')
-  }
-  if (!ssoKeycloakJwksUrl) {
-    throw new Error('SSO_KEYCLOAK_URL and SSO_KEYCLOAK_REALM are required')
+  // In local mode, skip validation of ICM and SSO configs
+  if (!isLocalMode) {
+    if (!icmApiUrl) {
+      throw new Error('ICM_API_URL is required')
+    }
+    if (!icmTrustedUsername) {
+      throw new Error('ICM_TRUSTED_USERNAME is required')
+    }
+    if (!keycloakTokenUrl) {
+      throw new Error('KEYCLOAK_TOKEN_URL is required')
+    }
+    if (!keycloakClientId) {
+      throw new Error('KEYCLOAK_CLIENT_ID is required')
+    }
+    if (!keycloakClientSecret) {
+      throw new Error('KEYCLOAK_CLIENT_SECRET is required')
+    }
+    if (!ssoKeycloakJwksUrl) {
+      throw new Error('SSO_KEYCLOAK_URL and SSO_KEYCLOAK_REALM are required')
+    }
   }
 
   return {

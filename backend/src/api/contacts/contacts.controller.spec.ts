@@ -182,10 +182,10 @@ describe('ContactsController', () => {
 
       await request(app.getHttpServer())
         .post('/contacts/hold')
-        .send({ contactIds: [1, 2, 3] })
+        .send({ contactIds: [1, 2, 3], reason: 'Test hold reason' })
         .expect(201)
 
-      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'SYSTEM')
+      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'SYSTEM', 'Test hold reason')
     })
 
     it('should pass username from @CurrentUser when guard sets it', async () => {
@@ -195,10 +195,10 @@ describe('ContactsController', () => {
       await request(app.getHttpServer())
         .post('/contacts/hold')
         .set('X-Test-Username', 'JDOE')
-        .send({ contactIds: [1] })
+        .send({ contactIds: [1], reason: 'Hold reason' })
         .expect(201)
 
-      expect(spy).toHaveBeenCalledWith([1], 'JDOE')
+      expect(spy).toHaveBeenCalledWith([1], 'JDOE', 'Hold reason')
     })
   })
 
@@ -229,7 +229,7 @@ describe('ContactsController', () => {
         .send({ contactIds: [1, 2, 3] })
         .expect(201)
 
-      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'SYSTEM')
+      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'SYSTEM', undefined)
     })
   })
 

@@ -14,7 +14,12 @@ import {
 import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { CurrentUser } from '../common/decorators'
-import { ContactIdsDto, ContactIdsWithActionDto } from '../common/dto/contact-ids.dto'
+import {
+  ContactIdsWithActionDto,
+  HoldContactsDto,
+  ResumeContactsDto,
+  UpdateHoldReasonDto,
+} from '../common/dto/contact-ids.dto'
 import { CSAGuard } from '../common/guards/csa.guard'
 import { ContactsService } from './contacts.service'
 import { ContactDto } from './dto/contact.dto'
@@ -120,19 +125,31 @@ export class ContactsController {
   @Post('hold')
   @ApiResponse({ status: 200, description: 'Bulk hold result with success and failed arrays' })
   async holdContacts(
-    @Body() dto: ContactIdsDto,
+    @Body() dto: HoldContactsDto,
     @CurrentUser() userId: string,
   ): Promise<BulkOperationResponse> {
-    return this.contactsService.holdContacts(dto.contactIds, userId)
+    return this.contactsService.holdContacts(dto.contactIds, userId, dto.reason)
   }
 
   @Post('resume')
   @ApiResponse({ status: 200, description: 'Bulk resume result with success and failed arrays' })
   async resumeContacts(
-    @Body() dto: ContactIdsDto,
+    @Body() dto: ResumeContactsDto,
     @CurrentUser() userId: string,
   ): Promise<BulkOperationResponse> {
-    return this.contactsService.resumeContacts(dto.contactIds, userId)
+    return this.contactsService.resumeContacts(dto.contactIds, userId, dto.reason)
+  }
+
+  @Patch(':id/hold-reason')
+  @ApiResponse({ status: 200, description: 'Updated or cleared hold reason' })
+  @ApiResponse({ status: 400, description: 'Reason required when contact is ON_HOLD' })
+  @ApiResponse({ status: 404, description: 'Contact not found' })
+  async updateHoldReason(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateHoldReasonDto,
+    @CurrentUser() userId: string,
+  ): Promise<{ success: boolean; contact?: { id: number; holdReason: string } }> {
+    return this.contactsService.updateHoldReason(id, dto.reason, userId)
   }
 
   @Post('set-eligible')

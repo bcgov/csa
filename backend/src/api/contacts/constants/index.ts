@@ -19,6 +19,7 @@ export const ALLOWED_FILTER_SORT_FIELDS = [
   'serviceOffice',
   'assignedTo',
   'holdBy',
+  'holdReason',
 ] as const
 
 export const CSA_STATUSES = {

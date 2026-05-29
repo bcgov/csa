@@ -6,8 +6,7 @@ export const OOC_AGREEMENT_LINES_QUERY_HIERARCHY = {
     AgreementLines: {
       fields: 'Id, ICM Person ID',
     },
-    fields:
-      'Service Provider, CSN, Agreement End Date, Agreement Start Date, Agreement Status, Agreement Type, PCMS Version Num, ICM PCMS Contract Number, SHSS Transition In Applicable Flag, Updated',
+    fields: 'Id, Updated',
     searchspec:
       "([Agreement Status] = 'Active' OR [Agreement Status] = 'Inactive') AND [Agreement Type] = 'Out of Care'",
   },

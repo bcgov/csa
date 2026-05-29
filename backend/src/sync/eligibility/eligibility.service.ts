@@ -143,6 +143,7 @@ function selectOocPrimaryAgreement(agreements: AgreementRecord[]): AgreementReco
       agreement.source === 'ICM' && normalize(agreement.agreementType) === 'OUT OF CARE',
   )
 
+  // Business expects at most one Active OOC agreement per person.
   const active = oocAgreements.find(
     (agreement) => normalize(agreement.agreementStatus) === 'ACTIVE',
   )

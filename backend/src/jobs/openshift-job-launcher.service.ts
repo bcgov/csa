@@ -86,13 +86,17 @@ export class OpenshiftJobLauncher {
   async isJobRunning(jobType: JobType): Promise<boolean> {
     if (!this.enabled || !this.k8sApi) {
       // If OpenShift is disabled, we can't check - return false (rely on DB constraint)
+      this.logger.debug(`OpenShift is disabled, skipping isJobRunning check for ${jobType}`)
       return false
     }
 
     const cronJobName = this.cronJobNames[jobType]
     if (!cronJobName) {
+      this.logger.warn(`No CronJob mapping found for job type: ${jobType}`)
       return false
     }
+
+    this.logger.log(`Checking if ${jobType} is already running in namespace ${this.namespace}...`)
 
     try {
       // List all Jobs with this job type label that are active
@@ -100,6 +104,10 @@ export class OpenshiftJobLauncher {
         namespace: this.namespace,
         labelSelector: `csa.job-type=${jobType}`,
       })
+
+      this.logger.debug(
+        `Found ${response.items.length} total Job(s) with label csa.job-type=${jobType}`,
+      )
 
       // Check if any job is active (not completed or failed)
       const activeJobs = response.items.filter((job) => {
@@ -117,10 +125,12 @@ export class OpenshiftJobLauncher {
         return true
       }
 
+      this.logger.log(`No active Jobs found for ${jobType}, safe to create new Job`)
       return false
     } catch (error) {
       this.logger.error(
-        `Error checking for running jobs: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `Error checking for running jobs in namespace ${this.namespace}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error instanceof Error ? error.stack : '',
       )
       // On error, return false and let the creation attempt proceed (it will fail if job exists)
       return false
@@ -133,9 +143,13 @@ export class OpenshiftJobLauncher {
    * @param jobRunId The job_runs.id to pass as JOB_RUN_ID env variable
    */
   async launchJob(jobType: JobType, jobRunId: number): Promise<LaunchJobResult> {
+    this.logger.log(
+      `[launchJob] Starting OpenShift Job creation for ${jobType} (job_run_id: ${jobRunId}, namespace: ${this.namespace})`,
+    )
+
     if (!this.enabled || !this.k8sApi) {
       const message = 'OpenShift job launcher is disabled; job will not run in OpenShift'
-      this.logger.warn(message)
+      this.logger.warn(`[launchJob] ${message}`)
       return {
         success: false,
         jobName: '',
@@ -145,19 +159,28 @@ export class OpenshiftJobLauncher {
 
     const cronJobName = this.cronJobNames[jobType]
     if (!cronJobName) {
-      throw new Error(`No CronJob mapping configured for job type: ${jobType}`)
+      const errorMsg = `No CronJob mapping configured for job type: ${jobType}`
+      this.logger.error(`[launchJob] ${errorMsg}`)
+      throw new Error(errorMsg)
     }
 
     const jobName = `${cronJobName}-${jobRunId}`
+    this.logger.log(`[launchJob] Target Job name: ${jobName}`)
 
     try {
       // Fetch the CronJob template
-      this.logger.log(`Fetching CronJob template: ${cronJobName}`)
+      this.logger.log(
+        `[launchJob] Fetching CronJob template '${cronJobName}' from namespace ${this.namespace}...`,
+      )
       const cronJobResponse = await this.k8sApi.readNamespacedCronJob({
         name: cronJobName,
         namespace: this.namespace,
       })
       const cronJob = cronJobResponse
+
+      this.logger.log(
+        `[launchJob] Successfully fetched CronJob '${cronJobName}' (suspend: ${cronJob.spec?.suspend})`,
+      )
 
       if (!cronJob.spec?.jobTemplate) {
         throw new Error(`CronJob ${cronJobName} has no jobTemplate`)
@@ -174,18 +197,32 @@ export class OpenshiftJobLauncher {
       // Deep clone to avoid mutating the original template
       const podTemplate = JSON.parse(JSON.stringify(podTemplateSpec)) as typeof podTemplateSpec
 
+      // Log pod template details
+      const containerCount = podTemplate.spec?.containers?.length ?? 0
+      const containerNames = podTemplate.spec?.containers?.map((c) => c.name).join(', ') ?? 'none'
+      const containerImages =
+        podTemplate.spec?.containers?.map((c) => `${c.name}:${c.image}`).join(', ') ?? 'none'
+      this.logger.log(
+        `[launchJob] Pod template has ${containerCount} container(s): ${containerNames}`,
+      )
+      this.logger.debug(`[launchJob] Container images: ${containerImages}`)
+
       // Inject JOB_RUN_ID into all containers
       if (podTemplate.spec?.containers) {
         for (const container of podTemplate.spec.containers) {
           if (!container.env) {
             container.env = []
           }
+          const originalEnvCount = container.env.length
           // Remove existing JOB_RUN_ID placeholder and add actual value
           container.env = container.env.filter((envVar) => envVar.name !== 'JOB_RUN_ID')
           container.env.push({
             name: 'JOB_RUN_ID',
             value: jobRunId.toString(),
           })
+          this.logger.debug(
+            `[launchJob] Injected JOB_RUN_ID=${jobRunId} into container '${container.name}' (env vars: ${originalEnvCount} -> ${container.env.length})`,
+          )
         }
       }
 
@@ -212,14 +249,24 @@ export class OpenshiftJobLauncher {
         },
       }
 
-      this.logger.log(`Creating Job: ${jobName} for job_run ${jobRunId}`)
-      await this.k8sApi.createNamespacedJob({
+      this.logger.log(
+        `[launchJob] Creating Job '${jobName}' in namespace ${this.namespace} for job_run ${jobRunId}...`,
+      )
+      this.logger.debug(
+        `[launchJob] Job labels: ${JSON.stringify(job.metadata?.labels)}, annotations: ${JSON.stringify(job.metadata?.annotations)}`,
+      )
+
+      const createResponse = await this.k8sApi.createNamespacedJob({
         namespace: this.namespace,
         body: job,
       })
 
+      const createdJobName = createResponse.metadata?.name ?? jobName
+      const createdJobUid = createResponse.metadata?.uid ?? 'unknown'
       const message = `Job ${jobName} created successfully in OpenShift. Processing ${jobType} job.`
-      this.logger.log(message)
+      this.logger.log(
+        `[launchJob] ✓ SUCCESS: Job '${createdJobName}' created (UID: ${createdJobUid}, status: ${createResponse.status?.active ?? 0} active pods)`,
+      )
 
       return {
         success: true,
@@ -228,6 +275,7 @@ export class OpenshiftJobLauncher {
       }
     } catch (error) {
       let errorMessage = 'Unknown error creating OpenShift Job'
+      let httpStatus: number | undefined
 
       if (error instanceof Error) {
         errorMessage = error.message
@@ -235,6 +283,7 @@ export class OpenshiftJobLauncher {
         // Handle specific K8s API errors
         if ('response' in error && typeof error.response === 'object' && error.response) {
           const k8sError = error.response as { statusCode?: number; body?: { message?: string } }
+          httpStatus = k8sError.statusCode
 
           if (k8sError.statusCode === 404) {
             errorMessage = `CronJob ${cronJobName} not found in namespace ${this.namespace}`
@@ -249,8 +298,11 @@ export class OpenshiftJobLauncher {
       }
 
       this.logger.error(
-        `Failed to create Job ${jobName}: ${errorMessage}`,
+        `[launchJob] ✗ FAILED to create Job '${jobName}' in namespace ${this.namespace}: ${errorMessage}${httpStatus ? ` (HTTP ${httpStatus})` : ''}`,
         error instanceof Error ? error.stack : '',
+      )
+      this.logger.error(
+        `[launchJob] Context - jobType: ${jobType}, jobRunId: ${jobRunId}, cronJobName: ${cronJobName}, namespace: ${this.namespace}`,
       )
 
       return {

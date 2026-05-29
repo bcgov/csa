@@ -4,10 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { of } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { IcmApiConfig } from '../icm.config'
-import {
-  expandAgreementLineItems,
-  OOC_AGREEMENT_LINES_QUERY_HIERARCHY,
-} from '../agreement-lines'
+import { expandAgreementLineItems, OOC_AGREEMENT_LINES_QUERY_HIERARCHY } from '../agreement-lines'
 import { IcmApiDataSource } from './icm-api-data-source'
 import { IcmContactUpdatePayload } from './icm-data-source'
 

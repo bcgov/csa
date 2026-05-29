@@ -6,10 +6,7 @@ import {
   getAgeCutoffDate,
 } from 'src/common/utils'
 import { IcmApiRecord } from './data-source/icm-data-source'
-import {
-  expandAgreementLineItems,
-  OOC_AGREEMENT_LINES_QUERY_HIERARCHY,
-} from './agreement-lines'
+import { expandAgreementLineItems, OOC_AGREEMENT_LINES_QUERY_HIERARCHY } from './agreement-lines'
 import {
   FieldMapEntry,
   STG_AGREEMENT_LINE_MAP,

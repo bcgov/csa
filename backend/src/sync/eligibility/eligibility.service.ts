@@ -167,14 +167,17 @@ function findClosedIcmOrderPreviousMonth(
   referenceDate: Date,
 ): OrderRecord | null {
   const prevMonth = getPreviousMonth(referenceDate)
-  return (
-    orders.find(
-      (order) =>
-        order.source === 'ICM' &&
-        order.agreementRowId === agreementRowId &&
-        normalize(order.orderStatus) === 'CLOSED' &&
-        isInMonth(order.effectiveStartDate, prevMonth),
-    ) ?? null
+  const matching = orders.filter(
+    (order) =>
+      order.source === 'ICM' &&
+      order.agreementRowId === agreementRowId &&
+      normalize(order.orderStatus) === 'CLOSED' &&
+      isInMonth(order.effectiveStartDate, prevMonth),
+  )
+  if (matching.length === 0) return null
+
+  return matching.reduce((highest, current) =>
+    current.amount > highest.amount ? current : highest,
   )
 }
 

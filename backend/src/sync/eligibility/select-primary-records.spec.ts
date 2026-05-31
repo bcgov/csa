@@ -538,6 +538,45 @@ describe('selectPrimaryRecords', () => {
       expect(result.primaryAgreement!.rowId).toBe('AGR-OOC')
     })
 
+    it('picks highest-amount closed order when multiple exist in previous month', () => {
+      const activeAgreement = makeAgreement({
+        source: 'ICM',
+        rowId: 'AGR-OOC',
+        agreementStatus: 'Active',
+        agreementType: 'Out of Care',
+      })
+      const lowerAmountOrder = makeOrder({
+        source: 'ICM',
+        agreementRowId: 'AGR-OOC',
+        orderStatus: 'Closed',
+        orderNumber: 'ORD-LOW',
+        amount: 1200,
+        effectiveStartDate: new Date('2026-04-05T00:00:00Z'),
+        product: 'Lower Rate',
+      })
+      const higherAmountOrder = makeOrder({
+        source: 'ICM',
+        agreementRowId: 'AGR-OOC',
+        orderStatus: 'Closed',
+        orderNumber: 'ORD-HIGH',
+        amount: 2400,
+        effectiveStartDate: new Date('2026-04-20T00:00:00Z'),
+        product: 'Higher Rate',
+      })
+
+      const result = selectPrimaryRecords(
+        makeProfile({
+          misLegalAuthCode: 'OPC',
+          agreements: [activeAgreement],
+          orders: [lowerAmountOrder, higherAmountOrder],
+        }),
+        referenceDate,
+      )
+
+      expect(result.primaryOrder!.orderNumber).toBe('ORD-HIGH')
+      expect(result.primaryOrder!.product).toBe('Higher Rate')
+    })
+
     it('does not pick closed order outside previous month', () => {
       const activeAgreement = makeAgreement({
         source: 'ICM',

@@ -48,7 +48,9 @@ export class OpenshiftJobLauncher {
         // Or allow override from config for local dev
         const namespaceFromConfig = this.configService.get<string>('openshift.namespace')
         this.namespace =
-          namespaceFromConfig || this.readNamespaceFromServiceAccount() || 'openshift-test-namespace'
+          namespaceFromConfig ||
+          this.readNamespaceFromServiceAccount() ||
+          'openshift-test-namespace'
         this.logger.log(`Using OpenShift namespace: ${this.namespace}`)
       } catch {
         this.logger.warn('Failed to load in-cluster config, falling back to default kubeconfig')
@@ -184,7 +186,9 @@ export class OpenshiftJobLauncher {
         labelSelector: `csa.job-type=${jobType}`,
       })
 
-      this.logger.debug(`Found ${response.items.length} total Job(s) with label csa.job-type=${jobType}`)
+      this.logger.debug(
+        `Found ${response.items.length} total Job(s) with label csa.job-type=${jobType}`,
+      )
 
       // Check if any job is active (not completed or failed)
       const activeJobs = response.items.filter((job) => {
@@ -279,7 +283,9 @@ export class OpenshiftJobLauncher {
       const containerNames = podTemplate.spec?.containers?.map((c) => c.name).join(', ') ?? 'none'
       const containerImages =
         podTemplate.spec?.containers?.map((c) => `${c.name}:${c.image}`).join(', ') ?? 'none'
-      this.logger.log(`[launchJob] Pod template has ${containerCount} container(s): ${containerNames}`)
+      this.logger.log(
+        `[launchJob] Pod template has ${containerCount} container(s): ${containerNames}`,
+      )
       this.logger.debug(`[launchJob] Container images: ${containerImages}`)
 
       // Inject JOB_RUN_ID into all containers

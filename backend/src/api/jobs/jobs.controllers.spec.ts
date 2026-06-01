@@ -201,7 +201,10 @@ describe('JobsController', () => {
       const res = await request(app.getHttpServer()).post('/jobs/run-eligibility').expect(503)
 
       expect(res.body.message).toBe('Failed to launch: CronJob not found')
-      expect(mockJobsService.markFailed).toHaveBeenCalledWith(10, 'Failed to launch: CronJob not found')
+      expect(mockJobsService.markFailed).toHaveBeenCalledWith(
+        10,
+        'Failed to launch: CronJob not found',
+      )
     })
 
     it('should return 500 when createJob throws', async () => {

@@ -79,9 +79,7 @@ export class JobsController {
   ) {}
 
   private isOpenShiftManagedJobType(jobType: string): jobType is JobType {
-    return (
-      jobType === JobType.RUN_ELIGIBILITY || jobType === JobType.AUTO_BATCH
-    )
+    return jobType === JobType.RUN_ELIGIBILITY || jobType === JobType.AUTO_BATCH
   }
 
   private isOlderThanReconcileThreshold(job: { startedAt: Date | null; createdAt: Date }): boolean {

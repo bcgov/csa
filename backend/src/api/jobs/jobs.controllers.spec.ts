@@ -2,9 +2,10 @@ import type { INestApplication } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { Prisma } from '@prisma/client'
-import request from 'supertest'
 import { JobRunner } from 'src/jobs/job-runner.service'
 import { JobsService } from 'src/jobs/jobs.service'
+import { OpenshiftJobLauncher } from 'src/jobs/openshift-job-launcher.service'
+import request from 'supertest'
 import { CSAGuard } from '../common/guards/csa.guard'
 import { JobsController } from './jobs.controller'
 
@@ -22,6 +23,21 @@ describe('JobsController', () => {
     createJob: vi.fn(),
     getJob: vi.fn(),
     getJobs: vi.fn(),
+    markFailed: vi.fn(),
+  }
+
+  const mockOpenshiftJobLauncher = {
+    isEnabled: vi.fn().mockReturnValue(false),
+    isJobRunning: vi.fn().mockResolvedValue(false),
+    getJobStatus: vi.fn().mockResolvedValue({
+      state: 'ACTIVE',
+      message: 'OpenShift job is still active',
+    }),
+    launchJob: vi.fn().mockResolvedValue({
+      success: false,
+      jobName: '',
+      message: 'OpenShift disabled',
+    }),
   }
 
   beforeEach(async () => {
@@ -30,6 +46,7 @@ describe('JobsController', () => {
       providers: [
         { provide: JobRunner, useValue: mockJobRunner },
         { provide: JobsService, useValue: mockJobsService },
+        { provide: OpenshiftJobLauncher, useValue: mockOpenshiftJobLauncher },
       ],
     })
       .overrideGuard(CSAGuard)
@@ -147,49 +164,87 @@ describe('JobsController', () => {
 
   describe('POST /jobs/run-eligibility', () => {
     it('should create a job and return jobRunId', async () => {
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(true)
+      mockOpenshiftJobLauncher.isJobRunning.mockResolvedValue(false)
+      mockOpenshiftJobLauncher.launchJob.mockResolvedValue({
+        success: true,
+        jobName: 'csa-run-eligibility-12345',
+        message: 'Job launched successfully',
+      })
       mockJobsService.createJob.mockResolvedValue({ id: 42 })
-      mockJobRunner.executeJob.mockResolvedValue({ success: true })
 
       const res = await request(app.getHttpServer()).post('/jobs/run-eligibility').expect(201)
 
-      expect(res.body).toEqual({ jobRunId: 42 })
+      expect(res.body).toEqual({
+        jobRunId: 42,
+        message: 'Job launched successfully',
+        openshiftJobName: 'csa-run-eligibility-12345',
+      })
+      expect(mockOpenshiftJobLauncher.isJobRunning).toHaveBeenCalledWith('RUN_ELIGIBILITY')
       expect(mockJobsService.createJob).toHaveBeenCalledWith({
         jobType: 'RUN_ELIGIBILITY',
         jobTrigger: 'END_USER',
       })
+      expect(mockOpenshiftJobLauncher.launchJob).toHaveBeenCalledWith('RUN_ELIGIBILITY', 42)
     })
 
-    it('should fire executeJob without awaiting', async () => {
-      mockJobsService.createJob.mockResolvedValue({ id: 10 })
-      let executeCalled = false
-      mockJobRunner.executeJob.mockImplementation(async () => {
-        executeCalled = true
-        return { success: true }
+    it('should fail request and mark job as failed when launchJob fails', async () => {
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(true)
+      mockOpenshiftJobLauncher.isJobRunning.mockResolvedValue(false)
+      mockOpenshiftJobLauncher.launchJob.mockResolvedValue({
+        success: false,
+        jobName: '',
+        message: 'Failed to launch: CronJob not found',
       })
+      mockJobsService.createJob.mockResolvedValue({ id: 10 })
 
-      await request(app.getHttpServer()).post('/jobs/run-eligibility').expect(201)
+      const res = await request(app.getHttpServer()).post('/jobs/run-eligibility').expect(503)
 
-      // Give the microtask queue a chance to flush
-      await new Promise((r) => setTimeout(r, 10))
-      expect(executeCalled).toBe(true)
+      expect(res.body.message).toBe('Failed to launch: CronJob not found')
+      expect(mockJobsService.markFailed).toHaveBeenCalledWith(10, 'Failed to launch: CronJob not found')
     })
 
     it('should return 500 when createJob throws', async () => {
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(true)
+      mockOpenshiftJobLauncher.isJobRunning.mockResolvedValue(false)
       mockJobsService.createJob.mockRejectedValue(new Error('DB error'))
 
       await request(app.getHttpServer()).post('/jobs/run-eligibility').expect(500)
     })
 
-    it('should suppress executeJob rejection and still return 201', async () => {
-      mockJobsService.createJob.mockResolvedValue({ id: 11 })
-      mockJobRunner.executeJob.mockRejectedValue(new Error('job crashed'))
+    it('should return immediately when OpenShift is disabled', async () => {
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(false)
+      mockJobsService.createJob.mockResolvedValue({ id: 501 })
+      mockJobRunner.executeJob.mockResolvedValue({ success: true })
 
       const res = await request(app.getHttpServer()).post('/jobs/run-eligibility').expect(201)
 
-      expect(res.body).toEqual({ jobRunId: 11 })
+      expect(res.body).toEqual({
+        jobRunId: 501,
+        message: 'OpenShift disabled; running RUN_ELIGIBILITY in API process',
+      })
+      expect(mockJobsService.createJob).toHaveBeenCalledWith({
+        jobType: 'RUN_ELIGIBILITY',
+        jobTrigger: 'END_USER',
+      })
+      expect(mockJobRunner.executeJob).toHaveBeenCalledWith(501)
+      expect(mockOpenshiftJobLauncher.launchJob).not.toHaveBeenCalled()
     })
 
-    it('should return 409 when same job type is already RUNNING (P2002)', async () => {
+    it('should return 409 when job is already running in OpenShift', async () => {
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(true)
+      mockOpenshiftJobLauncher.isJobRunning.mockResolvedValue(true)
+
+      const res = await request(app.getHttpServer()).post('/jobs/run-eligibility').expect(409)
+
+      expect(res.body.message).toContain('RUN_ELIGIBILITY')
+      expect(res.body.message).toContain('already running')
+      expect(mockJobsService.createJob).not.toHaveBeenCalled()
+    })
+
+    it('should return 409 when createJob throws P2002 (race condition)', async () => {
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(true)
+      mockOpenshiftJobLauncher.isJobRunning.mockResolvedValue(false)
       const uniqueErr = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
         code: 'P2002',
         clientVersion: '5.0.0',
@@ -200,34 +255,44 @@ describe('JobsController', () => {
 
       expect(res.body.message).toContain('RUN_ELIGIBILITY')
       expect(res.body.message).toContain('already running')
-      expect(mockJobRunner.executeJob).not.toHaveBeenCalled()
     })
   })
 
   describe('POST /jobs/auto-batch', () => {
     it('should create a job and return jobRunId', async () => {
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(true)
+      mockOpenshiftJobLauncher.isJobRunning.mockResolvedValue(false)
+      mockOpenshiftJobLauncher.launchJob.mockResolvedValue({
+        success: true,
+        jobName: 'csa-run-auto-batch-67890',
+        message: 'Job launched successfully',
+      })
       mockJobsService.createJob.mockResolvedValue({ id: 99 })
-      mockJobRunner.executeJob.mockResolvedValue({ success: true })
 
       const res = await request(app.getHttpServer()).post('/jobs/auto-batch').expect(201)
 
-      expect(res.body).toEqual({ jobRunId: 99 })
+      expect(res.body).toEqual({
+        jobRunId: 99,
+        message: 'Job launched successfully',
+        openshiftJobName: 'csa-run-auto-batch-67890',
+      })
+      expect(mockOpenshiftJobLauncher.isJobRunning).toHaveBeenCalledWith('AUTO_BATCH')
       expect(mockJobsService.createJob).toHaveBeenCalledWith({
         jobType: 'AUTO_BATCH',
         jobTrigger: 'END_USER',
       })
+      expect(mockOpenshiftJobLauncher.launchJob).toHaveBeenCalledWith('AUTO_BATCH', 99)
     })
 
-    it('should return 409 when AUTO_BATCH is already RUNNING (P2002)', async () => {
-      const uniqueErr = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-        code: 'P2002',
-        clientVersion: '5.0.0',
-      })
-      mockJobsService.createJob.mockRejectedValue(uniqueErr)
+    it('should return 409 when AUTO_BATCH is already running in OpenShift', async () => {
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(true)
+      mockOpenshiftJobLauncher.isJobRunning.mockResolvedValue(true)
 
-      await request(app.getHttpServer()).post('/jobs/auto-batch').expect(409)
+      const res = await request(app.getHttpServer()).post('/jobs/auto-batch').expect(409)
 
-      expect(mockJobRunner.executeJob).not.toHaveBeenCalled()
+      expect(res.body.message).toContain('AUTO_BATCH')
+      expect(res.body.message).toContain('already running')
+      expect(mockJobsService.createJob).not.toHaveBeenCalled()
     })
   })
 
@@ -267,6 +332,35 @@ describe('JobsController', () => {
       mockJobsService.getJob.mockResolvedValue(null)
 
       await request(app.getHttpServer()).get('/jobs/999').expect(404)
+    })
+
+    it('should reconcile RUNNING to FAILED when OpenShift reports failed', async () => {
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(true)
+      mockOpenshiftJobLauncher.getJobStatus.mockResolvedValue({
+        state: 'FAILED',
+        message: 'BackoffLimitExceeded',
+      })
+      mockJobsService.getJob.mockResolvedValue({
+        id: 77,
+        jobType: 'RUN_ELIGIBILITY',
+        status: 'RUNNING',
+        jobTrigger: 'END_USER',
+        retryCount: 0,
+        error: null,
+        metadata: null,
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+        startedAt: new Date('2026-01-01T00:00:01Z'),
+        completedAt: null,
+      })
+
+      const res = await request(app.getHttpServer()).get('/jobs/77').expect(200)
+
+      expect(mockJobsService.markFailed).toHaveBeenCalledWith(
+        77,
+        'OpenShift job failed: BackoffLimitExceeded',
+      )
+      expect(res.body.status).toBe('FAILED')
+      expect(res.body.error).toBe('OpenShift job failed: BackoffLimitExceeded')
     })
   })
 })

@@ -2,12 +2,12 @@ import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
-  BATCH_DETAIL_EVENT,
-  BATCH_DETAIL_STATUS,
-  BATCH_EVENT,
-  BATCH_STATUS,
-  CSA_EVENT,
-  CSA_STATUS,
+    BATCH_DETAIL_EVENT,
+    BATCH_DETAIL_STATUS,
+    BATCH_EVENT,
+    BATCH_STATUS,
+    CSA_EVENT,
+    CSA_STATUS,
 } from './constants'
 import { StateMachineService } from './state-machine.service'
 
@@ -189,13 +189,22 @@ describe('StateMachineService', () => {
     })
 
     it('should reject invalid transition', () => {
-      const result = service.transitionContact(CSA_STATUS.ELIGIBLE, CSA_EVENT.HOLD, 'USER')
+      // RESUME is not valid from ELIGIBLE state
+      const result = service.transitionContact(CSA_STATUS.ELIGIBLE, CSA_EVENT.RESUME, 'USER')
 
       expect(result.success).toBe(false)
       expect(result.reason).toBe('Invalid transition')
     })
 
-    it('should handle HOLD event', () => {
+    it('should handle HOLD event from ELIGIBLE', () => {
+      const result = service.transitionContact(CSA_STATUS.ELIGIBLE, CSA_EVENT.HOLD, 'USER')
+
+      expect(result.success).toBe(true)
+      expect(result.from).toBe(CSA_STATUS.ELIGIBLE)
+      expect(result.to).toBe(CSA_STATUS.ON_HOLD)
+    })
+
+    it('should handle HOLD event from ELIGIBLE_TBD', () => {
       const result = service.transitionContact(CSA_STATUS.ELIGIBLE_TBD, CSA_EVENT.HOLD, 'USER')
 
       expect(result.success).toBe(true)

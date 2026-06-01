@@ -36,6 +36,7 @@ describe('EligibilityService', () => {
     'stg_icm_legal_authority_admin',
     'stg_icm_legal_authority',
     'stg_icm_agreement',
+    'stg_icm_agreement_line',
     'stg_icm_orders',
     'stg_mis_payments',
     'stg_mis_contracts',
@@ -788,10 +789,10 @@ describe('buildLoadContactProfilesSql', () => {
     // Aggregation CTEs group by X_CONTACT_NUM (not CONTACT_ROW_ID)
     expect(sql).toContain('GROUP BY eligible_cases.X_CONTACT_NUM')
 
-    // Agg joins use X_CONTACT_NUM
+    // Agg joins use X_CONTACT_NUM; OOC loads agreements/orders via agreement line person id
     expect(sql).toContain('icm_plc.X_CONTACT_NUM = cases.X_CONTACT_NUM')
-    expect(sql).toContain('icm_ord.X_CONTACT_NUM = cases.X_CONTACT_NUM')
-    expect(sql).toContain('icm_agr.X_CONTACT_NUM = cases.X_CONTACT_NUM')
+    expect(sql).toContain('icm_line.X_CONTACT_NUM = eligible_cases.X_CONTACT_NUM')
+    expect(sql).toContain('stg_icm_agreement_line icm_line')
 
     // No remaining CASE_ROW_ID joins in final SELECT
     expect(sql).not.toMatch(/LEFT JOIN.*CASE_ROW_ID = cases\.ROW_ID/)
@@ -898,6 +899,8 @@ const STAGING_CHANGE_ARM_MARKERS = [
   'legal_admin.data_changed_at >= $1',
   'icm_ord.data_changed_at >= $1',
   'icm_agr.data_changed_at >= $1',
+  'icm_line.data_changed_at >= $1',
+  'stg_icm_agreement_line icm_line',
   'mis_plc.last_updated_date::DATE >=',
   'mis_con.last_updated_date::DATE >=',
   'mis_pay.last_updated_date::DATE >=',

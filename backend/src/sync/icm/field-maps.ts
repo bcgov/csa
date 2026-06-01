@@ -307,6 +307,17 @@ export const STG_AGREEMENT_MAP: FieldMapEntry[] = [
   },
 ]
 
+export const STG_AGREEMENT_LINE_MAP: FieldMapEntry[] = [
+  { sourceField: 'ROW_ID', sourceLabel: 'Id' },
+  { sourceField: 'AGREEMENT_ROW_ID', sourceLabel: 'Agreement Id' },
+  { sourceField: 'X_CONTACT_NUM', sourceLabel: 'ICM Person ID' },
+  {
+    sourceField: 'LAST_UPD',
+    sourceLabel: 'Updated',
+    excludeFromChangeDetection: true,
+  },
+]
+
 export const STG_ORDER_MAP: FieldMapEntry[] = [
   { sourceField: 'ORDER_NUM', sourceLabel: 'Order Number', masterField: 'order_number' },
   { sourceField: 'NAME', sourceLabel: 'Order Type', masterField: 'order_type' },

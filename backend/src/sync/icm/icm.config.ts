@@ -5,8 +5,11 @@ import {
   formatDateTimePacific,
   getAgeCutoffDate,
 } from 'src/common/utils'
+import { IcmApiRecord } from './data-source/icm-data-source'
+import { expandAgreementLineItems, OOC_AGREEMENT_LINES_QUERY_HIERARCHY } from './agreement-lines'
 import {
   FieldMapEntry,
+  STG_AGREEMENT_LINE_MAP,
   STG_AGREEMENT_MAP,
   STG_ICM_CASES_MAP,
   STG_ICM_CONTACTS_MAP,
@@ -24,6 +27,10 @@ export interface IcmApiConfig {
   cursorLabel: string | string[]
   searchSpec?: () => string
   fieldMap: FieldMapEntry[]
+  /** Nested ICM fetch (e.g. Agreements + AgreementLines). */
+  queryHierarchy?: Record<string, unknown>
+  /** Normalizes hierarchical API items before staging upsert. */
+  transformItems?: (items: IcmApiRecord[]) => IcmApiRecord[]
 }
 // TODO: date may not need DateTime as query params
 // Configs for ingesting ICM data into staging tables
@@ -75,6 +82,16 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     searchSpec: () =>
       '([Agreement Type] = "SHSS" OR [Agreement Type] = "FCH" OR [Agreement Type] = "Out of Care")',
     fieldMap: STG_AGREEMENT_MAP,
+  },
+  {
+    name: 'ooc_agreement_lines',
+    endpoint: '/Agreements/Agreements',
+    stagingTable: 'stg_icm_agreement_line',
+    primaryKey: 'ROW_ID',
+    cursorLabel: 'Updated',
+    queryHierarchy: OOC_AGREEMENT_LINES_QUERY_HIERARCHY,
+    transformItems: expandAgreementLineItems,
+    fieldMap: STG_AGREEMENT_LINE_MAP,
   },
   {
     name: 'orders',

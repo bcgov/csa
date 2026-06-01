@@ -2,12 +2,12 @@ import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
-    BATCH_DETAIL_EVENT,
-    BATCH_DETAIL_STATUS,
-    BATCH_EVENT,
-    BATCH_STATUS,
-    CSA_EVENT,
-    CSA_STATUS,
+  BATCH_DETAIL_EVENT,
+  BATCH_DETAIL_STATUS,
+  BATCH_EVENT,
+  BATCH_STATUS,
+  CSA_EVENT,
+  CSA_STATUS,
 } from './constants'
 import { StateMachineService } from './state-machine.service'
 

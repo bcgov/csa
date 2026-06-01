@@ -1,7 +1,8 @@
 export interface FieldMapEntry {
   sourceField: string
   sourceLabel: string
-  masterField: string
+  /** Omitted for staging-only bridge tables (e.g. agreement lines) with no contacts column. */
+  masterField?: string
   dbType?: 'timestamp' | 'date' | 'numeric'
   excludeFromChangeDetection?: boolean
 }

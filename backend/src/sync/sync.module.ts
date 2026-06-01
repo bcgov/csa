@@ -8,6 +8,7 @@ import { syncConfig } from 'src/config/sync.config'
 import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
 import { AutoBatchHandler } from './handlers/auto-batch.handler'
+import { BackfillOocAgreementLinesHandler } from './handlers/backfill-ooc-agreement-lines.handler'
 import { IngestDataHandler } from './handlers/ingest-data.handler'
 import { IngestIcmHandler } from './handlers/ingest-icm.handler'
 import { IngestMisHandler } from './handlers/ingest-mis.handler'
@@ -49,6 +50,7 @@ import { MisService } from './mis/mis.service'
     MisService,
     AutoBatchService,
     AutoBatchHandler,
+    BackfillOocAgreementLinesHandler,
     IngestDataHandler,
     IngestIcmHandler,
     IngestMisHandler,
@@ -57,6 +59,7 @@ import { MisService } from './mis/mis.service'
   ],
   exports: [
     AutoBatchHandler,
+    BackfillOocAgreementLinesHandler,
     IngestDataHandler,
     IngestIcmHandler,
     IngestMisHandler,
@@ -68,6 +71,7 @@ export class SyncModule implements OnModuleInit {
   constructor(
     private readonly registry: JobRegistry,
     private readonly autoBatchHandler: AutoBatchHandler,
+    private readonly backfillOocAgreementLinesHandler: BackfillOocAgreementLinesHandler,
     private readonly ingestDataHandler: IngestDataHandler,
     private readonly ingestIcmHandler: IngestIcmHandler,
     private readonly ingestMisHandler: IngestMisHandler,
@@ -77,6 +81,10 @@ export class SyncModule implements OnModuleInit {
 
   onModuleInit() {
     this.registry.register(this.autoBatchHandler.jobType, this.autoBatchHandler)
+    this.registry.register(
+      this.backfillOocAgreementLinesHandler.jobType,
+      this.backfillOocAgreementLinesHandler,
+    )
     this.registry.register(this.ingestDataHandler.jobType, this.ingestDataHandler)
     this.registry.register(this.ingestIcmHandler.jobType, this.ingestIcmHandler)
     this.registry.register(this.ingestMisHandler.jobType, this.ingestMisHandler)

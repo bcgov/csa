@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { of } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { IcmApiConfig } from '../icm.config'
+import { expandAgreementLineItems, OOC_AGREEMENT_LINES_QUERY_HIERARCHY } from '../agreement-lines'
 import { IcmApiDataSource } from './icm-api-data-source'
 import { IcmContactUpdatePayload } from './icm-data-source'
 
@@ -123,6 +124,54 @@ describe('IcmApiDataSource', () => {
       expect(callUrl).toContain('GetChildren=false')
       expect(callUrl).toContain('childlinks=None')
       expect(callUrl).toContain('ExecutionMode=ForwardOnly')
+    })
+
+    it('should send QueryHierarchy and omit GetChildren when configured', async () => {
+      const oocConfig: IcmApiConfig = {
+        ...mockConfig,
+        name: 'ooc_agreement_lines',
+        queryHierarchy: OOC_AGREEMENT_LINES_QUERY_HIERARCHY,
+      }
+
+      httpService.get.mockReturnValue(of({ status: 200, headers: {}, data: { items: [] } }))
+
+      await service.fetchAll(oocConfig)
+
+      const callUrl = decodeURIComponent(httpService.get.mock.calls[0][0]).replace(/\+/g, ' ')
+      expect(callUrl).toContain('QueryHierarchy=')
+      expect(callUrl).toContain("[Agreement Type] = 'Out of Care'")
+      expect(callUrl).not.toContain('GetChildren=false')
+    })
+
+    it('should apply transformItems after fetch', async () => {
+      const oocConfig: IcmApiConfig = {
+        ...mockConfig,
+        transformItems: expandAgreementLineItems,
+      }
+
+      httpService.get.mockReturnValue(
+        of({
+          status: 200,
+          headers: {},
+          data: {
+            items: [
+              {
+                Id: 'AGR-1',
+                AgreementLines: [{ Id: 'LINE-1', 'ICM Person ID': 'PERSON-1' }],
+              },
+            ],
+          },
+        }),
+      )
+
+      const results = await service.fetchAll(oocConfig)
+
+      expect(results).toHaveLength(1)
+      expect(results[0]).toMatchObject({
+        Id: 'LINE-1',
+        'Agreement Id': 'AGR-1',
+        'ICM Person ID': 'PERSON-1',
+      })
     })
 
     it('should include workspace param when configured', async () => {

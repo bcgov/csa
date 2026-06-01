@@ -71,8 +71,9 @@ export class IcmApiDataSource extends IcmDataSource {
       hasMore = items.length === PAGE_SIZE
     }
 
-    this.logger.log(`Fetched ${allRecords.length} ${config.name} records total`)
-    return allRecords
+    const records = config.transformItems ? config.transformItems(allRecords) : allRecords
+    this.logger.log(`Fetched ${records.length} ${config.name} records total`)
+    return records
   }
 
   async updateContacts(contacts: IcmContactUpdatePayload[]): Promise<void> {
@@ -126,9 +127,14 @@ export class IcmApiDataSource extends IcmDataSource {
       ViewMode: 'Catalog',
       excludeEmptyFieldsInResponse: 'False',
       ExecutionMode: 'ForwardOnly',
-      GetChildren: 'false',
-      childlinks: 'None',
     })
+
+    if (config.queryHierarchy) {
+      params.set('QueryHierarchy', JSON.stringify(config.queryHierarchy))
+    } else {
+      params.set('GetChildren', 'false')
+      params.set('childlinks', 'None')
+    }
 
     const workspace = this.configService.get<string>('icm.workspace')
     if (workspace) {

@@ -41,11 +41,14 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
     masterField: 'birth_province',
   },
 
+  // CSA fields below are written back to ICM by IcmSyncBackService; excluded from
+  // change detection so our own write-back is not detected as an inbound change.
   {
     sourceField: 'X_CSA_SENT_DATE',
     sourceLabel: 'Key Player CSA Sent Date',
     masterField: 'csa_sent_date',
     dbType: 'timestamp',
+    excludeFromChangeDetection: true,
   },
   {
     sourceField: 'X_CSA_PAY_STATUS',
@@ -58,8 +61,14 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
     sourceLabel: 'Key Player CSA Status Effective Date',
     masterField: 'csa_status_effective_date',
     dbType: 'timestamp',
+    excludeFromChangeDetection: true,
   },
-  { sourceField: 'X_CSA_DIN', sourceLabel: 'Key Player DIN', masterField: 'din' },
+  {
+    sourceField: 'X_CSA_DIN',
+    sourceLabel: 'Key Player DIN',
+    masterField: 'din',
+    excludeFromChangeDetection: true,
+  },
 
   {
     sourceField: 'CONTACT_LAST_UPD',

@@ -29,7 +29,7 @@ export function expandAgreementLineItems(items: IcmApiRecord[]): IcmApiRecord[] 
     const linesRaw = agreement['AgreementLines']
     const lines: AgreementLineRecord[] = Array.isArray(linesRaw)
       ? (linesRaw as AgreementLineRecord[])
-      : linesRaw
+      : linesRaw != null && typeof linesRaw === 'object'
         ? [linesRaw as AgreementLineRecord]
         : []
 

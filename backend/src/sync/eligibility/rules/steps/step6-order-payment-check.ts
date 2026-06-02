@@ -1,6 +1,6 @@
 import { normalize } from 'src/common/utils'
-import { ELIGIBILITY_CONFIG } from '../../eligibility.config'
 import { getPreviousMonth, isInMonth } from '../../eligibility-month'
+import { ELIGIBILITY_CONFIG } from '../../eligibility.config'
 import { EligibilityResult } from '../../eligibility.types'
 import { EligibilityContext, EligibilityRule } from '../rule.interface'
 import { step7_UpdateEligible } from './step7-update-eligible'
@@ -65,27 +65,29 @@ export const step6_OrderPaymentCheck: EligibilityRule = {
           )
     }
 
-    let hasTypeStatusMatch = false
-    for (const order of previousMonthOrders) {
+    // Filter orders that match type AND status criteria
+    const validOrders = previousMonthOrders.filter((order) => {
       const typeMatch = ELIGIBILITY_CONFIG.ELIGIBLE_ORDER_TYPES.includes(normalize(order.orderType))
       const statusMatch = ELIGIBILITY_CONFIG.ELIGIBLE_ORDER_STATUSES.includes(
         normalize(order.orderStatus),
       )
-      const amountMatch = order.amount >= ELIGIBILITY_CONFIG.MIN_ORDER_AMOUNT
+      return typeMatch && statusMatch
+    })
 
-      if (typeMatch && statusMatch && amountMatch) {
-        return step7_UpdateEligible(csaStatus)
-      }
+    // Calculate total amount from all valid orders (handles multiple/split orders in same month)
+    const totalAmount = validOrders.reduce((sum, order) => sum + order.amount, 0)
 
-      if (typeMatch && statusMatch) {
-        hasTypeStatusMatch = true
-      }
+    // Check if total meets minimum threshold
+    if (validOrders.length > 0 && totalAmount >= ELIGIBILITY_CONFIG.MIN_ORDER_AMOUNT) {
+      return step7_UpdateEligible(csaStatus)
     }
 
-    if (hasTypeStatusMatch) {
+    // Valid orders exist but total amount insufficient
+    if (validOrders.length > 0) {
       return step8_UpdateEligibleTbd(csaStatus)
     }
 
+    // No valid orders found
     return hasNonPlacement
       ? step8_UpdateEligibleTbd(csaStatus)
       : step9_UpdateNotEligible(csaStatus, ctx.cancelReasonCode, ctx.careEndDate, ctx.referenceDate)

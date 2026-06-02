@@ -230,4 +230,141 @@ describe('step6_OrderPaymentCheck', () => {
       expect(result!.step).toBe(9)
     })
   })
+
+  describe('Multiple orders in same month (User Story 39154)', () => {
+    it('should sum multiple split orders that together meet threshold', () => {
+      const ctx = makeCtx({
+        orders: [
+          makeOrder({ amount: 775.0 }), // April 1-15
+          makeOrder({ amount: 775.0 }), // April 16-30
+        ],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(7) // Total = 1550.0 >= 1549.2 threshold
+    })
+
+    it('should sum multiple orders when total exactly meets threshold', () => {
+      const ctx = makeCtx({
+        orders: [makeOrder({ amount: 774.6 }), makeOrder({ amount: 774.6 })],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(7) // Total = 1549.2 (exact threshold)
+    })
+
+    it('should sum multiple orders when total exceeds threshold', () => {
+      const ctx = makeCtx({
+        orders: [makeOrder({ amount: 800.0 }), makeOrder({ amount: 800.0 })],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(7) // Total = 1600.0
+    })
+
+    it('should route to step 8 when multiple orders sum below threshold', () => {
+      const ctx = makeCtx({
+        orders: [makeOrder({ amount: 500.0 }), makeOrder({ amount: 500.0 })],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(8) // Total = 1000.0 < 1549.2
+    })
+
+    it('should route to step 8 when split orders sum just below threshold (edge case)', () => {
+      const ctx = makeCtx({
+        orders: [
+          makeOrder({ amount: 774.2 }), // Original user story amounts
+          makeOrder({ amount: 774.2 }),
+        ],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(8) // Total = 1548.4 < 1549.2 (0.8 below threshold)
+    })
+
+    it('should sum three or more orders in same month', () => {
+      const ctx = makeCtx({
+        orders: [
+          makeOrder({ amount: 520.0 }),
+          makeOrder({ amount: 520.0 }),
+          makeOrder({ amount: 520.0 }),
+        ],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(7) // Total = 1560.0
+    })
+
+    it('should only sum orders that match type and status criteria', () => {
+      const ctx = makeCtx({
+        orders: [
+          makeOrder({ amount: 800.0 }), // valid
+          makeOrder({ amount: 800.0, orderType: 'Invalid Type' }), // invalid type
+          makeOrder({ amount: 800.0, orderStatus: 'Invalid Status' }), // invalid status
+        ],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(8) // Only 800.0 counted (< 1549.2)
+    })
+
+    it('should sum valid orders even when one order alone would fail', () => {
+      const ctx = makeCtx({
+        orders: [
+          makeOrder({ amount: 1000.0 }), // individually fails
+          makeOrder({ amount: 600.0 }), // individually fails
+        ],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(7) // Total = 1600.0 (passes)
+    })
+
+    it('should handle mix of valid and invalid orders correctly', () => {
+      const ctx = makeCtx({
+        orders: [
+          makeOrder({ amount: 774.6 }), // valid
+          makeOrder({ amount: 1000.0, orderType: 'Invalid' }), // invalid
+          makeOrder({ amount: 774.6 }), // valid
+        ],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(7) // Only valid: 774.6 + 774.6 = 1549.2
+    })
+
+    it('should sum multiple MIS orders correctly', () => {
+      const ctx = makeCtx({
+        orders: [
+          makeOrder({ amount: 800.0, source: 'MIS' }),
+          makeOrder({ amount: 800.0, source: 'MIS' }),
+        ],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(7)
+    })
+
+    it('should maintain ICM precedence when summing multiple orders', () => {
+      const ctx = makeCtx({
+        orders: [
+          makeOrder({ source: 'ICM', amount: 500.0 }),
+          makeOrder({ source: 'ICM', amount: 500.0 }), // Total ICM = 1000
+          makeOrder({ source: 'MIS', amount: 2000.0 }), // MIS ignored
+        ],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(8) // ICM total = 1000 < 1549.2
+    })
+
+    it('should handle renewal scenario - contract renewed mid-month', () => {
+      const ctx = makeCtx({
+        orders: [
+          makeOrder({
+            amount: 775.0,
+            effectiveStartDate: new Date('2026-01-01'),
+            effectiveEndDate: new Date('2026-01-15'),
+          }),
+          makeOrder({
+            amount: 775.0,
+            effectiveStartDate: new Date('2026-01-16'),
+            effectiveEndDate: new Date('2026-01-31'),
+          }),
+        ],
+      })
+      const result = step6_OrderPaymentCheck.evaluate(ctx)
+      expect(result!.step).toBe(7) // Renewal orders sum to 1550.0 >= threshold
+    })
+  })
 })

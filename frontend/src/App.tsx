@@ -3187,7 +3187,7 @@ function App() {
                         disabled={isRunningEligibilityAll || isRunningAutoBatch}
                         sx={{ fontSize: '0.85rem' }}
                       >
-                        Auto-batch all contacts
+                        Add System determined Eligible/NE kids to Batch
                       </MenuItem>
                     </Menu>
                     <Button
@@ -3285,8 +3285,9 @@ function App() {
                 {isRunningAutoBatch && (
                   <Box sx={{ mb: 2 }}>
                     <Alert severity="info" sx={{ mb: 1 }}>
-                      Auto-batch is running. Please wait while all eligible contacts are being added
-                      to the batch. This banner will disappear once the job is complete.
+                      Children are being added to a &apos;Pending&apos; batch. Please do not make
+                      any manual CSA transitions while the job is in progress. This banner will
+                      disappear once the job is complete.
                     </Alert>
                     <LinearProgress />
                   </Box>
@@ -6933,19 +6934,21 @@ function App() {
         aria-labelledby="confirm-auto-batch-dialog-title"
         aria-describedby="confirm-auto-batch-dialog-description"
       >
-        <DialogTitle id="confirm-auto-batch-dialog-title">Confirm Auto-batch</DialogTitle>
+        <DialogTitle id="confirm-auto-batch-dialog-title">
+          Add System determined Eligible/NE kids to Batch
+        </DialogTitle>
         <DialogContent>
           <DialogContentText id="confirm-auto-batch-dialog-description">
-            Are you sure you want to auto-batch all eligible contacts? This will automatically add
-            all contacts with eligible statuses to the pending batch.
+            All children with CSA Status &apos;Eligible&apos; or &apos;Not Eligible - In Pay&apos;
+            will get added to a &apos;Pending&apos; batch request. Do you wish to proceed?
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleConfirmAutoBatchDialogClose} color="inherit">
-            Cancel
+            No
           </Button>
           <Button onClick={handleAutoBatchAll} variant="contained" autoFocus>
-            Ok
+            Yes
           </Button>
         </DialogActions>
       </Dialog>

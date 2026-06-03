@@ -15,6 +15,7 @@ import {
   PROTECTED_STATUSES_SQL,
 } from './eligibility.config'
 import { EligibilityInputError } from './eligibility.errors'
+import { getPreviousMonth, isInMonth } from './eligibility-month'
 import {
   buildContactHasStagingChangesSql,
   buildFindAgedOutContactIdsSql,
@@ -38,12 +39,16 @@ import { step3_PlacementCheck } from './rules/steps/step3-placement-check'
 import { step4_FetchAgreementContract } from './rules/steps/step4-fetch-agreement-contract'
 import { step6_OrderPaymentCheck } from './rules/steps/step6-order-payment-check'
 
+const { STEP8_LEGAL_AUTH_CODES } = ELIGIBILITY_CONFIG
+
 const REQUIRED_STAGING_TABLES = [
   'stg_icm_cases',
   'stg_icm_placements',
   'stg_icm_legal_authority_admin',
   'stg_icm_legal_authority',
   'stg_icm_agreement',
+  // Temporary: agreement line ingest returns empty until ICM API is ready
+  // 'stg_icm_agreement_line',
   'stg_icm_orders',
   'stg_mis_payments',
   'stg_mis_contracts',
@@ -68,11 +73,18 @@ const RULES: EligibilityRule[] = [
 // into the master contacts table.
 // Status priority: Active > Interrupted > Ended/Closed (latest by endDate)
 // Within each status tier: ICM Placement > ICM Non-Placement > MIS Placement > MIS Non-Placement
-export function selectPrimaryRecords(profile: ContactProfile): {
+export function selectPrimaryRecords(
+  profile: ContactProfile,
+  referenceDate: Date = pacificToday(),
+): {
   primaryPlacement: PlacementRecord | null
   primaryOrder: OrderRecord | null
   primaryAgreement: AgreementRecord | null
 } {
+  if (isOocChild(profile)) {
+    return selectOocPrimaryRecords(profile, referenceDate)
+  }
+
   const primaryPlacement = selectPrimaryPlacement(profile.placements)
 
   // Primary Order: match via primary placement's link key
@@ -105,6 +117,69 @@ export function selectPrimaryRecords(profile: ContactProfile): {
   }
 
   return { primaryPlacement, primaryOrder, primaryAgreement }
+}
+
+/** Section 54 / OOC: OPC, OPO, OPT — agreement by person id; placement blank on display. */
+function isOocChild(profile: ContactProfile): boolean {
+  const code = normalize(profile.misLegalAuthCode)
+  return code != null && STEP8_LEGAL_AUTH_CODES.includes(code)
+}
+
+function selectOocPrimaryRecords(
+  profile: ContactProfile,
+  referenceDate: Date,
+): {
+  primaryPlacement: PlacementRecord | null
+  primaryOrder: OrderRecord | null
+  primaryAgreement: AgreementRecord | null
+} {
+  const primaryAgreement = selectOocPrimaryAgreement(profile.agreements)
+  const primaryOrder =
+    primaryAgreement?.rowId != null
+      ? findClosedIcmOrderPreviousMonth(profile.orders, primaryAgreement.rowId, referenceDate)
+      : null
+
+  return { primaryPlacement: null, primaryOrder, primaryAgreement }
+}
+
+function selectOocPrimaryAgreement(agreements: AgreementRecord[]): AgreementRecord | null {
+  const oocAgreements = agreements.filter(
+    (agreement) =>
+      agreement.source === 'ICM' && normalize(agreement.agreementType) === 'OUT OF CARE',
+  )
+
+  // Business expects at most one Active OOC agreement per person.
+  const active = oocAgreements.find(
+    (agreement) => normalize(agreement.agreementStatus) === 'ACTIVE',
+  )
+  if (active) return active
+
+  const withEndDate = oocAgreements.filter((agreement) => agreement.agreementEndDate != null)
+  if (withEndDate.length === 0) return null
+
+  return withEndDate.reduce((latest, current) =>
+    current.agreementEndDate!.getTime() > latest.agreementEndDate!.getTime() ? current : latest,
+  )
+}
+
+function findClosedIcmOrderPreviousMonth(
+  orders: OrderRecord[],
+  agreementRowId: string,
+  referenceDate: Date,
+): OrderRecord | null {
+  const prevMonth = getPreviousMonth(referenceDate)
+  const matching = orders.filter(
+    (order) =>
+      order.source === 'ICM' &&
+      order.agreementRowId === agreementRowId &&
+      normalize(order.orderStatus) === 'CLOSED' &&
+      isInMonth(order.effectiveStartDate, prevMonth),
+  )
+  if (matching.length === 0) return null
+
+  return matching.reduce((highest, current) =>
+    current.amount > highest.amount ? current : highest,
+  )
 }
 
 const SOURCE_TYPE_PRIORITY: Array<{ source: 'ICM' | 'MIS'; type: string }> = [
@@ -819,6 +894,8 @@ export class EligibilityService {
             ? parseISODatePacific(agreement.terminationDate)
             : null,
           mcfdContract: agreement.mcfdContract ?? null,
+          serviceProviderName: agreement.serviceProviderName ?? null,
+          providerId: agreement.providerId ?? null,
           source: 'ICM',
         }),
       )

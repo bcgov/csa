@@ -4,6 +4,7 @@ import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import { CSAGuard } from '../common/guards/csa.guard'
+import { AuditTrailService } from '../audit-trail/audit-trail.service'
 import { ContactsController } from './contacts.controller'
 import { ContactsService } from './contacts.service'
 
@@ -47,6 +48,10 @@ describe('ContactsController', () => {
     runContactEligibility: vi.fn(),
   }
 
+  const mockAuditTrailService = {
+    findByContactId: vi.fn(),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ContactsController],
@@ -54,6 +59,10 @@ describe('ContactsController', () => {
         {
           provide: ContactsService,
           useValue: mockContactsService,
+        },
+        {
+          provide: AuditTrailService,
+          useValue: mockAuditTrailService,
         },
       ],
     })
@@ -343,6 +352,24 @@ describe('ContactsController', () => {
         .get('/contacts/1/batches')
         .expect(200)
         .expect(batchDetails)
+    })
+  })
+
+  describe('GET /contacts/:id/audit-trail', () => {
+    it('should return paginated audit trail for a contact', async () => {
+      const auditResponse = {
+        data: [{ id: 1, contactId: 1, operation: 'New' }],
+        page: 1,
+        limit: 10,
+        total: 1,
+        totalPages: 1,
+      }
+      mockAuditTrailService.findByContactId.mockResolvedValue(auditResponse)
+
+      const res = await request(app.getHttpServer()).get('/contacts/1/audit-trail').expect(200)
+
+      expect(res.body).toEqual(auditResponse)
+      expect(mockAuditTrailService.findByContactId).toHaveBeenCalledWith(1, 1, 10)
     })
   })
 

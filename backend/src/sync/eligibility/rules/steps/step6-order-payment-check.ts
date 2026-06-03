@@ -1,5 +1,6 @@
 import { normalize } from 'src/common/utils'
 import { ELIGIBILITY_CONFIG } from '../../eligibility.config'
+import { getPreviousMonth, isInMonth } from '../../eligibility-month'
 import { EligibilityResult } from '../../eligibility.types'
 import { EligibilityContext, EligibilityRule } from '../rule.interface'
 import { step7_UpdateEligible } from './step7-update-eligible'
@@ -89,17 +90,4 @@ export const step6_OrderPaymentCheck: EligibilityRule = {
       ? step8_UpdateEligibleTbd(csaStatus)
       : step9_UpdateNotEligible(csaStatus, ctx.cancelReasonCode, ctx.careEndDate, ctx.referenceDate)
   },
-}
-
-function isInMonth(date: Date | null, month: { year: number; month: number }): boolean {
-  if (!date) return false
-  return date.getUTCFullYear() === month.year && date.getUTCMonth() === month.month
-}
-
-function getPreviousMonth(date: Date): { year: number; month: number } {
-  const month = date.getUTCMonth() - 1
-  if (month < 0) {
-    return { year: date.getUTCFullYear() - 1, month: 11 }
-  }
-  return { year: date.getUTCFullYear(), month }
 }

@@ -90,8 +90,26 @@ model Contact {
 
   // Relations
   contactBatchDetails        ContactBatchDetail[]
+  auditTrailEntries          ContactAuditTrail[]
 
   @@map("contacts")
+  @@schema("csa")
+}
+
+model ContactAuditTrail {
+  id          Int      @id @default(autoincrement())
+  contactId   Int      @map("contact_id")
+  actionedAt  DateTime @default(now()) @map("actioned_at") @db.Timestamptz()
+  actionedBy  String   @map("actioned_by")
+  operation   String
+  field       String?
+  oldValue    String?  @map("old_value")
+  newValue    String?  @map("new_value")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, actionedAt(sort: Desc)])
+  @@map("contact_audit_trail")
   @@schema("csa")
 }
 

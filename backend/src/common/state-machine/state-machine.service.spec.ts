@@ -189,13 +189,22 @@ describe('StateMachineService', () => {
     })
 
     it('should reject invalid transition', () => {
-      const result = service.transitionContact(CSA_STATUS.ELIGIBLE, CSA_EVENT.HOLD, 'USER')
+      // RESUME is not valid from ELIGIBLE state
+      const result = service.transitionContact(CSA_STATUS.ELIGIBLE, CSA_EVENT.RESUME, 'USER')
 
       expect(result.success).toBe(false)
       expect(result.reason).toBe('Invalid transition')
     })
 
-    it('should handle HOLD event', () => {
+    it('should handle HOLD event from ELIGIBLE', () => {
+      const result = service.transitionContact(CSA_STATUS.ELIGIBLE, CSA_EVENT.HOLD, 'USER')
+
+      expect(result.success).toBe(true)
+      expect(result.from).toBe(CSA_STATUS.ELIGIBLE)
+      expect(result.to).toBe(CSA_STATUS.ON_HOLD)
+    })
+
+    it('should handle HOLD event from ELIGIBLE_TBD', () => {
       const result = service.transitionContact(CSA_STATUS.ELIGIBLE_TBD, CSA_EVENT.HOLD, 'USER')
 
       expect(result.success).toBe(true)

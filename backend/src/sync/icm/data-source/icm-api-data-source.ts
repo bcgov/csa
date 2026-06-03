@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config'
 import { firstValueFrom } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { formatDatePacific } from 'src/common/utils'
-import { ICM_UPDATE_BATCH_LIMIT, IcmApiConfig } from '../icm.config'
+import { ICM_UPDATE_BATCH_LIMIT, IcmApiConfig, isOocAgreementLinesConfig } from '../icm.config'
 import { IcmApiRecord, IcmContactUpdatePayload, IcmDataSource } from './icm-data-source'
 
 const PAGE_SIZE = 100
@@ -22,6 +22,12 @@ export class IcmApiDataSource extends IcmDataSource {
   }
 
   async fetchAll(config: IcmApiConfig, lastUpdated?: Date): Promise<IcmApiRecord[]> {
+    // Temporary: agreement line ICM API is not ready in test — fake an empty paginated response.
+    if (isOocAgreementLinesConfig(config)) {
+      this.logger.warn(`${config.name}: returning empty result (temporary)`)
+      return []
+    }
+
     const icmApiUrl = this.configService.get<string>('admin.icmApiUrl')!
     const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
     const timeout = this.configService.get<number>('sync.icmRequestTimeoutMs')!
@@ -71,8 +77,9 @@ export class IcmApiDataSource extends IcmDataSource {
       hasMore = items.length === PAGE_SIZE
     }
 
-    this.logger.log(`Fetched ${allRecords.length} ${config.name} records total`)
-    return allRecords
+    const records = config.transformItems ? config.transformItems(allRecords) : allRecords
+    this.logger.log(`Fetched ${records.length} ${config.name} records total`)
+    return records
   }
 
   async updateContacts(contacts: IcmContactUpdatePayload[]): Promise<void> {
@@ -126,9 +133,14 @@ export class IcmApiDataSource extends IcmDataSource {
       ViewMode: 'Catalog',
       excludeEmptyFieldsInResponse: 'False',
       ExecutionMode: 'ForwardOnly',
-      GetChildren: 'false',
-      childlinks: 'None',
     })
+
+    if (config.queryHierarchy) {
+      params.set('QueryHierarchy', JSON.stringify(config.queryHierarchy))
+    } else {
+      params.set('GetChildren', 'false')
+      params.set('childlinks', 'None')
+    }
 
     const workspace = this.configService.get<string>('icm.workspace')
     if (workspace) {

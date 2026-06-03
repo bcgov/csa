@@ -8,7 +8,11 @@ import { ContactAuditTrailDto } from './dto/contact-audit-trail.dto'
 export class AuditTrailService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(page = 1, limit = 10, contactId?: number): Promise<PaginatedResponse<ContactAuditTrailDto>> {
+  async findAll(
+    page = 1,
+    limit = 10,
+    contactId?: number,
+  ): Promise<PaginatedResponse<ContactAuditTrailDto>> {
     const safePage = page >= 1 ? page : 1
     const safeLimit = limit >= 1 ? Math.min(limit, 200) : 10
     const where = contactId ? { contactId } : {}

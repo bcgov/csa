@@ -28,7 +28,12 @@ export class AuditTrailController {
   }
 
   @Get()
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
   @ApiQuery({
     name: 'limit',
     required: false,

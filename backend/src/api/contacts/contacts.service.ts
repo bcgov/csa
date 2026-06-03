@@ -777,11 +777,15 @@ export class ContactsService {
       throw err
     }
 
-    // Clear the review flag after eligibility is run
-    await this.prisma.contact.update({
-      where: { id: contactId },
-      data: { needsReview: false },
-    })
+    // Clear the review flag after eligibility is run, unless the contact is ON_HOLD.
+    // For ON_HOLD contacts, the review flag is set by the eligibility upsert when
+    // staging data has changed, and we want to preserve that signal.
+    if (result.newStatus !== CSA_STATUS.ON_HOLD) {
+      await this.prisma.contact.update({
+        where: { id: contactId },
+        data: { needsReview: false },
+      })
+    }
 
     // If the eligibility run flipped csa_status, the upsert flagged
     // icm_integration_status=true. Try to push immediately; on failure

@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
+import { ConfigService } from '@nestjs/config'
 import { Test } from '@nestjs/testing'
 import { Prisma } from '@prisma/client'
 import { JobRunner } from 'src/jobs/job-runner.service'
@@ -7,6 +8,7 @@ import { JobsService } from 'src/jobs/jobs.service'
 import { OpenshiftJobLauncher } from 'src/jobs/openshift-job-launcher.service'
 import request from 'supertest'
 import { CSAGuard } from '../common/guards/csa.guard'
+import { clearOpenshiftStatusCacheForTests } from './job-openshift-advisory'
 import { JobsController } from './jobs.controller'
 
 const mockCSAGuard = { canActivate: () => true }
@@ -28,6 +30,8 @@ describe('JobsController', () => {
 
   const mockOpenshiftJobLauncher = {
     isEnabled: vi.fn().mockReturnValue(false),
+    hasCronJobMapping: vi.fn().mockReturnValue(true),
+    getJobStatus: vi.fn().mockResolvedValue({ state: 'ACTIVE', message: 'active' }),
     launchJob: vi.fn().mockResolvedValue({
       success: false,
       jobName: '',
@@ -35,10 +39,18 @@ describe('JobsController', () => {
     }),
   }
 
+  const mockConfigService = {
+    get: vi.fn((key: string, defaultValue?: unknown) => {
+      if (key === 'app.deployEnv') return 'local'
+      return defaultValue
+    }),
+  }
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [JobsController],
       providers: [
+        { provide: ConfigService, useValue: mockConfigService },
         { provide: JobRunner, useValue: mockJobRunner },
         { provide: JobsService, useValue: mockJobsService },
         { provide: OpenshiftJobLauncher, useValue: mockOpenshiftJobLauncher },
@@ -53,9 +65,13 @@ describe('JobsController', () => {
 
     controller = module.get<JobsController>(JobsController)
     vi.clearAllMocks()
+    mockOpenshiftJobLauncher.isEnabled.mockReturnValue(false)
+    mockOpenshiftJobLauncher.hasCronJobMapping.mockReturnValue(true)
+    clearOpenshiftStatusCacheForTests()
   })
 
   afterEach(async () => {
+    clearOpenshiftStatusCacheForTests()
     await app.close()
   })
 
@@ -142,8 +158,12 @@ describe('JobsController', () => {
       )
     })
 
-    it('should return immediately when OpenShift is disabled', async () => {
+    it('should run in API process when OpenShift is disabled and DEPLOY_ENV is local', async () => {
       mockOpenshiftJobLauncher.isEnabled.mockReturnValue(false)
+      mockConfigService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+        if (key === 'app.deployEnv') return 'local'
+        return defaultValue
+      })
       mockJobsService.createJob.mockResolvedValue({ id: 501 })
       mockJobRunner.executeJob.mockResolvedValue({ success: true })
 
@@ -151,10 +171,24 @@ describe('JobsController', () => {
 
       expect(res.body).toEqual({
         jobRunId: 501,
-        message: 'OpenShift disabled; running RUN_ELIGIBILITY in API process',
+        message: 'Running RUN_ELIGIBILITY in API process (DEPLOY_ENV=local)',
       })
       expect(mockJobRunner.executeJob).toHaveBeenCalledWith(501)
       expect(mockOpenshiftJobLauncher.launchJob).not.toHaveBeenCalled()
+    })
+
+    it('should return 503 when OpenShift is disabled and DEPLOY_ENV is dev', async () => {
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(false)
+      mockConfigService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+        if (key === 'app.deployEnv') return 'dev'
+        return defaultValue
+      })
+
+      const res = await request(app.getHttpServer()).post('/jobs/run-eligibility').expect(503)
+
+      expect(res.body.message).toContain('DEPLOY_ENV is dev')
+      expect(mockJobsService.createJob).not.toHaveBeenCalled()
+      expect(mockJobRunner.executeJob).not.toHaveBeenCalled()
     })
 
     it('should return 409 when createJob throws P2002 (race condition)', async () => {
@@ -173,7 +207,7 @@ describe('JobsController', () => {
   })
 
   describe('GET /jobs/:id', () => {
-    it('should return job status from database only', async () => {
+    it('should return job status without warning when OpenShift is disabled', async () => {
       const job = {
         id: 5,
         jobType: 'RUN_ELIGIBILITY',
@@ -191,7 +225,42 @@ describe('JobsController', () => {
       const res = await request(app.getHttpServer()).get('/jobs/5').expect(200)
 
       expect(res.body.status).toBe('RUNNING')
+      expect(res.body.warning).toBeUndefined()
       expect(mockJobsService.markFailed).not.toHaveBeenCalled()
+      expect(mockOpenshiftJobLauncher.getJobStatus).not.toHaveBeenCalled()
+    })
+
+    it('should return a user-facing warning without mutating the job', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-06-01T12:15:00Z'))
+
+      const job = {
+        id: 5,
+        jobType: 'RUN_ELIGIBILITY',
+        status: 'RUNNING',
+        jobTrigger: 'END_USER',
+        retryCount: 0,
+        error: null,
+        metadata: null,
+        createdAt: new Date('2026-06-01T12:00:00Z'),
+        startedAt: new Date('2026-06-01T12:00:01Z'),
+        completedAt: null,
+      }
+      mockJobsService.getJob.mockResolvedValue(job)
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(true)
+      mockOpenshiftJobLauncher.getJobStatus.mockResolvedValue({
+        state: 'NOT_FOUND',
+        message: 'OpenShift job csa-run-eligibility-5 not found',
+      })
+
+      const res = await request(app.getHttpServer()).get('/jobs/5').expect(200)
+
+      expect(res.body.status).toBe('RUNNING')
+      expect(res.body.warning).toContain('does not appear to be running')
+      expect(res.body.warning).toContain('25 minutes')
+      expect(mockJobsService.markFailed).not.toHaveBeenCalled()
+
+      vi.useRealTimers()
     })
 
     it('should return 404 when job not found', async () => {

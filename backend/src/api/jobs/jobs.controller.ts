@@ -13,7 +13,9 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { ConfigService } from '@nestjs/config'
 import { Prisma } from '@prisma/client'
+import type { DeployEnv } from 'src/config/app.config'
 import { JobStatus } from 'src/jobs/enums/job-status.enum'
 import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
@@ -21,6 +23,8 @@ import { JobRunner } from 'src/jobs/job-runner.service'
 import { JobsService } from 'src/jobs/jobs.service'
 import { OpenshiftJobLauncher } from 'src/jobs/openshift-job-launcher.service'
 import { CSAGuard } from '../common/guards/csa.guard'
+import { canRunBulkJobInApiProcess } from './bulk-job-deploy-env'
+import { getJobRunWarning } from './job-openshift-advisory'
 
 const PAGE_DEFAULT = 1
 const LIMIT_DEFAULT = 20
@@ -37,20 +41,24 @@ interface JobRunResponse {
   createdAt: Date
   startedAt: Date | null
   completedAt: Date | null
+  warning?: string
 }
 
-function toJobRunResponse(job: {
-  id: number
-  jobType: string
-  status: string
-  jobTrigger: string
-  retryCount: number | null
-  error: string | null
-  metadata: unknown
-  createdAt: Date
-  startedAt: Date | null
-  completedAt: Date | null
-}): JobRunResponse {
+function toJobRunResponse(
+  job: {
+    id: number
+    jobType: string
+    status: string
+    jobTrigger: string
+    retryCount: number | null
+    error: string | null
+    metadata: unknown
+    createdAt: Date
+    startedAt: Date | null
+    completedAt: Date | null
+  },
+  warning?: string,
+): JobRunResponse {
   return {
     id: job.id,
     jobType: job.jobType,
@@ -62,6 +70,7 @@ function toJobRunResponse(job: {
     createdAt: job.createdAt,
     startedAt: job.startedAt,
     completedAt: job.completedAt,
+    ...(warning ? { warning } : {}),
   }
 }
 
@@ -72,6 +81,7 @@ export class JobsController {
   private readonly logger = new Logger(JobsController.name)
 
   constructor(
+    private readonly configService: ConfigService,
     private readonly jobRunner: JobRunner,
     private readonly jobsService: JobsService,
     private readonly openshiftJobLauncher: OpenshiftJobLauncher,
@@ -104,7 +114,7 @@ export class JobsController {
 
     return {
       jobRunId: jobRun.id,
-      message: `OpenShift disabled; running ${jobType} in API process`,
+      message: `Running ${jobType} in API process (DEPLOY_ENV=local)`,
     }
   }
 
@@ -112,7 +122,14 @@ export class JobsController {
     jobType: JobType,
   ): Promise<{ jobRunId: number; message: string; openshiftJobName?: string }> {
     if (!this.openshiftJobLauncher.isEnabled()) {
-      return this.startFireAndForgetJob(jobType)
+      const deployEnv = this.configService.get<DeployEnv>('app.deployEnv', 'local')
+      if (canRunBulkJobInApiProcess(deployEnv)) {
+        return this.startFireAndForgetJob(jobType)
+      }
+
+      throw new ServiceUnavailableException(
+        `Bulk ${jobType} jobs must run in OpenShift when DEPLOY_ENV is ${deployEnv}. The job launcher is not available.`,
+      )
     }
 
     let jobRun
@@ -187,8 +204,15 @@ export class JobsController {
       page: safePage,
       limit: safeLimit,
     })
+    const data = await Promise.all(
+      result.data.map(async (job) => {
+        const warning = await getJobRunWarning(job, this.openshiftJobLauncher)
+        return toJobRunResponse(job, warning)
+      }),
+    )
+
     return {
-      data: result.data.map(toJobRunResponse),
+      data,
       total: result.total,
       page: result.page,
       limit: result.limit,
@@ -220,6 +244,7 @@ export class JobsController {
       throw new NotFoundException(`Job ${id} not found`)
     }
 
-    return toJobRunResponse(job)
+    const warning = await getJobRunWarning(job, this.openshiftJobLauncher)
+    return toJobRunResponse(job, warning)
   }
 }

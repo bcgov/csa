@@ -1,4 +1,4 @@
-import { ConfigService } from '@nestjs/config'
+import { existsSync, readFileSync } from 'fs'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { JobType } from './enums/job-type.enum'
@@ -7,13 +7,11 @@ import { OpenshiftJobLauncher } from './openshift-job-launcher.service'
 import { OPENSHIFT_CRONJOB_NAMES } from './openshift.constants'
 
 const mockLoadFromCluster = vi.fn()
-const mockLoadFromDefault = vi.fn()
 const mockMakeApiClient = vi.fn()
 
 vi.mock('@kubernetes/client-node', () => ({
   KubeConfig: class {
     loadFromCluster = mockLoadFromCluster
-    loadFromDefault = mockLoadFromDefault
     makeApiClient = mockMakeApiClient
   },
   BatchV1Api: vi.fn(),
@@ -56,26 +54,19 @@ describe('OpenshiftJobLauncher', () => {
     },
   }
 
-  const createModule = async (enabledSetting: string | undefined) => {
-    mockLoadFromCluster.mockImplementation(() => {
-      throw new Error('not in cluster')
-    })
-    mockLoadFromDefault.mockImplementation(() => undefined)
+  const createModule = async (inCluster: boolean, withNamespace = true) => {
+    if (inCluster) {
+      mockLoadFromCluster.mockImplementation(() => undefined)
+      vi.mocked(existsSync).mockReturnValue(withNamespace)
+      vi.mocked(readFileSync).mockReturnValue(withNamespace ? 'test-namespace' : '')
+    } else {
+      mockLoadFromCluster.mockImplementation(() => {
+        throw new Error('not in cluster')
+      })
+    }
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        OpenshiftJobLauncher,
-        {
-          provide: ConfigService,
-          useValue: {
-            get: vi.fn((key: string) => {
-              if (key === 'openshift.enabled') return enabledSetting
-              if (key === 'openshift.namespace') return 'test-namespace'
-              return undefined
-            }),
-          },
-        },
-      ],
+      providers: [OpenshiftJobLauncher],
     }).compile()
 
     return module.get<OpenshiftJobLauncher>(OpenshiftJobLauncher)
@@ -91,9 +82,10 @@ describe('OpenshiftJobLauncher', () => {
     }
 
     mockMakeApiClient.mockReturnValue(mockK8sApi)
-    mockLoadFromCluster.mockImplementation(() => undefined)
+    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(readFileSync).mockReturnValue('test-namespace')
 
-    service = await createModule('true')
+    service = await createModule(true)
     // @ts-expect-error - test access to private field
     service.k8sApi = mockK8sApi
     // @ts-expect-error - test access to private field
@@ -105,19 +97,19 @@ describe('OpenshiftJobLauncher', () => {
       expect(service).toBeDefined()
     })
 
-    it('should initialize with OpenShift enabled when OPENSHIFT_ENABLED=true', async () => {
-      const enabledService = await createModule('true')
+    it('should be enabled when in-cluster config loads', async () => {
+      const enabledService = await createModule(true)
       expect(enabledService.isEnabled()).toBe(true)
     })
 
-    it('should be disabled when OPENSHIFT_ENABLED is false', async () => {
-      const disabledService = await createModule('false')
+    it('should be disabled when not running in-cluster', async () => {
+      const disabledService = await createModule(false)
       expect(disabledService.isEnabled()).toBe(false)
     })
 
-    it('should auto-disable when not in-cluster and OPENSHIFT_ENABLED is unset', async () => {
-      const autoService = await createModule(undefined)
-      expect(autoService.isEnabled()).toBe(false)
+    it('should be disabled when in-cluster but namespace file is missing', async () => {
+      const disabledService = await createModule(true, false)
+      expect(disabledService.isEnabled()).toBe(false)
     })
   })
 
@@ -176,7 +168,7 @@ describe('OpenshiftJobLauncher', () => {
     })
 
     it('should return disabled message when OpenShift is disabled', async () => {
-      const disabledService = await createModule('false')
+      const disabledService = await createModule(false)
       const result = await disabledService.launchJob(JobType.RUN_ELIGIBILITY, 123)
 
       expect(result.success).toBe(false)

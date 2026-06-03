@@ -1,6 +1,5 @@
 import * as k8s from '@kubernetes/client-node'
 import { Injectable, Logger } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import { existsSync, readFileSync } from 'fs'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JOB_RUN_ID_FLAG, stripJobRunIdArgs } from 'src/jobs/entrypoints/job-entrypoint-args'
@@ -31,49 +30,36 @@ export class OpenshiftJobLauncher {
   private readonly enabled: boolean
   private readonly cronJobNames: Partial<Record<JobType, string>>
 
-  constructor(private readonly configService: ConfigService) {
+  constructor() {
     this.cronJobNames = {
       [JobType.RUN_ELIGIBILITY]: OPENSHIFT_CRONJOB_NAMES.RUN_ELIGIBILITY,
       [JobType.AUTO_BATCH]: OPENSHIFT_CRONJOB_NAMES.AUTO_BATCH,
     }
 
-    const enabledSetting = this.configService.get<string | undefined>('openshift.enabled')
-
-    if (enabledSetting === 'false') {
-      this.enabled = false
-      this.namespace = 'local'
-      this.logger.log('OpenShift job launcher disabled (OPENSHIFT_ENABLED=false)')
-      return
-    }
-
     const kc = new k8s.KubeConfig()
-    const namespaceFromConfig = this.configService.get<string>('openshift.namespace')
 
     try {
       kc.loadFromCluster()
-      this.logger.log('Loaded in-cluster OpenShift configuration')
-      this.namespace =
-        namespaceFromConfig ||
-        this.readNamespaceFromServiceAccount() ||
-        'openshift-test-namespace'
-      this.enabled = true
-      this.k8sApi = kc.makeApiClient(k8s.BatchV1Api)
-      this.logger.log(`Using OpenShift namespace: ${this.namespace}`)
-      return
-    } catch {
-      if (enabledSetting === 'true') {
-        this.logger.warn('In-cluster config unavailable; falling back to default kubeconfig')
-        kc.loadFromDefault()
-        this.namespace = namespaceFromConfig || 'openshift-test-namespace'
-        this.enabled = true
-        this.k8sApi = kc.makeApiClient(k8s.BatchV1Api)
+      const namespace = this.readNamespaceFromServiceAccount()
+      if (!namespace) {
+        this.enabled = false
+        this.namespace = 'local'
+        this.logger.warn(
+          'OpenShift job launcher disabled (in-cluster config loaded but namespace could not be read)',
+        )
         return
       }
 
+      this.logger.log('Loaded in-cluster OpenShift configuration')
+      this.namespace = namespace
+      this.enabled = true
+      this.k8sApi = kc.makeApiClient(k8s.BatchV1Api)
+      this.logger.log(`Using OpenShift namespace: ${this.namespace}`)
+    } catch {
       this.enabled = false
       this.namespace = 'local'
       this.logger.log(
-        'OpenShift job launcher disabled (not running in-cluster; set OPENSHIFT_ENABLED=true to use kubeconfig)',
+        'OpenShift job launcher disabled (not running in-cluster; bulk jobs run in the API process)',
       )
     }
   }

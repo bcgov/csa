@@ -1,7 +1,5 @@
 import { Module, OnModuleInit } from '@nestjs/common'
-import { ConfigModule } from '@nestjs/config'
 import { PrismaModule } from 'src/common/database/prisma.module'
-import openshiftConfig from 'src/config/openshift.config'
 import { IcmSyncBackModule } from 'src/sync/icm/icm-sync-back.module'
 import { RetryFailedHandler } from './handlers/retry-failed.handler'
 import { JobRegistry } from './job-registry.service'
@@ -20,7 +18,7 @@ import { OpenshiftJobLauncher } from './openshift-job-launcher.service'
  * - Register their handlers (cross-cutting jobs) with JobRegistry in onModuleInit()
  */
 @Module({
-  imports: [PrismaModule, IcmSyncBackModule, ConfigModule.forFeature(openshiftConfig)],
+  imports: [PrismaModule, IcmSyncBackModule],
   providers: [JobsService, JobRunner, JobRegistry, RetryFailedHandler, OpenshiftJobLauncher],
   exports: [JobsService, JobRunner, JobRegistry, RetryFailedHandler, OpenshiftJobLauncher],
 })

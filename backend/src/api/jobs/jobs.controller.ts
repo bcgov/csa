@@ -25,7 +25,6 @@ import { CSAGuard } from '../common/guards/csa.guard'
 const PAGE_DEFAULT = 1
 const LIMIT_DEFAULT = 20
 const LIMIT_MAX = 200
-const RUNNING_RECONCILE_THRESHOLD_MS = 40 * 60 * 1000
 
 interface JobRunResponse {
   id: number
@@ -78,15 +77,6 @@ export class JobsController {
     private readonly openshiftJobLauncher: OpenshiftJobLauncher,
   ) {}
 
-  private isOpenShiftManagedJobType(jobType: string): jobType is JobType {
-    return jobType === JobType.RUN_ELIGIBILITY || jobType === JobType.AUTO_BATCH
-  }
-
-  private isOlderThanReconcileThreshold(job: { startedAt: Date | null; createdAt: Date }): boolean {
-    const startedAtMs = (job.startedAt ?? job.createdAt).getTime()
-    return Date.now() - startedAtMs > RUNNING_RECONCILE_THRESHOLD_MS
-  }
-
   // Concurrency: csa.job_runs has a partial unique index on (job_type) WHERE status='RUNNING'
   // so the second concurrent createJob for the same type raises P2002. We translate that to 409.
   private async startFireAndForgetJob(
@@ -121,15 +111,8 @@ export class JobsController {
   private async launchOpenShiftJob(
     jobType: JobType,
   ): Promise<{ jobRunId: number; message: string; openshiftJobName?: string }> {
-    // Local/dev fallback when OpenShift launcher is disabled
     if (!this.openshiftJobLauncher.isEnabled()) {
       return this.startFireAndForgetJob(jobType)
-    }
-
-    // Check if Job is already running in OpenShift BEFORE creating job_runs
-    const isRunning = await this.openshiftJobLauncher.isJobRunning(jobType)
-    if (isRunning) {
-      throw new ConflictException(`${jobType} is already running in OpenShift`)
     }
 
     let jobRun
@@ -147,7 +130,6 @@ export class JobsController {
 
     this.logger.log(`Created job_run ${jobRun.id} for ${jobType}, launching OpenShift Job...`)
 
-    // Launch OpenShift Job from CronJob template
     const launchResult = await this.openshiftJobLauncher.launchJob(jobType, jobRun.id)
 
     if (!launchResult.success) {
@@ -236,32 +218,6 @@ export class JobsController {
     const job = await this.jobsService.getJob(id)
     if (!job) {
       throw new NotFoundException(`Job ${id} not found`)
-    }
-
-    if (
-      job.status === JobStatus.RUNNING &&
-      this.openshiftJobLauncher.isEnabled() &&
-      this.isOpenShiftManagedJobType(job.jobType)
-    ) {
-      const openshiftStatus = await this.openshiftJobLauncher.getJobStatus(job.jobType, job.id)
-
-      if (openshiftStatus.state === 'FAILED') {
-        await this.jobsService.markFailed(id, `OpenShift job failed: ${openshiftStatus.message}`)
-        job.status = JobStatus.FAILED
-        job.error = `OpenShift job failed: ${openshiftStatus.message}`
-        job.completedAt = new Date()
-      } else if (
-        (openshiftStatus.state === 'NOT_FOUND' || openshiftStatus.state === 'COMPLETED') &&
-        this.isOlderThanReconcileThreshold(job)
-      ) {
-        await this.jobsService.markFailed(
-          id,
-          `OpenShift job is ${openshiftStatus.state.toLowerCase()} but DB never reached terminal status`,
-        )
-        job.status = JobStatus.FAILED
-        job.error = `OpenShift job is ${openshiftStatus.state.toLowerCase()} but DB never reached terminal status`
-        job.completedAt = new Date()
-      }
     }
 
     return toJobRunResponse(job)

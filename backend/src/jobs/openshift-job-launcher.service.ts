@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { existsSync, readFileSync } from 'fs'
 import { JobType } from 'src/jobs/enums/job-type.enum'
+import { JOB_RUN_ID_FLAG, stripJobRunIdArgs } from 'src/jobs/entrypoints/job-entrypoint-args'
 import { OPENSHIFT_CRONJOB_NAMES } from './openshift.constants'
 
 export interface LaunchJobResult {
@@ -31,38 +32,49 @@ export class OpenshiftJobLauncher {
   private readonly cronJobNames: Partial<Record<JobType, string>>
 
   constructor(private readonly configService: ConfigService) {
-    this.enabled = this.configService.get<boolean>('openshift.enabled', true)
     this.cronJobNames = {
       [JobType.RUN_ELIGIBILITY]: OPENSHIFT_CRONJOB_NAMES.RUN_ELIGIBILITY,
       [JobType.AUTO_BATCH]: OPENSHIFT_CRONJOB_NAMES.AUTO_BATCH,
     }
 
-    if (this.enabled) {
-      const kc = new k8s.KubeConfig()
-      // In-cluster config when running in OpenShift, or local kubeconfig for dev
-      try {
-        kc.loadFromCluster()
-        this.logger.log('Loaded in-cluster OpenShift configuration')
+    const enabledSetting = this.configService.get<string | undefined>('openshift.enabled')
 
-        // Read namespace from service account (standard in OpenShift)
-        // Or allow override from config for local dev
-        const namespaceFromConfig = this.configService.get<string>('openshift.namespace')
-        this.namespace =
-          namespaceFromConfig ||
-          this.readNamespaceFromServiceAccount() ||
-          'openshift-test-namespace'
-        this.logger.log(`Using OpenShift namespace: ${this.namespace}`)
-      } catch {
-        this.logger.warn('Failed to load in-cluster config, falling back to default kubeconfig')
-        kc.loadFromDefault()
-        // For local dev, use config or default
-        this.namespace =
-          this.configService.get<string>('openshift.namespace') || 'openshift-test-namespace'
-      }
+    if (enabledSetting === 'false') {
+      this.enabled = false
+      this.namespace = 'local'
+      this.logger.log('OpenShift job launcher disabled (OPENSHIFT_ENABLED=false)')
+      return
+    }
+
+    const kc = new k8s.KubeConfig()
+    const namespaceFromConfig = this.configService.get<string>('openshift.namespace')
+
+    try {
+      kc.loadFromCluster()
+      this.logger.log('Loaded in-cluster OpenShift configuration')
+      this.namespace =
+        namespaceFromConfig ||
+        this.readNamespaceFromServiceAccount() ||
+        'openshift-test-namespace'
+      this.enabled = true
       this.k8sApi = kc.makeApiClient(k8s.BatchV1Api)
-    } else {
-      this.logger.warn('OpenShift job launcher is DISABLED (OPENSHIFT_ENABLED=false)')
-      this.namespace = 'openshift-test-namespace' // Fallback for disabled mode
+      this.logger.log(`Using OpenShift namespace: ${this.namespace}`)
+      return
+    } catch {
+      if (enabledSetting === 'true') {
+        this.logger.warn('In-cluster config unavailable; falling back to default kubeconfig')
+        kc.loadFromDefault()
+        this.namespace = namespaceFromConfig || 'openshift-test-namespace'
+        this.enabled = true
+        this.k8sApi = kc.makeApiClient(k8s.BatchV1Api)
+        return
+      }
+
+      this.enabled = false
+      this.namespace = 'local'
+      this.logger.log(
+        'OpenShift job launcher disabled (not running in-cluster; set OPENSHIFT_ENABLED=true to use kubeconfig)',
+      )
     }
   }
 
@@ -160,68 +172,9 @@ export class OpenshiftJobLauncher {
   }
 
   /**
-   * Check if a Job is currently running in OpenShift for the given job type.
-   * @param jobType The type of job to check
-   * @returns true if a job is running, false otherwise
-   */
-  async isJobRunning(jobType: JobType): Promise<boolean> {
-    if (!this.enabled || !this.k8sApi) {
-      // If OpenShift is disabled, we can't check - return false (rely on DB constraint)
-      this.logger.debug(`OpenShift is disabled, skipping isJobRunning check for ${jobType}`)
-      return false
-    }
-
-    const cronJobName = this.cronJobNames[jobType]
-    if (!cronJobName) {
-      this.logger.warn(`No CronJob mapping found for job type: ${jobType}`)
-      return false
-    }
-
-    this.logger.log(`Checking if ${jobType} is already running in namespace ${this.namespace}...`)
-
-    try {
-      // List all Jobs with this job type label that are active
-      const response = await this.k8sApi.listNamespacedJob({
-        namespace: this.namespace,
-        labelSelector: `csa.job-type=${jobType}`,
-      })
-
-      this.logger.debug(
-        `Found ${response.items.length} total Job(s) with label csa.job-type=${jobType}`,
-      )
-
-      // Check if any job is active (not completed or failed)
-      const activeJobs = response.items.filter((job) => {
-        const active = job.status?.active ?? 0
-        const succeeded = job.status?.succeeded ?? 0
-        const failed = job.status?.failed ?? 0
-        // Job is running if it has active pods and hasn't completed
-        return active > 0 || (succeeded === 0 && failed === 0)
-      })
-
-      if (activeJobs.length > 0) {
-        this.logger.warn(
-          `Found ${activeJobs.length} active OpenShift Job(s) for ${jobType}: ${activeJobs.map((j) => j.metadata?.name).join(', ')}`,
-        )
-        return true
-      }
-
-      this.logger.log(`No active Jobs found for ${jobType}, safe to create new Job`)
-      return false
-    } catch (error) {
-      this.logger.error(
-        `Error checking for running jobs in namespace ${this.namespace}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        error instanceof Error ? error.stack : '',
-      )
-      // On error, return false and let the creation attempt proceed (it will fail if job exists)
-      return false
-    }
-  }
-
-  /**
    * Creates a Job from a suspended CronJob template.
    * @param jobType The type of job to launch
-   * @param jobRunId The job_runs.id to pass as JOB_RUN_ID env variable
+   * @param jobRunId The job_runs.id passed to the entrypoint as --job-run-id
    */
   async launchJob(jobType: JobType, jobRunId: number): Promise<LaunchJobResult> {
     this.logger.log(
@@ -288,21 +241,13 @@ export class OpenshiftJobLauncher {
       )
       this.logger.debug(`[launchJob] Container images: ${containerImages}`)
 
-      // Inject JOB_RUN_ID into all containers
+      // Append --job-run-id for UI-triggered runs (cron / oc create omit this flag)
       if (podTemplate.spec?.containers) {
         for (const container of podTemplate.spec.containers) {
-          if (!container.env) {
-            container.env = []
-          }
-          const originalEnvCount = container.env.length
-          // Remove existing JOB_RUN_ID placeholder and add actual value
-          container.env = container.env.filter((envVar) => envVar.name !== 'JOB_RUN_ID')
-          container.env.push({
-            name: 'JOB_RUN_ID',
-            value: jobRunId.toString(),
-          })
+          const existingArgs = container.args ?? []
+          container.args = [...stripJobRunIdArgs(existingArgs), JOB_RUN_ID_FLAG, jobRunId.toString()]
           this.logger.debug(
-            `[launchJob] Injected JOB_RUN_ID=${jobRunId} into container '${container.name}' (env vars: ${originalEnvCount} -> ${container.env.length})`,
+            `[launchJob] Appended ${JOB_RUN_ID_FLAG}=${jobRunId} to container '${container.name}' args`,
           )
         }
       }

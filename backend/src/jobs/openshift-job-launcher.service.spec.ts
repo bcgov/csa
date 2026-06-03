@@ -2,10 +2,10 @@ import { ConfigService } from '@nestjs/config'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { JobType } from './enums/job-type.enum'
+import { JOB_RUN_ID_FLAG } from './entrypoints/job-entrypoint-args'
 import { OpenshiftJobLauncher } from './openshift-job-launcher.service'
 import { OPENSHIFT_CRONJOB_NAMES } from './openshift.constants'
 
-// Mock the Kubernetes client module
 const mockLoadFromCluster = vi.fn()
 const mockLoadFromDefault = vi.fn()
 const mockMakeApiClient = vi.fn()
@@ -19,7 +19,6 @@ vi.mock('@kubernetes/client-node', () => ({
   BatchV1Api: vi.fn(),
 }))
 
-// Mock fs module
 vi.mock('fs', () => ({
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
@@ -31,7 +30,6 @@ describe('OpenshiftJobLauncher', () => {
     readNamespacedCronJob: ReturnType<typeof vi.fn>
     readNamespacedJob: ReturnType<typeof vi.fn>
     createNamespacedJob: ReturnType<typeof vi.fn>
-    listNamespacedJob: ReturnType<typeof vi.fn>
   }
 
   const mockCronJob = {
@@ -48,6 +46,7 @@ describe('OpenshiftJobLauncher', () => {
                   name: 'backend',
                   image: 'csa-backend:latest',
                   env: [{ name: 'NODE_ENV', value: 'production' }],
+                  args: ['--existing'],
                 },
               ],
             },
@@ -57,20 +56,11 @@ describe('OpenshiftJobLauncher', () => {
     },
   }
 
-  beforeEach(async () => {
-    // Reset mocks
-    vi.clearAllMocks()
-
-    // Create mock K8s API
-    mockK8sApi = {
-      readNamespacedCronJob: vi.fn(),
-      readNamespacedJob: vi.fn(),
-      createNamespacedJob: vi.fn(),
-      listNamespacedJob: vi.fn(),
-    }
-
-    // Setup makeApiClient to return our mock API
-    mockMakeApiClient.mockReturnValue(mockK8sApi)
+  const createModule = async (enabledSetting: string | undefined) => {
+    mockLoadFromCluster.mockImplementation(() => {
+      throw new Error('not in cluster')
+    })
+    mockLoadFromDefault.mockImplementation(() => undefined)
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -78,21 +68,36 @@ describe('OpenshiftJobLauncher', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: vi.fn((key: string, defaultValue?: unknown) => {
-              if (key === 'openshift.enabled') return true
+            get: vi.fn((key: string) => {
+              if (key === 'openshift.enabled') return enabledSetting
               if (key === 'openshift.namespace') return 'test-namespace'
-              return defaultValue
+              return undefined
             }),
           },
         },
       ],
     }).compile()
 
-    service = module.get<OpenshiftJobLauncher>(OpenshiftJobLauncher)
+    return module.get<OpenshiftJobLauncher>(OpenshiftJobLauncher)
+  }
 
-    // Inject mock K8s API client
-    // @ts-expect-error - accessing private property for testing
+  beforeEach(async () => {
+    vi.clearAllMocks()
+
+    mockK8sApi = {
+      readNamespacedCronJob: vi.fn(),
+      readNamespacedJob: vi.fn(),
+      createNamespacedJob: vi.fn(),
+    }
+
+    mockMakeApiClient.mockReturnValue(mockK8sApi)
+    mockLoadFromCluster.mockImplementation(() => undefined)
+
+    service = await createModule('true')
+    // @ts-expect-error - test access to private field
     service.k8sApi = mockK8sApi
+    // @ts-expect-error - test access to private field
+    service.enabled = true
   })
 
   describe('Service Initialization', () => {
@@ -100,150 +105,19 @@ describe('OpenshiftJobLauncher', () => {
       expect(service).toBeDefined()
     })
 
-    it('should initialize with OpenShift enabled', () => {
-      expect(service.isEnabled()).toBe(true)
+    it('should initialize with OpenShift enabled when OPENSHIFT_ENABLED=true', async () => {
+      const enabledService = await createModule('true')
+      expect(enabledService.isEnabled()).toBe(true)
     })
 
     it('should be disabled when OPENSHIFT_ENABLED is false', async () => {
-      const module = await Test.createTestingModule({
-        providers: [
-          OpenshiftJobLauncher,
-          {
-            provide: ConfigService,
-            useValue: {
-              get: vi.fn((key: string) => {
-                if (key === 'openshift.enabled') return false
-                return undefined
-              }),
-            },
-          },
-        ],
-      }).compile()
-
-      const disabledService = module.get<OpenshiftJobLauncher>(OpenshiftJobLauncher)
+      const disabledService = await createModule('false')
       expect(disabledService.isEnabled()).toBe(false)
     })
-  })
 
-  describe('isJobRunning', () => {
-    it('should return false when no active jobs exist', async () => {
-      mockK8sApi.listNamespacedJob.mockResolvedValue({
-        items: [],
-      })
-
-      const result = await service.isJobRunning(JobType.RUN_ELIGIBILITY)
-
-      expect(result).toBe(false)
-      expect(mockK8sApi.listNamespacedJob).toHaveBeenCalledWith({
-        namespace: expect.any(String),
-        labelSelector: `csa.job-type=${JobType.RUN_ELIGIBILITY}`,
-      })
-    })
-
-    it('should return true when an active job exists', async () => {
-      mockK8sApi.listNamespacedJob.mockResolvedValue({
-        items: [
-          {
-            metadata: { name: 'csa-run-eligibility-123' },
-            status: {
-              active: 1,
-              succeeded: 0,
-              failed: 0,
-            },
-          },
-        ],
-      })
-
-      const result = await service.isJobRunning(JobType.RUN_ELIGIBILITY)
-
-      expect(result).toBe(true)
-    })
-
-    it('should return true when job has not completed yet', async () => {
-      mockK8sApi.listNamespacedJob.mockResolvedValue({
-        items: [
-          {
-            metadata: { name: 'csa-run-eligibility-123' },
-            status: {
-              active: 0,
-              succeeded: 0,
-              failed: 0,
-            },
-          },
-        ],
-      })
-
-      const result = await service.isJobRunning(JobType.RUN_ELIGIBILITY)
-
-      expect(result).toBe(true)
-    })
-
-    it('should return false when job has succeeded', async () => {
-      mockK8sApi.listNamespacedJob.mockResolvedValue({
-        items: [
-          {
-            metadata: { name: 'csa-run-eligibility-123' },
-            status: {
-              active: 0,
-              succeeded: 1,
-              failed: 0,
-            },
-          },
-        ],
-      })
-
-      const result = await service.isJobRunning(JobType.RUN_ELIGIBILITY)
-
-      expect(result).toBe(false)
-    })
-
-    it('should return false when job has failed', async () => {
-      mockK8sApi.listNamespacedJob.mockResolvedValue({
-        items: [
-          {
-            metadata: { name: 'csa-run-eligibility-123' },
-            status: {
-              active: 0,
-              succeeded: 0,
-              failed: 1,
-            },
-          },
-        ],
-      })
-
-      const result = await service.isJobRunning(JobType.RUN_ELIGIBILITY)
-
-      expect(result).toBe(false)
-    })
-
-    it('should return false on API error', async () => {
-      mockK8sApi.listNamespacedJob.mockRejectedValue(new Error('API error'))
-
-      const result = await service.isJobRunning(JobType.RUN_ELIGIBILITY)
-
-      expect(result).toBe(false)
-    })
-
-    it('should return false when OpenShift is disabled', async () => {
-      const module = await Test.createTestingModule({
-        providers: [
-          OpenshiftJobLauncher,
-          {
-            provide: ConfigService,
-            useValue: {
-              get: vi.fn((key: string) => {
-                if (key === 'openshift.enabled') return false
-                return undefined
-              }),
-            },
-          },
-        ],
-      }).compile()
-
-      const disabledService = module.get<OpenshiftJobLauncher>(OpenshiftJobLauncher)
-      const result = await disabledService.isJobRunning(JobType.RUN_ELIGIBILITY)
-
-      expect(result).toBe(false)
+    it('should auto-disable when not in-cluster and OPENSHIFT_ENABLED is unset', async () => {
+      const autoService = await createModule(undefined)
+      expect(autoService.isEnabled()).toBe(false)
     })
   })
 
@@ -260,26 +134,21 @@ describe('OpenshiftJobLauncher', () => {
       expect(result.success).toBe(true)
       expect(result.jobName).toBe(`${OPENSHIFT_CRONJOB_NAMES.RUN_ELIGIBILITY}-${jobRunId}`)
       expect(result.message).toContain('created successfully')
-
-      expect(mockK8sApi.readNamespacedCronJob).toHaveBeenCalledWith({
-        name: OPENSHIFT_CRONJOB_NAMES.RUN_ELIGIBILITY,
-        namespace: expect.any(String),
-      })
-
       expect(mockK8sApi.createNamespacedJob).toHaveBeenCalled()
     })
 
-    it('should inject JOB_RUN_ID environment variable', async () => {
+    it('should append --job-run-id container args', async () => {
       const jobRunId = 456
       await service.launchJob(JobType.RUN_ELIGIBILITY, jobRunId)
 
       const createCall = mockK8sApi.createNamespacedJob.mock.calls[0][0]
       const job = createCall.body
 
-      expect(job.spec.template.spec.containers[0].env).toContainEqual({
-        name: 'JOB_RUN_ID',
-        value: jobRunId.toString(),
-      })
+      expect(job.spec.template.spec.containers[0].args).toEqual([
+        '--existing',
+        JOB_RUN_ID_FLAG,
+        jobRunId.toString(),
+      ])
     })
 
     it('should add labels to Job metadata', async () => {
@@ -291,53 +160,23 @@ describe('OpenshiftJobLauncher', () => {
 
       expect(job.metadata.labels).toMatchObject({
         'app.kubernetes.io/name': 'csa-backend',
-        'app.kubernetes.io/component': 'job',
         'csa.job-type': JobType.RUN_ELIGIBILITY,
         'csa.job-run-id': jobRunId.toString(),
       })
     })
 
-    it('should add annotations to Job metadata', async () => {
-      const jobRunId = 999
-      await service.launchJob(JobType.RUN_ELIGIBILITY, jobRunId)
-
-      const createCall = mockK8sApi.createNamespacedJob.mock.calls[0][0]
-      const job = createCall.body
-
-      expect(job.metadata.annotations).toMatchObject({
-        'cronjob.kubernetes.io/instantiate': 'manual',
-        'csa.triggered-by': 'api',
-      })
-    })
-
     it('should not mutate original CronJob template', async () => {
-      const originalEnvLength =
-        mockCronJob.spec.jobTemplate.spec.template.spec.containers[0].env.length
+      const originalArgs = [...mockCronJob.spec.jobTemplate.spec.template.spec.containers[0].args]
 
       await service.launchJob(JobType.RUN_ELIGIBILITY, 123)
 
-      expect(mockCronJob.spec.jobTemplate.spec.template.spec.containers[0].env.length).toBe(
-        originalEnvLength,
+      expect(mockCronJob.spec.jobTemplate.spec.template.spec.containers[0].args).toEqual(
+        originalArgs,
       )
     })
 
     it('should return disabled message when OpenShift is disabled', async () => {
-      const module = await Test.createTestingModule({
-        providers: [
-          OpenshiftJobLauncher,
-          {
-            provide: ConfigService,
-            useValue: {
-              get: vi.fn((key: string) => {
-                if (key === 'openshift.enabled') return false
-                return undefined
-              }),
-            },
-          },
-        ],
-      }).compile()
-
-      const disabledService = module.get<OpenshiftJobLauncher>(OpenshiftJobLauncher)
+      const disabledService = await createModule('false')
       const result = await disabledService.launchJob(JobType.RUN_ELIGIBILITY, 123)
 
       expect(result.success).toBe(false)
@@ -356,45 +195,10 @@ describe('OpenshiftJobLauncher', () => {
       expect(result.message).toContain('not found')
     })
 
-    it('should handle permission denied (403) error', async () => {
-      const error: Partial<Error> & { response?: { statusCode: number } } = new Error('Forbidden')
-      error.response = { statusCode: 403 }
-      mockK8sApi.readNamespacedCronJob.mockRejectedValue(error)
-
-      const result = await service.launchJob(JobType.RUN_ELIGIBILITY, 123)
-
-      expect(result.success).toBe(false)
-      expect(result.message).toContain('Permission denied')
-    })
-
-    it('should handle conflict (409) error', async () => {
-      mockK8sApi.readNamespacedCronJob.mockResolvedValue(mockCronJob)
-      const error: Partial<Error> & { response?: { statusCode: number } } = new Error('Conflict')
-      error.response = { statusCode: 409 }
-      mockK8sApi.createNamespacedJob.mockRejectedValue(error)
-
-      const result = await service.launchJob(JobType.RUN_ELIGIBILITY, 123)
-
-      expect(result.success).toBe(false)
-      expect(result.message).toContain('already exists')
-    })
-
     it('should throw error for unmapped job type', async () => {
       await expect(service.launchJob(JobType.INGEST_DATA, 123)).rejects.toThrow(
         'No CronJob mapping configured',
       )
-    })
-
-    it('should handle CronJob without jobTemplate', async () => {
-      mockK8sApi.readNamespacedCronJob.mockResolvedValue({
-        metadata: { name: 'test-cronjob' },
-        spec: {},
-      })
-
-      const result = await service.launchJob(JobType.RUN_ELIGIBILITY, 123)
-
-      expect(result.success).toBe(false)
-      expect(result.message).toContain('no jobTemplate')
     })
 
     it('should work with AUTO_BATCH job type', async () => {
@@ -428,15 +232,6 @@ describe('OpenshiftJobLauncher', () => {
 
       const result = await service.getJobStatus(JobType.RUN_ELIGIBILITY, 123)
       expect(result.state).toBe('FAILED')
-    })
-
-    it('should return COMPLETED when job has succeeded', async () => {
-      mockK8sApi.readNamespacedJob.mockResolvedValue({
-        status: { active: 0, succeeded: 1, failed: 0 },
-      })
-
-      const result = await service.getJobStatus(JobType.RUN_ELIGIBILITY, 123)
-      expect(result.state).toBe('COMPLETED')
     })
 
     it('should return NOT_FOUND when Kubernetes returns 404', async () => {

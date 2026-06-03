@@ -412,10 +412,7 @@ function App() {
           // Wait for the job to complete
           const completedJob = await waitForEligibilityJobCompletion(runningJob.id, (job) => {
             if (job.status === 'RUNNING') {
-              const progress = getJobRunProgressUpdate(
-                job,
-                'Eligibility query is still running...',
-              )
+              const progress = getJobRunProgressUpdate(job, 'Eligibility query is still running...')
               setSnackbar({
                 open: true,
                 message: progress.message,
@@ -484,10 +481,7 @@ function App() {
         // Wait for the job to complete
         const completedJob = await waitForEligibilityJobCompletion(runningJob.id, (job) => {
           if (job.status === 'RUNNING') {
-            const progress = getJobRunProgressUpdate(
-              job,
-              'Eligibility query is still running...',
-            )
+            const progress = getJobRunProgressUpdate(job, 'Eligibility query is still running...')
             setSnackbar({
               open: true,
               message: progress.message,

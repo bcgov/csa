@@ -110,11 +110,7 @@ export async function getJobRunWarning(
     return undefined
   }
 
-  const openshiftStatus = await getCachedOpenshiftStatus(
-    launcher,
-    job.jobType as JobType,
-    job.id,
-  )
+  const openshiftStatus = await getCachedOpenshiftStatus(launcher, job.jobType as JobType, job.id)
 
   return buildOpenshiftUserWarning(openshiftStatus.state, job.createdAt, nowMs)
 }

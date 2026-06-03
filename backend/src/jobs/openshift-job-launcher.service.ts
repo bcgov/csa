@@ -231,7 +231,11 @@ export class OpenshiftJobLauncher {
       if (podTemplate.spec?.containers) {
         for (const container of podTemplate.spec.containers) {
           const existingArgs = container.args ?? []
-          container.args = [...stripJobRunIdArgs(existingArgs), JOB_RUN_ID_FLAG, jobRunId.toString()]
+          container.args = [
+            ...stripJobRunIdArgs(existingArgs),
+            JOB_RUN_ID_FLAG,
+            jobRunId.toString(),
+          ]
           this.logger.debug(
             `[launchJob] Appended ${JOB_RUN_ID_FLAG}=${jobRunId} to container '${container.name}' args`,
           )

@@ -5728,26 +5728,13 @@ function App() {
                           <Box
                             sx={{
                               display: 'flex',
-                              justifyContent: 'space-between',
+                              justifyContent: 'flex-end',
                               alignItems: 'center',
                               mb: 3,
                               borderBottom: '1px solid #e0e0e0',
                               pb: 2,
                             }}
                           >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                                Batch History
-                              </Typography>
-                              <Tooltip
-                                title="Complete history of all batch submissions for the selected child, including batch status and transaction types."
-                                arrow
-                              >
-                                <IconButton size="small" sx={{ padding: 0.5 }}>
-                                  <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                               <TextField
                                 size="small"
@@ -6153,26 +6140,13 @@ function App() {
                           <Box
                             sx={{
                               display: 'flex',
-                              justifyContent: 'space-between',
+                              justifyContent: 'flex-end',
                               alignItems: 'center',
                               mb: 3,
                               borderBottom: '1px solid #e0e0e0',
                               pb: 2,
                             }}
                           >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                                CSA Audit Trail
-                              </Typography>
-                              <Tooltip
-                                title="Audit entries for selected fields on this contact. Most recent updates appear first."
-                                arrow
-                              >
-                                <IconButton size="small" sx={{ padding: 0.5 }}>
-                                  <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                               <TextField
                                 size="small"

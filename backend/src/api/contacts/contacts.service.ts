@@ -518,11 +518,15 @@ export class ContactsService {
     // If contact is NOT on hold and no reason provided, clear the reason
     const newReason = hasReason ? reason!.trim() : null
 
+    // Do not update hold_by here — that is set on HOLD only. last_updated_by is set so the
+    // audit trigger records the correct Actioned By on Reason changes without reassigning
+    // who put the contact on hold.
     const updated = await this.prisma.contact.update({
       where: { id: contactId },
       data: {
         holdReason: newReason,
-        ...(isOnHold ? { holdBy: userId } : {}),
+        lastUpdatedBy: userId,
+        lastUpdatedAt: new Date(),
       },
       select: { id: true, holdReason: true },
     })

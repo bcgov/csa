@@ -17,9 +17,6 @@ CREATE INDEX idx_contact_audit_trail_contact_actioned_at
 CREATE INDEX idx_contact_audit_trail_actioned_at
   ON csa.contact_audit_trail (actioned_at DESC);
 
-COMMENT ON TABLE csa.contact_audit_trail IS
-  'Audit trail when auditable CSA master fields are added or changed (BL-28)';
-
 CREATE OR REPLACE FUNCTION csa.trg_contacts_audit_trail()
 RETURNS TRIGGER AS $$
 DECLARE

@@ -108,9 +108,9 @@ function buildStagingDataChangedUnions(options: {
 const CHANGED_CONTACTS_CTE = `
     changed_contacts AS (
       ${buildStagingDataChangedUnions({
-  select: 'DISTINCT cases.X_CONTACT_NUM',
-  filterByPerson: false,
-})}
+        select: 'DISTINCT cases.X_CONTACT_NUM',
+        filterByPerson: false,
+      })}
     ),`
 
 /**

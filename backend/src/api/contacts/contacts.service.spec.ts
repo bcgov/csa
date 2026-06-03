@@ -1438,7 +1438,7 @@ describe('ContactsService', () => {
   })
 
   describe('updateHoldReason', () => {
-    it('should update hold reason without updating last_updated audit fields', async () => {
+    it('should update hold reason and last_updated fields without changing hold_by', async () => {
       vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
         id: 1,
         csaStatus: 'on_hold',
@@ -1454,13 +1454,13 @@ describe('ContactsService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             holdReason: 'Reason text',
-            holdBy: 'fin.user',
+            lastUpdatedBy: 'fin.user',
+            lastUpdatedAt: expect.any(Date),
           }),
         }),
       )
       const updateData = updateSpy.mock.calls[0][0].data as Record<string, unknown>
-      expect(updateData).not.toHaveProperty('lastUpdatedBy')
-      expect(updateData).not.toHaveProperty('lastUpdatedAt')
+      expect(updateData).not.toHaveProperty('holdBy')
     })
   })
 

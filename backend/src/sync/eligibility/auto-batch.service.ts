@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common'
-import { AppLogger } from 'src/common/logger/app-logger'
+import { BatchesService } from 'src/api/batches/batches.service'
 import { TRANSACTION_TYPES } from 'src/api/contacts/constants'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { AppLogger } from 'src/common/logger/app-logger'
 import { BATCH_STATUS } from 'src/common/state-machine/constants/batch-status.constants'
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
 
@@ -18,7 +19,10 @@ export interface AutoBatchResult {
 export class AutoBatchService {
   private readonly logger = new AppLogger(AutoBatchService.name)
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly batchesService: BatchesService,
+  ) {}
 
   async run(): Promise<AutoBatchResult> {
     const rows = await this.prisma.$queryRawUnsafe<{ person_id_icm: string; csa_status: string }[]>(
@@ -48,21 +52,8 @@ export class AutoBatchService {
     )
     const idMap = new Map(contactRows.map((row) => [row.person_id_icm, row.id]))
 
-    const [existingBatch] = await this.prisma.$queryRawUnsafe<{ id: number }[]>(
-      `SELECT id FROM batches WHERE status = $1 LIMIT 1`,
-      BATCH_STATUS.PENDING,
-    )
-    let batchId: number
-    if (existingBatch) {
-      batchId = existingBatch.id
-    } else {
-      const [newBatch] = await this.prisma.$queryRawUnsafe<{ id: number }[]>(
-        `INSERT INTO batches (batch_date, status, record_count, created_at, updated_at)
-         VALUES (CURRENT_DATE, $1, 0, NOW(), NOW()) RETURNING id`,
-        BATCH_STATUS.PENDING,
-      )
-      batchId = newBatch.id
-    }
+    const pendingBatch = await this.batchesService.findOrCreatePendingBatch()
+    const batchId = pendingBatch.id
 
     const allDbIds = allPersonIds
       .map((pid) => idMap.get(pid))

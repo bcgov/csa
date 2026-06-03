@@ -193,7 +193,14 @@ export function buildLoadContactProfilesSql(
         legal_auth.START_DT
       FROM stg_icm_legal_authority legal_auth
       INNER JOIN eligible_cases ON eligible_cases.CONTACT_ROW_ID = legal_auth.PAR_ROW_ID
-      ORDER BY eligible_cases.X_CONTACT_NUM, legal_auth.START_DT DESC NULLS LAST
+      ORDER BY 
+        eligible_cases.X_CONTACT_NUM,
+        CASE 
+          WHEN legal_auth.EXPIRY_DT IS NULL THEN 0
+          WHEN legal_auth.EXPIRY_DT::DATE >= CURRENT_DATE THEN 0
+          ELSE 1
+        END,
+        legal_auth.START_DT DESC NULLS LAST
     ),
 
     unique_legal_admin AS (

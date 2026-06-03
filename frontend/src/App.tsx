@@ -53,6 +53,7 @@ import {
   getAllBatches,
   getAllContacts,
   getBatchContacts,
+  getContactAuditTrail,
   getContactBatches,
   getLastSuccessfulRuns,
   getRunningEligibilityJob,
@@ -71,6 +72,7 @@ import {
   type Batch,
   type BatchContactDetail,
   type Contact,
+  type ContactAuditTrailEntry,
   type ContactBatchDetail,
   type ContactEligibilityResult,
   type JobRun,
@@ -215,6 +217,12 @@ const COLUMN_LABELS: Record<string, string> = {
   // Batch History columns
   batchRequestStatus: 'Batch Request Status',
   batchDetailStatus: 'Batch Detail Status',
+  // Audit Trail columns
+  actionedBy: 'Actioned By',
+  operation: 'Operation',
+  field: 'Field',
+  oldValue: 'Old Value',
+  newValue: 'New Value',
 }
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
@@ -315,6 +323,8 @@ function App() {
   const [activeColumnFilters, setActiveColumnFilters] = useState<Record<string, string>>({})
   const [selectedChild, setSelectedChild] = useState<number | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<number | null>(null) // No batch selected initially
+  const [isBatchHistoryExpanded, setIsBatchHistoryExpanded] = useState(false)
+  const [isAuditTrailExpanded, setIsAuditTrailExpanded] = useState(false)
 
   // Pre-defined filter state
   const [preDefinedFilter, setPreDefinedFilter] = useState('Pending User review/action')
@@ -544,6 +554,10 @@ function App() {
   const [contactBatchHistory, setContactBatchHistory] = useState<ContactBatchDetail[]>([])
   const [loadingBatchHistory, setLoadingBatchHistory] = useState(false)
 
+  // Audit trail state for selected contact
+  const [contactAuditTrail, setContactAuditTrail] = useState<ContactAuditTrailEntry[]>([])
+  const [loadingAuditTrail, setLoadingAuditTrail] = useState(false)
+
   // Batch requests state
   const [batches, setBatches] = useState<Batch[]>([])
   const [loadingBatches, setLoadingBatches] = useState(false)
@@ -623,6 +637,30 @@ function App() {
     direction: 'asc' | 'desc'
   } | null>(null)
 
+  // Audit Trail search, filter, and sort states
+  const [auditTrailSearchTerm, setAuditTrailSearchTerm] = useState('')
+  const [auditTrailColumnFilters, setAuditTrailColumnFilters] = useState<Record<string, string[]>>({
+    date: [],
+    actionedBy: [],
+    operation: [],
+    field: [],
+    oldValue: [],
+    newValue: [],
+  })
+  const [auditTrailFilterAnchor, setAuditTrailFilterAnchor] = useState<FilterAnchor>({
+    element: null,
+    column: '',
+  })
+  const [auditTrailFilterSearchTerm, setAuditTrailFilterSearchTerm] = useState('')
+  const [auditTrailSortAnchor, setAuditTrailSortAnchor] = useState<SortAnchor>({
+    element: null,
+    column: '',
+  })
+  const [auditTrailSortConfig, setAuditTrailSortConfig] = useState<{
+    column: string
+    direction: 'asc' | 'desc'
+  } | null>(null)
+
   // Batch Requests search, filter, and sort states
   const [batchRequestsSearchTerm, setBatchRequestsSearchTerm] = useState('')
   const [batchRequestsColumnFilters, setBatchRequestsColumnFilters] = useState<
@@ -683,6 +721,7 @@ function App() {
   const [batchRequestsPage, setBatchRequestsPage] = useState(1)
   const [batchDetailsPage, setBatchDetailsPage] = useState(1)
   const [batchHistoryPage, setBatchHistoryPage] = useState(1)
+  const [auditTrailPage, setAuditTrailPage] = useState(1)
   const BATCH_PAGE_SIZE = 10
 
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({
@@ -1955,17 +1994,26 @@ function App() {
   // Fetch batch history for selected contact
   const handleContactClick = async (contactId: number) => {
     setSelectedChild(contactId)
+    setIsBatchHistoryExpanded(false)
+    setIsAuditTrailExpanded(false)
     setLoadingBatchHistory(true)
+    setLoadingAuditTrail(true)
     setSelectedBatchHistoryId(null) // Clear batch history selection when changing contacts
 
     try {
-      const batchHistory = await getContactBatches(contactId)
+      const [batchHistory, auditTrailResponse] = await Promise.all([
+        getContactBatches(contactId),
+        getContactAuditTrail(contactId),
+      ])
       setContactBatchHistory(batchHistory)
+      setContactAuditTrail(auditTrailResponse.data)
     } catch (error) {
-      console.error('Failed to fetch batch history:', error)
+      console.error('Failed to fetch contact history data:', error)
       setContactBatchHistory([])
+      setContactAuditTrail([])
     } finally {
       setLoadingBatchHistory(false)
+      setLoadingAuditTrail(false)
     }
   }
 
@@ -2253,6 +2301,36 @@ function App() {
     return Array.from(new Set(values)).filter((v) => v !== undefined && v !== '')
   }
 
+  // Audit Trail filter handling functions
+  const handleAuditTrailFilterClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
+    setAuditTrailFilterAnchor({ element: event.currentTarget, column })
+    setAuditTrailFilterSearchTerm('')
+  }
+
+  const handleAuditTrailFilterClose = () => {
+    setAuditTrailFilterAnchor({ element: null, column: '' })
+    setAuditTrailFilterSearchTerm('')
+  }
+
+  const handleAuditTrailFilterChange = (column: string, value: string) => {
+    setAuditTrailColumnFilters((prev) => {
+      const currentFilters = prev[column] || []
+      const newFilters = currentFilters.includes(value)
+        ? currentFilters.filter((v) => v !== value)
+        : [...currentFilters, value]
+      return { ...prev, [column]: newFilters }
+    })
+  }
+
+  const clearAuditTrailColumnFilter = (column: string) => {
+    setAuditTrailColumnFilters((prev) => ({ ...prev, [column]: [] }))
+  }
+
+  const getAuditTrailUniqueValues = (column: string) => {
+    const values = contactAuditTrail.map((row) => row[column as keyof ContactAuditTrailEntry])
+    return Array.from(new Set(values)).filter((v) => v !== undefined && v !== '')
+  }
+
   // Batch Requests filter handling functions
   const handleBatchRequestsFilterClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
     setBatchRequestsFilterAnchor({ element: event.currentTarget, column })
@@ -2360,6 +2438,20 @@ function App() {
   const handleBatchHistorySort = (column: string, direction: 'asc' | 'desc') => {
     setBatchHistorySortConfig({ column, direction })
     handleBatchHistorySortClose()
+  }
+
+  // Audit Trail sort handling functions
+  const handleAuditTrailSortClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
+    setAuditTrailSortAnchor({ element: event.currentTarget, column })
+  }
+
+  const handleAuditTrailSortClose = () => {
+    setAuditTrailSortAnchor({ element: null, column: '' })
+  }
+
+  const handleAuditTrailSort = (column: string, direction: 'asc' | 'desc') => {
+    setAuditTrailSortConfig({ column, direction })
+    handleAuditTrailSortClose()
   }
 
   // Batch Requests sort handling functions
@@ -2625,6 +2717,72 @@ function App() {
     return Math.ceil(filteredBatchHistory.length / BATCH_PAGE_SIZE)
   }, [filteredBatchHistory.length])
 
+  // Filter audit trail data (frontend-only filtering)
+  const filteredAuditTrail = useMemo(() => {
+    let data = [...contactAuditTrail]
+
+    // Apply global search across all columns
+    if (auditTrailSearchTerm) {
+      const searchLower = auditTrailSearchTerm.toLowerCase()
+      data = data.filter((row) => {
+        return (
+          row.date.toLowerCase().includes(searchLower) ||
+          row.actionedBy.toLowerCase().includes(searchLower) ||
+          row.operation.toLowerCase().includes(searchLower) ||
+          row.field.toLowerCase().includes(searchLower) ||
+          row.oldValue.toLowerCase().includes(searchLower) ||
+          row.newValue.toLowerCase().includes(searchLower)
+        )
+      })
+    }
+
+    // Apply column-specific filters
+    for (const [column, filters] of Object.entries(auditTrailColumnFilters)) {
+      if (filters.length > 0) {
+        data = data.filter((row) => {
+          const columnValue = String(row[column as keyof ContactAuditTrailEntry])
+          return filters.includes(columnValue)
+        })
+      }
+    }
+
+    // Apply sorting
+    if (auditTrailSortConfig) {
+      const { column, direction } = auditTrailSortConfig
+      const dateColumns = ['date']
+      data.sort((a, b) => {
+        const aValue = String(a[column as keyof ContactAuditTrailEntry] || '')
+        const bValue = String(b[column as keyof ContactAuditTrailEntry] || '')
+
+        if (dateColumns.includes(column)) {
+          const aDate = parseFormattedDate(aValue)
+          const bDate = parseFormattedDate(bValue)
+          if (aDate && bDate) {
+            const comparison = aDate.getTime() - bDate.getTime()
+            return direction === 'asc' ? comparison : -comparison
+          }
+          if (aDate && !bDate) return direction === 'asc' ? 1 : -1
+          if (!aDate && bDate) return direction === 'asc' ? -1 : 1
+        }
+
+        const comparison = aValue.localeCompare(bValue, undefined, { numeric: true })
+        return direction === 'asc' ? comparison : -comparison
+      })
+    }
+
+    return data
+  }, [contactAuditTrail, auditTrailSearchTerm, auditTrailColumnFilters, auditTrailSortConfig])
+
+  // Paginated audit trail
+  const paginatedAuditTrail = useMemo(() => {
+    const startIndex = (auditTrailPage - 1) * BATCH_PAGE_SIZE
+    return filteredAuditTrail.slice(startIndex, startIndex + BATCH_PAGE_SIZE)
+  }, [filteredAuditTrail, auditTrailPage])
+
+  const auditTrailTotalPages = useMemo(() => {
+    return Math.ceil(filteredAuditTrail.length / BATCH_PAGE_SIZE)
+  }, [filteredAuditTrail.length])
+
   // Filter batch requests data
   const filteredBatchRequests = useMemo(() => {
     // Transform API data to match table structure
@@ -2815,6 +2973,10 @@ function App() {
   useEffect(() => {
     setBatchHistoryPage(1)
   }, [batchHistorySearchTerm, batchHistoryColumnFilters, selectedChild])
+
+  useEffect(() => {
+    setAuditTrailPage(1)
+  }, [auditTrailSearchTerm, auditTrailColumnFilters, selectedChild])
 
   return (
     <Box
@@ -4272,6 +4434,122 @@ function App() {
                   </Box>
                 </Menu>
 
+                {/* Audit Trail Sort Menu */}
+                <Menu
+                  anchorEl={auditTrailSortAnchor.element}
+                  open={Boolean(auditTrailSortAnchor.element)}
+                  onClose={handleAuditTrailSortClose}
+                  PaperProps={{
+                    sx: {
+                      width: 200,
+                    },
+                  }}
+                >
+                  <MenuItem
+                    onClick={() => handleAuditTrailSort(auditTrailSortAnchor.column, 'asc')}
+                    sx={{ gap: 1.5 }}
+                  >
+                    <ArrowUpwardIcon fontSize="small" />
+                    <Typography variant="body2">Sort Ascending</Typography>
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => handleAuditTrailSort(auditTrailSortAnchor.column, 'desc')}
+                    sx={{ gap: 1.5 }}
+                  >
+                    <ArrowDownwardIcon fontSize="small" />
+                    <Typography variant="body2">Sort Descending</Typography>
+                  </MenuItem>
+                </Menu>
+
+                {/* Audit Trail Filter Menu */}
+                <Menu
+                  anchorEl={auditTrailFilterAnchor.element}
+                  open={Boolean(auditTrailFilterAnchor.element)}
+                  onClose={handleAuditTrailFilterClose}
+                  PaperProps={{
+                    sx: {
+                      maxHeight: 400,
+                      width: 250,
+                    },
+                  }}
+                >
+                  <Box sx={{ p: 2 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mb: 1,
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        Filter by{' '}
+                        {COLUMN_LABELS[auditTrailFilterAnchor.column] ||
+                          auditTrailFilterAnchor.column}
+                      </Typography>
+                      <Button
+                        size="small"
+                        onClick={() => {
+                          clearAuditTrailColumnFilter(auditTrailFilterAnchor.column)
+                          handleAuditTrailFilterClose()
+                        }}
+                        sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                      >
+                        Clear
+                      </Button>
+                    </Box>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      placeholder="Search"
+                      value={auditTrailFilterSearchTerm}
+                      onChange={(e) => setAuditTrailFilterSearchTerm(e.target.value)}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Box component="span" sx={{ fontSize: '18px' }}>
+                              🔍
+                            </Box>
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ mb: 1 }}
+                    />
+                    <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                      {auditTrailFilterAnchor.column &&
+                        getAuditTrailUniqueValues(auditTrailFilterAnchor.column)
+                          .sort()
+                          .filter((value) =>
+                            String(value)
+                              .toLowerCase()
+                              .includes(auditTrailFilterSearchTerm.toLowerCase()),
+                          )
+                          .map((value) => (
+                            <Box
+                              key={String(value)}
+                              sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                            >
+                              <Checkbox
+                                size="small"
+                                checked={
+                                  auditTrailColumnFilters[auditTrailFilterAnchor.column]?.includes(
+                                    String(value),
+                                  ) || false
+                                }
+                                onChange={() =>
+                                  handleAuditTrailFilterChange(
+                                    auditTrailFilterAnchor.column,
+                                    String(value),
+                                  )
+                                }
+                              />
+                              <Typography variant="body2">{String(value)}</Typography>
+                            </Box>
+                          ))}
+                    </Box>
+                  </Box>
+                </Menu>
+
                 {/* Details Section */}
                 {selectedChild !== null && (
                   <Box sx={{ mt: 3 }}>
@@ -5402,15 +5680,18 @@ function App() {
                 {/* Batch History Section */}
                 {selectedChild !== null && (
                   <Box sx={{ mt: 3 }}>
-                    <Paper sx={{ p: 3 }}>
+                    <Paper sx={{ p: 0, overflow: 'hidden' }}>
                       <Box
+                        onClick={() => setIsBatchHistoryExpanded((prev) => !prev)}
                         sx={{
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          mb: 3,
-                          borderBottom: '1px solid #e0e0e0',
-                          pb: 2,
+                          px: 3,
+                          py: 2,
+                          backgroundColor: '#f5f5f5',
+                          borderBottom: isBatchHistoryExpanded ? '1px solid #e0e0e0' : 'none',
+                          cursor: 'pointer',
                         }}
                       >
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -5421,354 +5702,758 @@ function App() {
                             title="Complete history of all batch submissions for the selected child, including batch status and transaction types."
                             arrow
                           >
-                            <IconButton size="small" sx={{ padding: 0.5 }}>
+                            <IconButton
+                              size="small"
+                              sx={{ padding: 0.5 }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
                             </IconButton>
                           </Tooltip>
                         </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <TextField
-                            size="small"
-                            placeholder="Search batch history..."
-                            value={batchHistorySearchTerm}
-                            onChange={(e) => setBatchHistorySearchTerm(e.target.value)}
-                            InputProps={{
-                              startAdornment: (
-                                <InputAdornment position="start">
-                                  <Box component="span" sx={{ fontSize: '18px' }}>
-                                    🔍
-                                  </Box>
-                                </InputAdornment>
-                              ),
-                              endAdornment: batchHistorySearchTerm && (
-                                <InputAdornment position="end">
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => setBatchHistorySearchTerm('')}
-                                    edge="end"
-                                  >
-                                    <CloseIcon fontSize="small" />
-                                  </IconButton>
-                                </InputAdornment>
-                              ),
-                            }}
-                            sx={{ width: '300px' }}
-                          />
-                          <Tooltip title="Clear all filters and sorting" arrow>
-                            <span>
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                startIcon={<FilterAltOffIcon />}
-                                disabled={
-                                  !batchHistorySearchTerm &&
-                                  !batchHistorySortConfig &&
-                                  Object.values(batchHistoryColumnFilters).every(
-                                    (arr) => arr.length === 0,
-                                  )
-                                }
-                                onClick={() => {
-                                  setBatchHistorySearchTerm('')
-                                  setBatchHistoryColumnFilters({
-                                    batchId: [],
-                                    batchDate: [],
-                                    batchRequestStatus: [],
-                                    transactionType: [],
-                                    batchDetailStatus: [],
-                                    systemComments: [],
-                                  })
-                                  setBatchHistorySortConfig(null)
-                                  setBatchHistoryPage(1)
-                                }}
-                                sx={{
-                                  textTransform: 'none',
-                                  minWidth: 'auto',
-                                  '&.Mui-disabled': {
-                                    opacity: 0.5,
-                                  },
-                                }}
-                              >
-                                Clear Filters
-                              </Button>
-                            </span>
-                          </Tooltip>
-                          <Button
-                            variant="contained"
-                            size="small"
-                            disabled={!canRemoveFromBatch || isRunningEligibilityAll}
-                            onClick={handleRemoveFromBatch}
-                            sx={{
-                              textTransform: 'none',
-                              backgroundColor: '#1976d2',
-                              '&:hover': {
-                                backgroundColor: '#1565c0',
-                              },
-                              '&.Mui-disabled': {
-                                backgroundColor: '#e0e0e0',
-                                color: '#9e9e9e',
-                              },
-                            }}
-                          >
-                            Remove from Batch
-                          </Button>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#666' }}>
+                          <Typography variant="body2">
+                            {isBatchHistoryExpanded ? 'Collapse' : 'Expand'}
+                          </Typography>
+                          {isBatchHistoryExpanded ? (
+                            <ArrowUpwardIcon fontSize="small" />
+                          ) : (
+                            <ArrowDownwardIcon fontSize="small" />
+                          )}
                         </Box>
                       </Box>
 
-                      {/* Batch History Table */}
-                      <TableContainer>
-                        <Table size="small">
-                          <TableHead>
-                            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                              <TableCell sx={{ fontWeight: 600 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <span
-                                    onClick={(e) => handleBatchHistorySortClick(e, 'batchId')}
-                                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                                  >
-                                    Batch ID
-                                  </span>
-                                  <IconButton
+                      {isBatchHistoryExpanded && (
+                        <Box sx={{ p: 3 }}>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              mb: 3,
+                              borderBottom: '1px solid #e0e0e0',
+                              pb: 2,
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                                Batch History
+                              </Typography>
+                              <Tooltip
+                                title="Complete history of all batch submissions for the selected child, including batch status and transaction types."
+                                arrow
+                              >
+                                <IconButton size="small" sx={{ padding: 0.5 }}>
+                                  <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <TextField
+                                size="small"
+                                placeholder="Search batch history..."
+                                value={batchHistorySearchTerm}
+                                onChange={(e) => setBatchHistorySearchTerm(e.target.value)}
+                                InputProps={{
+                                  startAdornment: (
+                                    <InputAdornment position="start">
+                                      <Box component="span" sx={{ fontSize: '18px' }}>
+                                        🔍
+                                      </Box>
+                                    </InputAdornment>
+                                  ),
+                                  endAdornment: batchHistorySearchTerm && (
+                                    <InputAdornment position="end">
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => setBatchHistorySearchTerm('')}
+                                        edge="end"
+                                      >
+                                        <CloseIcon fontSize="small" />
+                                      </IconButton>
+                                    </InputAdornment>
+                                  ),
+                                }}
+                                sx={{ width: '300px' }}
+                              />
+                              <Tooltip title="Clear all filters and sorting" arrow>
+                                <span>
+                                  <Button
+                                    variant="outlined"
                                     size="small"
-                                    onClick={(e) => handleBatchHistoryFilterClick(e, 'batchId')}
+                                    startIcon={<FilterAltOffIcon />}
+                                    disabled={
+                                      !batchHistorySearchTerm &&
+                                      !batchHistorySortConfig &&
+                                      Object.values(batchHistoryColumnFilters).every(
+                                        (arr) => arr.length === 0,
+                                      )
+                                    }
+                                    onClick={() => {
+                                      setBatchHistorySearchTerm('')
+                                      setBatchHistoryColumnFilters({
+                                        batchId: [],
+                                        batchDate: [],
+                                        batchRequestStatus: [],
+                                        transactionType: [],
+                                        batchDetailStatus: [],
+                                        systemComments: [],
+                                      })
+                                      setBatchHistorySortConfig(null)
+                                      setBatchHistoryPage(1)
+                                    }}
                                     sx={{
-                                      padding: 0.5,
-                                      color:
-                                        batchHistoryColumnFilters.batchId?.length > 0
-                                          ? '#1976d2'
-                                          : '#666',
+                                      textTransform: 'none',
+                                      minWidth: 'auto',
+                                      '&.Mui-disabled': {
+                                        opacity: 0.5,
+                                      },
                                     }}
                                   >
-                                    <FilterListIcon fontSize="small" />
-                                  </IconButton>
-                                </Box>
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <span
-                                    onClick={(e) => handleBatchHistorySortClick(e, 'batchDate')}
-                                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                                  >
-                                    Batch Date
-                                  </span>
-                                </Box>
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <span
-                                    onClick={(e) =>
-                                      handleBatchHistorySortClick(e, 'batchRequestStatus')
-                                    }
-                                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                                  >
-                                    Batch Request Status
-                                  </span>
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) =>
-                                      handleBatchHistoryFilterClick(e, 'batchRequestStatus')
-                                    }
-                                    sx={{
-                                      padding: 0.5,
-                                      color:
-                                        batchHistoryColumnFilters.batchRequestStatus?.length > 0
-                                          ? '#1976d2'
-                                          : '#666',
-                                    }}
-                                  >
-                                    <FilterListIcon fontSize="small" />
-                                  </IconButton>
-                                </Box>
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <span
-                                    onClick={(e) =>
-                                      handleBatchHistorySortClick(e, 'transactionType')
-                                    }
-                                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                                  >
-                                    Transaction Type
-                                  </span>
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) =>
-                                      handleBatchHistoryFilterClick(e, 'transactionType')
-                                    }
-                                    sx={{
-                                      padding: 0.5,
-                                      color:
-                                        batchHistoryColumnFilters.transactionType?.length > 0
-                                          ? '#1976d2'
-                                          : '#666',
-                                    }}
-                                  >
-                                    <FilterListIcon fontSize="small" />
-                                  </IconButton>
-                                </Box>
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <span
-                                    onClick={(e) => handleBatchHistorySortClick(e, 'effectiveDate')}
-                                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                                  >
-                                    Effective Date
-                                  </span>
-                                </Box>
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <span
-                                    onClick={(e) =>
-                                      handleBatchHistorySortClick(e, 'batchDetailStatus')
-                                    }
-                                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                                  >
-                                    Batch Detail Status
-                                  </span>
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) =>
-                                      handleBatchHistoryFilterClick(e, 'batchDetailStatus')
-                                    }
-                                    sx={{
-                                      padding: 0.5,
-                                      color:
-                                        batchHistoryColumnFilters.batchDetailStatus?.length > 0
-                                          ? '#1976d2'
-                                          : '#666',
-                                    }}
-                                  >
-                                    <FilterListIcon fontSize="small" />
-                                  </IconButton>
-                                </Box>
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <span
-                                    onClick={(e) =>
-                                      handleBatchHistorySortClick(e, 'systemComments')
-                                    }
-                                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                                  >
-                                    System Comments
-                                  </span>
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) =>
-                                      handleBatchHistoryFilterClick(e, 'systemComments')
-                                    }
-                                    sx={{
-                                      padding: 0.5,
-                                      color:
-                                        batchHistoryColumnFilters.systemComments?.length > 0
-                                          ? '#1976d2'
-                                          : '#666',
-                                    }}
-                                  >
-                                    <FilterListIcon fontSize="small" />
-                                  </IconButton>
-                                </Box>
-                              </TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {loadingBatchHistory ? (
-                              <TableRow>
-                                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                                  <Typography variant="body2" color="text.secondary">
-                                    Loading batch history...
-                                  </Typography>
-                                </TableCell>
-                              </TableRow>
-                            ) : filteredBatchHistory.length === 0 ? (
-                              <TableRow>
-                                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                                  <Typography variant="body2" color="text.secondary">
-                                    {selectedChild
-                                      ? 'No batch history found for this contact'
-                                      : 'Select a contact to view batch history'}
-                                  </Typography>
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              paginatedBatchHistory.map((row) => (
-                                <TableRow
-                                  key={row.id}
-                                  hover
-                                  onClick={() => handleBatchHistoryRowClick(row.id)}
-                                  selected={selectedBatchHistoryId === row.id}
-                                  sx={{
-                                    '&:hover': { backgroundColor: '#f9f9f9' },
-                                    cursor: 'pointer',
-                                    '&.Mui-selected': {
-                                      backgroundColor: '#e3f2fd !important',
-                                    },
-                                    '&.Mui-selected:hover': {
-                                      backgroundColor: '#bbdefb !important',
-                                    },
-                                  }}
-                                >
-                                  <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
-                                    {row.batchId}
-                                  </TableCell>
-                                  <TableCell>{row.batchDate}</TableCell>
-                                  <TableCell>
-                                    {row.batchRequestStatus === 'Pending' && (
-                                      <Box
-                                        component="span"
+                                    Clear Filters
+                                  </Button>
+                                </span>
+                              </Tooltip>
+                              <Button
+                                variant="contained"
+                                size="small"
+                                disabled={!canRemoveFromBatch || isRunningEligibilityAll}
+                                onClick={handleRemoveFromBatch}
+                                sx={{
+                                  textTransform: 'none',
+                                  backgroundColor: '#1976d2',
+                                  '&:hover': {
+                                    backgroundColor: '#1565c0',
+                                  },
+                                  '&.Mui-disabled': {
+                                    backgroundColor: '#e0e0e0',
+                                    color: '#9e9e9e',
+                                  },
+                                }}
+                              >
+                                Remove from Batch
+                              </Button>
+                            </Box>
+                          </Box>
+
+                          {/* Batch History Table */}
+                          <TableContainer>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <span
+                                        onClick={(e) => handleBatchHistorySortClick(e, 'batchId')}
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                      >
+                                        Batch ID
+                                      </span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => handleBatchHistoryFilterClick(e, 'batchId')}
                                         sx={{
-                                          backgroundColor: '#fce4ec',
-                                          color: '#c2185b',
-                                          px: 1.5,
-                                          py: 0.5,
-                                          borderRadius: 1,
-                                          fontSize: '0.75rem',
-                                          fontWeight: 500,
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
+                                          padding: 0.5,
+                                          color:
+                                            batchHistoryColumnFilters.batchId?.length > 0
+                                              ? '#1976d2'
+                                              : '#666',
                                         }}
                                       >
-                                        Pending
-                                      </Box>
-                                    )}
-                                    {row.batchRequestStatus !== 'Pending' && row.batchRequestStatus}
+                                        <FilterListIcon fontSize="small" />
+                                      </IconButton>
+                                    </Box>
                                   </TableCell>
-                                  <TableCell>{row.transactionType}</TableCell>
-                                  <TableCell>{row.effectiveDate}</TableCell>
-                                  <TableCell>{row.batchDetailStatus}</TableCell>
-                                  <TableCell>{row.systemComments}</TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <span
+                                        onClick={(e) => handleBatchHistorySortClick(e, 'batchDate')}
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                      >
+                                        Batch Date
+                                      </span>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <span
+                                        onClick={(e) =>
+                                          handleBatchHistorySortClick(e, 'batchRequestStatus')
+                                        }
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                      >
+                                        Batch Request Status
+                                      </span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) =>
+                                          handleBatchHistoryFilterClick(e, 'batchRequestStatus')
+                                        }
+                                        sx={{
+                                          padding: 0.5,
+                                          color:
+                                            batchHistoryColumnFilters.batchRequestStatus?.length > 0
+                                              ? '#1976d2'
+                                              : '#666',
+                                        }}
+                                      >
+                                        <FilterListIcon fontSize="small" />
+                                      </IconButton>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <span
+                                        onClick={(e) =>
+                                          handleBatchHistorySortClick(e, 'transactionType')
+                                        }
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                      >
+                                        Transaction Type
+                                      </span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) =>
+                                          handleBatchHistoryFilterClick(e, 'transactionType')
+                                        }
+                                        sx={{
+                                          padding: 0.5,
+                                          color:
+                                            batchHistoryColumnFilters.transactionType?.length > 0
+                                              ? '#1976d2'
+                                              : '#666',
+                                        }}
+                                      >
+                                        <FilterListIcon fontSize="small" />
+                                      </IconButton>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <span
+                                        onClick={(e) =>
+                                          handleBatchHistorySortClick(e, 'effectiveDate')
+                                        }
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                      >
+                                        Effective Date
+                                      </span>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <span
+                                        onClick={(e) =>
+                                          handleBatchHistorySortClick(e, 'batchDetailStatus')
+                                        }
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                      >
+                                        Batch Detail Status
+                                      </span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) =>
+                                          handleBatchHistoryFilterClick(e, 'batchDetailStatus')
+                                        }
+                                        sx={{
+                                          padding: 0.5,
+                                          color:
+                                            batchHistoryColumnFilters.batchDetailStatus?.length > 0
+                                              ? '#1976d2'
+                                              : '#666',
+                                        }}
+                                      >
+                                        <FilterListIcon fontSize="small" />
+                                      </IconButton>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <span
+                                        onClick={(e) =>
+                                          handleBatchHistorySortClick(e, 'systemComments')
+                                        }
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                      >
+                                        System Comments
+                                      </span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) =>
+                                          handleBatchHistoryFilterClick(e, 'systemComments')
+                                        }
+                                        sx={{
+                                          padding: 0.5,
+                                          color:
+                                            batchHistoryColumnFilters.systemComments?.length > 0
+                                              ? '#1976d2'
+                                              : '#666',
+                                        }}
+                                      >
+                                        <FilterListIcon fontSize="small" />
+                                      </IconButton>
+                                    </Box>
+                                  </TableCell>
                                 </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
-                      {/* Batch History Pagination */}
-                      {filteredBatchHistory.length > 0 && (
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            mt: 2,
-                            px: 2,
-                            pb: 2,
-                          }}
-                        >
-                          <Typography variant="body2" color="text.secondary">
-                            Showing {paginatedBatchHistory.length} of {filteredBatchHistory.length}{' '}
-                            records
+                              </TableHead>
+                              <TableBody>
+                                {loadingBatchHistory ? (
+                                  <TableRow>
+                                    <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                                      <Typography variant="body2" color="text.secondary">
+                                        Loading batch history...
+                                      </Typography>
+                                    </TableCell>
+                                  </TableRow>
+                                ) : filteredBatchHistory.length === 0 ? (
+                                  <TableRow>
+                                    <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                                      <Typography variant="body2" color="text.secondary">
+                                        {selectedChild
+                                          ? 'No batch history found for this contact'
+                                          : 'Select a contact to view batch history'}
+                                      </Typography>
+                                    </TableCell>
+                                  </TableRow>
+                                ) : (
+                                  paginatedBatchHistory.map((row) => (
+                                    <TableRow
+                                      key={row.id}
+                                      hover
+                                      onClick={() => handleBatchHistoryRowClick(row.id)}
+                                      selected={selectedBatchHistoryId === row.id}
+                                      sx={{
+                                        '&:hover': { backgroundColor: '#f9f9f9' },
+                                        cursor: 'pointer',
+                                        '&.Mui-selected': {
+                                          backgroundColor: '#e3f2fd !important',
+                                        },
+                                        '&.Mui-selected:hover': {
+                                          backgroundColor: '#bbdefb !important',
+                                        },
+                                      }}
+                                    >
+                                      <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
+                                        {row.batchId}
+                                      </TableCell>
+                                      <TableCell>{row.batchDate}</TableCell>
+                                      <TableCell>
+                                        {row.batchRequestStatus === 'Pending' && (
+                                          <Box
+                                            component="span"
+                                            sx={{
+                                              backgroundColor: '#fce4ec',
+                                              color: '#c2185b',
+                                              px: 1.5,
+                                              py: 0.5,
+                                              borderRadius: 1,
+                                              fontSize: '0.75rem',
+                                              fontWeight: 500,
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                            }}
+                                          >
+                                            Pending
+                                          </Box>
+                                        )}
+                                        {row.batchRequestStatus !== 'Pending' &&
+                                          row.batchRequestStatus}
+                                      </TableCell>
+                                      <TableCell>{row.transactionType}</TableCell>
+                                      <TableCell>{row.effectiveDate}</TableCell>
+                                      <TableCell>{row.batchDetailStatus}</TableCell>
+                                      <TableCell>{row.systemComments}</TableCell>
+                                    </TableRow>
+                                  ))
+                                )}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                          {/* Batch History Pagination */}
+                          {filteredBatchHistory.length > 0 && (
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                mt: 2,
+                                px: 2,
+                                pb: 2,
+                              }}
+                            >
+                              <Typography variant="body2" color="text.secondary">
+                                Showing {paginatedBatchHistory.length} of{' '}
+                                {filteredBatchHistory.length} records
+                              </Typography>
+                              <Pagination
+                                count={batchHistoryTotalPages}
+                                page={batchHistoryPage}
+                                onChange={(_, page) => setBatchHistoryPage(page)}
+                                color="primary"
+                                showFirstButton
+                                showLastButton
+                              />
+                            </Box>
+                          )}
+                        </Box>
+                      )}
+                    </Paper>
+                  </Box>
+                )}
+
+                {/* Audit Trail Section */}
+                {selectedChild !== null && (
+                  <Box sx={{ mt: 3 }}>
+                    <Paper sx={{ p: 0, overflow: 'hidden' }}>
+                      <Box
+                        onClick={() => setIsAuditTrailExpanded((prev) => !prev)}
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          px: 3,
+                          py: 2,
+                          backgroundColor: '#f5f5f5',
+                          borderBottom: isAuditTrailExpanded ? '1px solid #e0e0e0' : 'none',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                            CSA Audit Trail
                           </Typography>
-                          <Pagination
-                            count={batchHistoryTotalPages}
-                            page={batchHistoryPage}
-                            onChange={(_, page) => setBatchHistoryPage(page)}
-                            color="primary"
-                            showFirstButton
-                            showLastButton
-                          />
+                          <Tooltip
+                            title="Audit entries for selected fields on this contact. Most recent updates appear first."
+                            arrow
+                          >
+                            <IconButton
+                              size="small"
+                              sx={{ padding: 0.5 }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#666' }}>
+                          <Typography variant="body2">
+                            {isAuditTrailExpanded ? 'Collapse' : 'Expand'}
+                          </Typography>
+                          {isAuditTrailExpanded ? (
+                            <ArrowUpwardIcon fontSize="small" />
+                          ) : (
+                            <ArrowDownwardIcon fontSize="small" />
+                          )}
+                        </Box>
+                      </Box>
+
+                      {isAuditTrailExpanded && (
+                        <Box sx={{ p: 3 }}>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              mb: 3,
+                              borderBottom: '1px solid #e0e0e0',
+                              pb: 2,
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                                CSA Audit Trail
+                              </Typography>
+                              <Tooltip
+                                title="Audit entries for selected fields on this contact. Most recent updates appear first."
+                                arrow
+                              >
+                                <IconButton size="small" sx={{ padding: 0.5 }}>
+                                  <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <TextField
+                                size="small"
+                                placeholder="Search audit trail..."
+                                value={auditTrailSearchTerm}
+                                onChange={(e) => setAuditTrailSearchTerm(e.target.value)}
+                                InputProps={{
+                                  startAdornment: (
+                                    <InputAdornment position="start">
+                                      <Box component="span" sx={{ fontSize: '18px' }}>
+                                        🔍
+                                      </Box>
+                                    </InputAdornment>
+                                  ),
+                                  endAdornment: auditTrailSearchTerm && (
+                                    <InputAdornment position="end">
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => setAuditTrailSearchTerm('')}
+                                        edge="end"
+                                      >
+                                        <CloseIcon fontSize="small" />
+                                      </IconButton>
+                                    </InputAdornment>
+                                  ),
+                                }}
+                                sx={{ width: '300px' }}
+                              />
+                              <Tooltip title="Clear all filters and sorting" arrow>
+                                <span>
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={<FilterAltOffIcon />}
+                                    disabled={
+                                      !auditTrailSearchTerm &&
+                                      !auditTrailSortConfig &&
+                                      Object.values(auditTrailColumnFilters).every(
+                                        (arr) => arr.length === 0,
+                                      )
+                                    }
+                                    onClick={() => {
+                                      setAuditTrailSearchTerm('')
+                                      setAuditTrailColumnFilters({
+                                        date: [],
+                                        actionedBy: [],
+                                        operation: [],
+                                        field: [],
+                                        oldValue: [],
+                                        newValue: [],
+                                      })
+                                      setAuditTrailSortConfig(null)
+                                      setAuditTrailPage(1)
+                                    }}
+                                    sx={{
+                                      textTransform: 'none',
+                                      minWidth: 'auto',
+                                      '&.Mui-disabled': {
+                                        opacity: 0.5,
+                                      },
+                                    }}
+                                  >
+                                    Clear Filters
+                                  </Button>
+                                </span>
+                              </Tooltip>
+                            </Box>
+                          </Box>
+
+                          {/* Audit Trail Table */}
+                          <TableContainer>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <span
+                                        onClick={(e) => handleAuditTrailSortClick(e, 'date')}
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                      >
+                                        Date
+                                      </span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => handleAuditTrailFilterClick(e, 'date')}
+                                        sx={{
+                                          padding: 0.5,
+                                          color:
+                                            auditTrailColumnFilters.date?.length > 0
+                                              ? '#1976d2'
+                                              : '#666',
+                                        }}
+                                      >
+                                        <FilterListIcon fontSize="small" />
+                                      </IconButton>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <span
+                                        onClick={(e) => handleAuditTrailSortClick(e, 'actionedBy')}
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                      >
+                                        Actioned By
+                                      </span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) =>
+                                          handleAuditTrailFilterClick(e, 'actionedBy')
+                                        }
+                                        sx={{
+                                          padding: 0.5,
+                                          color:
+                                            auditTrailColumnFilters.actionedBy?.length > 0
+                                              ? '#1976d2'
+                                              : '#666',
+                                        }}
+                                      >
+                                        <FilterListIcon fontSize="small" />
+                                      </IconButton>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <span
+                                        onClick={(e) => handleAuditTrailSortClick(e, 'operation')}
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                      >
+                                        Operation
+                                      </span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => handleAuditTrailFilterClick(e, 'operation')}
+                                        sx={{
+                                          padding: 0.5,
+                                          color:
+                                            auditTrailColumnFilters.operation?.length > 0
+                                              ? '#1976d2'
+                                              : '#666',
+                                        }}
+                                      >
+                                        <FilterListIcon fontSize="small" />
+                                      </IconButton>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <span
+                                        onClick={(e) => handleAuditTrailSortClick(e, 'field')}
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                      >
+                                        Field
+                                      </span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => handleAuditTrailFilterClick(e, 'field')}
+                                        sx={{
+                                          padding: 0.5,
+                                          color:
+                                            auditTrailColumnFilters.field?.length > 0
+                                              ? '#1976d2'
+                                              : '#666',
+                                        }}
+                                      >
+                                        <FilterListIcon fontSize="small" />
+                                      </IconButton>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <span
+                                        onClick={(e) => handleAuditTrailSortClick(e, 'oldValue')}
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                      >
+                                        Old Value
+                                      </span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => handleAuditTrailFilterClick(e, 'oldValue')}
+                                        sx={{
+                                          padding: 0.5,
+                                          color:
+                                            auditTrailColumnFilters.oldValue?.length > 0
+                                              ? '#1976d2'
+                                              : '#666',
+                                        }}
+                                      >
+                                        <FilterListIcon fontSize="small" />
+                                      </IconButton>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <span
+                                        onClick={(e) => handleAuditTrailSortClick(e, 'newValue')}
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                      >
+                                        New Value
+                                      </span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => handleAuditTrailFilterClick(e, 'newValue')}
+                                        sx={{
+                                          padding: 0.5,
+                                          color:
+                                            auditTrailColumnFilters.newValue?.length > 0
+                                              ? '#1976d2'
+                                              : '#666',
+                                        }}
+                                      >
+                                        <FilterListIcon fontSize="small" />
+                                      </IconButton>
+                                    </Box>
+                                  </TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {loadingAuditTrail ? (
+                                  <TableRow>
+                                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                                      <Typography variant="body2" color="text.secondary">
+                                        Loading audit trail...
+                                      </Typography>
+                                    </TableCell>
+                                  </TableRow>
+                                ) : filteredAuditTrail.length === 0 ? (
+                                  <TableRow>
+                                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                                      <Typography variant="body2" color="text.secondary">
+                                        {selectedChild
+                                          ? 'No audit trail found for this contact'
+                                          : 'Select a contact to view audit trail'}
+                                      </Typography>
+                                    </TableCell>
+                                  </TableRow>
+                                ) : (
+                                  paginatedAuditTrail.map((row) => (
+                                    <TableRow
+                                      key={row.id}
+                                      hover
+                                      sx={{ '&:hover': { backgroundColor: '#f9f9f9' } }}
+                                    >
+                                      <TableCell>{row.date}</TableCell>
+                                      <TableCell>{row.actionedBy}</TableCell>
+                                      <TableCell>{row.operation}</TableCell>
+                                      <TableCell>{row.field}</TableCell>
+                                      <TableCell>{row.oldValue}</TableCell>
+                                      <TableCell>{row.newValue}</TableCell>
+                                    </TableRow>
+                                  ))
+                                )}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+
+                          {/* Audit Trail Pagination */}
+                          {filteredAuditTrail.length > 0 && (
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                mt: 2,
+                                px: 2,
+                                pb: 2,
+                              }}
+                            >
+                              <Typography variant="body2" color="text.secondary">
+                                Showing {paginatedAuditTrail.length} of {filteredAuditTrail.length}{' '}
+                                records
+                              </Typography>
+                              <Pagination
+                                count={auditTrailTotalPages}
+                                page={auditTrailPage}
+                                onChange={(_, page) => setAuditTrailPage(page)}
+                                color="primary"
+                                showFirstButton
+                                showLastButton
+                              />
+                            </Box>
+                          )}
                         </Box>
                       )}
                     </Paper>

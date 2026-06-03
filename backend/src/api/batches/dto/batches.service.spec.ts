@@ -30,6 +30,7 @@ describe('BatchesService', () => {
       findMany: vi.fn(),
       update: vi.fn(),
     },
+    $executeRaw: vi.fn().mockResolvedValue(undefined),
     $transaction: vi.fn().mockImplementation(async (fnOrArray: any) => {
       if (typeof fnOrArray === 'function') {
         return fnOrArray(mockPrismaService)
@@ -219,6 +220,8 @@ describe('BatchesService', () => {
       const result = await service.findOrCreatePendingBatch()
 
       expect(result).toEqual({ ...pendingBatch, statusLabel: 'Pending' })
+      expect(mockPrismaService.$transaction).toHaveBeenCalled()
+      expect(mockPrismaService.$executeRaw).toHaveBeenCalled()
       expect(mockPrismaService.batch.findFirst).toHaveBeenCalledWith({
         where: { status: BATCH_STATUS.PENDING },
       })
@@ -233,6 +236,8 @@ describe('BatchesService', () => {
       const result = await service.findOrCreatePendingBatch()
 
       expect(result).toEqual({ ...newBatch, statusLabel: 'Pending' })
+      expect(mockPrismaService.$transaction).toHaveBeenCalled()
+      expect(mockPrismaService.$executeRaw).toHaveBeenCalled()
       expect(mockPrismaService.batch.create).toHaveBeenCalledWith({
         data: {
           batchDate: null,

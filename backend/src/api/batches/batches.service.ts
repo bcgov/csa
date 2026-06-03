@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from 'src/common/database/prisma.service'
 import {
   BATCH_DETAIL_STATUS,
@@ -23,6 +24,10 @@ import { ContactsService } from '../contacts/contacts.service'
 import { BulkOperationResponse } from '../contacts/interfaces'
 
 const { BATCH_INITIATED_BY, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
+
+/** Serializes find-or-create pending batch across API replicas (pg_advisory_xact_lock). */
+const PENDING_BATCH_ADVISORY_LOCK_CLASS = 2847
+const PENDING_BATCH_ADVISORY_LOCK_OBJECT = 1
 
 class TransitionSkipError extends Error {
   constructor(public readonly reason: string) {
@@ -207,12 +212,19 @@ export class BatchesService {
   }
 
   async findOrCreatePendingBatch() {
-    let pendingBatch = await this.prisma.batch.findFirst({
-      where: { status: BATCH_STATUS.PENDING },
-    })
+    const pendingBatch = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(${PENDING_BATCH_ADVISORY_LOCK_CLASS}, ${PENDING_BATCH_ADVISORY_LOCK_OBJECT})`,
+      )
 
-    if (!pendingBatch) {
-      pendingBatch = await this.prisma.batch.create({
+      const existing = await tx.batch.findFirst({
+        where: { status: BATCH_STATUS.PENDING },
+      })
+      if (existing) {
+        return existing
+      }
+
+      return tx.batch.create({
         data: {
           batchDate: null,
           status: BATCH_STATUS.PENDING,
@@ -221,7 +233,7 @@ export class BatchesService {
           createdAt: new Date(),
         },
       })
-    }
+    })
 
     return enrichLabels(pendingBatch)
   }

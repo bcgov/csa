@@ -227,6 +227,7 @@ const COLUMN_LABELS: Record<string, string> = {
 }
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
+const HOLD_REASON_PREVIEW_LENGTH = 150
 
 const toYMD = (date: Date, timeZone: string): string => {
   const parts = new Intl.DateTimeFormat('en-US', { ...DATE_FORMAT, timeZone }).formatToParts(date)
@@ -287,6 +288,13 @@ const parseFormattedDate = (dateStr: string): Date | null => {
     parseInt(minute),
     parseInt(second),
   )
+}
+
+const getHoldReasonPreview = (reason: string): string => {
+  if (reason.length <= HOLD_REASON_PREVIEW_LENGTH) {
+    return reason
+  }
+  return `${reason.slice(0, HOLD_REASON_PREVIEW_LENGTH)}...`
 }
 
 // Capitalize first letter of a string
@@ -3901,9 +3909,23 @@ function App() {
                           <TableCell>{row.caseStatus}</TableCell>
                           <TableCell>{row.legacyFile}</TableCell>
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
-                          <TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <span>{row.holdReason || ''}</span>
+                              {row.holdReason ? (
+                                row.holdReason.length > HOLD_REASON_PREVIEW_LENGTH ? (
+                                  <Tooltip title={row.holdReason} arrow>
+                                    <Typography component="span" sx={{ whiteSpace: 'nowrap' }}>
+                                      {getHoldReasonPreview(row.holdReason)}
+                                    </Typography>
+                                  </Tooltip>
+                                ) : (
+                                  <Typography component="span" sx={{ whiteSpace: 'nowrap' }}>
+                                    {row.holdReason}
+                                  </Typography>
+                                )
+                              ) : (
+                                <Typography component="span" sx={{ whiteSpace: 'nowrap' }} />
+                              )}
                               {row.csaStatusRaw === 'on_hold' && (
                                 <Tooltip title="Edit hold reason">
                                   <IconButton

@@ -3909,7 +3909,7 @@ function App() {
                           <TableCell>{row.caseStatus}</TableCell>
                           <TableCell>{row.legacyFile}</TableCell>
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
-                          <TableCell sx={{ minWidth: 280, maxWidth: 320 }}>
+                          <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
                               {row.holdReason ? (
                                 row.holdReason.length > HOLD_REASON_PREVIEW_LENGTH ? (
@@ -3917,9 +3917,11 @@ function App() {
                                     <Typography
                                       component="span"
                                       sx={{
+                                        maxWidth: 300,
                                         whiteSpace: 'pre-wrap',
                                         wordBreak: 'break-word',
                                         fontSize: 'inherit',
+                                        display: 'inline-block',
                                       }}
                                     >
                                       {getHoldReasonPreview(row.holdReason)}
@@ -3929,7 +3931,7 @@ function App() {
                                   <Typography
                                     component="span"
                                     sx={{
-                                      whiteSpace: 'pre-wrap',
+                                      whiteSpace: 'normal',
                                       wordBreak: 'break-word',
                                       fontSize: 'inherit',
                                     }}

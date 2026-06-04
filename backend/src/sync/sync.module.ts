@@ -1,7 +1,6 @@
 import { HttpModule } from '@nestjs/axios'
 import { Module, OnModuleInit } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
-import { BatchesModule } from 'src/api/batches/batches.module'
 import { PrismaModule } from 'src/common/database/prisma.module'
 import { adminConfig } from 'src/config/admin.config'
 import { icmConfig } from 'src/config/icm.config'
@@ -33,7 +32,6 @@ import { MisService } from './mis/mis.service'
     HttpModule,
     PrismaModule,
     JobsModule,
-    BatchesModule,
     IcmSyncBackModule,
     EligibilityModule,
   ],

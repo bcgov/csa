@@ -241,9 +241,130 @@ describe('WeeklyContactMatcherService', () => {
       // findMany called once (in loadCandidates), not per findMatchingBatchDetail call
       expect(mockPrisma.contactBatchDetail.findMany).toHaveBeenCalledTimes(1)
     })
+
+    it('should match when CRA returns uppercase and snapshot is title case', async () => {
+      await loadWith([
+        makeBatchDetail({
+          craMatchingSnapshot: makeSnapshot({
+            ccraDinNum: '',
+            childGivenName: 'Acoose Scotty',
+            childMiddleName: '',
+            childSurName: 'Caston',
+            childBirthDate: '20260225',
+            childBirthCity: 'Kelowna',
+          }),
+        }),
+      ])
+
+      const result = await service.findMatchingBatchDetail({
+        childDin: '261552376',
+        childGivenName: 'ACOOSE SCOTTY',
+        childInitial: '',
+        childSurName: 'CASTON',
+        childSex: 'M',
+        childBirthDate: '20260225',
+        childBirthCity: 'KELOWNA',
+        childBirthProv: 'BC',
+        childBirthCountry: 'CA',
+      })
+
+      expect(result).toEqual({
+        id: 10,
+        contactId: 1,
+        batchId: 5,
+        transactionType: 'application',
+        systemComments: null,
+        contact: { din: null },
+      })
+    })
+
+    it('should match when CRA returns uppercase initial and snapshot middle name is title case', async () => {
+      await loadWith([
+        makeBatchDetail({
+          craMatchingSnapshot: makeSnapshot({
+            ccraDinNum: '',
+            childGivenName: 'Savion',
+            childMiddleName: 'Derik',
+            childSurName: 'Hayes',
+            childBirthDate: '20260406',
+            childBirthCity: 'Surrey',
+          }),
+        }),
+      ])
+
+      const result = await service.findMatchingBatchDetail({
+        childDin: '260941182',
+        childGivenName: 'SAVION',
+        childInitial: 'D',
+        childSurName: 'HAYES',
+        childSex: 'M',
+        childBirthDate: '20260406',
+        childBirthCity: 'SURREY',
+        childBirthProv: 'BC',
+        childBirthCountry: 'CA',
+      })
+
+      expect(result).not.toBeNull()
+    })
+
+    it('should match when CRA returns lowercase sex and snapshot is uppercase', async () => {
+      await loadWith([
+        makeBatchDetail({
+          craMatchingSnapshot: makeSnapshot({
+            ccraDinNum: '',
+            childSex: 'M',
+          }),
+        }),
+      ])
+
+      const result = await service.findMatchingBatchDetail({
+        ...wklDetail,
+        childDin: '',
+        childSex: 'm',
+      })
+
+      expect(result).not.toBeNull()
+    })
+
+    it('should match snapshot country when WKL returns lowercase ca', async () => {
+      await loadWith([
+        makeBatchDetail({
+          craMatchingSnapshot: makeSnapshot({
+            ccraDinNum: '',
+            childBirthCountry: 'CA',
+          }),
+        }),
+      ])
+
+      const result = await service.findMatchingBatchDetail({
+        ...wklDetail,
+        childDin: '',
+        childBirthCountry: 'ca',
+      })
+
+      expect(result).not.toBeNull()
+    })
+  })
+
+  describe('mapWeeklyFileGender', () => {
+    it('should map lowercase WKL sex codes to CSA gender values', () => {
+      expect(service.mapWeeklyFileGender('m')).toBe('Man/Boy')
+      expect(service.mapWeeklyFileGender('f')).toBe('Woman/Girl')
+      expect(service.mapWeeklyFileGender('x')).toEqual({ in: ['Unknown', 'Non-Binary'] })
+    })
   })
 
   describe('findMatchingContact', () => {
+    it('should map lowercase WKL sex when matching contact by details', async () => {
+      mockPrisma.contact.findMany.mockResolvedValueOnce([]) // DIN
+      mockPrisma.contact.findMany.mockResolvedValueOnce([])
+
+      await service.findMatchingContact({ ...wklDetail, childDin: 'UNKNOWN', childSex: 'm' })
+
+      const detailQuery = mockPrisma.contact.findMany.mock.calls[1][0]
+      expect(detailQuery.where.gender).toBe('Man/Boy')
+    })
+
     it('should match contact by DIN', async () => {
       mockPrisma.contact.findMany.mockResolvedValue([
         { id: 10, din: 'DIN123', csaStatus: 'batch_sent_application' },
@@ -332,6 +453,28 @@ describe('WeeklyContactMatcherService', () => {
       })
     })
 
+    it('should query Canada-equivalent contacts when WKL country is lowercase ca', async () => {
+      mockPrisma.contact.findMany.mockResolvedValueOnce([]) // DIN
+      mockPrisma.contact.findMany.mockResolvedValueOnce([])
+
+      await service.findMatchingContact({
+        childDin: 'UNKNOWN',
+        childGivenName: 'JANE',
+        childInitial: '',
+        childSurName: 'SMITH',
+        childSex: 'F',
+        childBirthDate: '20120315',
+        childBirthCity: 'VANCOUVER',
+        childBirthProv: 'BC',
+        childBirthCountry: 'ca',
+      })
+
+      const detailQuery = mockPrisma.contact.findMany.mock.calls[1][0]
+      expect(detailQuery.where.AND[1]).toEqual({
+        OR: [{ birthCountry: 'CA' }, { birthCountry: '' }, { birthCountry: null }],
+      })
+    })
+
     it('should query non-Canada contacts when WKL country is EX', async () => {
       mockPrisma.contact.findMany.mockResolvedValueOnce([]) // DIN
       mockPrisma.contact.findMany.mockResolvedValueOnce([
@@ -372,7 +515,9 @@ describe('WeeklyContactMatcherService', () => {
         })
 
         const detailQuery = mockPrisma.contact.findMany.mock.calls[1][0]
-        expect(detailQuery.where.AND[0].OR).toEqual([{ firstName: 'JOHN' }])
+        expect(detailQuery.where.AND[0].OR).toEqual([
+          { firstName: { equals: 'JOHN', mode: 'insensitive' } },
+        ])
       })
 
       it('Pattern A: WKL has first name + initial → middleName startsWith initial', async () => {
@@ -388,7 +533,10 @@ describe('WeeklyContactMatcherService', () => {
 
         const detailQuery = mockPrisma.contact.findMany.mock.calls[1][0]
         expect(detailQuery.where.AND[0].OR).toEqual([
-          { firstName: 'JOHN', middleName: { startsWith: 'R' } },
+          {
+            firstName: { equals: 'JOHN', mode: 'insensitive' },
+            middleName: { startsWith: 'R', mode: 'insensitive' },
+          },
         ])
       })
 
@@ -405,8 +553,11 @@ describe('WeeklyContactMatcherService', () => {
 
         const detailQuery = mockPrisma.contact.findMany.mock.calls[1][0]
         expect(detailQuery.where.AND[0].OR).toEqual([
-          { firstName: 'JOHN ROBERT' },
-          { firstName: 'JOHN', middleName: 'ROBERT' },
+          { firstName: { equals: 'JOHN ROBERT', mode: 'insensitive' } },
+          {
+            firstName: { equals: 'JOHN', mode: 'insensitive' },
+            middleName: { equals: 'ROBERT', mode: 'insensitive' },
+          },
         ])
       })
     })

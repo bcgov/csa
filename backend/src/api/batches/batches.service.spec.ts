@@ -28,6 +28,7 @@ describe('BatchesService', () => {
         create: vi.fn(),
       },
       $executeRaw: vi.fn().mockResolvedValue(undefined),
+      $queryRaw: vi.fn().mockResolvedValue([{ next: 5 }]),
       $transaction: vi.fn().mockImplementation(async (fn: (tx: typeof mockPrisma) => unknown) =>
         fn(mockPrisma),
       ),
@@ -302,6 +303,7 @@ describe('BatchesService', () => {
       mockPrisma.batch.findFirst.mockResolvedValue(null)
       mockPrisma.batch.create.mockResolvedValue({
         id: 99,
+        batchNumber: 5,
         initiatedBy: 'CRA',
         status: 'in_progress',
         recordCount: 0,
@@ -317,6 +319,7 @@ describe('BatchesService', () => {
       expect(mockPrisma.$executeRaw).toHaveBeenCalled()
       expect(mockPrisma.batch.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
+          batchNumber: 5,
           initiatedBy: 'CRA',
           status: 'in_progress',
           recordCount: 0,
@@ -326,13 +329,13 @@ describe('BatchesService', () => {
     })
 
     it('should return existing CRA in_progress batch without creating', async () => {
-      const existing = { id: 67, initiatedBy: 'CRA', status: 'in_progress' }
+      const existing = { id: 67, batchNumber: 3, initiatedBy: 'CRA', status: 'in_progress' }
       mockPrisma.batch.findFirst.mockResolvedValue(existing)
 
       const batch = await service.createWklBatchForUnmatchedRecords(buildHeader())
 
-      expect(batch).toBe(existing)
       expect(mockPrisma.batch.create).not.toHaveBeenCalled()
+      expect(batch).toBe(existing)
     })
   })
 

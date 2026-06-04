@@ -2242,7 +2242,7 @@ function App() {
   const getBatchHistoryUniqueValues = (column: string) => {
     // Transform API data to match the table structure, then get unique values
     const transformedData = contactBatchHistory.map((item) => ({
-      batchId: String(item.batch.id),
+      batchId: String(item.batch.batchNumber),
       batchDate: item.batch.batchDate ? formatDateYMD(item.batch.batchDate) : '',
       batchRequestStatus: item.batch.statusLabel || item.batch.status || '',
       transactionType: capitalize(item.transactionType) || '',
@@ -2291,7 +2291,7 @@ function App() {
       // Map API fields to display fields - must match filteredBatchRequests transformation
       switch (column) {
         case 'batchId':
-          return String(batch.id)
+          return String(batch.batchNumber)
         case 'batchDate':
           return batch.batchDate ? formatDateYMD(batch.batchDate) : ''
         case 'status':
@@ -2546,7 +2546,7 @@ function App() {
     // Map API data to match the expected table structure
     let data = contactBatchHistory.map((item) => ({
       id: item.id,
-      batchId: String(item.batch.id),
+      batchId: String(item.batch.batchNumber),
       batchDate: item.batch.batchDate ? formatDateYMD(item.batch.batchDate) : '',
       batchRequestStatus: item.batch.statusLabel || item.batch.status || '',
       transactionType: capitalize(item.transactionType) || '',
@@ -2630,7 +2630,7 @@ function App() {
     // Transform API data to match table structure
     let data = batches.map((batch) => ({
       id: batch.id,
-      batchId: String(batch.id),
+      batchId: String(batch.batchNumber),
       batchDate: batch.batchDate ? formatDateYMD(batch.batchDate) : '',
       status: batch.statusLabel || batch.status,
       recordCount: batch.recordCount,

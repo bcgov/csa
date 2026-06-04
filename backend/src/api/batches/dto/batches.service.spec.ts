@@ -37,6 +37,8 @@ describe('BatchesService', () => {
       }
       return Promise.all(fnOrArray)
     }),
+    $executeRaw: vi.fn().mockResolvedValue(undefined),
+    $queryRaw: vi.fn().mockResolvedValue([{ next: 5 }]),
   }
 
   const mockContactsService = {
@@ -240,6 +242,7 @@ describe('BatchesService', () => {
       expect(mockPrismaService.$executeRaw).toHaveBeenCalled()
       expect(mockPrismaService.batch.create).toHaveBeenCalledWith({
         data: {
+          batchNumber: 5,
           batchDate: null,
           status: BATCH_STATUS.PENDING,
           recordCount: 0,

@@ -715,6 +715,7 @@ export class ContactsService {
         batch: {
           select: {
             id: true,
+            batchNumber: true,
             batchDate: true,
             status: true,
             systemComments: true,

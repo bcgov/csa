@@ -3912,7 +3912,7 @@ function App() {
                           <TableCell
                             sx={
                               row.holdReason && row.holdReason.length > HOLD_REASON_PREVIEW_LENGTH
-                                ? { minWidth: 460, maxWidth: 520 }
+                                ? { minWidth: 420, maxWidth: 480 }
                                 : undefined
                             }
                           >
@@ -3923,7 +3923,7 @@ function App() {
                                     <Typography
                                       component="span"
                                       sx={{
-                                        maxWidth: 500,
+                                        maxWidth: 460,
                                         whiteSpace: 'pre-wrap',
                                         wordBreak: 'break-word',
                                         fontSize: 'inherit',

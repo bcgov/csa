@@ -190,6 +190,7 @@ export interface BulkOperationResponse {
 
 export interface Batch {
   id: number
+  batchNumber: number
   batchDate: string | null
   status: string
   statusLabel: string
@@ -214,6 +215,7 @@ export interface ContactBatchDetail {
   statusLabel: string | null
   batch: {
     id: number
+    batchNumber: number
     batchDate: string
     status: string
     statusLabel: string

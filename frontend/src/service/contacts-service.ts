@@ -508,8 +508,9 @@ export const runEligibilityForAllWithPolling = async (
 
   // Poll for completion
   const pollInterval = 10000 // 10 seconds
+  const maxAttempts = 60 // 10 minutes max
 
-  for (;;) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const job = await getJobStatus(jobRunId)
 
     if (onProgress) {
@@ -523,6 +524,8 @@ export const runEligibilityForAllWithPolling = async (
     // Wait before next poll
     await new Promise((resolve) => setTimeout(resolve, pollInterval))
   }
+
+  throw new Error('Eligibility job timed out')
 }
 
 /**
@@ -624,8 +627,9 @@ export const waitForEligibilityJobCompletion = async (
   onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
   const pollInterval = 10000 // 10 seconds
+  const maxAttempts = 60 // 10 minutes max
 
-  for (;;) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const job = await getJobStatus(jobId)
 
     if (onProgress) {
@@ -639,6 +643,8 @@ export const waitForEligibilityJobCompletion = async (
     // Wait before next poll
     await new Promise((resolve) => setTimeout(resolve, pollInterval))
   }
+
+  throw new Error('Eligibility job timed out')
 }
 
 /**
@@ -651,8 +657,9 @@ export const waitForAutoBatchJobCompletion = async (
   onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
   const pollInterval = 5000 // 5 seconds
+  const maxAttempts = 60 // 5 minutes max
 
-  for (;;) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const job = await getJobStatus(jobId)
 
     if (onProgress) {
@@ -666,6 +673,8 @@ export const waitForAutoBatchJobCompletion = async (
     // Wait before next poll
     await new Promise((resolve) => setTimeout(resolve, pollInterval))
   }
+
+  throw new Error('Auto-batch job timed out')
 }
 
 /**
@@ -704,8 +713,9 @@ export const runAutoBatchWithPolling = async (
 
   // Poll for completion
   const pollInterval = 5000 // 5 seconds
+  const maxAttempts = 60 // 5 minutes max
 
-  for (;;) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const job = await getJobStatus(jobRunId)
 
     if (onProgress) {
@@ -719,4 +729,6 @@ export const runAutoBatchWithPolling = async (
     // Wait before next poll
     await new Promise((resolve) => setTimeout(resolve, pollInterval))
   }
+
+  throw new Error('Auto-batch job timed out')
 }

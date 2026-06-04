@@ -3909,22 +3909,36 @@ function App() {
                           <TableCell>{row.caseStatus}</TableCell>
                           <TableCell>{row.legacyFile}</TableCell>
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
-                          <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <TableCell sx={{ minWidth: 280, maxWidth: 320 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
                               {row.holdReason ? (
                                 row.holdReason.length > HOLD_REASON_PREVIEW_LENGTH ? (
                                   <Tooltip title={row.holdReason} arrow>
-                                    <Typography component="span" sx={{ whiteSpace: 'nowrap' }}>
+                                    <Typography
+                                      component="span"
+                                      sx={{
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-word',
+                                        fontSize: 'inherit',
+                                      }}
+                                    >
                                       {getHoldReasonPreview(row.holdReason)}
                                     </Typography>
                                   </Tooltip>
                                 ) : (
-                                  <Typography component="span" sx={{ whiteSpace: 'nowrap' }}>
+                                  <Typography
+                                    component="span"
+                                    sx={{
+                                      whiteSpace: 'pre-wrap',
+                                      wordBreak: 'break-word',
+                                      fontSize: 'inherit',
+                                    }}
+                                  >
                                     {row.holdReason}
                                   </Typography>
                                 )
                               ) : (
-                                <Typography component="span" sx={{ whiteSpace: 'nowrap' }} />
+                                <Typography component="span" />
                               )}
                               {row.csaStatusRaw === 'on_hold' && (
                                 <Tooltip title="Edit hold reason">

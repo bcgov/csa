@@ -817,6 +817,18 @@ describe('buildLoadContactProfilesSql', () => {
     expect(sql).not.toContain('eligible_cases.ROW_ID = legal_auth.PAR_ROW_ID')
   })
 
+  it('should select latest legal authority by effective date then expiry (US-39065)', () => {
+    const { sql } = buildLoadContactProfilesSql(null)
+    const cteStart = sql.indexOf('latest_legal_auth AS (')
+    const cteEnd = sql.indexOf('unique_legal_admin AS (', cteStart)
+    const legalAuthCte = sql.slice(cteStart, cteEnd)
+
+    expect(legalAuthCte).toContain('legal_auth.START_DT DESC NULLS LAST')
+    expect(legalAuthCte).toContain('CASE WHEN legal_auth.EXPIRY_DT IS NULL THEN 0 ELSE 1 END')
+    expect(legalAuthCte).toContain('legal_auth.EXPIRY_DT DESC NULLS LAST')
+    expect(legalAuthCte).not.toContain('EXPIRY_DT::DATE >= CURRENT_DATE')
+  })
+
   it('should join MIS data via placement - contract - payment', () => {
     const { sql } = buildLoadContactProfilesSql(null)
 

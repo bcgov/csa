@@ -136,7 +136,7 @@ const CHANGED_CONTACTS_CTE = `
  * CTEs:
  *  - changed_contacts (incremental only): contacts with recently changed data
  *  - eligible_cases: all case rows from staging (filtered by change detection in incremental mode)
- *  - latest_legal_auth: most recent legal authority per person (DISTINCT ON X_CONTACT_NUM)
+ *  - latest_legal_auth: one legal authority per person — latest START_DT, then blank EXPIRY_DT, then latest EXPIRY_DT
  *  - icm_placements_agg: active/interrupted/ended/closed ICM placements grouped by contact
  *  - icm_orders_agg: ICM orders grouped by contact (via placement or agreement line person id)
  *  - icm_agreements_agg: ICM agreements grouped by contact (via placement or agreement line)
@@ -193,14 +193,11 @@ export function buildLoadContactProfilesSql(
         legal_auth.START_DT
       FROM stg_icm_legal_authority legal_auth
       INNER JOIN eligible_cases ON eligible_cases.CONTACT_ROW_ID = legal_auth.PAR_ROW_ID
-      ORDER BY 
+      ORDER BY
         eligible_cases.X_CONTACT_NUM,
-        CASE 
-          WHEN legal_auth.EXPIRY_DT IS NULL THEN 0
-          WHEN legal_auth.EXPIRY_DT::DATE >= CURRENT_DATE THEN 0
-          ELSE 1
-        END,
-        legal_auth.START_DT DESC NULLS LAST
+        legal_auth.START_DT DESC NULLS LAST,
+        CASE WHEN legal_auth.EXPIRY_DT IS NULL THEN 0 ELSE 1 END,
+        legal_auth.EXPIRY_DT DESC NULLS LAST
     ),
 
     unique_legal_admin AS (

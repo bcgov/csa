@@ -11,6 +11,7 @@ import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { BatchesModule } from './batches/batches.module'
 import { ContactsModule } from './contacts/contacts.module'
+import { AuditTrailModule } from './audit-trail/audit-trail.module'
 import { JobsApiModule } from './jobs/jobs.module'
 import { HealthController } from './health/health.controller'
 import { MetricsController } from './metrics/metrics.controller'
@@ -26,6 +27,7 @@ const enableMockApi = process.env.USE_MOCK_DATA === 'true'
     TerminusModule,
     ContactsModule,
     BatchesModule,
+    AuditTrailModule,
     JobsApiModule,
     StateMachineModule,
     AdminModule,

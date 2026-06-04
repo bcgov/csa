@@ -5695,8 +5695,17 @@ function App() {
                         }}
                       >
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                            Batch History
+                          <Typography
+                            variant="h6"
+                            sx={{
+                              fontWeight: 500,
+                              ...(contactBatchHistory.length === 0 && {
+                                fontStyle: 'italic',
+                                color: '#999',
+                              }),
+                            }}
+                          >
+                            Batch History ({contactBatchHistory.length})
                           </Typography>
                           <Tooltip
                             title="Complete history of all batch submissions for the selected child, including batch status and transaction types."
@@ -6107,8 +6116,17 @@ function App() {
                         }}
                       >
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                            CSA Audit Trail
+                          <Typography
+                            variant="h6"
+                            sx={{
+                              fontWeight: 500,
+                              ...(contactAuditTrail.length === 0 && {
+                                fontStyle: 'italic',
+                                color: '#999',
+                              }),
+                            }}
+                          >
+                            CSA Audit Trail ({contactAuditTrail.length})
                           </Typography>
                           <Tooltip
                             title="Audit entries for selected fields on this contact. Most recent updates appear first."

@@ -9,6 +9,7 @@ import { Job } from './interfaces/job.interface'
 import { JobRegistry } from './job-registry.service'
 import { JobRunner } from './job-runner.service'
 import { JobsService } from './jobs.service'
+import { OpenshiftJobLauncher } from './openshift-job-launcher.service'
 
 describe('JobRunner', () => {
   let runner: JobRunner
@@ -58,6 +59,8 @@ describe('JobRunner', () => {
             markFailed: vi.fn().mockResolvedValue(mockJobRun),
             getFailedJobs: vi.fn().mockResolvedValue([]),
             markStuckJobsAsFailed: vi.fn().mockResolvedValue({ count: 0 }),
+            getStuckRunningJobs: vi.fn().mockResolvedValue([]),
+            markStuckJobAsFailed: vi.fn().mockResolvedValue({ count: 1 }),
             resetToRunning: vi.fn().mockResolvedValue(mockJobRun),
           },
         },
@@ -66,6 +69,17 @@ describe('JobRunner', () => {
           useValue: {
             getHandler: vi.fn().mockReturnValue(mockHandler),
             hasHandler: vi.fn().mockReturnValue(true),
+          },
+        },
+        {
+          provide: OpenshiftJobLauncher,
+          useValue: {
+            isEnabled: vi.fn().mockReturnValue(false),
+            hasCronJobMapping: vi.fn().mockReturnValue(false),
+            getJobStatus: vi.fn().mockResolvedValue({
+              state: 'UNKNOWN',
+              message: 'Unknown',
+            }),
           },
         },
       ],
@@ -260,6 +274,57 @@ describe('JobRunner', () => {
       // Should reset existing job to RUNNING (not create a new one)
       expect(jobsService.resetToRunning).toHaveBeenCalledWith(2)
       expect(jobsService.createJob).not.toHaveBeenCalled()
+    })
+
+    it('should skip marking stuck OpenShift jobs when OpenShift reports ACTIVE', async () => {
+      const stuckJob = {
+        ...mockJobRun,
+        id: 9,
+        jobType: JobType.RUN_ELIGIBILITY,
+        startedAt: new Date(Date.now() - 60 * 60 * 1000),
+      }
+
+      const openshift = (runner as any).openshiftJobLauncher as any
+      openshift.isEnabled.mockReturnValue(true)
+      openshift.hasCronJobMapping.mockReturnValue(true)
+      openshift.getJobStatus.mockResolvedValue({
+        state: 'ACTIVE',
+        message: 'Still running',
+      })
+
+      vi.mocked(jobsService.getStuckRunningJobs).mockResolvedValue([stuckJob] as any)
+      vi.mocked(jobsService.getFailedJobs).mockResolvedValue([])
+
+      await runner.processFailedJobs()
+
+      expect(jobsService.markStuckJobAsFailed).not.toHaveBeenCalled()
+    })
+
+    it('should mark stuck OpenShift jobs as failed when OpenShift reports FAILED', async () => {
+      const stuckJob = {
+        ...mockJobRun,
+        id: 10,
+        jobType: JobType.RUN_ELIGIBILITY,
+        startedAt: new Date(Date.now() - 60 * 60 * 1000),
+      }
+
+      const openshift = (runner as any).openshiftJobLauncher as any
+      openshift.isEnabled.mockReturnValue(true)
+      openshift.hasCronJobMapping.mockReturnValue(true)
+      openshift.getJobStatus.mockResolvedValue({
+        state: 'FAILED',
+        message: 'BackoffLimitExceeded',
+      })
+
+      vi.mocked(jobsService.getStuckRunningJobs).mockResolvedValue([stuckJob] as any)
+      vi.mocked(jobsService.getFailedJobs).mockResolvedValue([])
+
+      await runner.processFailedJobs()
+
+      expect(jobsService.markStuckJobAsFailed).toHaveBeenCalledWith(
+        10,
+        'OpenShift job failed: BackoffLimitExceeded',
+      )
     })
 
     it('should skip retry when job of same type is already running (P2002)', async () => {

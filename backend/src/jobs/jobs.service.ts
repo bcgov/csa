@@ -60,8 +60,8 @@ export class JobsService {
   }
 
   async markSuccess(id: number, metadata?: Record<string, unknown>) {
-    return this.prisma.jobRun.update({
-      where: { id },
+    return this.prisma.jobRun.updateMany({
+      where: { id, status: JobStatus.RUNNING },
       data: {
         status: JobStatus.SUCCESS,
         completedAt: new Date(),
@@ -71,8 +71,8 @@ export class JobsService {
   }
 
   async markFailed(id: number, error: string) {
-    return this.prisma.jobRun.update({
-      where: { id },
+    return this.prisma.jobRun.updateMany({
+      where: { id, status: JobStatus.RUNNING },
       data: {
         status: JobStatus.FAILED,
         error,
@@ -141,6 +141,17 @@ export class JobsService {
       data: {
         status: JobStatus.FAILED,
         error: 'Job timed out (stuck)',
+        completedAt: new Date(),
+      },
+    })
+  }
+
+  async markStuckJobAsFailed(id: number, error: string = 'Job timed out (stuck)') {
+    return this.prisma.jobRun.updateMany({
+      where: { id, status: JobStatus.RUNNING },
+      data: {
+        status: JobStatus.FAILED,
+        error,
         completedAt: new Date(),
       },
     })

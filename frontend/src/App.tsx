@@ -55,8 +55,8 @@ import {
   getBatchContacts,
   getContactAuditTrail,
   getContactBatches,
-  getLastSuccessfulRuns,
   getJobRunProgressUpdate,
+  getLastSuccessfulRuns,
   getRunningEligibilityJob,
   holdContacts,
   removeContactFromBatch,
@@ -331,6 +331,7 @@ function App() {
   // Store multiple active column filters: column name -> query value
   const [activeColumnFilters, setActiveColumnFilters] = useState<Record<string, string>>({})
   const [selectedChild, setSelectedChild] = useState<number | null>(null)
+  const [rememberedChildId, setRememberedChildId] = useState<number | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<number | null>(null) // No batch selected initially
   const [isBatchHistoryExpanded, setIsBatchHistoryExpanded] = useState(false)
   const [isAuditTrailExpanded, setIsAuditTrailExpanded] = useState(false)
@@ -1198,8 +1199,19 @@ function App() {
     fetchBatches()
   }, [isAuthenticated])
 
+  const clearSelectedChildContext = (forgetRememberedSelection: boolean = false) => {
+    setSelectedChild(null)
+    setContactBatchHistory([])
+    setSelectedBatchHistoryId(null)
+    setLoadingBatchHistory(false)
+    if (forgetRememberedSelection) {
+      setRememberedChildId(null)
+    }
+  }
+
   // Handle page change
   const handlePageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
+    clearSelectedChildContext()
     setCurrentPage(page)
   }
 
@@ -2013,6 +2025,7 @@ function App() {
     setSelectedChild(contactId)
     setIsBatchHistoryExpanded(false)
     setIsAuditTrailExpanded(false)
+    setRememberedChildId(contactId)
     setLoadingBatchHistory(true)
     setLoadingAuditTrail(true)
     setSelectedBatchHistoryId(null) // Clear batch history selection when changing contacts
@@ -2566,6 +2579,52 @@ function App() {
 
     return data
   }, [contacts])
+
+  useEffect(() => {
+    if (selectedChild === null) return
+
+    const stillVisible = filteredData.some((child) => child.id === selectedChild)
+    if (!stillVisible) {
+      clearSelectedChildContext()
+    }
+  }, [selectedChild, filteredData])
+
+  useEffect(() => {
+    if (selectedChild !== null || rememberedChildId === null) return
+
+    const shouldRestore = filteredData.some((child) => child.id === rememberedChildId)
+    if (!shouldRestore) return
+
+    let cancelled = false
+
+    const restoreSelectedChildContext = async () => {
+      setSelectedChild(rememberedChildId)
+      setLoadingBatchHistory(true)
+      setSelectedBatchHistoryId(null)
+
+      try {
+        const batchHistory = await getContactBatches(rememberedChildId)
+        if (!cancelled) {
+          setContactBatchHistory(batchHistory)
+        }
+      } catch (error) {
+        console.error('Failed to restore batch history:', error)
+        if (!cancelled) {
+          setContactBatchHistory([])
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingBatchHistory(false)
+        }
+      }
+    }
+
+    restoreSelectedChildContext()
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedChild, rememberedChildId, filteredData])
 
   // Check if all selected records have valid CSA status for Hold/Resume
   const canHoldResume = useMemo(() => {
@@ -3912,7 +3971,7 @@ function App() {
                           <TableCell
                             sx={
                               row.holdReason && row.holdReason.length > HOLD_REASON_PREVIEW_LENGTH
-                                ? { minWidth: 420, maxWidth: 480 }
+                                ? { minWidth: 390, maxWidth: 450 }
                                 : undefined
                             }
                           >
@@ -3923,7 +3982,7 @@ function App() {
                                     <Typography
                                       component="span"
                                       sx={{
-                                        maxWidth: 460,
+                                        maxWidth: 430,
                                         whiteSpace: 'pre-wrap',
                                         wordBreak: 'break-word',
                                         fontSize: 'inherit',
@@ -4633,7 +4692,7 @@ function App() {
                         <Button
                           variant="text"
                           size="small"
-                          onClick={() => setSelectedChild(null)}
+                          onClick={() => clearSelectedChildContext(true)}
                           sx={{ textTransform: 'none', color: '#666' }}
                         >
                           Close

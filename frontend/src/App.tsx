@@ -40,7 +40,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { OnHoldDialog } from './components/OnHoldDialog'
 import { getRuntimeConfig } from './config/keycloak.config'
@@ -55,8 +55,8 @@ import {
   getBatchContacts,
   getContactAuditTrail,
   getContactBatches,
-  getLastSuccessfulRuns,
   getJobRunProgressUpdate,
+  getLastSuccessfulRuns,
   getRunningEligibilityJob,
   holdContacts,
   removeContactFromBatch,
@@ -227,6 +227,7 @@ const COLUMN_LABELS: Record<string, string> = {
 }
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
+const HOLD_REASON_PREVIEW_LENGTH = 150
 
 const toYMD = (date: Date, timeZone: string): string => {
   const parts = new Intl.DateTimeFormat('en-US', { ...DATE_FORMAT, timeZone }).formatToParts(date)
@@ -289,6 +290,13 @@ const parseFormattedDate = (dateStr: string): Date | null => {
   )
 }
 
+const getHoldReasonPreview = (reason: string): string => {
+  if (reason.length <= HOLD_REASON_PREVIEW_LENGTH) {
+    return reason
+  }
+  return `${reason.slice(0, HOLD_REASON_PREVIEW_LENGTH)}...`
+}
+
 // Capitalize first letter of a string
 const capitalize = (str: string): string => {
   if (!str) return str
@@ -323,6 +331,8 @@ function App() {
   // Store multiple active column filters: column name -> query value
   const [activeColumnFilters, setActiveColumnFilters] = useState<Record<string, string>>({})
   const [selectedChild, setSelectedChild] = useState<number | null>(null)
+  const [rememberedChildId, setRememberedChildId] = useState<number | null>(null)
+  const restoreBatchHistoryRequestId = useRef(0)
   const [selectedBatch, setSelectedBatch] = useState<number | null>(null) // No batch selected initially
   const [isBatchHistoryExpanded, setIsBatchHistoryExpanded] = useState(false)
   const [isAuditTrailExpanded, setIsAuditTrailExpanded] = useState(false)
@@ -1190,8 +1200,19 @@ function App() {
     fetchBatches()
   }, [isAuthenticated])
 
+  const clearSelectedChildContext = (forgetRememberedSelection: boolean = false) => {
+    setSelectedChild(null)
+    setContactBatchHistory([])
+    setSelectedBatchHistoryId(null)
+    setLoadingBatchHistory(false)
+    if (forgetRememberedSelection) {
+      setRememberedChildId(null)
+    }
+  }
+
   // Handle page change
   const handlePageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
+    clearSelectedChildContext()
     setCurrentPage(page)
   }
 
@@ -2005,6 +2026,7 @@ function App() {
     setSelectedChild(contactId)
     setIsBatchHistoryExpanded(false)
     setIsAuditTrailExpanded(false)
+    setRememberedChildId(contactId)
     setLoadingBatchHistory(true)
     setLoadingAuditTrail(true)
     setSelectedBatchHistoryId(null) // Clear batch history selection when changing contacts
@@ -2558,6 +2580,47 @@ function App() {
 
     return data
   }, [contacts])
+
+  useEffect(() => {
+    if (selectedChild === null) return
+
+    const stillVisible = filteredData.some((child) => child.id === selectedChild)
+    if (!stillVisible) {
+      clearSelectedChildContext()
+    }
+  }, [selectedChild, filteredData])
+
+  useEffect(() => {
+    if (selectedChild !== null || rememberedChildId === null) return
+
+    const shouldRestore = filteredData.some((child) => child.id === rememberedChildId)
+    if (!shouldRestore) return
+
+    const restoreSelectedChildContext = async () => {
+      const requestId = ++restoreBatchHistoryRequestId.current
+      setSelectedChild(rememberedChildId)
+      setLoadingBatchHistory(true)
+      setSelectedBatchHistoryId(null)
+
+      try {
+        const batchHistory = await getContactBatches(rememberedChildId)
+        if (requestId === restoreBatchHistoryRequestId.current) {
+          setContactBatchHistory(batchHistory)
+        }
+      } catch (error) {
+        console.error('Failed to restore batch history:', error)
+        if (requestId === restoreBatchHistoryRequestId.current) {
+          setContactBatchHistory([])
+        }
+      } finally {
+        if (requestId === restoreBatchHistoryRequestId.current) {
+          setLoadingBatchHistory(false)
+        }
+      }
+    }
+
+    restoreSelectedChildContext()
+  }, [selectedChild, rememberedChildId, filteredData])
 
   // Check if all selected records have valid CSA status for Hold/Resume
   const canHoldResume = useMemo(() => {
@@ -3901,9 +3964,45 @@ function App() {
                           <TableCell>{row.caseStatus}</TableCell>
                           <TableCell>{row.legacyFile}</TableCell>
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <span>{row.holdReason || ''}</span>
+                          <TableCell
+                            sx={
+                              row.holdReason && row.holdReason.length > HOLD_REASON_PREVIEW_LENGTH
+                                ? { minWidth: 390, maxWidth: 450 }
+                                : undefined
+                            }
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+                              {row.holdReason ? (
+                                row.holdReason.length > HOLD_REASON_PREVIEW_LENGTH ? (
+                                  <Tooltip title={row.holdReason} arrow>
+                                    <Typography
+                                      component="span"
+                                      sx={{
+                                        maxWidth: 430,
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-word',
+                                        fontSize: 'inherit',
+                                        display: 'inline-block',
+                                      }}
+                                    >
+                                      {getHoldReasonPreview(row.holdReason)}
+                                    </Typography>
+                                  </Tooltip>
+                                ) : (
+                                  <Typography
+                                    component="span"
+                                    sx={{
+                                      whiteSpace: 'normal',
+                                      wordBreak: 'break-word',
+                                      fontSize: 'inherit',
+                                    }}
+                                  >
+                                    {row.holdReason}
+                                  </Typography>
+                                )
+                              ) : (
+                                <Typography component="span" />
+                              )}
                               {row.csaStatusRaw === 'on_hold' && (
                                 <Tooltip title="Edit hold reason">
                                   <IconButton
@@ -4589,7 +4688,7 @@ function App() {
                         <Button
                           variant="text"
                           size="small"
-                          onClick={() => setSelectedChild(null)}
+                          onClick={() => clearSelectedChildContext(true)}
                           sx={{ textTransform: 'none', color: '#666' }}
                         >
                           Close

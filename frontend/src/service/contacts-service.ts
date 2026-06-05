@@ -501,7 +501,7 @@ export const getJobStatus = async (jobId: number): Promise<JobRun> => {
  * @param onProgress - Optional callback for progress updates
  */
 export const runEligibilityForAllWithPolling = async (
-  onProgress?: (status: string) => void,
+  onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
   // Start the job
   const { jobRunId } = await startEligibilityJob()
@@ -514,7 +514,7 @@ export const runEligibilityForAllWithPolling = async (
     const job = await getJobStatus(jobRunId)
 
     if (onProgress) {
-      onProgress(job.status)
+      onProgress(job)
     }
 
     if (job.status === 'SUCCESS' || job.status === 'FAILED') {
@@ -542,7 +542,22 @@ export interface JobRun {
   createdAt: string
   startedAt: string | null
   completedAt: string | null
+  /** Plain-language notice when a running job may be stuck (from GET /jobs). */
+  warning?: string
 }
+
+export type JobRunProgressUpdate = {
+  message: string
+  severity: 'info' | 'warning'
+}
+
+export const getJobRunProgressUpdate = (
+  job: JobRun,
+  runningMessage: string,
+): JobRunProgressUpdate => ({
+  message: job.warning ?? runningMessage,
+  severity: job.warning ? 'warning' : 'info',
+})
 
 export interface JobsResponse {
   data: JobRun[]
@@ -609,7 +624,7 @@ export const getRunningEligibilityJob = async (): Promise<JobRun | null> => {
  */
 export const waitForEligibilityJobCompletion = async (
   jobId: number,
-  onProgress?: (status: string) => void,
+  onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
   const pollInterval = 10000 // 10 seconds
   const maxAttempts = 60 // 10 minutes max
@@ -618,7 +633,7 @@ export const waitForEligibilityJobCompletion = async (
     const job = await getJobStatus(jobId)
 
     if (onProgress) {
-      onProgress(job.status)
+      onProgress(job)
     }
 
     if (job.status === 'SUCCESS' || job.status === 'FAILED') {
@@ -639,7 +654,7 @@ export const waitForEligibilityJobCompletion = async (
  */
 export const waitForAutoBatchJobCompletion = async (
   jobId: number,
-  onProgress?: (status: string) => void,
+  onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
   const pollInterval = 5000 // 5 seconds
   const maxAttempts = 60 // 5 minutes max
@@ -648,7 +663,7 @@ export const waitForAutoBatchJobCompletion = async (
     const job = await getJobStatus(jobId)
 
     if (onProgress) {
-      onProgress(job.status)
+      onProgress(job)
     }
 
     if (job.status === 'SUCCESS' || job.status === 'FAILED') {
@@ -691,7 +706,7 @@ export const getRunningAutoBatchJob = async (): Promise<JobRun | null> => {
  * @param onProgress - Optional callback for progress updates
  */
 export const runAutoBatchWithPolling = async (
-  onProgress?: (status: string) => void,
+  onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
   // Start the job
   const { jobRunId } = await startAutoBatchJob()
@@ -704,7 +719,7 @@ export const runAutoBatchWithPolling = async (
     const job = await getJobStatus(jobRunId)
 
     if (onProgress) {
-      onProgress(job.status)
+      onProgress(job)
     }
 
     if (job.status === 'SUCCESS' || job.status === 'FAILED') {

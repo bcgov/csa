@@ -40,7 +40,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { OnHoldDialog } from './components/OnHoldDialog'
 import { getRuntimeConfig } from './config/keycloak.config'
@@ -332,6 +332,7 @@ function App() {
   const [activeColumnFilters, setActiveColumnFilters] = useState<Record<string, string>>({})
   const [selectedChild, setSelectedChild] = useState<number | null>(null)
   const [rememberedChildId, setRememberedChildId] = useState<number | null>(null)
+  const restoreBatchHistoryRequestId = useRef(0)
   const [selectedBatch, setSelectedBatch] = useState<number | null>(null) // No batch selected initially
   const [isBatchHistoryExpanded, setIsBatchHistoryExpanded] = useState(false)
   const [isAuditTrailExpanded, setIsAuditTrailExpanded] = useState(false)
@@ -2595,35 +2596,30 @@ function App() {
     const shouldRestore = filteredData.some((child) => child.id === rememberedChildId)
     if (!shouldRestore) return
 
-    let cancelled = false
-
     const restoreSelectedChildContext = async () => {
+      const requestId = ++restoreBatchHistoryRequestId.current
       setSelectedChild(rememberedChildId)
       setLoadingBatchHistory(true)
       setSelectedBatchHistoryId(null)
 
       try {
         const batchHistory = await getContactBatches(rememberedChildId)
-        if (!cancelled) {
+        if (requestId === restoreBatchHistoryRequestId.current) {
           setContactBatchHistory(batchHistory)
         }
       } catch (error) {
         console.error('Failed to restore batch history:', error)
-        if (!cancelled) {
+        if (requestId === restoreBatchHistoryRequestId.current) {
           setContactBatchHistory([])
         }
       } finally {
-        if (!cancelled) {
+        if (requestId === restoreBatchHistoryRequestId.current) {
           setLoadingBatchHistory(false)
         }
       }
     }
 
     restoreSelectedChildContext()
-
-    return () => {
-      cancelled = true
-    }
   }, [selectedChild, rememberedChildId, filteredData])
 
   // Check if all selected records have valid CSA status for Hold/Resume

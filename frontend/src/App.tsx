@@ -55,6 +55,7 @@ import {
   getBatchContacts,
   getContactBatches,
   getLastSuccessfulRuns,
+  getJobRunProgressUpdate,
   getRunningEligibilityJob,
   holdContacts,
   removeContactFromBatch,
@@ -398,19 +399,24 @@ function App() {
         if (runningJob) {
           // Found a running job - lock the UI and wait for completion
           setIsRunningEligibilityAll(true)
+          const initialProgress = getJobRunProgressUpdate(
+            runningJob,
+            'Eligibility query is running in the background...',
+          )
           setSnackbar({
             open: true,
-            message: 'Eligibility query is running in the background...',
-            severity: 'info',
+            message: initialProgress.message,
+            severity: initialProgress.severity,
           })
 
           // Wait for the job to complete
-          const completedJob = await waitForEligibilityJobCompletion(runningJob.id, (status) => {
-            if (status === 'RUNNING') {
+          const completedJob = await waitForEligibilityJobCompletion(runningJob.id, (job) => {
+            if (job.status === 'RUNNING') {
+              const progress = getJobRunProgressUpdate(job, 'Eligibility query is still running...')
               setSnackbar({
                 open: true,
-                message: 'Eligibility query is still running...',
-                severity: 'info',
+                message: progress.message,
+                severity: progress.severity,
               })
             }
           })
@@ -473,12 +479,13 @@ function App() {
         })
 
         // Wait for the job to complete
-        const completedJob = await waitForEligibilityJobCompletion(runningJob.id, (status) => {
-          if (status === 'RUNNING') {
+        const completedJob = await waitForEligibilityJobCompletion(runningJob.id, (job) => {
+          if (job.status === 'RUNNING') {
+            const progress = getJobRunProgressUpdate(job, 'Eligibility query is still running...')
             setSnackbar({
               open: true,
-              message: 'Eligibility query is still running...',
-              severity: 'info',
+              message: progress.message,
+              severity: progress.severity,
             })
           }
         })
@@ -1629,12 +1636,13 @@ function App() {
         severity: 'info',
       })
 
-      const job: JobRun = await runEligibilityForAllWithPolling((status) => {
-        if (status === 'RUNNING') {
+      const job: JobRun = await runEligibilityForAllWithPolling((pollJob) => {
+        if (pollJob.status === 'RUNNING') {
+          const progress = getJobRunProgressUpdate(pollJob, 'Eligibility query is running...')
           setSnackbar({
             open: true,
-            message: 'Eligibility query is running...',
-            severity: 'info',
+            message: progress.message,
+            severity: progress.severity,
           })
         }
       })
@@ -1879,12 +1887,13 @@ function App() {
         severity: 'info',
       })
 
-      const job: JobRun = await runAutoBatchWithPolling((status) => {
-        if (status === 'RUNNING') {
+      const job: JobRun = await runAutoBatchWithPolling((pollJob) => {
+        if (pollJob.status === 'RUNNING') {
+          const progress = getJobRunProgressUpdate(pollJob, 'Auto-batch job is running...')
           setSnackbar({
             open: true,
-            message: 'Auto-batch job is running...',
-            severity: 'info',
+            message: progress.message,
+            severity: progress.severity,
           })
         }
       })

@@ -223,6 +223,25 @@ export interface ContactBatchDetail {
   }
 }
 
+export interface ContactAuditTrailEntry {
+  id: number
+  contactId: number
+  date: string
+  actionedBy: string
+  operation: string
+  field: string
+  oldValue: string
+  newValue: string
+}
+
+export interface PaginatedContactAuditTrailResponse {
+  data: ContactAuditTrailEntry[]
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
 export interface BatchContactDetail {
   id: number
   contactId: number
@@ -302,6 +321,23 @@ export const updateHoldReason = async (
  */
 export const getContactBatches = async (contactId: number): Promise<ContactBatchDetail[]> => {
   const response = await APIService.getAxiosInstance().get(`/contacts/${contactId}/batches`)
+  return response.data
+}
+
+/**
+ * Get audit trail entries for a specific contact
+ * @param contactId - Contact ID
+ * @param page - Page number (default: 1)
+ * @param limit - Items per page (default: 200)
+ */
+export const getContactAuditTrail = async (
+  contactId: number,
+  page: number = 1,
+  limit: number = 200,
+): Promise<PaginatedContactAuditTrailResponse> => {
+  const response = await APIService.getAxiosInstance().get(`/contacts/${contactId}/audit-trail`, {
+    params: { page, limit },
+  })
   return response.data
 }
 

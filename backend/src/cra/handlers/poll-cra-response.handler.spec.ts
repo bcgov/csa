@@ -189,6 +189,125 @@ describe('PollCraResponseHandler', () => {
     })
   }
 
+  describe('File sorting (RSP before WKL)', () => {
+    it('should process RSP files before WKL files when both are present', async () => {
+      const rspFileName = 'craUserId.ARSP0001.txt'
+      const wklFileName = 'craUserId.AWKL0001.txt'
+
+      // Set up both files in the database (WKL listed first to test sorting)
+      mockPrisma.transferFile.findMany.mockResolvedValue([
+        { id: 2, fileName: wklFileName, isDetailsProcessed: false, isValid: true },
+        { id: 1, fileName: rspFileName, isDetailsProcessed: false, isValid: true },
+      ])
+
+      // Track the order of processing
+      const processOrder: string[] = []
+      mockInboundFileService.getLocalFilePath.mockImplementation(
+        (destId: string, fileName: string) => {
+          processOrder.push(fileName)
+          return `/tmp/cra/inbound/${fileName}`
+        },
+      )
+
+      // Mock file type detection
+      mockInboundFileService.getResponseFileType.mockImplementation((fileName: string) => {
+        if (fileName.includes('RSP')) return 'RSP' satisfies ResponseFileType
+        if (fileName.includes('WKL')) return 'WKL' satisfies ResponseFileType
+        return null
+      })
+
+      // Setup parsers
+      mockInboundResponseService.parseFile.mockReturnValue({
+        header: { recordCount: 2 },
+        details: [],
+      })
+      mockInboundWeeklyResponseService.parseWeeklyResponseFile.mockReturnValue({
+        header: { tranCode: '6136', recordTypeCode: '00' },
+        details: [],
+        trailer: { tranCode: '6138', recordTypeCode: '00', recordCount: 2 },
+      })
+
+      await handler.execute(mockContext)
+
+      // Verify RSP was processed before WKL
+      expect(processOrder[0]).toBe(rspFileName)
+      expect(processOrder[1]).toBe(wklFileName)
+    })
+
+    it('should maintain original order for files of the same type', async () => {
+      const rspFile1 = 'craUserId.ARSP0001.txt'
+      const rspFile2 = 'craUserId.ARSP0002.txt'
+
+      mockPrisma.transferFile.findMany.mockResolvedValue([
+        { id: 2, fileName: rspFile2, isDetailsProcessed: false, isValid: true },
+        { id: 1, fileName: rspFile1, isDetailsProcessed: false, isValid: true },
+      ])
+
+      const processOrder: string[] = []
+      mockInboundFileService.getLocalFilePath.mockImplementation(
+        (destId: string, fileName: string) => {
+          processOrder.push(fileName)
+          return `/tmp/cra/inbound/${fileName}`
+        },
+      )
+
+      mockInboundFileService.getResponseFileType.mockReturnValue('RSP' satisfies ResponseFileType)
+      mockInboundResponseService.parseFile.mockReturnValue({
+        header: { recordCount: 2 },
+        details: [],
+      })
+
+      await handler.execute(mockContext)
+
+      // Files should maintain their original order (2, 1) since they're the same type
+      expect(processOrder[0]).toBe(rspFile2)
+      expect(processOrder[1]).toBe(rspFile1)
+    })
+
+    it('should handle multiple RSP and WKL files correctly', async () => {
+      const files = [
+        { id: 1, fileName: 'craUserId.AWKL0001.txt', isDetailsProcessed: false, isValid: true },
+        { id: 2, fileName: 'craUserId.ARSP0001.txt', isDetailsProcessed: false, isValid: true },
+        { id: 3, fileName: 'craUserId.AWKL0002.txt', isDetailsProcessed: false, isValid: true },
+        { id: 4, fileName: 'craUserId.ARSP0002.txt', isDetailsProcessed: false, isValid: true },
+      ]
+
+      mockPrisma.transferFile.findMany.mockResolvedValue(files)
+
+      const processOrder: string[] = []
+      mockInboundFileService.getLocalFilePath.mockImplementation(
+        (destId: string, fileName: string) => {
+          processOrder.push(fileName)
+          return `/tmp/cra/inbound/${fileName}`
+        },
+      )
+
+      mockInboundFileService.getResponseFileType.mockImplementation((fileName: string) => {
+        if (fileName.includes('RSP')) return 'RSP' satisfies ResponseFileType
+        if (fileName.includes('WKL')) return 'WKL' satisfies ResponseFileType
+        return null
+      })
+
+      mockInboundResponseService.parseFile.mockReturnValue({
+        header: { recordCount: 2 },
+        details: [],
+      })
+      mockInboundWeeklyResponseService.parseWeeklyResponseFile.mockReturnValue({
+        header: { tranCode: '6136', recordTypeCode: '00' },
+        details: [],
+        trailer: { tranCode: '6138', recordTypeCode: '00', recordCount: 2 },
+      })
+
+      await handler.execute(mockContext)
+
+      // All RSP files should be processed before any WKL files
+      expect(processOrder[0]).toContain('RSP')
+      expect(processOrder[1]).toContain('RSP')
+      expect(processOrder[2]).toContain('WKL')
+      expect(processOrder[3]).toContain('WKL')
+    })
+  })
+
   describe('No new files', () => {
     it('should return success with files_processed: 0 when no unprocessed files', async () => {
       const result = await handler.execute(mockContext)

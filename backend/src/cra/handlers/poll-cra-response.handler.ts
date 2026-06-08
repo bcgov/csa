@@ -8,11 +8,11 @@ import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_DETAIL_EVENT, CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
 
 import { pacificToday, parseWklDate } from 'src/common/utils'
-import { CANCEL_REASON } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
+import { CANCEL_REASON } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { IcmSyncBackService, SyncBackResult } from 'src/sync/icm/icm-sync-back.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { InboundFileService } from '../inbound/inbound-file.service'
@@ -75,7 +75,10 @@ export class PollCraResponseHandler extends BaseJob {
       where: { direction: FILE_DIRECTION.INBOUND, isDetailsProcessed: false, isValid: true },
     })
 
-    if (unprocessedResponseFiles.length === 0) {
+    // Sort files to ensure RSP files are processed before WKL files
+    const sortedFiles = this.sortFilesByType(unprocessedResponseFiles)
+
+    if (sortedFiles.length === 0) {
       return {
         success: true,
         message: 'No new CRA response files to process',
@@ -84,7 +87,7 @@ export class PollCraResponseHandler extends BaseJob {
     }
 
     let totalRecordsProcessed = 0
-    for (const responseFile of unprocessedResponseFiles) {
+    for (const responseFile of sortedFiles) {
       totalRecordsProcessed += await this.processResponseFile(responseFile)
     }
 
@@ -110,7 +113,7 @@ export class PollCraResponseHandler extends BaseJob {
       success: true,
       message: `Processed ${totalRecordsProcessed} CRA response records from ${unprocessedResponseFiles.length} file(s)`,
       metadata: {
-        files_processed: unprocessedResponseFiles.length,
+        files_processed: sortedFiles.length,
         records_updated: totalUpdated,
         records_accepted: this.recordsAccepted,
         records_rejected: this.recordsRejected,
@@ -128,6 +131,26 @@ export class PollCraResponseHandler extends BaseJob {
         },
       },
     }
+  }
+
+  /**
+   * Sort files to ensure RSP (Response) files are processed before WKL (Weekly) files.
+   * This is required by business to avoid processing errors when both file types are present.
+   */
+  private sortFilesByType(
+    files: Array<{ id: number; fileName: string }>,
+  ): Array<{ id: number; fileName: string }> {
+    return files.sort((a, b) => {
+      const typeA = this.inboundFileService.getResponseFileType(a.fileName)
+      const typeB = this.inboundFileService.getResponseFileType(b.fileName)
+
+      // RSP files should be processed before WKL files
+      if (typeA === 'RSP' && typeB === 'WKL') return -1
+      if (typeA === 'WKL' && typeB === 'RSP') return 1
+
+      // Maintain original order for files of the same type
+      return 0
+    })
   }
 
   private async downloadAndRegisterNewFiles(): Promise<void> {
@@ -210,7 +233,7 @@ export class PollCraResponseHandler extends BaseJob {
 
     this.logger.log(
       `Parsed File: ${responseFile.fileName}, Valid Processed records= ${details.length} ` +
-        (recordCount !== undefined ? `, Total Records in File = ${recordCount}` : ''),
+      (recordCount !== undefined ? `, Total Records in File = ${recordCount}` : ''),
     )
 
     if (isWeekly) {
@@ -326,13 +349,13 @@ export class PollCraResponseHandler extends BaseJob {
     if (!batchDetail) {
       this.logger.warn(
         `WKL: no matching batch detail for ${detail.childGivenName.trim()} ${detail.childSurName.trim()} ` +
-          `(DIN: ${detail.childDin?.trim() || 'none'})`,
+        `(DIN: ${detail.childDin?.trim() || 'none'})`,
       )
       const contacts = await this.weeklyContactMatcher.findMatchingContact(detail)
       if (!contacts) {
         this.logger.warn(
           `WKL: no matching contacts for ${detail.childGivenName.trim()} ${detail.childSurName.trim()} ` +
-            `(DIN: ${detail.childDin?.trim() || 'none'})`,
+          `(DIN: ${detail.childDin?.trim() || 'none'})`,
         )
         this.newCraRecordsInWkl.push(detail)
         this.recordsWklSkipped++
@@ -354,7 +377,7 @@ export class PollCraResponseHandler extends BaseJob {
     if (batchDetail.transactionType !== wklType) {
       this.logger.warn(
         `WKL: transaction type mismatch for contact ${batchDetail.contactId} — ` +
-          `WKL says ${wklType}, batch detail says ${batchDetail.transactionType}`,
+        `WKL says ${wklType}, batch detail says ${batchDetail.transactionType}`,
       )
     }
 
@@ -366,7 +389,7 @@ export class PollCraResponseHandler extends BaseJob {
 
     this.logger.log(
       `Processing WKL detail for contactId ${batchDetail.contactId}, transaction type ${wklType}, status ${detail.status}, ` +
-        `isApproved: ${isApproved}, isRefused: ${isRefused}`,
+      `isApproved: ${isApproved}, isRefused: ${isRefused}`,
     )
 
     const din = detail.childDin?.trim()
@@ -428,7 +451,7 @@ export class PollCraResponseHandler extends BaseJob {
   ): Promise<void> {
     this.logger.log(
       `Processing unmatched WKL detail for contactId ${contactId} (case ${caseNumber}), ` +
-        `transaction type ${wklType}, status ${detail.status}`,
+      `transaction type ${wklType}, status ${detail.status}`,
     )
     if (!this.unmatchedWklBatchId) {
       const batch = await this.batchesService.createWklBatchForUnmatchedRecords(header)
@@ -448,7 +471,7 @@ export class PollCraResponseHandler extends BaseJob {
     if (batchDetail.transactionType !== wklType) {
       this.logger.warn(
         `WKL: transaction type mismatch for contact ${batchDetail.contactId} — ` +
-          `WKL says ${wklType}, batch detail says ${batchDetail.transactionType}`,
+        `WKL says ${wklType}, batch detail says ${batchDetail.transactionType}`,
       )
     }
 
@@ -512,7 +535,7 @@ export class PollCraResponseHandler extends BaseJob {
     }
     this.logger.log(
       `Finished processing unmatched WKL detail for contactId ${contactId} (case ${caseNumber}), ` +
-        `transaction type ${wklType}, status ${detail.status}, approved: ${isApproved}, refused: ${isRefused}`,
+      `transaction type ${wklType}, status ${detail.status}, approved: ${isApproved}, refused: ${isRefused}`,
     )
   }
 }

@@ -7,7 +7,7 @@ import { JobTrigger } from '../enums/job-trigger.enum'
 import { JobType } from '../enums/job-type.enum'
 import { JobRunner } from '../job-runner.service'
 
-// One-time full load of ICM cases into stg_icm_cases (populates CLOSE_DT)
+// One-time full load of ICM cases into stg_icm_cases (populates CLOSED_DT)
 async function bootstrap() {
   const logger = new AppLogger('BackfillIcmCasesJob')
 

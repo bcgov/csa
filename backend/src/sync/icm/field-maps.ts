@@ -103,13 +103,13 @@ export const STG_ICM_CASES_MAP: FieldMapEntry[] = [
   { sourceField: 'TYPE_CD', sourceLabel: 'Type', masterField: 'case_type' },
   { sourceField: 'STATUS_CD', sourceLabel: 'Status', masterField: 'case_status' },
   {
-    sourceField: 'CLOSE_DT',
+    sourceField: 'CLOSED_DT',
     sourceLabel: 'Closed Date',
     dbType: 'timestamp',
     excludeFromChangeDetection: true,
   },
   {
-    sourceField: 'CLOSE_REASON',
+    sourceField: 'X_CLOSED_RSN_CD',
     sourceLabel: 'Close Reason',
     excludeFromChangeDetection: true,
   },

@@ -127,7 +127,7 @@ const CHANGED_CONTACTS_CTE = `
  * stg_icm_cases (different CONTACT_ROW_IDs). Aggregation CTEs group by X_CONTACT_NUM
  * so arrays combine data across all cases. DISTINCT ON in the final SELECT
  * picks one case row per person for scalar fields (Open > Admin Re-open > else,
- * then most recent CLOSE_DT, then LAST_UPD).
+ * then most recent CLOSED_DT).
  *
  * Join topology (matches ICM/MIS data model):
  *  ICM: Cases -[CaseId]-> N Placements -[AgreementID]-> 1 Agreement -[AgreementID]-> N Orders
@@ -491,8 +491,7 @@ export function buildLoadContactProfilesSql(
       WHEN 'ADMIN RE-OPEN' THEN 2
       ELSE 3
     END,
-    cases.CLOSE_DT::TIMESTAMP DESC NULLS LAST,
-    cases.LAST_UPD::TIMESTAMP DESC NULLS LAST
+    cases.CLOSED_DT::TIMESTAMP DESC NULLS LAST
 `
 
   let params: unknown[]

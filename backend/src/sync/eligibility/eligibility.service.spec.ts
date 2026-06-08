@@ -804,9 +804,8 @@ describe('buildLoadContactProfilesSql', () => {
     expect(sql).toContain("WHEN 'OPEN' THEN 1")
     expect(sql).toContain("WHEN 'ADMIN RE-OPEN' THEN 2")
 
-    // Must tiebreak closed cases by CLOSE_DT descending, then LAST_UPD
-    expect(sql).toContain('cases.CLOSE_DT::TIMESTAMP DESC NULLS LAST')
-    expect(sql).toContain('cases.LAST_UPD::TIMESTAMP DESC NULLS LAST')
+    // Must tiebreak closed cases by CLOSED_DT descending
+    expect(sql).toContain('cases.CLOSED_DT::TIMESTAMP DESC NULLS LAST')
   })
 
   it('should join legal authority on CONTACT_ROW_ID (PersonIcmId), not ROW_ID (CaseId)', () => {

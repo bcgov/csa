@@ -1391,7 +1391,13 @@ describe('ContactsService', () => {
         where: { contactId: 1 },
         include: {
           batch: {
-            select: { id: true, batchDate: true, status: true, systemComments: true },
+            select: {
+              id: true,
+              batchNumber: true,
+              batchDate: true,
+              status: true,
+              systemComments: true,
+            },
           },
           contact: {
             select: { effectiveDate: true, careEndDate: true, cancelReasonCode: true },

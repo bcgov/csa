@@ -10,11 +10,12 @@ import { step8_UpdateEligibleTbd } from './step8-update-eligible-tbd'
  * Checks placements in the previous month (current month - 1):
  *
  * 1. Active/Interrupted Placement (startDate prior to current month) -> Step 4
- * 2. Fallback: Ended/Closed Placement (endDate in previous month) -> Step 4
- * 3. Active/Interrupted Non-Placement (startDate prior to current month) -> Step 8
- * 4. Fallback: Ended/Closed Non-Placement (endDate in previous month) -> Step 8
- * 5. Both Placement + Non-Placement -> Step 4 (placement precedence)
- * 6. Nothing found -> Step 8
+ * 2. Ended/Closed Placement (endDate in previous month) -> Step 4
+ * 3. BOTH Active AND Ended placements -> ALL go to Step 4 (US-39154)
+ * 4. Active/Interrupted Non-Placement (startDate prior to current month) -> Step 8
+ * 5. Ended/Closed Non-Placement (endDate in previous month) -> Step 8
+ * 6. Both Placement + Non-Placement -> Step 4 (placement precedence)
+ * 7. Nothing found -> Step 8
  */
 export const step3_PlacementCheck: EligibilityRule = {
   name: 'step3_PlacementCheck',
@@ -52,17 +53,12 @@ export const step3_PlacementCheck: EligibilityRule = {
     const hasEndedPlacement = endedPlacements.length > 0
     const hasEndedNonPlacement = endedNonPlacements.length > 0
 
-    if (hasActivePlacement) {
-      ctx.hasPlacement = true
-      ctx.hasNonPlacement = hasActiveNonPlacement
-      ctx.eligiblePlacements = activePlacements
-      return null
-    }
-
-    if (hasEndedPlacement) {
+    // US-39154: Include BOTH Active/Interrupted AND Ended/Closed placements when present
+    if (hasActivePlacement || hasEndedPlacement) {
       ctx.hasPlacement = true
       ctx.hasNonPlacement = hasActiveNonPlacement || hasEndedNonPlacement
-      ctx.eligiblePlacements = endedPlacements
+      // Combine all placements from previous month (both active and ended)
+      ctx.eligiblePlacements = [...activePlacements, ...endedPlacements]
       return null
     }
 

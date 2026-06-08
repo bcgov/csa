@@ -125,7 +125,7 @@ describe('step3_PlacementCheck', () => {
       expect(result!.step).toBe(8)
     })
 
-    it('should prefer Active Placement over Ended Placement', () => {
+    it('should include BOTH Active AND Ended placements (US-39154)', () => {
       const ctx = makeCtx({
         placements: [
           makePlacement({
@@ -144,8 +144,119 @@ describe('step3_PlacementCheck', () => {
       })
       const result = step3_PlacementCheck.evaluate(ctx)
       expect(result).toBeNull()
-      expect(ctx.eligiblePlacements).toHaveLength(1)
-      expect(ctx.eligiblePlacements![0].placementNumber).toBe('ACTIVE')
+      expect(ctx.eligiblePlacements).toHaveLength(2)
+      expect(ctx.eligiblePlacements!.some((p) => p.placementNumber === 'ACTIVE')).toBe(true)
+      expect(ctx.eligiblePlacements!.some((p) => p.placementNumber === 'ENDED')).toBe(true)
+    })
+  })
+
+  describe('Multiple placements in previous month (US-39154)', () => {
+    it('should include multiple Active placements', () => {
+      const ctx = makeCtx({
+        placements: [
+          makePlacement({
+            type: 'Placement',
+            status: 'Active',
+            startDate: BEFORE_CURRENT_MONTH,
+            placementNumber: 'P1',
+          }),
+          makePlacement({
+            type: 'Placement',
+            status: 'Interrupted',
+            startDate: BEFORE_CURRENT_MONTH,
+            placementNumber: 'P2',
+          }),
+        ],
+      })
+      const result = step3_PlacementCheck.evaluate(ctx)
+      expect(result).toBeNull()
+      expect(ctx.eligiblePlacements).toHaveLength(2)
+    })
+
+    it('should include multiple Ended placements from previous month', () => {
+      const ctx = makeCtx({
+        placements: [
+          makePlacement({
+            type: 'Placement',
+            status: 'Ended',
+            endDate: IN_PREV_MONTH,
+            placementNumber: 'E1',
+          }),
+          makePlacement({
+            type: 'Placement',
+            status: 'Closed',
+            endDate: IN_PREV_MONTH,
+            placementNumber: 'E2',
+          }),
+        ],
+      })
+      const result = step3_PlacementCheck.evaluate(ctx)
+      expect(result).toBeNull()
+      expect(ctx.eligiblePlacements).toHaveLength(2)
+    })
+
+    it('should include both Active and multiple Ended placements together', () => {
+      const ctx = makeCtx({
+        placements: [
+          makePlacement({
+            type: 'Placement',
+            status: 'Active',
+            startDate: BEFORE_CURRENT_MONTH,
+            placementNumber: 'ACTIVE-1',
+          }),
+          makePlacement({
+            type: 'Placement',
+            status: 'Interrupted',
+            startDate: BEFORE_CURRENT_MONTH,
+            placementNumber: 'ACTIVE-2',
+          }),
+          makePlacement({
+            type: 'Placement',
+            status: 'Ended',
+            endDate: IN_PREV_MONTH,
+            placementNumber: 'ENDED-1',
+          }),
+          makePlacement({
+            type: 'Placement',
+            status: 'Closed',
+            endDate: IN_PREV_MONTH,
+            placementNumber: 'ENDED-2',
+          }),
+        ],
+      })
+      const result = step3_PlacementCheck.evaluate(ctx)
+      expect(result).toBeNull()
+      expect(ctx.eligiblePlacements).toHaveLength(4)
+      expect(ctx.hasPlacement).toBe(true)
+    })
+
+    it('should filter out ended placements not in previous month', () => {
+      const ctx = makeCtx({
+        placements: [
+          makePlacement({
+            type: 'Placement',
+            status: 'Active',
+            startDate: BEFORE_CURRENT_MONTH,
+            placementNumber: 'ACTIVE',
+          }),
+          makePlacement({
+            type: 'Placement',
+            status: 'Ended',
+            endDate: IN_PREV_MONTH,
+            placementNumber: 'ENDED-GOOD',
+          }),
+          makePlacement({
+            type: 'Placement',
+            status: 'Ended',
+            endDate: NOT_IN_PREV_MONTH,
+            placementNumber: 'ENDED-BAD',
+          }),
+        ],
+      })
+      const result = step3_PlacementCheck.evaluate(ctx)
+      expect(result).toBeNull()
+      expect(ctx.eligiblePlacements).toHaveLength(2)
+      expect(ctx.eligiblePlacements!.some((p) => p.placementNumber === 'ENDED-BAD')).toBe(false)
     })
   })
 

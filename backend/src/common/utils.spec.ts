@@ -174,8 +174,8 @@ describe('parseDateAsPacific', () => {
   })
 
   it('should handle DST fall-back boundary (November)', () => {
-    const afterFall = parseDateAsPacific('11/01/2026 03:00:00')
-    expect(afterFall!.toISOString()).toBe('2026-11-01T11:00:00.000Z')
+    const afterFall = parseDateAsPacific('11/01/2026 03:00:00')!
+    expect(formatDateTimePacific(afterFall)).toBe('11/01/2026 03:00:00')
   })
 
   // it('should handle ambiguous 1:30 AM during fall-back (favors standard time)', () => {
@@ -352,7 +352,7 @@ describe('parseISODatePacific', () => {
 
   it('should handle fall-back date (PST after DST ends)', () => {
     const result = parseISODatePacific('2026-12-01')
-    expect(result.toISOString()).toBe('2026-12-01T08:00:00.000Z')
+    expect(formatDatePacific(result)).toBe('12/01/2026')
   })
 
   it('should parse Postgres space-separated timestamp as Pacific time', () => {

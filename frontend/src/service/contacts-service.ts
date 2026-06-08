@@ -225,6 +225,25 @@ export interface ContactBatchDetail {
   }
 }
 
+export interface ContactAuditTrailEntry {
+  id: number
+  contactId: number
+  date: string
+  actionedBy: string
+  operation: string
+  field: string
+  oldValue: string
+  newValue: string
+}
+
+export interface PaginatedContactAuditTrailResponse {
+  data: ContactAuditTrailEntry[]
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
 export interface BatchContactDetail {
   id: number
   contactId: number
@@ -304,6 +323,23 @@ export const updateHoldReason = async (
  */
 export const getContactBatches = async (contactId: number): Promise<ContactBatchDetail[]> => {
   const response = await APIService.getAxiosInstance().get(`/contacts/${contactId}/batches`)
+  return response.data
+}
+
+/**
+ * Get audit trail entries for a specific contact
+ * @param contactId - Contact ID
+ * @param page - Page number (default: 1)
+ * @param limit - Items per page (default: 200)
+ */
+export const getContactAuditTrail = async (
+  contactId: number,
+  page: number = 1,
+  limit: number = 200,
+): Promise<PaginatedContactAuditTrailResponse> => {
+  const response = await APIService.getAxiosInstance().get(`/contacts/${contactId}/audit-trail`, {
+    params: { page, limit },
+  })
   return response.data
 }
 
@@ -503,7 +539,7 @@ export const getJobStatus = async (jobId: number): Promise<JobRun> => {
  * @param onProgress - Optional callback for progress updates
  */
 export const runEligibilityForAllWithPolling = async (
-  onProgress?: (status: string) => void,
+  onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
   // Start the job
   const { jobRunId } = await startEligibilityJob()
@@ -516,7 +552,7 @@ export const runEligibilityForAllWithPolling = async (
     const job = await getJobStatus(jobRunId)
 
     if (onProgress) {
-      onProgress(job.status)
+      onProgress(job)
     }
 
     if (job.status === 'SUCCESS' || job.status === 'FAILED') {
@@ -544,7 +580,22 @@ export interface JobRun {
   createdAt: string
   startedAt: string | null
   completedAt: string | null
+  /** Plain-language notice when a running job may be stuck (from GET /jobs). */
+  warning?: string
 }
+
+export type JobRunProgressUpdate = {
+  message: string
+  severity: 'info' | 'warning'
+}
+
+export const getJobRunProgressUpdate = (
+  job: JobRun,
+  runningMessage: string,
+): JobRunProgressUpdate => ({
+  message: job.warning ?? runningMessage,
+  severity: job.warning ? 'warning' : 'info',
+})
 
 export interface JobsResponse {
   data: JobRun[]
@@ -611,7 +662,7 @@ export const getRunningEligibilityJob = async (): Promise<JobRun | null> => {
  */
 export const waitForEligibilityJobCompletion = async (
   jobId: number,
-  onProgress?: (status: string) => void,
+  onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
   const pollInterval = 10000 // 10 seconds
   const maxAttempts = 60 // 10 minutes max
@@ -620,7 +671,7 @@ export const waitForEligibilityJobCompletion = async (
     const job = await getJobStatus(jobId)
 
     if (onProgress) {
-      onProgress(job.status)
+      onProgress(job)
     }
 
     if (job.status === 'SUCCESS' || job.status === 'FAILED') {
@@ -641,7 +692,7 @@ export const waitForEligibilityJobCompletion = async (
  */
 export const waitForAutoBatchJobCompletion = async (
   jobId: number,
-  onProgress?: (status: string) => void,
+  onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
   const pollInterval = 5000 // 5 seconds
   const maxAttempts = 60 // 5 minutes max
@@ -650,7 +701,7 @@ export const waitForAutoBatchJobCompletion = async (
     const job = await getJobStatus(jobId)
 
     if (onProgress) {
-      onProgress(job.status)
+      onProgress(job)
     }
 
     if (job.status === 'SUCCESS' || job.status === 'FAILED') {
@@ -693,7 +744,7 @@ export const getRunningAutoBatchJob = async (): Promise<JobRun | null> => {
  * @param onProgress - Optional callback for progress updates
  */
 export const runAutoBatchWithPolling = async (
-  onProgress?: (status: string) => void,
+  onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
   // Start the job
   const { jobRunId } = await startAutoBatchJob()
@@ -706,7 +757,7 @@ export const runAutoBatchWithPolling = async (
     const job = await getJobStatus(jobRunId)
 
     if (onProgress) {
-      onProgress(job.status)
+      onProgress(job)
     }
 
     if (job.status === 'SUCCESS' || job.status === 'FAILED') {

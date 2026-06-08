@@ -186,8 +186,8 @@ describe('JobsService', () => {
     it('should update status to SUCCESS with completedAt', async () => {
       await service.markSuccess(1)
 
-      expect(prisma.jobRun.update).toHaveBeenCalledWith({
-        where: { id: 1 },
+      expect(prisma.jobRun.updateMany).toHaveBeenCalledWith({
+        where: { id: 1, status: JobStatus.RUNNING },
         data: expect.objectContaining({
           status: JobStatus.SUCCESS,
           completedAt: expect.any(Date),
@@ -198,8 +198,8 @@ describe('JobsService', () => {
     it('should update metadata if provided', async () => {
       await service.markSuccess(1, { recordsProcessed: 100 })
 
-      expect(prisma.jobRun.update).toHaveBeenCalledWith({
-        where: { id: 1 },
+      expect(prisma.jobRun.updateMany).toHaveBeenCalledWith({
+        where: { id: 1, status: JobStatus.RUNNING },
         data: expect.objectContaining({
           status: JobStatus.SUCCESS,
           metadata: { recordsProcessed: 100 },
@@ -212,8 +212,8 @@ describe('JobsService', () => {
     it('should update status to FAILED with error and increment retry count', async () => {
       await service.markFailed(1, 'Connection timeout')
 
-      expect(prisma.jobRun.update).toHaveBeenCalledWith({
-        where: { id: 1 },
+      expect(prisma.jobRun.updateMany).toHaveBeenCalledWith({
+        where: { id: 1, status: JobStatus.RUNNING },
         data: expect.objectContaining({
           status: JobStatus.FAILED,
           error: 'Connection timeout',

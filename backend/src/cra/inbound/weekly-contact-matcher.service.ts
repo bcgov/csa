@@ -4,11 +4,29 @@ import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_DETAIL_STATUS } from 'src/common/state-machine/constants/batch-detail-status.constants'
 import { BATCH_STATUS } from 'src/common/state-machine/constants/batch-status.constants'
 import { AppLogger } from 'src/common/logger/app-logger'
-import { parseWklDate } from 'src/common/utils'
+import { normalize, parseWklDate } from 'src/common/utils'
 import { CraMatchingSnapshot } from './cra-matching-snapshot.interface'
 import { DetailRecord04 } from './inbound-weekly.interface'
 
 const ACTIVE_BATCH_STATUSES = [BATCH_STATUS.IN_PROGRESS, BATCH_STATUS.PARTIALLY_PROCESSED]
+
+const equalsIgnoreCase = (a: string | null | undefined, b: string | null | undefined): boolean =>
+  normalize(a ?? '') === normalize(b ?? '')
+
+const insensitiveEquals = (value: string) => ({
+  equals: value.trim(),
+  mode: 'insensitive' as const,
+})
+
+const isCanadaCountryCode = (country: string | null | undefined): boolean => {
+  const normalized = normalize(country ?? '')
+  return normalized === 'CA' || normalized === 'CANADA'
+}
+
+const equalsCountryCode = (a: string | null | undefined, b: string | null | undefined): boolean => {
+  if (isCanadaCountryCode(a) && isCanadaCountryCode(b)) return true
+  return equalsIgnoreCase(a, b)
+}
 
 // CRA's "First Name" field is either:
 //   A) our FirstName alone — Initial field (if present) must equal first char of our MiddleName
@@ -24,10 +42,10 @@ const matchesGivenName = (
   const fn = firstName ?? ''
   const mn = middleName ?? ''
 
-  if (wklGiven === fn) {
-    return !wklInit || mn.charAt(0) === wklInit
+  if (equalsIgnoreCase(wklGiven, fn)) {
+    return !wklInit || equalsIgnoreCase(mn.charAt(0), wklInit)
   }
-  return mn !== '' && wklGiven === `${fn} ${mn}`
+  return mn !== '' && equalsIgnoreCase(wklGiven, `${fn} ${mn}`)
 }
 
 interface WklChildDetails {
@@ -111,12 +129,12 @@ export class WeeklyContactMatcherService {
           snap.childGivenName,
           snap.childMiddleName,
         ) &&
-        snap.childSurName === wklDetail.childSurName.trim() &&
-        snap.childSex === wklDetail.childSex.trim() &&
+        equalsIgnoreCase(snap.childSurName, wklDetail.childSurName) &&
+        equalsIgnoreCase(snap.childSex, wklDetail.childSex) &&
         snap.childBirthDate === wklDetail.childBirthDate.trim() &&
-        snap.childBirthCity === wklDetail.childBirthCity.trim() &&
-        snap.childBirthProv === wklDetail.childBirthProv.trim() &&
-        snap.childBirthCountry === wklDetail.childBirthCountry.trim()
+        equalsIgnoreCase(snap.childBirthCity, wklDetail.childBirthCity) &&
+        equalsIgnoreCase(snap.childBirthProv, wklDetail.childBirthProv) &&
+        equalsCountryCode(snap.childBirthCountry, wklDetail.childBirthCountry)
       )
     })
 
@@ -179,21 +197,24 @@ export class WeeklyContactMatcherService {
     const namePatterns: Prisma.ContactWhereInput[] = [
       // Pattern A: WKL FirstName === our firstName; Initial (if present) must equal middleName[0]
       {
-        firstName: wklGiven,
-        ...(wklInit && { middleName: { startsWith: wklInit } }),
+        firstName: insensitiveEquals(wklGiven),
+        ...(wklInit && { middleName: { startsWith: wklInit, mode: 'insensitive' } }),
       },
     ]
     if (combinedMiddle) {
       // Pattern B: WKL FirstName === our firstName + " " + middleName
-      namePatterns.push({ firstName: combinedFirst, middleName: combinedMiddle })
+      namePatterns.push({
+        firstName: insensitiveEquals(combinedFirst),
+        middleName: insensitiveEquals(combinedMiddle),
+      })
     }
 
-    const birthCountry = wklDetail.childBirthCountry.trim()
+    const isCanada = isCanadaCountryCode(wklDetail.childBirthCountry)
     const detailMatches = await this.prisma.contact.findMany({
       where: {
         AND: [
           { OR: namePatterns },
-          birthCountry === 'CA'
+          isCanada
             ? { OR: [{ birthCountry: 'CA' }, { birthCountry: '' }, { birthCountry: null }] }
             : {
                 NOT: {
@@ -201,14 +222,14 @@ export class WeeklyContactMatcherService {
                 },
               },
         ],
-        lastName: wklDetail.childSurName.trim(),
+        lastName: insensitiveEquals(wklDetail.childSurName),
         gender: this.mapWeeklyFileGender(wklDetail.childSex.trim()),
         dateOfBirth: parseWklDate(wklDetail.childBirthDate.trim()),
         ...(wklDetail.childBirthCity.trim() && {
-          birthCity: wklDetail.childBirthCity.trim(),
+          birthCity: insensitiveEquals(wklDetail.childBirthCity),
         }),
         ...(wklDetail.childBirthProv.trim() && {
-          birthProvince: wklDetail.childBirthProv.trim(),
+          birthProvince: insensitiveEquals(wklDetail.childBirthProv),
         }),
       },
       select: { id: true, din: true, csaStatus: true, caseNumber: true },
@@ -241,7 +262,7 @@ export class WeeklyContactMatcherService {
   }
 
   mapWeeklyFileGender(wklGender: string): string | { in: string[] } | null {
-    switch (wklGender.trim()) {
+    switch (normalize(wklGender)) {
       case 'M':
         return 'Man/Boy'
       case 'F':

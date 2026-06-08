@@ -29,9 +29,9 @@ describe('BatchesService', () => {
       },
       $executeRaw: vi.fn().mockResolvedValue(undefined),
       $queryRaw: vi.fn().mockResolvedValue([{ next: 5 }]),
-      $transaction: vi.fn().mockImplementation(async (fn: (tx: typeof mockPrisma) => unknown) =>
-        fn(mockPrisma),
-      ),
+      $transaction: vi
+        .fn()
+        .mockImplementation(async (fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma)),
     }
 
     mockStateMachine = {
@@ -295,6 +295,45 @@ describe('BatchesService', () => {
           },
         },
       )
+    })
+  })
+
+  describe('findOrCreatePendingBatch', () => {
+    it('should create a pending batch with the next batch_number', async () => {
+      mockPrisma.batch.findFirst.mockResolvedValue(null)
+      mockPrisma.batch.create.mockResolvedValue({
+        id: 10,
+        batchNumber: 5,
+        status: BATCH_STATUS.PENDING,
+        recordCount: 0,
+        batchDate: null,
+        createdAt: new Date(),
+        systemComments: null,
+      })
+
+      const batch = await service.findOrCreatePendingBatch()
+
+      expect(mockPrisma.$transaction).toHaveBeenCalled()
+      expect(mockPrisma.$executeRaw).toHaveBeenCalled()
+      expect(mockPrisma.$queryRaw).toHaveBeenCalled()
+      expect(mockPrisma.batch.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          batchNumber: 5,
+          status: BATCH_STATUS.PENDING,
+          recordCount: 0,
+        }),
+      })
+      expect(batch.batchNumber).toBe(5)
+    })
+
+    it('should return existing pending batch without creating', async () => {
+      const existing = { id: 3, batchNumber: 2, status: BATCH_STATUS.PENDING, recordCount: 1 }
+      mockPrisma.batch.findFirst.mockResolvedValue(existing)
+
+      const batch = await service.findOrCreatePendingBatch()
+
+      expect(mockPrisma.batch.create).not.toHaveBeenCalled()
+      expect(batch).toEqual({ ...existing, statusLabel: 'Pending' })
     })
   })
 

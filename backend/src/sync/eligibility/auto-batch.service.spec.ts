@@ -56,10 +56,7 @@ describe('AutoBatchService', () => {
 
     const result = await service.run()
 
-    expect(mockBatchesService.addContactsToPendingBatch).toHaveBeenCalledWith(
-      [10, 11],
-      'SYSTEM',
-    )
+    expect(mockBatchesService.addContactsToPendingBatch).toHaveBeenCalledWith([10, 11], 'SYSTEM')
     expect(result).toEqual({ application: 1, cancellation: 1 })
   })
 

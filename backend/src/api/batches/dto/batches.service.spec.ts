@@ -228,12 +228,14 @@ describe('BatchesService', () => {
     })
 
     it('should create new pending batch if none exists', async () => {
-      const newBatch = { id: 1, status: BATCH_STATUS.PENDING, recordCount: 0 }
+      const newBatch = { id: 1, batchNumber: 5, status: BATCH_STATUS.PENDING, recordCount: 0 }
       mockPrismaService.batch.findFirst.mockResolvedValue(null)
       mockPrismaService.batch.create.mockResolvedValue(newBatch)
 
       const result = await service.findOrCreatePendingBatch()
 
+      expect(mockPrismaService.$transaction).toHaveBeenCalled()
+      expect(mockPrismaService.$executeRaw).toHaveBeenCalled()
       expect(result).toEqual({ ...newBatch, statusLabel: 'Pending' })
       expect(mockPrismaService.batch.create).toHaveBeenCalledWith({
         data: {

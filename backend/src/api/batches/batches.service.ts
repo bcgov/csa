@@ -25,8 +25,21 @@ import { BulkOperationResponse } from '../contacts/interfaces'
 
 const { BATCH_INITIATED_BY, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
-/** Advisory lock namespace for batch creation (pg_advisory_xact_lock class id). */
+/**
+ * Batch creation locking (pg_advisory_xact_lock class 2847).
+ *
+ * Two problems, one fix:
+ * 1. Internal id gaps — concurrent pending-batch creation raced on
+ *    batches_pending_unique; failed inserts still advanced the SERIAL.
+ * 2. Business batch numbers — batch_number is sequential (1, 2, 3…) and
+ *    shown in the UI instead of the internal id.
+ *
+ * Lock 0 serializes MAX(batch_number)+1 across all batch types.
+ * Lock 1 serializes find-or-create for the single pending batch.
+ * Lock 2 serializes find-or-create for the CRA WKL unmatched in_progress batch.
+ */
 const BATCH_ADVISORY_LOCK_CLASS = 2847
+const BATCH_NUMBER_ADVISORY_LOCK_OBJECT = 0
 const PENDING_BATCH_ADVISORY_LOCK_OBJECT = 1
 const WKL_UNMATCHED_BATCH_ADVISORY_LOCK_OBJECT = 2
 
@@ -72,6 +85,9 @@ export class BatchesService {
   }
 
   private async nextBatchNumber(tx: Prisma.TransactionClient): Promise<number> {
+    await tx.$executeRaw(
+      Prisma.sql`SELECT pg_advisory_xact_lock(${BATCH_ADVISORY_LOCK_CLASS}, ${BATCH_NUMBER_ADVISORY_LOCK_OBJECT})`,
+    )
     const rows = await tx.$queryRaw<{ next: number }[]>(
       Prisma.sql`SELECT COALESCE(MAX(batch_number), 0) + 1 AS next FROM csa.batches`,
     )

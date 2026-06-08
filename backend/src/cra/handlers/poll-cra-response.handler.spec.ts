@@ -120,10 +120,12 @@ describe('PollCraResponseHandler', () => {
       },
       batch: {
         findUnique: vi.fn().mockResolvedValue({ systemComments: null }),
-        findMany: vi.fn().mockImplementation(({ where }: { where?: { id?: { in?: number[] } } }) => {
-          const ids = where?.id?.in ?? []
-          return Promise.resolve(ids.map((id) => ({ id, batchNumber: id })))
-        }),
+        findMany: vi
+          .fn()
+          .mockImplementation(({ where }: { where?: { id?: { in?: number[] } } }) => {
+            const ids = where?.id?.in ?? []
+            return Promise.resolve(ids.map((id) => ({ id, batchNumber: id })))
+          }),
       },
     }
 

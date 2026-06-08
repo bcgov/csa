@@ -21,6 +21,7 @@ describe('AutoBatchService', () => {
       addContactsToPendingBatch: vi.fn().mockResolvedValue({
         batch: {
           id: 42,
+          batchNumber: 42,
           status: BATCH_STATUS.PENDING,
           statusLabel: 'Pending',
           recordCount: 2,

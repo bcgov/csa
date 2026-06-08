@@ -73,12 +73,12 @@ export class AutoBatchService {
 
     if (result.skipped.length > 0) {
       this.logger.log(
-        `Auto-batch skipped ${result.skipped.length} contacts (batch ${result.batch.batchNumber})`,
+        `Auto-batch skipped ${result.skipped.length} contacts (batch ${result.batch.id})`,
       )
     }
 
     this.logger.log(
-      `Auto-batched ${application} application + ${cancellation} cancellation contacts into batch ${result.batch.batchNumber}`,
+      `Auto-batched ${application} application + ${cancellation} cancellation contacts into batch ${result.batch.id}`,
     )
 
     return { application, cancellation }

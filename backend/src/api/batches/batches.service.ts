@@ -141,7 +141,7 @@ export class BatchesService {
       },
     })
 
-    this.logger.log(`Batch ${batch.batchNumber}: ${currentState}->${nextState} [${event}]`)
+    this.logger.log(`Batch ${batchId}: ${currentState}->${nextState} [${event}]`)
 
     return { success: true, from: currentState, to: nextState }
   }
@@ -280,9 +280,9 @@ export class BatchesService {
 
       if (existingBatch) {
         this.logger.warn(
-          `Attempted to create WKL batch for unmatched records, but batch ${existingBatch.batchNumber} is already in progress. ` +
+          `Attempted to create WKL batch for unmatched records, but batch ${existingBatch.id} is already in progress. ` +
             `This should not happen as we check for unmatched records before creating the batch, but it could occur in rare cases of high concurrency. ` +
-            `Please review batch ${existingBatch.batchNumber} for details.`,
+            `Please review batch ${existingBatch.id} for details.`,
         )
         return existingBatch
       }
@@ -437,7 +437,7 @@ export class BatchesService {
 
     const batchRecord = await this.prisma.batch.findUnique({
       where: { id: batchId },
-      select: { initiatedBy: true, batchNumber: true },
+      select: { initiatedBy: true },
     })
     if (batchRecord?.initiatedBy === BATCH_INITIATED_BY.CRA) {
       await this.prisma.batch.update({
@@ -505,9 +505,7 @@ export class BatchesService {
     }
 
     // All still in progress — acknowledgement received, no status change
-    this.logger.log(
-      `Batch ${batchRecord?.batchNumber ?? batchId}: RSP acknowledgement received, all details still in_progress`,
-    )
+    this.logger.log(`Batch ${batchId}: RSP acknowledgement received, all details still in_progress`)
     const batch = await this.prisma.batch.findUnique({
       where: { id: batchId },
       select: { systemComments: true },
@@ -665,12 +663,6 @@ export class BatchesService {
     caseNumber: string,
     craMatchingSnapshot: any,
   ): Promise<MatchedBatchDetail> {
-    const batch = await this.prisma.batch.findUnique({
-      where: { id: batchId },
-      select: { batchNumber: true },
-    })
-    const batchLabel = batch?.batchNumber ?? batchId
-
     const existingDetail = await this.prisma.contactBatchDetail.findFirst({
       where: {
         batchId,
@@ -688,13 +680,13 @@ export class BatchesService {
     })
     if (existingDetail) {
       this.logger.warn(
-        `Attempted to create WKL batch detail for contact ${contactId} in batch ${batchLabel}, but it already exists. ` +
+        `Attempted to create WKL batch detail for contact ${contactId} in batch ${batchId}, but it already exists. ` +
           `Please review batch detail ${existingDetail.id} for details.`,
       )
       return existingDetail
     }
     this.logger.log(
-      `Creating batch detail for contact ${contactId} in batch ${batchLabel} with CRA status ${craStatus}`,
+      `Creating batch detail for contact ${contactId} in batch ${batchId} with CRA status ${craStatus}`,
     )
     const now = new Date()
     const snapshot = {

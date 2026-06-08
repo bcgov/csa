@@ -325,7 +325,6 @@ describe('SendCraFileHandler', () => {
       expect(result.message).toContain('Batch 10')
       expect(result.metadata).toEqual({
         batch_id: 10,
-        batch_number: 10,
         file_path: '/tmp/cra/testfile.txt',
         record_count: 3,
         contacts_count: 2,

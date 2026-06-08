@@ -66,7 +66,7 @@ export class SendCraFileHandler extends BaseJob {
     })
 
     if (this.batchDetails.length === 0) {
-      this.logger.log(`Batch ${this.batch.batchNumber} has no contacts`)
+      this.logger.log(`Batch ${this.batch.id} has no contacts`)
       return
     }
 
@@ -134,15 +134,14 @@ export class SendCraFileHandler extends BaseJob {
     }
 
     this.logger.log(
-      `Batch ${this.batch.batchNumber}: file ${fileName} sent, ${this.batchDetails.length} contacts updated`,
+      `Batch ${this.batch.id}: file ${fileName} sent, ${this.batchDetails.length} contacts updated`,
     )
 
     return {
       success: true,
-      message: `Batch ${this.batch.batchNumber} sent to CRA`,
+      message: `Batch ${this.batch.id} sent to CRA`,
       metadata: {
         batch_id: this.batch.id,
-        batch_number: this.batch.batchNumber,
         file_path: filePath,
         record_count: recordCount,
         contacts_count: this.batchDetails.length,
@@ -182,7 +181,7 @@ export class SendCraFileHandler extends BaseJob {
     const missingRefDetails = this.batchDetails.filter((detail) => !detail.referenceNumber)
     if (missingRefDetails.length > 0) {
       this.logger.warn(
-        `Batch ${this.batch!.batchNumber}: ${missingRefDetails.length} details missing referenceNumber, backfilling`,
+        `Batch ${this.batch!.id}: ${missingRefDetails.length} details missing referenceNumber, backfilling`,
       )
       for (const detail of missingRefDetails) {
         const caseNumber = detail.contact.caseNumber ?? ''
@@ -200,7 +199,7 @@ export class SendCraFileHandler extends BaseJob {
     await super.onFailure(context, error)
 
     if (this.batch) {
-      this.logger.error(`File transfer failed for batch ${this.batch.batchNumber}`, error)
+      this.logger.error(`File transfer failed for batch ${this.batch.id}`, error)
       const errorMessage = error.message || 'File transfer failed'
       await this.batchesService.updateBatchStatus(this.batch.id, BATCH_EVENT.SEND_FAILED, {
         additionalData: {

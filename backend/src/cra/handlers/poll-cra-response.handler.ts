@@ -107,15 +107,6 @@ export class PollCraResponseHandler extends BaseJob {
       this.recordsWklUnmatchedApproved +
       this.recordsWklUnmatchedRefused
 
-    const processedBatches =
-      this.processedBatchIds.size > 0
-        ? await this.prisma.batch.findMany({
-            where: { id: { in: [...this.processedBatchIds] } },
-            select: { id: true, batchNumber: true },
-            orderBy: { batchNumber: 'asc' },
-          })
-        : []
-
     return {
       success: true,
       message: `Processed ${totalRecordsProcessed} CRA response records from ${unprocessedResponseFiles.length} file(s)`,
@@ -131,8 +122,7 @@ export class PollCraResponseHandler extends BaseJob {
         records_wkl_unmatched_approved: this.recordsWklUnmatchedApproved,
         records_wkl_unmatched_refused: this.recordsWklUnmatchedRefused,
         records_wkl_unmatched_skipped: this.recordsWklUnmatchedSkipped,
-        batch_ids: processedBatches.map((batch) => batch.id),
-        batch_numbers: processedBatches.map((batch) => batch.batchNumber),
+        batch_ids: [...this.processedBatchIds],
         syncResult,
         craNewRecordsInWkl: {
           count: this.newCraRecordsInWkl.length,
@@ -446,7 +436,7 @@ export class PollCraResponseHandler extends BaseJob {
       const batch = await this.batchesService.createWklBatchForUnmatchedRecords(header)
       this.unmatchedWklBatchId = batch.id
       this.processedBatchIds.add(batch.id)
-      this.logger.log(`Created CRA unmatched WKL batch ${batch.batchNumber}`)
+      this.logger.log(`Created CRA unmatched WKL batch ${batch.id}`)
     }
 
     const batchDetail = await this.batchesService.createBatchDetailsForWklUnmatchedRecords(

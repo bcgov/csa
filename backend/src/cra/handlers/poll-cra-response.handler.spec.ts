@@ -1546,18 +1546,61 @@ describe('PollCraResponseHandler', () => {
         )
       })
 
-      it('persists na status for non-electronic records', async () => {
+      it('persists all parsed lines but only processes actionable electronic records', async () => {
         setupWeeklyFile()
-        setupWeeklyParseFile([makeWklDetail({ receiveMode: ' ' })])
+        setupWeeklyParseFile([
+          makeWklDetail({ receiveMode: ' ' }),
+          makeWklDetail({ status: WKL_STATUS.IN_PROGRESS }),
+          makeWklDetail({ childDin: '987654321', status: WKL_STATUS.COMPLETED }),
+        ])
+        mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
+
+        const result = await handler.execute(mockContext)
+
+        expect(mockWklFileRecordService.persistRecord).toHaveBeenCalledTimes(3)
+        expect(mockWklFileRecordService.persistRecord).toHaveBeenNthCalledWith(
+          1,
+          expect.objectContaining({ recordIndex: 0, matchStatus: 'na' }),
+        )
+        expect(mockWklFileRecordService.persistRecord).toHaveBeenNthCalledWith(
+          2,
+          expect.objectContaining({ recordIndex: 1, matchStatus: 'na' }),
+        )
+        expect(mockWklFileRecordService.persistRecord).toHaveBeenNthCalledWith(
+          3,
+          expect.objectContaining({ recordIndex: 2, matchStatus: 'matched' }),
+        )
+        expect(mockWeeklyContactMatcher.findMatchingBatchDetail).toHaveBeenCalledTimes(1)
+        expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledTimes(1)
+        expect(mockContactsService.updateCsaStatus).toHaveBeenCalledTimes(1)
+        expect(result.metadata.records_wkl_approved).toBe(1)
+        expect(result.metadata.records_wkl_skipped).toBe(2)
+      })
+
+      it('persists na status for non-electronic records without processing them', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([
+          makeWklDetail({ receiveMode: ' ' }),
+          makeWklDetail({ childDin: '987654321' }),
+        ])
+        mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
 
         await handler.execute(mockContext)
 
+        expect(mockWklFileRecordService.persistRecord).toHaveBeenCalledTimes(2)
         expect(mockWklFileRecordService.persistRecord).toHaveBeenCalledWith(
           expect.objectContaining({
+            recordIndex: 0,
             matchStatus: 'na',
           }),
         )
-        expect(mockWeeklyContactMatcher.findMatchingBatchDetail).not.toHaveBeenCalled()
+        expect(mockWklFileRecordService.persistRecord).toHaveBeenCalledWith(
+          expect.objectContaining({
+            recordIndex: 1,
+            matchStatus: 'matched',
+          }),
+        )
+        expect(mockWeeklyContactMatcher.findMatchingBatchDetail).toHaveBeenCalledTimes(1)
       })
 
       it('persists na status for in-progress records', async () => {

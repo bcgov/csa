@@ -61,6 +61,7 @@ describe('PollCraResponseHandler', () => {
   let mockContactsService: any
   let mockIcmSyncBackService: any
   let mockWeeklyContactMatcher: any
+  let mockWklFileRecordService: any
 
   beforeEach(() => {
     mockCraTransferService = {
@@ -107,6 +108,7 @@ describe('PollCraResponseHandler', () => {
     mockPrisma = {
       transferFile: {
         findMany: vi.fn().mockResolvedValue([]),
+        create: vi.fn().mockResolvedValue({}),
         update: vi.fn().mockResolvedValue({}),
       },
       contactBatchDetail: {
@@ -146,6 +148,11 @@ describe('PollCraResponseHandler', () => {
       loadCandidates: vi.fn().mockResolvedValue(undefined),
       findMatchingBatchDetail: vi.fn(),
       findMatchingContact: vi.fn(),
+      buildWklMatchingSnapshot: vi.fn().mockReturnValue({}),
+    }
+
+    mockWklFileRecordService = {
+      persistRecord: vi.fn().mockResolvedValue(undefined),
     }
 
     handler = new PollCraResponseHandler(
@@ -158,6 +165,7 @@ describe('PollCraResponseHandler', () => {
       mockContactsService,
       mockIcmSyncBackService as any,
       mockWeeklyContactMatcher,
+      mockWklFileRecordService,
     )
   })
 
@@ -906,7 +914,7 @@ describe('PollCraResponseHandler', () => {
 
     function setupWeeklyParseFile(details: any[]) {
       mockInboundWeeklyResponseService.parseWeeklyResponseFile.mockReturnValue({
-        header: { tranCode: '6136', recordTypeCode: '00' },
+        header: { tranCode: '6136', recordTypeCode: '00', processDate: '20250420' },
         details,
         trailer: { tranCode: '6138', recordTypeCode: '00', recordCount: details.length + 2 },
       })
@@ -1486,6 +1494,103 @@ describe('PollCraResponseHandler', () => {
             cancelReasonCode: '21',
           },
         )
+      })
+    })
+
+    describe('WKL file record persistence', () => {
+      it('persists one record per WKL detail line', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([makeWklDetail(), makeWklDetail({ childDin: '987654321' })])
+        mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
+
+        await handler.execute(mockContext)
+
+        expect(mockWklFileRecordService.persistRecord).toHaveBeenCalledTimes(2)
+      })
+
+      it('persists matched status when batch detail is found', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([makeWklDetail()])
+        mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
+
+        await handler.execute(mockContext)
+
+        expect(mockWklFileRecordService.persistRecord).toHaveBeenCalledWith(
+          expect.objectContaining({
+            transferFileId: 1,
+            recordIndex: 0,
+            weeklyFileDate: expect.any(Date),
+            matchStatus: 'matched',
+            contactId: 42,
+            batchDetailId: 200,
+            matchedBy: 'SYSTEM',
+            processedAt: expect.any(Date),
+          }),
+        )
+      })
+
+      it('persists unmatched status when no batch detail or contact is found', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([makeWklDetail()])
+        mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(null)
+        mockWeeklyContactMatcher.findMatchingContact.mockResolvedValue(null)
+
+        await handler.execute(mockContext)
+
+        expect(mockWklFileRecordService.persistRecord).toHaveBeenCalledWith(
+          expect.objectContaining({
+            transferFileId: 1,
+            recordIndex: 0,
+            matchStatus: 'unmatched',
+          }),
+        )
+      })
+
+      it('persists na status for non-electronic records', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([makeWklDetail({ receiveMode: ' ' })])
+
+        await handler.execute(mockContext)
+
+        expect(mockWklFileRecordService.persistRecord).toHaveBeenCalledWith(
+          expect.objectContaining({
+            matchStatus: 'na',
+          }),
+        )
+        expect(mockWeeklyContactMatcher.findMatchingBatchDetail).not.toHaveBeenCalled()
+      })
+
+      it('persists na status for in-progress records', async () => {
+        setupWeeklyFile()
+        setupWeeklyParseFile([makeWklDetail({ status: WKL_STATUS.IN_PROGRESS })])
+
+        await handler.execute(mockContext)
+
+        expect(mockWklFileRecordService.persistRecord).toHaveBeenCalledWith(
+          expect.objectContaining({
+            matchStatus: 'na',
+          }),
+        )
+        expect(mockWeeklyContactMatcher.findMatchingBatchDetail).not.toHaveBeenCalled()
+      })
+
+      it('sets file_type when registering a new inbound file', async () => {
+        mockPrisma.transferFile.findMany.mockResolvedValue([])
+        mockCraTransferService.listInboundFiles.mockResolvedValue([
+          { fileName: 'craUserId.AWKL0002.txt' },
+        ])
+        mockCraTransferService.downloadInboundFile.mockResolvedValue(Buffer.from('content'))
+        mockInboundFileService.isValidResponseFile.mockReturnValue(true)
+        mockInboundFileService.getResponseFileType.mockReturnValue('WKL')
+
+        await handler.execute(mockContext)
+
+        expect(mockPrisma.transferFile.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            fileType: 'WKL',
+            fileName: 'craUserId.AWKL0002.txt',
+          }),
+        })
       })
     })
   })

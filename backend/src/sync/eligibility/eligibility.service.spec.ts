@@ -797,14 +797,15 @@ describe('buildLoadContactProfilesSql', () => {
     // No remaining CASE_ROW_ID joins in final SELECT
     expect(sql).not.toMatch(/LEFT JOIN.*CASE_ROW_ID = cases\.ROW_ID/)
   })
-  it('should prioritise Open > Admin Re-open > most recently updated case for multi-case children (BL-24)', () => {
+  it('should prioritise Open > Admin Re-open > most recently closed case for multi-case children (BL-24)', () => {
     const { sql } = buildLoadContactProfilesSql(null)
 
     // ORDER BY must include case status priority after X_CONTACT_NUM
     expect(sql).toContain("WHEN 'OPEN' THEN 1")
     expect(sql).toContain("WHEN 'ADMIN RE-OPEN' THEN 2")
 
-    // Must tiebreak closed cases by LAST_UPD descending (cast to TIMESTAMP for correct ordering)
+    // Must tiebreak closed cases by CLOSE_DT descending, then LAST_UPD
+    expect(sql).toContain('cases.CLOSE_DT::TIMESTAMP DESC NULLS LAST')
     expect(sql).toContain('cases.LAST_UPD::TIMESTAMP DESC NULLS LAST')
   })
 

@@ -54,13 +54,16 @@ describe('WeeklyFilesController', () => {
       totalPages: 1,
     })
 
-    await request(app.getHttpServer()).get('/weekly-files').expect(200).expect({
-      data: [{ id: 1, fileName: 'craUserId.AWKL0001.txt', totalCount: 2 }],
-      page: 1,
-      limit: 10,
-      total: 1,
-      totalPages: 1,
-    })
+    await request(app.getHttpServer())
+      .get('/weekly-files')
+      .expect(200)
+      .expect({
+        data: [{ id: 1, fileName: 'craUserId.AWKL0001.txt', totalCount: 2 }],
+        page: 1,
+        limit: 10,
+        total: 1,
+        totalPages: 1,
+      })
   })
 
   it('POST /weekly-files/:id/records/:recordId/associate associates a record', async () => {

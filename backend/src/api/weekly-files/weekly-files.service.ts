@@ -77,10 +77,7 @@ export class WeeklyFilesService {
 
     return {
       data: files.map((file) =>
-        toWeeklyFileSummaryDto(
-          file,
-          aggregateWeeklyFileCounts(recordsByFileId.get(file.id) ?? []),
-        ),
+        toWeeklyFileSummaryDto(file, aggregateWeeklyFileCounts(recordsByFileId.get(file.id) ?? [])),
       ),
       page: safePage,
       limit: safeLimit,
@@ -204,10 +201,7 @@ export class WeeklyFilesService {
     return toWeeklyFileRecordDto(updated)
   }
 
-  async dissociateRecord(
-    fileId: number,
-    recordId: number,
-  ): Promise<WeeklyFileRecordDto> {
+  async dissociateRecord(fileId: number, recordId: number): Promise<WeeklyFileRecordDto> {
     await this.assertWeeklyFileExists(fileId)
     const record = await this.getWklRecordForFile(fileId, recordId)
 

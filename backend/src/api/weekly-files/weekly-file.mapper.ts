@@ -82,10 +82,7 @@ export function toWeeklyFileSummaryDto(
 
 export function toCsaMatchFound(matchStatus: string): 'Yes' | 'No' | 'N/A' {
   if (matchStatus === WKL_MATCH_STATUS.MATCHED) return 'Yes'
-  if (
-    matchStatus === WKL_MATCH_STATUS.UNMATCHED ||
-    matchStatus === WKL_MATCH_STATUS.ASSOCIATED
-  ) {
+  if (matchStatus === WKL_MATCH_STATUS.UNMATCHED || matchStatus === WKL_MATCH_STATUS.ASSOCIATED) {
     return 'No'
   }
   return 'N/A'

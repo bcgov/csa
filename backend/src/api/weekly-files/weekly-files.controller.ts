@@ -13,10 +13,7 @@ import { ApiBody, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { CurrentUser } from '../common/decorators'
 import { CSAGuard } from '../common/guards/csa.guard'
-import {
-  AssociateWklRecordDto,
-  ReprocessWeeklyFileResultDto,
-} from './dto/associate-wkl-record.dto'
+import { AssociateWklRecordDto, ReprocessWeeklyFileResultDto } from './dto/associate-wkl-record.dto'
 import { WeeklyFileRecordDto, WeeklyFileSummaryDto } from './dto/weekly-file.dto'
 import { WeeklyFilesService } from './weekly-files.service'
 

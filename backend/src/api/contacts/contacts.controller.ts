@@ -21,6 +21,7 @@ import {
   UpdateHoldReasonDto,
 } from '../common/dto/contact-ids.dto'
 import { CSAGuard } from '../common/guards/csa.guard'
+import { AuditTrailService } from '../audit-trail/audit-trail.service'
 import { ContactsService } from './contacts.service'
 import { ContactDto } from './dto/contact.dto'
 import { BulkOperationResponse } from './interfaces'
@@ -29,7 +30,10 @@ import { BulkOperationResponse } from './interfaces'
 @Controller('contacts')
 @UseGuards(CSAGuard)
 export class ContactsController {
-  constructor(private readonly contactsService: ContactsService) {}
+  constructor(
+    private readonly contactsService: ContactsService,
+    private readonly auditTrailService: AuditTrailService,
+  ) {}
 
   private parsePage(page?: string): number {
     const parsed = page ? parseInt(page, 10) : 1
@@ -193,6 +197,29 @@ export class ContactsController {
   @ApiResponse({ status: 404, description: 'Contact not found' })
   async findContactBatches(@Param('id', ParseIntPipe) id: number) {
     return this.contactsService.findContactBatches(id)
+  }
+
+  @Get(':id/audit-trail')
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10, max: 200)',
+  })
+  @ApiResponse({ status: 200, description: 'CSA audit trail for this contact (most recent first)' })
+  @ApiResponse({ status: 404, description: 'Contact not found' })
+  async findContactAuditTrail(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.auditTrailService.findByContactId(id, this.parsePage(page), this.parseLimit(limit))
   }
 
   @Post(':id/run-eligibility')

@@ -1385,6 +1385,7 @@ describe('PollCraResponseHandler', () => {
           99,
           CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY,
           { careEndDate: expect.any(Date), din: '123456789', cancelReasonCode: '21' },
+          'PollCraResponseHandler.processUnmatchedWeeklyDetail',
         )
         expect(result.metadata.records_wkl_unmatched_approved).toBe(1)
         expect(result.metadata.records_wkl_unmatched_refused).toBe(0)
@@ -1418,6 +1419,7 @@ describe('PollCraResponseHandler', () => {
           99,
           CSA_STATUS.CANCELLATION_REFUSED_CRA,
           { careEndDate: expect.any(Date), din: '123456789', cancelReasonCode: '21' },
+          'PollCraResponseHandler.processUnmatchedWeeklyDetail',
         )
         expect(result.metadata.records_wkl_unmatched_refused).toBe(1)
         expect(result.metadata.records_wkl_unmatched_approved).toBe(0)
@@ -1478,6 +1480,7 @@ describe('PollCraResponseHandler', () => {
             din: '123456789',
             cancelReasonCode: '22',
           },
+          'PollCraResponseHandler.processUnmatchedWeeklyDetail',
         )
       })
 
@@ -1502,6 +1505,7 @@ describe('PollCraResponseHandler', () => {
             din: '123456789',
             cancelReasonCode: '21',
           },
+          'PollCraResponseHandler.processUnmatchedWeeklyDetail',
         )
       })
     })

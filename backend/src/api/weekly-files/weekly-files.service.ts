@@ -157,7 +157,6 @@ export class WeeklyFilesService {
     fileId: number,
     recordId: number,
     contactId: number,
-    userId: string,
   ): Promise<WeeklyFileRecordDto> {
     await this.assertWeeklyFileExists(fileId)
     const record = await this.getWklRecordForFile(fileId, recordId)
@@ -189,7 +188,7 @@ export class WeeklyFilesService {
         matchStatus: WKL_MATCH_STATUS.ASSOCIATED,
         contactId,
         batchDetailId: null,
-        matchedBy: userId,
+        matchedBy: null,
         processedAt: null,
       },
       include: {
@@ -311,6 +310,10 @@ export class WeeklyFilesService {
         },
       })
       processedRecordIds.push(record.id)
+    }
+
+    if (processedRecordIds.length === 0) {
+      throw new BadRequestException('No associated records could be reprocessed')
     }
 
     for (const batchId of processedBatchIds) {

@@ -61,15 +61,15 @@ export class WeeklyFilesController {
   }
 
   @Post(':id/records/:recordId/associate')
+  @HttpCode(200)
   @ApiBody({ type: AssociateWklRecordDto })
   @ApiResponse({ status: 200, description: 'Associated WKL record with contact' })
   associateRecord(
     @Param('id', ParseIntPipe) id: number,
     @Param('recordId', ParseIntPipe) recordId: number,
     @Body() dto: AssociateWklRecordDto,
-    @CurrentUser() userId: string,
   ): Promise<WeeklyFileRecordDto> {
-    return this.weeklyFilesService.associateRecord(id, recordId, dto.contactId, userId)
+    return this.weeklyFilesService.associateRecord(id, recordId, dto.contactId)
   }
 
   @Post(':id/records/:recordId/dissociate')
@@ -83,6 +83,7 @@ export class WeeklyFilesController {
   }
 
   @Post(':id/reprocess')
+  @HttpCode(200)
   @ApiResponse({ status: 200, description: 'Reprocessed associated WKL records' })
   reprocess(
     @Param('id', ParseIntPipe) id: number,

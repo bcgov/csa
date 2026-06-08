@@ -72,12 +72,11 @@ describe('WeeklyFilesController', () => {
 
     await request(app.getHttpServer())
       .post('/weekly-files/1/records/5/associate')
-      .set('X-Test-Username', 'JDOE')
       .send({ contactId: 99 })
-      .expect(201)
+      .expect(200)
       .expect({ id: 5, matchStatus: 'associated', csaMatchFound: 'No' })
 
-    expect(mockWeeklyFilesService.associateRecord).toHaveBeenCalledWith(1, 5, 99, 'JDOE')
+    expect(mockWeeklyFilesService.associateRecord).toHaveBeenCalledWith(1, 5, 99)
   })
 
   it('POST /weekly-files/:id/records/:recordId/dissociate dissociates a record', async () => {
@@ -104,7 +103,7 @@ describe('WeeklyFilesController', () => {
     await request(app.getHttpServer())
       .post('/weekly-files/1/reprocess')
       .set('X-Test-Username', 'JDOE')
-      .expect(201)
+      .expect(200)
       .expect({ processedRecordIds: [5, 6], skippedRecords: [] })
 
     expect(mockWeeklyFilesService.reprocess).toHaveBeenCalledWith(1, 'JDOE')

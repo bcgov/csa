@@ -184,13 +184,13 @@ describe('WeeklyFilesService', () => {
         id: 5,
         recordIndex: 0,
         matchStatus: WKL_MATCH_STATUS.ASSOCIATED,
-        matchedBy: 'JDOE',
+        matchedBy: null,
         processedAt: null,
         recordData: electronicRecordData,
         contact: { caseNumber: '1-99', personIdIcm: 'ICM-99' },
       })
 
-      const result = await service.associateRecord(1, 5, 99, 'JDOE')
+      const result = await service.associateRecord(1, 5, 99)
 
       expect(mockPrisma.wklFileRecord.update).toHaveBeenCalledWith({
         where: { id: 5 },
@@ -198,7 +198,7 @@ describe('WeeklyFilesService', () => {
           matchStatus: WKL_MATCH_STATUS.ASSOCIATED,
           contactId: 99,
           batchDetailId: null,
-          matchedBy: 'JDOE',
+          matchedBy: null,
           processedAt: null,
         },
         include: {
@@ -223,8 +223,22 @@ describe('WeeklyFilesService', () => {
         contact: null,
       })
 
-      await expect(service.associateRecord(1, 5, 99, 'JDOE')).rejects.toBeInstanceOf(
-        BadRequestException,
+      await expect(service.associateRecord(1, 5, 99)).rejects.toBeInstanceOf(BadRequestException)
+    })
+
+    it('rejects association for non-electronic records', async () => {
+      mockPrisma.transferFile.findFirst.mockResolvedValue({ id: 1 })
+      mockPrisma.wklFileRecord.findFirst.mockResolvedValue({
+        id: 5,
+        matchStatus: WKL_MATCH_STATUS.UNMATCHED,
+        processedAt: null,
+        batchDetailId: null,
+        recordData: { ...electronicRecordData, receiveMode: ' ' },
+        contact: null,
+      })
+
+      await expect(service.associateRecord(1, 5, 99)).rejects.toThrow(
+        'Only electronic records can be associated',
       )
     })
 
@@ -239,7 +253,7 @@ describe('WeeklyFilesService', () => {
         contact: null,
       })
 
-      await expect(service.associateRecord(1, 5, 99, 'JDOE')).rejects.toThrow(
+      await expect(service.associateRecord(1, 5, 99)).rejects.toThrow(
         'Cannot associate a record that has already been processed',
       )
     })
@@ -339,8 +353,71 @@ describe('WeeklyFilesService', () => {
       mockPrisma.transferFile.findFirst.mockResolvedValue({ id: 1 })
       mockPrisma.wklFileRecord.findMany.mockResolvedValue([])
 
-      await expect(service.reprocess(1, 'JDOE')).rejects.toBeInstanceOf(BadRequestException)
+      await expect(service.reprocess(1, 'JDOE')).rejects.toThrow(
+        'No associated records to reprocess',
+      )
     })
 
+    it('throws when all associated records fail reprocessing', async () => {
+      mockPrisma.transferFile.findFirst.mockResolvedValue({ id: 1 })
+      mockPrisma.wklFileRecord.findMany.mockResolvedValue([
+        {
+          id: 5,
+          recordIndex: 0,
+          weeklyFileDate: new Date('2025-04-20'),
+          processedAt: null,
+          batchDetailId: null,
+          recordData: electronicRecordData,
+          contact: { id: 99, caseNumber: '1-99' },
+        },
+      ])
+      mockWklAssociatedRecordProcessor.processAssociatedRecord.mockResolvedValue(null)
+
+      await expect(service.reprocess(1, 'JDOE')).rejects.toThrow(
+        'No associated records could be reprocessed',
+      )
+      expect(mockBatchesService.aggregateBatchStatus).not.toHaveBeenCalled()
+      expect(mockIcmSyncBackService.syncFlaggedWithRetry).not.toHaveBeenCalled()
+    })
+
+    it('returns partial results when some associated records are skipped', async () => {
+      mockPrisma.transferFile.findFirst.mockResolvedValue({ id: 1 })
+      mockPrisma.wklFileRecord.findMany.mockResolvedValue([
+        {
+          id: 5,
+          recordIndex: 0,
+          weeklyFileDate: new Date('2025-04-20'),
+          processedAt: null,
+          batchDetailId: null,
+          recordData: electronicRecordData,
+          contact: { id: 99, caseNumber: '1-99' },
+        },
+        {
+          id: 6,
+          recordIndex: 1,
+          weeklyFileDate: new Date('2025-04-20'),
+          processedAt: null,
+          batchDetailId: null,
+          recordData: electronicRecordData,
+          contact: { id: 100, caseNumber: '1-100' },
+        },
+      ])
+      mockWklAssociatedRecordProcessor.processAssociatedRecord
+        .mockImplementationOnce(async (_detail, _contactId, _caseNumber, ctx) => {
+          ctx.processedBatchIds.add(500)
+          return { contactId: 99, batchDetailId: 600 }
+        })
+        .mockResolvedValueOnce(null)
+      mockPrisma.wklFileRecord.update.mockResolvedValue({})
+
+      const result = await service.reprocess(1, 'JDOE')
+
+      expect(result).toEqual({
+        processedRecordIds: [5],
+        skippedRecords: [{ recordId: 6, reason: 'processing_skipped' }],
+      })
+      expect(mockBatchesService.aggregateBatchStatus).toHaveBeenCalled()
+      expect(mockIcmSyncBackService.syncFlaggedWithRetry).toHaveBeenCalled()
+    })
   })
 })

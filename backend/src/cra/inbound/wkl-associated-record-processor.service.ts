@@ -43,14 +43,16 @@ export class WklAssociatedRecordProcessorService {
   ): Promise<{ contactId: number; batchDetailId: number } | null> {
     const wklType = TRANSACTION_TYPE_MAP[detail.transactionType]
     if (!wklType || !TRANSACTION_TYPES.includes(wklType)) {
-      this.logger.warn(`WKL: unexpected transaction type ${detail.transactionType}, skipping`)
+      this.logger.warn(
+        `WKL: unexpected transaction type ${detail.transactionType}, skipping [origin: ${ctx.origin}]`,
+      )
       counters.skipped++
       return null
     }
 
     this.logger.log(
       `Processing associated WKL detail for contactId ${contactId} (case ${caseNumber}), ` +
-        `transaction type ${wklType}, status ${detail.status}`,
+        `transaction type ${wklType}, status ${detail.status} [origin: ${ctx.origin}]`,
     )
 
     if (!ctx.unmatchedWklBatchId.value) {
@@ -102,6 +104,7 @@ export class WklAssociatedRecordProcessorService {
         batchDetail.contactId,
         nextState,
         additionalData,
+        ctx.origin,
       )
       counters.approved++
     } else if (isRefused) {
@@ -117,11 +120,13 @@ export class WklAssociatedRecordProcessorService {
         batchDetail.contactId,
         nextState,
         additionalData,
+        ctx.origin,
       )
       counters.refused++
     } else {
       this.logger.warn(
-        `WKL: unexpected status '${detail.status}' for contact ${batchDetail.contactId}, skipping`,
+        `WKL: unexpected status '${detail.status}' for contact ${batchDetail.contactId}, skipping ` +
+          `[origin: ${ctx.origin}]`,
       )
       counters.skipped++
       return null

@@ -110,6 +110,12 @@ const VALID_CSA_STATUSES = [
   'on_hold', // On Hold
 ]
 
+const shouldHideEligibilityListContact = (contact: Contact): boolean =>
+  contact.placementLocation === '0' &&
+  contact.locationType === 'PL' &&
+  contact.locationSubType === '54' &&
+  contact.placementStatus === 'Active'
+
 // Valid CSA statuses for Add to Batch button
 const VALID_BATCH_STATUSES = [
   'eligible', // Eligible
@@ -2516,67 +2522,69 @@ function App() {
   // Apply filters and sorting to data - always use API data
   // Note: Sorting is now handled by the backend API, so we just transform the data here
   const filteredData = useMemo(() => {
-    const data = contacts.map((contact) => ({
-      id: contact.id,
-      firstName: contact.firstName || '',
-      middleName: contact.middleName || '',
-      lastName: contact.lastName || '',
-      akaLastName: contact.akaLastName || '',
-      akaFirstName: contact.akaFirstName || '',
-      personIdIcm: contact.personIdIcm || '',
-      personIdMis: contact.personIdMis || '',
-      gender: contact.gender || '',
-      dob: contact.dateOfBirth ? formatDateYMD(contact.dateOfBirth) : '',
-      age: contact.age || 0,
-      din: contact.din || '',
-      csaStatus: contact.csaStatusLabel || contact.csaStatus || '', // Display label
-      csaStatusRaw: contact.csaStatus || '', // Raw value for validation logic
-      statusEffective: contact.csaStatusEffectiveDate
-        ? formatDateTimeYMDHMS(contact.csaStatusEffectiveDate)
-        : '',
-      caseNumber: contact.caseNumber || '',
-      caseType: contact.caseType || '',
-      caseStatus: contact.caseStatus || '',
-      caseLoad: contact.caseLoad || '',
-      legacyFile: contact.legacyFileNumber || '',
-      serviceOffice: contact.serviceOffice || '',
-      assignedTo: contact.assignedTo || '',
-      effectiveLegalStatus: contact.effectiveLegalStatus || '',
-      effectiveDate: contact.effectiveDate ? formatDateYMD(contact.effectiveDate) : '',
-      expiryDate: contact.expiryDate ? formatDateYMD(contact.expiryDate) : '',
-      // Birth location
-      birthCity: contact.birthCity || '',
-      birthProvince: contact.birthProvince || '',
-      birthCountry: contact.birthCountry || '',
-      // Placement fields
-      placementLocation: contact.placementLocation || '',
-      locationType: contact.locationType || '',
-      locationSubType: contact.locationSubType || '',
-      placementStatus: contact.placementStatus || '',
-      actualStartDate: contact.actualStartDate ? formatDateYMD(contact.actualStartDate) : '',
-      actualEndDate: contact.actualEndDate ? formatDateYMD(contact.actualEndDate) : '',
-      paidUnpaid: contact.paidUnpaid || '',
-      sourcePlacement: contact.sourcePlacement || '',
-      // Service provider and agreement fields
-      serviceProviderName: contact.serviceProviderName || '',
-      providerId: contact.providerId || '',
-      placeOfServiceName: contact.placeOfServiceName || '',
-      agreementType: contact.agreementType || '',
-      agreementStatus: contact.agreementStatus || '',
-      agreementStartDate: contact.agreementStartDate
-        ? formatDateYMD(contact.agreementStartDate)
-        : '',
-      agreementEndDate: contact.agreementEndDate ? formatDateYMD(contact.agreementEndDate) : '',
-      terminationDate: contact.terminationDate ? formatDateYMD(contact.terminationDate) : '',
-      mcfdContract: contact.mcfdContract || '',
-      product: contact.product || '',
-      isOver18: contact.isOver18 || false,
-      cgwrks3: contact.holdBy || '',
-      holdReason: contact.holdReason || '',
-      lastUpdated: contact.lastUpdatedAt ? formatDateTimeYMDHMS(contact.lastUpdatedAt) : '',
-      lastUpdatedBy: contact.lastUpdatedBy || '',
-      needsReview: contact.needsReview || false,
-    }))
+    const data = contacts
+      .filter((contact) => !shouldHideEligibilityListContact(contact))
+      .map((contact) => ({
+        id: contact.id,
+        firstName: contact.firstName || '',
+        middleName: contact.middleName || '',
+        lastName: contact.lastName || '',
+        akaLastName: contact.akaLastName || '',
+        akaFirstName: contact.akaFirstName || '',
+        personIdIcm: contact.personIdIcm || '',
+        personIdMis: contact.personIdMis || '',
+        gender: contact.gender || '',
+        dob: contact.dateOfBirth ? formatDateYMD(contact.dateOfBirth) : '',
+        age: contact.age || 0,
+        din: contact.din || '',
+        csaStatus: contact.csaStatusLabel || contact.csaStatus || '', // Display label
+        csaStatusRaw: contact.csaStatus || '', // Raw value for validation logic
+        statusEffective: contact.csaStatusEffectiveDate
+          ? formatDateTimeYMDHMS(contact.csaStatusEffectiveDate)
+          : '',
+        caseNumber: contact.caseNumber || '',
+        caseType: contact.caseType || '',
+        caseStatus: contact.caseStatus || '',
+        caseLoad: contact.caseLoad || '',
+        legacyFile: contact.legacyFileNumber || '',
+        serviceOffice: contact.serviceOffice || '',
+        assignedTo: contact.assignedTo || '',
+        effectiveLegalStatus: contact.effectiveLegalStatus || '',
+        effectiveDate: contact.effectiveDate ? formatDateYMD(contact.effectiveDate) : '',
+        expiryDate: contact.expiryDate ? formatDateYMD(contact.expiryDate) : '',
+        // Birth location
+        birthCity: contact.birthCity || '',
+        birthProvince: contact.birthProvince || '',
+        birthCountry: contact.birthCountry || '',
+        // Placement fields
+        placementLocation: contact.placementLocation || '',
+        locationType: contact.locationType || '',
+        locationSubType: contact.locationSubType || '',
+        placementStatus: contact.placementStatus || '',
+        actualStartDate: contact.actualStartDate ? formatDateYMD(contact.actualStartDate) : '',
+        actualEndDate: contact.actualEndDate ? formatDateYMD(contact.actualEndDate) : '',
+        paidUnpaid: contact.paidUnpaid || '',
+        sourcePlacement: contact.sourcePlacement || '',
+        // Service provider and agreement fields
+        serviceProviderName: contact.serviceProviderName || '',
+        providerId: contact.providerId || '',
+        placeOfServiceName: contact.placeOfServiceName || '',
+        agreementType: contact.agreementType || '',
+        agreementStatus: contact.agreementStatus || '',
+        agreementStartDate: contact.agreementStartDate
+          ? formatDateYMD(contact.agreementStartDate)
+          : '',
+        agreementEndDate: contact.agreementEndDate ? formatDateYMD(contact.agreementEndDate) : '',
+        terminationDate: contact.terminationDate ? formatDateYMD(contact.terminationDate) : '',
+        mcfdContract: contact.mcfdContract || '',
+        product: contact.product || '',
+        isOver18: contact.isOver18 || false,
+        cgwrks3: contact.holdBy || '',
+        holdReason: contact.holdReason || '',
+        lastUpdated: contact.lastUpdatedAt ? formatDateTimeYMDHMS(contact.lastUpdatedAt) : '',
+        lastUpdatedBy: contact.lastUpdatedBy || '',
+        needsReview: contact.needsReview || false,
+      }))
 
     return data
   }, [contacts])

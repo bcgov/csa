@@ -1,0 +1,132 @@
+import { Injectable, Logger } from '@nestjs/common'
+import { BatchesService } from 'src/api/batches/batches.service'
+import { ContactsService } from 'src/api/contacts/contacts.service'
+import { BATCH_DETAIL_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
+import { pacificToday, parseWklDate } from 'src/common/utils'
+import { CANCEL_REASON } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
+import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
+import type { DetailRecord04, HeaderRecord } from './inbound-weekly.interface'
+import { WeeklyContactMatcherService } from './weekly-contact-matcher.service'
+
+const { WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
+const { STATUS: WKL_STATUS, TRANSACTION_TYPE_MAP, TRANSACTION_TYPES } = WEEKLY_FILE
+
+export interface WklUnmatchedProcessContext {
+  unmatchedWklBatchId: { value: number | null }
+  processedBatchIds: Set<number>
+  header: HeaderRecord
+  origin: string
+}
+
+export interface WklUnmatchedProcessCounters {
+  approved: number
+  refused: number
+  skipped: number
+}
+
+@Injectable()
+export class WklAssociatedRecordProcessorService {
+  private readonly logger = new Logger(WklAssociatedRecordProcessorService.name)
+
+  constructor(
+    private readonly batchesService: BatchesService,
+    private readonly contactsService: ContactsService,
+    private readonly weeklyContactMatcher: WeeklyContactMatcherService,
+  ) {}
+
+  async processAssociatedRecord(
+    detail: DetailRecord04,
+    contactId: number,
+    caseNumber: string,
+    ctx: WklUnmatchedProcessContext,
+    counters: WklUnmatchedProcessCounters,
+  ): Promise<{ contactId: number; batchDetailId: number } | null> {
+    const wklType = TRANSACTION_TYPE_MAP[detail.transactionType]
+    if (!wklType || !TRANSACTION_TYPES.includes(wklType)) {
+      this.logger.warn(`WKL: unexpected transaction type ${detail.transactionType}, skipping`)
+      counters.skipped++
+      return null
+    }
+
+    this.logger.log(
+      `Processing associated WKL detail for contactId ${contactId} (case ${caseNumber}), ` +
+        `transaction type ${wklType}, status ${detail.status}`,
+    )
+
+    if (!ctx.unmatchedWklBatchId.value) {
+      const batch = await this.batchesService.createWklBatchForUnmatchedRecords(ctx.header)
+      ctx.unmatchedWklBatchId.value = batch.id
+      ctx.processedBatchIds.add(batch.id)
+    }
+
+    const batchDetail = await this.batchesService.createBatchDetailsForWklUnmatchedRecords(
+      ctx.unmatchedWklBatchId.value,
+      contactId,
+      wklType,
+      detail.status,
+      caseNumber,
+      this.weeklyContactMatcher.buildWklMatchingSnapshot(detail),
+    )
+
+    const isApproved =
+      detail.status?.toLowerCase() === WKL_STATUS.COMPLETED ||
+      detail.status?.toLowerCase() === WKL_STATUS.UPDATED
+    const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
+    const din = detail.childDin?.trim()
+    const careDate =
+      wklType === 'cancellation'
+        ? (parseWklDate(detail.careEndDate) ?? pacificToday())
+        : parseWklDate(detail.careStartDate)
+    const cancelReasonCode =
+      wklType === 'cancellation'
+        ? detail.careEndReasonCode?.trim() || CANCEL_REASON.CHILD_LEFT
+        : undefined
+    const additionalData: Record<string, unknown> = {
+      ...(careDate
+        ? wklType === 'cancellation'
+          ? { careEndDate: careDate }
+          : { effectiveDate: careDate }
+        : {}),
+      ...(din ? { din } : {}),
+      ...(cancelReasonCode ? { cancelReasonCode } : {}),
+    }
+
+    if (isApproved) {
+      const nextState =
+        wklType === 'application' ? CSA_STATUS.IN_PAY : CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY
+      await this.batchesService.updateBatchDetailStatus(
+        batchDetail.id,
+        BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
+      )
+      await this.contactsService.forceUpdateCsaStatus(
+        batchDetail.contactId,
+        nextState,
+        additionalData,
+      )
+      counters.approved++
+    } else if (isRefused) {
+      const nextState =
+        wklType === 'application'
+          ? CSA_STATUS.APPLICATION_REFUSED_CRA
+          : CSA_STATUS.CANCELLATION_REFUSED_CRA
+      await this.batchesService.updateBatchDetailStatus(
+        batchDetail.id,
+        BATCH_DETAIL_EVENT.CRA_WKL_REFUSED,
+      )
+      await this.contactsService.forceUpdateCsaStatus(
+        batchDetail.contactId,
+        nextState,
+        additionalData,
+      )
+      counters.refused++
+    } else {
+      this.logger.warn(
+        `WKL: unexpected status '${detail.status}' for contact ${batchDetail.contactId}, skipping`,
+      )
+      counters.skipped++
+      return null
+    }
+
+    return { contactId: batchDetail.contactId, batchDetailId: batchDetail.id }
+  }
+}

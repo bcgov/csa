@@ -7,7 +7,12 @@ import { WeeklyFilesController } from './weekly-files.controller'
 import { WeeklyFilesService } from './weekly-files.service'
 
 const mockCSAGuard = {
-  canActivate: () => true,
+  canActivate: (context: { switchToHttp: () => { getRequest: () => any } }) => {
+    const req = context.switchToHttp().getRequest()
+    const testUsername = req.headers['x-test-username']
+    if (testUsername) req.username = testUsername
+    return true
+  },
 }
 
 describe('WeeklyFilesController', () => {
@@ -17,6 +22,9 @@ describe('WeeklyFilesController', () => {
     findAll: vi.fn(),
     findOne: vi.fn(),
     findRecords: vi.fn(),
+    associateRecord: vi.fn(),
+    dissociateRecord: vi.fn(),
+    reprocess: vi.fn(),
   }
 
   beforeEach(async () => {
@@ -53,6 +61,53 @@ describe('WeeklyFilesController', () => {
       total: 1,
       totalPages: 1,
     })
+  })
+
+  it('POST /weekly-files/:id/records/:recordId/associate associates a record', async () => {
+    mockWeeklyFilesService.associateRecord.mockResolvedValue({
+      id: 5,
+      matchStatus: 'associated',
+      csaMatchFound: 'No',
+    })
+
+    await request(app.getHttpServer())
+      .post('/weekly-files/1/records/5/associate')
+      .set('X-Test-Username', 'JDOE')
+      .send({ contactId: 99 })
+      .expect(201)
+      .expect({ id: 5, matchStatus: 'associated', csaMatchFound: 'No' })
+
+    expect(mockWeeklyFilesService.associateRecord).toHaveBeenCalledWith(1, 5, 99, 'JDOE')
+  })
+
+  it('POST /weekly-files/:id/records/:recordId/dissociate dissociates a record', async () => {
+    mockWeeklyFilesService.dissociateRecord.mockResolvedValue({
+      id: 5,
+      matchStatus: 'unmatched',
+      csaMatchFound: 'No',
+    })
+
+    await request(app.getHttpServer())
+      .post('/weekly-files/1/records/5/dissociate')
+      .expect(200)
+      .expect({ id: 5, matchStatus: 'unmatched', csaMatchFound: 'No' })
+
+    expect(mockWeeklyFilesService.dissociateRecord).toHaveBeenCalledWith(1, 5)
+  })
+
+  it('POST /weekly-files/:id/reprocess reprocesses associated records', async () => {
+    mockWeeklyFilesService.reprocess.mockResolvedValue({
+      processedRecordIds: [5, 6],
+      skippedRecords: [],
+    })
+
+    await request(app.getHttpServer())
+      .post('/weekly-files/1/reprocess')
+      .set('X-Test-Username', 'JDOE')
+      .expect(201)
+      .expect({ processedRecordIds: [5, 6], skippedRecords: [] })
+
+    expect(mockWeeklyFilesService.reprocess).toHaveBeenCalledWith(1, 'JDOE')
   })
 
   it('GET /weekly-files/:id/records returns detail rows', async () => {

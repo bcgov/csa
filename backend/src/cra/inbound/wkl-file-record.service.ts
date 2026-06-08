@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client'
 import { PrismaService } from 'src/common/database/prisma.service'
 import type { DetailRecord04 } from './inbound-weekly.interface'
 
-export type WklMatchStatus = 'matched' | 'unmatched' | 'skipped' | 'na'
+export type WklMatchStatus = 'matched' | 'unmatched' | 'associated' | 'skipped' | 'na'
 
 export interface PersistWklRecordParams {
   transferFileId: number

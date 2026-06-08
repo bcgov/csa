@@ -11,6 +11,7 @@ export interface WeeklyFileCounts {
   eCount: number
   matchedCount: number
   unmatchedCount: number
+  associatedCount: number
   weeklyFileDate: Date | null
 }
 
@@ -25,6 +26,7 @@ export function aggregateWeeklyFileCounts(
   let eCount = 0
   let matchedCount = 0
   let unmatchedCount = 0
+  let associatedCount = 0
 
   for (const record of records) {
     if (!weeklyFileDate && record.weeklyFileDate) {
@@ -40,6 +42,8 @@ export function aggregateWeeklyFileCounts(
       matchedCount++
     } else if (record.matchStatus === WKL_MATCH_STATUS.UNMATCHED) {
       unmatchedCount++
+    } else if (record.matchStatus === WKL_MATCH_STATUS.ASSOCIATED) {
+      associatedCount++
     }
   }
 
@@ -48,6 +52,7 @@ export function aggregateWeeklyFileCounts(
     eCount,
     matchedCount,
     unmatchedCount,
+    associatedCount,
     weeklyFileDate,
   }
 }
@@ -70,13 +75,19 @@ export function toWeeklyFileSummaryDto(
     eCount: counts.eCount,
     matchedCount: counts.matchedCount,
     unmatchedCount: counts.unmatchedCount,
+    associatedCount: counts.associatedCount,
     isProcessed: file.isDetailsProcessed,
   }
 }
 
 export function toCsaMatchFound(matchStatus: string): 'Yes' | 'No' | 'N/A' {
   if (matchStatus === WKL_MATCH_STATUS.MATCHED) return 'Yes'
-  if (matchStatus === WKL_MATCH_STATUS.UNMATCHED) return 'No'
+  if (
+    matchStatus === WKL_MATCH_STATUS.UNMATCHED ||
+    matchStatus === WKL_MATCH_STATUS.ASSOCIATED
+  ) {
+    return 'No'
+  }
   return 'N/A'
 }
 

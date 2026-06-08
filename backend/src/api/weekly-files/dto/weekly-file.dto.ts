@@ -26,6 +26,9 @@ export class WeeklyFileSummaryDto {
   unmatchedCount: number
 
   @ApiProperty()
+  associatedCount: number
+
+  @ApiProperty()
   isProcessed: boolean
 }
 

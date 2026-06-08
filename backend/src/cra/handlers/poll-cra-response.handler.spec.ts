@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import type { ResponseFileType } from '../inbound/inbound-file.service'
 import { DETAIL_OUTCOME } from '../inbound/inbound.interface'
+import { WklAssociatedRecordProcessorService } from '../inbound/wkl-associated-record-processor.service'
 import { PollCraResponseHandler } from './poll-cra-response.handler'
 
 vi.mock('fs', () => ({
@@ -62,6 +63,7 @@ describe('PollCraResponseHandler', () => {
   let mockIcmSyncBackService: any
   let mockWeeklyContactMatcher: any
   let mockWklFileRecordService: any
+  let wklAssociatedRecordProcessor: WklAssociatedRecordProcessorService
 
   beforeEach(() => {
     mockCraTransferService = {
@@ -155,6 +157,12 @@ describe('PollCraResponseHandler', () => {
       persistRecord: vi.fn().mockResolvedValue(undefined),
     }
 
+    wklAssociatedRecordProcessor = new WklAssociatedRecordProcessorService(
+      mockBatchesService,
+      mockContactsService,
+      mockWeeklyContactMatcher,
+    )
+
     handler = new PollCraResponseHandler(
       mockCraTransferService,
       mockInboundFileService,
@@ -166,6 +174,7 @@ describe('PollCraResponseHandler', () => {
       mockIcmSyncBackService as any,
       mockWeeklyContactMatcher,
       mockWklFileRecordService,
+      wklAssociatedRecordProcessor,
     )
   })
 

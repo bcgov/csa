@@ -28,7 +28,7 @@ describe('weekly-file.mapper', () => {
     completionDate: '20250420',
   }
 
-  it('aggregates total, e, matched, and unmatched counts', () => {
+  it('aggregates total, e, matched, unmatched, and associated counts', () => {
     const counts = aggregateWeeklyFileCounts([
       {
         matchStatus: WKL_MATCH_STATUS.MATCHED,
@@ -41,6 +41,11 @@ describe('weekly-file.mapper', () => {
         recordData: { ...baseRecordData, receiveMode: 'E' },
       },
       {
+        matchStatus: WKL_MATCH_STATUS.ASSOCIATED,
+        weeklyFileDate: new Date('2025-04-20'),
+        recordData: { ...baseRecordData, receiveMode: 'E' },
+      },
+      {
         matchStatus: WKL_MATCH_STATUS.NA,
         weeklyFileDate: new Date('2025-04-20'),
         recordData: { ...baseRecordData, receiveMode: ' ' },
@@ -48,10 +53,11 @@ describe('weekly-file.mapper', () => {
     ])
 
     expect(counts).toEqual({
-      totalCount: 3,
-      eCount: 2,
+      totalCount: 4,
+      eCount: 3,
       matchedCount: 1,
       unmatchedCount: 1,
+      associatedCount: 1,
       weeklyFileDate: new Date('2025-04-20'),
     })
   })
@@ -59,6 +65,7 @@ describe('weekly-file.mapper', () => {
   it('maps match status to CSA Match Found display values', () => {
     expect(toCsaMatchFound(WKL_MATCH_STATUS.MATCHED)).toBe('Yes')
     expect(toCsaMatchFound(WKL_MATCH_STATUS.UNMATCHED)).toBe('No')
+    expect(toCsaMatchFound(WKL_MATCH_STATUS.ASSOCIATED)).toBe('No')
     expect(toCsaMatchFound(WKL_MATCH_STATUS.SKIPPED)).toBe('N/A')
     expect(toCsaMatchFound(WKL_MATCH_STATUS.NA)).toBe('N/A')
   })

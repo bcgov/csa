@@ -1,7 +1,22 @@
-import { Controller, Get, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common'
-import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common'
+import { ApiBody, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
+import { CurrentUser } from '../common/decorators'
 import { CSAGuard } from '../common/guards/csa.guard'
+import {
+  AssociateWklRecordDto,
+  ReprocessWeeklyFileResultDto,
+} from './dto/associate-wkl-record.dto'
 import { WeeklyFileRecordDto, WeeklyFileSummaryDto } from './dto/weekly-file.dto'
 import { WeeklyFilesService } from './weekly-files.service'
 
@@ -43,6 +58,37 @@ export class WeeklyFilesController {
     @Query('limit') limit?: string,
   ): Promise<PaginatedResponse<WeeklyFileRecordDto>> {
     return this.weeklyFilesService.findRecords(id, this.parsePage(page), this.parseLimit(limit))
+  }
+
+  @Post(':id/records/:recordId/associate')
+  @ApiBody({ type: AssociateWklRecordDto })
+  @ApiResponse({ status: 200, description: 'Associated WKL record with contact' })
+  associateRecord(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('recordId', ParseIntPipe) recordId: number,
+    @Body() dto: AssociateWklRecordDto,
+    @CurrentUser() userId: string,
+  ): Promise<WeeklyFileRecordDto> {
+    return this.weeklyFilesService.associateRecord(id, recordId, dto.contactId, userId)
+  }
+
+  @Post(':id/records/:recordId/dissociate')
+  @HttpCode(200)
+  @ApiResponse({ status: 200, description: 'Dissociated WKL record from contact' })
+  dissociateRecord(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('recordId', ParseIntPipe) recordId: number,
+  ): Promise<WeeklyFileRecordDto> {
+    return this.weeklyFilesService.dissociateRecord(id, recordId)
+  }
+
+  @Post(':id/reprocess')
+  @ApiResponse({ status: 200, description: 'Reprocessed associated WKL records' })
+  reprocess(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() userId: string,
+  ): Promise<ReprocessWeeklyFileResultDto> {
+    return this.weeklyFilesService.reprocess(id, userId)
   }
 
   @Get(':id')

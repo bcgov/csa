@@ -22,6 +22,7 @@ export const CRA_DATA_HANDLING_CONSTANT = {
   WKL_MATCH_STATUS: {
     MATCHED: 'matched',
     UNMATCHED: 'unmatched',
+    ASSOCIATED: 'associated',
     SKIPPED: 'skipped',
     NA: 'na',
   },

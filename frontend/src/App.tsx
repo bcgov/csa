@@ -110,7 +110,7 @@ const VALID_CSA_STATUSES = [
   'on_hold', // On Hold
 ]
 
-const shouldHideEligibilityListContact = (contact: Contact): boolean =>
+const isMockSection54Placement = (contact: Contact): boolean =>
   contact.placementLocation === '0' &&
   contact.locationType === 'PL' &&
   contact.locationSubType === '54' &&
@@ -2523,9 +2523,10 @@ function App() {
   // Apply filters and sorting to data - always use API data
   // Note: Sorting is now handled by the backend API, so we just transform the data here
   const filteredData = useMemo(() => {
-    const data = contacts
-      .filter((contact) => !shouldHideEligibilityListContact(contact))
-      .map((contact) => ({
+    const data = contacts.map((contact) => {
+      const hidePlacementDetails = isMockSection54Placement(contact)
+
+      return {
         id: contact.id,
         firstName: contact.firstName || '',
         middleName: contact.middleName || '',
@@ -2558,18 +2559,24 @@ function App() {
         birthProvince: contact.birthProvince || '',
         birthCountry: contact.birthCountry || '',
         // Placement fields
-        placementLocation: contact.placementLocation || '',
-        locationType: contact.locationType || '',
-        locationSubType: contact.locationSubType || '',
-        placementStatus: contact.placementStatus || '',
-        actualStartDate: contact.actualStartDate ? formatDateYMD(contact.actualStartDate) : '',
-        actualEndDate: contact.actualEndDate ? formatDateYMD(contact.actualEndDate) : '',
-        paidUnpaid: contact.paidUnpaid || '',
-        sourcePlacement: contact.sourcePlacement || '',
+        placementLocation: hidePlacementDetails ? '' : contact.placementLocation || '',
+        locationType: hidePlacementDetails ? '' : contact.locationType || '',
+        locationSubType: hidePlacementDetails ? '' : contact.locationSubType || '',
+        placementStatus: hidePlacementDetails ? '' : contact.placementStatus || '',
+        actualStartDate:
+          hidePlacementDetails || !contact.actualStartDate
+            ? ''
+            : formatDateYMD(contact.actualStartDate),
+        actualEndDate:
+          hidePlacementDetails || !contact.actualEndDate
+            ? ''
+            : formatDateYMD(contact.actualEndDate),
+        paidUnpaid: hidePlacementDetails ? '' : contact.paidUnpaid || '',
+        sourcePlacement: hidePlacementDetails ? '' : contact.sourcePlacement || '',
         // Service provider and agreement fields
         serviceProviderName: contact.serviceProviderName || '',
         providerId: contact.providerId || '',
-        placeOfServiceName: contact.placeOfServiceName || '',
+        placeOfServiceName: hidePlacementDetails ? '' : contact.placeOfServiceName || '',
         agreementType: contact.agreementType || '',
         agreementStatus: contact.agreementStatus || '',
         agreementStartDate: contact.agreementStartDate
@@ -2585,7 +2592,8 @@ function App() {
         lastUpdated: contact.lastUpdatedAt ? formatDateTimeYMDHMS(contact.lastUpdatedAt) : '',
         lastUpdatedBy: contact.lastUpdatedBy || '',
         needsReview: contact.needsReview || false,
-      }))
+      }
+    })
 
     return data
   }, [contacts])

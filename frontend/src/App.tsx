@@ -1028,7 +1028,8 @@ function App() {
     }
 
     // If column filter is active, re-apply all column filters on page change
-    if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+    // (but not while a full-text global search is active — it owns the results then)
+    if (!isSearchActive && isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
       performColumnFiltersSearch(activeColumnFilters, currentPage)
     } else if (!isSearchActive) {
       // Only fetch regular contacts when no column filter or search is active

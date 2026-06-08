@@ -26,10 +26,7 @@ describe('BackfillIcmCasesHandler', () => {
     }
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        BackfillIcmCasesHandler,
-        { provide: IcmService, useValue: mockIcmService },
-      ],
+      providers: [BackfillIcmCasesHandler, { provide: IcmService, useValue: mockIcmService }],
     }).compile()
 
     handler = module.get<BackfillIcmCasesHandler>(BackfillIcmCasesHandler)

@@ -233,7 +233,7 @@ export class PollCraResponseHandler extends BaseJob {
 
     this.logger.log(
       `Parsed File: ${responseFile.fileName}, Valid Processed records= ${details.length} ` +
-      (recordCount !== undefined ? `, Total Records in File = ${recordCount}` : ''),
+        (recordCount !== undefined ? `, Total Records in File = ${recordCount}` : ''),
     )
 
     if (isWeekly) {
@@ -349,13 +349,13 @@ export class PollCraResponseHandler extends BaseJob {
     if (!batchDetail) {
       this.logger.warn(
         `WKL: no matching batch detail for ${detail.childGivenName.trim()} ${detail.childSurName.trim()} ` +
-        `(DIN: ${detail.childDin?.trim() || 'none'})`,
+          `(DIN: ${detail.childDin?.trim() || 'none'})`,
       )
       const contacts = await this.weeklyContactMatcher.findMatchingContact(detail)
       if (!contacts) {
         this.logger.warn(
           `WKL: no matching contacts for ${detail.childGivenName.trim()} ${detail.childSurName.trim()} ` +
-          `(DIN: ${detail.childDin?.trim() || 'none'})`,
+            `(DIN: ${detail.childDin?.trim() || 'none'})`,
         )
         this.newCraRecordsInWkl.push(detail)
         this.recordsWklSkipped++
@@ -377,7 +377,7 @@ export class PollCraResponseHandler extends BaseJob {
     if (batchDetail.transactionType !== wklType) {
       this.logger.warn(
         `WKL: transaction type mismatch for contact ${batchDetail.contactId} — ` +
-        `WKL says ${wklType}, batch detail says ${batchDetail.transactionType}`,
+          `WKL says ${wklType}, batch detail says ${batchDetail.transactionType}`,
       )
     }
 
@@ -389,7 +389,7 @@ export class PollCraResponseHandler extends BaseJob {
 
     this.logger.log(
       `Processing WKL detail for contactId ${batchDetail.contactId}, transaction type ${wklType}, status ${detail.status}, ` +
-      `isApproved: ${isApproved}, isRefused: ${isRefused}`,
+        `isApproved: ${isApproved}, isRefused: ${isRefused}`,
     )
 
     const din = detail.childDin?.trim()
@@ -451,7 +451,7 @@ export class PollCraResponseHandler extends BaseJob {
   ): Promise<void> {
     this.logger.log(
       `Processing unmatched WKL detail for contactId ${contactId} (case ${caseNumber}), ` +
-      `transaction type ${wklType}, status ${detail.status}`,
+        `transaction type ${wklType}, status ${detail.status}`,
     )
     if (!this.unmatchedWklBatchId) {
       const batch = await this.batchesService.createWklBatchForUnmatchedRecords(header)
@@ -471,7 +471,7 @@ export class PollCraResponseHandler extends BaseJob {
     if (batchDetail.transactionType !== wklType) {
       this.logger.warn(
         `WKL: transaction type mismatch for contact ${batchDetail.contactId} — ` +
-        `WKL says ${wklType}, batch detail says ${batchDetail.transactionType}`,
+          `WKL says ${wklType}, batch detail says ${batchDetail.transactionType}`,
       )
     }
 
@@ -535,7 +535,7 @@ export class PollCraResponseHandler extends BaseJob {
     }
     this.logger.log(
       `Finished processing unmatched WKL detail for contactId ${contactId} (case ${caseNumber}), ` +
-      `transaction type ${wklType}, status ${detail.status}, approved: ${isApproved}, refused: ${isRefused}`,
+        `transaction type ${wklType}, status ${detail.status}, approved: ${isApproved}, refused: ${isRefused}`,
     )
   }
 }

@@ -110,11 +110,13 @@ const VALID_CSA_STATUSES = [
   'on_hold', // On Hold
 ]
 
+const normalizeMatchValue = (value?: string): string => (value ?? '').trim().toUpperCase()
+
 const isMockSection54Placement = (contact: Contact): boolean =>
-  contact.placementLocation === '0' &&
-  contact.locationType === 'PL' &&
-  contact.locationSubType === '54' &&
-  contact.placementStatus === 'Active'
+  normalizeMatchValue(contact.placementLocation) === '0' &&
+  normalizeMatchValue(contact.locationType) === 'PL' &&
+  normalizeMatchValue(contact.locationSubType) === '54' &&
+  normalizeMatchValue(contact.placementStatus) === 'ACTIVE'
 
 // Valid CSA statuses for Add to Batch button
 const VALID_BATCH_STATUSES = [

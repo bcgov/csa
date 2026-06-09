@@ -1,8 +1,10 @@
 import type { INestApplication } from '@nestjs/common'
-import type { TestingModule } from '@nestjs/testing'
+import { NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { Prisma } from '@prisma/client'
+import { BatchesService } from 'src/api/batches/batches.service'
 import { JobRunner } from 'src/jobs/job-runner.service'
 import { JobsService } from 'src/jobs/jobs.service'
 import { OpenshiftJobLauncher } from 'src/jobs/openshift-job-launcher.service'
@@ -26,6 +28,10 @@ describe('JobsController', () => {
     getJob: vi.fn(),
     getJobs: vi.fn(),
     markFailed: vi.fn(),
+  }
+
+  const mockBatchesService = {
+    findOne: vi.fn(),
   }
 
   const mockOpenshiftJobLauncher = {
@@ -53,6 +59,7 @@ describe('JobsController', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: JobRunner, useValue: mockJobRunner },
         { provide: JobsService, useValue: mockJobsService },
+        { provide: BatchesService, useValue: mockBatchesService },
         { provide: OpenshiftJobLauncher, useValue: mockOpenshiftJobLauncher },
       ],
     })
@@ -267,6 +274,137 @@ describe('JobsController', () => {
       mockJobsService.getJob.mockResolvedValue(null)
 
       await request(app.getHttpServer()).get('/jobs/999').expect(404)
+    })
+
+    describe('POST /jobs/send-cra-file/:batchId', () => {
+      const mockBatch = {
+        id: 123,
+        status: 'pending',
+        recordCount: 5,
+        createdAt: new Date('2026-01-01'),
+        batchDate: null,
+        systemComments: null,
+      }
+
+      it('should create job with batchId metadata when batch is valid', async () => {
+        mockBatchesService.findOne.mockResolvedValue(mockBatch)
+        mockOpenshiftJobLauncher.isEnabled.mockReturnValue(true)
+        mockOpenshiftJobLauncher.launchJob.mockResolvedValue({
+          success: true,
+          jobName: 'csa-cra-file-transfer-789',
+          message: 'Job launched successfully',
+        })
+        mockJobsService.createJob.mockResolvedValue({ id: 789 })
+
+        const res = await request(app.getHttpServer()).post('/jobs/send-cra-file/123').expect(201)
+
+        expect(res.body).toEqual({
+          jobRunId: 789,
+          message: 'Job launched successfully',
+          openshiftJobName: 'csa-cra-file-transfer-789',
+        })
+        expect(mockBatchesService.findOne).toHaveBeenCalledWith(123)
+        expect(mockJobsService.createJob).toHaveBeenCalledWith({
+          jobType: 'SEND_CRA_FILE',
+          jobTrigger: 'END_USER',
+          metadata: { batchId: 123 },
+        })
+        expect(mockOpenshiftJobLauncher.launchJob).toHaveBeenCalledWith('SEND_CRA_FILE', 789)
+      })
+
+      it('should return 404 when batch not found', async () => {
+        mockBatchesService.findOne.mockRejectedValue(new NotFoundException('Batch not found'))
+
+        const res = await request(app.getHttpServer()).post('/jobs/send-cra-file/999').expect(404)
+
+        expect(res.body.message).toContain('Batch 999 not found')
+        expect(mockJobsService.createJob).not.toHaveBeenCalled()
+      })
+
+      it('should return 400 when batch is not in PENDING status', async () => {
+        mockBatchesService.findOne.mockResolvedValue({
+          ...mockBatch,
+          status: 'in_progress',
+        })
+
+        const res = await request(app.getHttpServer()).post('/jobs/send-cra-file/123').expect(400)
+
+        expect(res.body.message).toContain('Cannot send batch 123 to CRA')
+        expect(res.body.message).toContain('in_progress')
+        expect(mockJobsService.createJob).not.toHaveBeenCalled()
+      })
+
+      it('should return 400 when batch has no records', async () => {
+        mockBatchesService.findOne.mockResolvedValue({
+          ...mockBatch,
+          recordCount: 0,
+        })
+
+        const res = await request(app.getHttpServer()).post('/jobs/send-cra-file/123').expect(400)
+
+        expect(res.body.message).toContain('Batch must have at least 1 record')
+        expect(mockJobsService.createJob).not.toHaveBeenCalled()
+      })
+
+      it('should fail when OpenShift launch fails', async () => {
+        mockBatchesService.findOne.mockResolvedValue(mockBatch)
+        mockOpenshiftJobLauncher.isEnabled.mockReturnValue(true)
+        mockOpenshiftJobLauncher.launchJob.mockResolvedValue({
+          success: false,
+          jobName: '',
+          message: 'CronJob csa-cra-file-transfer not found',
+        })
+        mockJobsService.createJob.mockResolvedValue({ id: 456 })
+
+        const res = await request(app.getHttpServer()).post('/jobs/send-cra-file/123').expect(503)
+
+        expect(res.body.message).toBe('CronJob csa-cra-file-transfer not found')
+        expect(mockJobsService.markFailed).toHaveBeenCalledWith(
+          456,
+          'CronJob csa-cra-file-transfer not found',
+        )
+      })
+
+      it('should return 409 when concurrent job is already running', async () => {
+        mockBatchesService.findOne.mockResolvedValue(mockBatch)
+        mockOpenshiftJobLauncher.isEnabled.mockReturnValue(true)
+        const uniqueErr = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: '5.0.0',
+        })
+        mockJobsService.createJob.mockRejectedValue(uniqueErr)
+
+        const res = await request(app.getHttpServer()).post('/jobs/send-cra-file/123').expect(409)
+
+        expect(res.body.message).toContain('SEND_CRA_FILE')
+        expect(res.body.message).toContain('already running')
+      })
+
+      it('should run in API process when OpenShift is disabled and DEPLOY_ENV is local', async () => {
+        mockBatchesService.findOne.mockResolvedValue(mockBatch)
+        mockOpenshiftJobLauncher.isEnabled.mockReturnValue(false)
+        mockConfigService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+          if (key === 'app.deployEnv') return 'local'
+          return defaultValue
+        })
+        mockJobsService.createJob.mockResolvedValue({ id: 555 })
+        mockJobRunner.executeJob.mockResolvedValue({ success: true })
+
+        const res = await request(app.getHttpServer()).post('/jobs/send-cra-file/123').expect(201)
+
+        expect(res.body).toEqual({
+          jobRunId: 555,
+          message: 'Running SEND_CRA_FILE in API process (DEPLOY_ENV=local)',
+        })
+        expect(mockJobRunner.executeJob).toHaveBeenCalledWith(555)
+        expect(mockOpenshiftJobLauncher.launchJob).not.toHaveBeenCalled()
+      })
+
+      it('should validate batchId parameter is a number', async () => {
+        await request(app.getHttpServer()).post('/jobs/send-cra-file/invalid').expect(400)
+
+        expect(mockBatchesService.findOne).not.toHaveBeenCalled()
+      })
     })
   })
 })

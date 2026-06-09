@@ -5,4 +5,5 @@
 export const OPENSHIFT_CRONJOB_NAMES = {
   RUN_ELIGIBILITY: 'csa-run-eligibility',
   AUTO_BATCH: 'csa-run-auto-batch',
+  SEND_CRA_FILE: 'csa-cra-file-transfer',
 } as const

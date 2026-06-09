@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Controller,
   Get,
@@ -12,9 +13,10 @@ import {
   ServiceUnavailableException,
   UseGuards,
 } from '@nestjs/common'
-import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { ConfigService } from '@nestjs/config'
+import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { Prisma } from '@prisma/client'
+import { BATCH_STATUS } from 'src/common/state-machine/constants'
 import type { DeployEnv } from 'src/config/app.config'
 import { JobStatus } from 'src/jobs/enums/job-status.enum'
 import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
@@ -22,6 +24,7 @@ import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobRunner } from 'src/jobs/job-runner.service'
 import { JobsService } from 'src/jobs/jobs.service'
 import { OpenshiftJobLauncher } from 'src/jobs/openshift-job-launcher.service'
+import { BatchesService } from '../batches/batches.service'
 import { CSAGuard } from '../common/guards/csa.guard'
 import { canRunBulkJobInApiProcess } from './bulk-job-deploy-env'
 import { getJobRunWarning } from './job-openshift-advisory'
@@ -85,6 +88,7 @@ export class JobsController {
     private readonly jobRunner: JobRunner,
     private readonly jobsService: JobsService,
     private readonly openshiftJobLauncher: OpenshiftJobLauncher,
+    private readonly batchesService: BatchesService,
   ) {}
 
   // Concurrency: csa.job_runs has a partial unique index on (job_type) WHERE status='RUNNING'
@@ -146,6 +150,86 @@ export class JobsController {
     }
 
     this.logger.log(`Created job_run ${jobRun.id} for ${jobType}, launching OpenShift Job...`)
+
+    const launchResult = await this.openshiftJobLauncher.launchJob(jobType, jobRun.id)
+
+    if (!launchResult.success) {
+      this.logger.warn(
+        `Failed to launch OpenShift Job for job_run ${jobRun.id}: ${launchResult.message}`,
+      )
+      await this.jobsService.markFailed(jobRun.id, launchResult.message)
+      throw new ServiceUnavailableException(launchResult.message)
+    }
+
+    return {
+      jobRunId: jobRun.id,
+      message: launchResult.message,
+      openshiftJobName: launchResult.jobName || undefined,
+    }
+  }
+
+  /**
+   * Launch an OpenShift job with metadata.
+   * Supports both OpenShift and local execution with metadata passed to the job handler.
+   */
+  private async launchOpenShiftJobWithMetadata(
+    jobType: JobType,
+    metadata: Record<string, unknown>,
+  ): Promise<{ jobRunId: number; message: string; openshiftJobName?: string }> {
+    if (!this.openshiftJobLauncher.isEnabled()) {
+      const deployEnv = this.configService.get<DeployEnv>('app.deployEnv', 'local')
+      if (canRunBulkJobInApiProcess(deployEnv)) {
+        // Local execution with metadata
+        let jobRun
+        try {
+          jobRun = await this.jobsService.createJob({
+            jobType,
+            jobTrigger: JobTrigger.END_USER,
+            metadata,
+          })
+        } catch (err) {
+          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+            throw new ConflictException(`${jobType} is already running`)
+          }
+          throw err
+        }
+
+        this.jobRunner.executeJob(jobRun.id).catch((err) => {
+          this.logger.error(
+            `Background local job ${jobRun.id} [${jobType}] crashed: ${(err as Error).message}`,
+            (err as Error).stack,
+          )
+        })
+
+        return {
+          jobRunId: jobRun.id,
+          message: `Running ${jobType} in API process (DEPLOY_ENV=local)`,
+        }
+      }
+
+      throw new ServiceUnavailableException(
+        `Bulk ${jobType} jobs must run in OpenShift when DEPLOY_ENV is ${deployEnv}. The job launcher is not available.`,
+      )
+    }
+
+    // OpenShift execution with metadata
+    let jobRun
+    try {
+      jobRun = await this.jobsService.createJob({
+        jobType,
+        jobTrigger: JobTrigger.END_USER,
+        metadata,
+      })
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictException(`${jobType} is already running`)
+      }
+      throw err
+    }
+
+    this.logger.log(
+      `Created job_run ${jobRun.id} for ${jobType} with metadata: ${JSON.stringify(metadata)}, launching OpenShift Job...`,
+    )
 
     const launchResult = await this.openshiftJobLauncher.launchJob(jobType, jobRun.id)
 
@@ -233,6 +317,49 @@ export class JobsController {
   @ApiResponse({ status: 503, description: 'Failed to launch OpenShift Job' })
   async autoBatch() {
     return this.launchOpenShiftJob(JobType.AUTO_BATCH)
+  }
+
+  @Post('send-cra-file/:batchId')
+  @ApiResponse({ status: 201, description: 'SEND_CRA_FILE job started for the batch' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid batch status - only PENDING batches can be sent',
+  })
+  @ApiResponse({ status: 404, description: 'Batch not found' })
+  @ApiResponse({ status: 409, description: 'SEND_CRA_FILE is already running' })
+  @ApiResponse({ status: 503, description: 'Failed to launch OpenShift Job' })
+  async sendCraFile(@Param('batchId', ParseIntPipe) batchId: number) {
+    // Validate batch exists and get its details
+    let batch
+    try {
+      batch = await this.batchesService.findOne(batchId)
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        throw new NotFoundException(`Batch ${batchId} not found`)
+      }
+      throw err
+    }
+
+    // Validate batch is in PENDING status
+    if (batch.status !== BATCH_STATUS.PENDING) {
+      throw new BadRequestException(
+        `Cannot send batch ${batchId} to CRA. Current status is '${batch.status}', but only '${BATCH_STATUS.PENDING}' batches can be sent.`,
+      )
+    }
+
+    // Validate batch has at least 1 record
+    if (batch.recordCount < 1) {
+      throw new BadRequestException(
+        `Cannot send batch ${batchId} to CRA. Batch must have at least 1 record.`,
+      )
+    }
+
+    this.logger.log(
+      `User triggered SEND_CRA_FILE for batch ${batchId} (status: ${batch.status}, records: ${batch.recordCount})`,
+    )
+
+    // Launch job with batchId in metadata
+    return this.launchOpenShiftJobWithMetadata(JobType.SEND_CRA_FILE, { batchId })
   }
 
   @Get(':id')

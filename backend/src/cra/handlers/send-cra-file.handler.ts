@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { readFile } from 'fs/promises'
-import { appendSystemComment, pacificToday } from 'src/common/utils'
 import type { Batch, Contact, ContactBatchDetail } from '@prisma/client'
 import { Prisma } from '@prisma/client'
+import { readFile } from 'fs/promises'
 import { BatchesService } from 'src/api/batches/batches.service'
 import { ContactsService } from 'src/api/contacts/contacts.service'
 import { PrismaService } from 'src/common/database/prisma.service'
@@ -13,6 +12,7 @@ import {
   BATCH_STATUS,
   CSA_EVENT,
 } from 'src/common/state-machine/constants'
+import { appendSystemComment, pacificToday } from 'src/common/utils'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
@@ -50,14 +50,33 @@ export class SendCraFileHandler extends BaseJob {
   async onStart(context: JobContext): Promise<void> {
     await super.onStart(context)
 
-    this.batch = await this.prisma.batch.findFirst({
-      where: { status: { in: [BATCH_STATUS.SYSTEM_ERROR, BATCH_STATUS.PENDING] } },
-      orderBy: { createdAt: 'asc' },
-    })
+    // Check if a specific batchId was provided (user-triggered from UI)
+    const batchId = context.metadata?.batchId as number | undefined
 
-    if (!this.batch) {
-      this.logger.log('No actionable batch found')
-      return
+    if (batchId) {
+      // User-triggered: process specific batch
+      this.batch = await this.prisma.batch.findUnique({
+        where: { id: batchId },
+      })
+
+      if (!this.batch) {
+        throw new Error(`Batch ${batchId} not found`)
+      }
+
+      this.logger.log(`Processing specific batch ${batchId} (user-triggered)`)
+    } else {
+      // Cron-triggered or standalone: process first pending batch (backwards compatible)
+      this.batch = await this.prisma.batch.findFirst({
+        where: { status: { in: [BATCH_STATUS.SYSTEM_ERROR, BATCH_STATUS.PENDING] } },
+        orderBy: { createdAt: 'asc' },
+      })
+
+      if (!this.batch) {
+        this.logger.log('No actionable batch found')
+        return
+      }
+
+      this.logger.log(`Processing oldest pending batch ${this.batch.id} (cron-triggered)`)
     }
 
     this.batchDetails = await this.prisma.contactBatchDetail.findMany({

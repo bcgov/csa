@@ -234,7 +234,7 @@ describe('PollCraResponseHandler', () => {
       expect(processOrder[1]).toBe(wklFileName)
     })
 
-    it('should maintain original order for files of the same type', async () => {
+    it('should sort files of the same type by sequence number', async () => {
       const rspFile1 = 'craUserId.ARSP0001.txt'
       const rspFile2 = 'craUserId.ARSP0002.txt'
 
@@ -259,9 +259,9 @@ describe('PollCraResponseHandler', () => {
 
       await handler.execute(mockContext)
 
-      // Files should maintain their original order (2, 1) since they're the same type
-      expect(processOrder[0]).toBe(rspFile2)
-      expect(processOrder[1]).toBe(rspFile1)
+      // Files should be sorted by sequence number (0001 before 0002)
+      expect(processOrder[0]).toBe(rspFile1)
+      expect(processOrder[1]).toBe(rspFile2)
     })
 
     it('should handle multiple RSP and WKL files correctly', async () => {

@@ -22,7 +22,8 @@ import type { DetailRecord04, HeaderRecord } from '../inbound/inbound-weekly.int
 import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import { WeeklyContactMatcherService } from '../inbound/weekly-contact-matcher.service'
 import { CraTransferService } from '../transfer/cra-transfer.service'
-const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
+const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY, WEEKLY_FILE, RESPONSE_FILE_TYPE } =
+  CRA_DATA_HANDLING_CONSTANT
 const { STATUS: WKL_STATUS, RECEIVE_MODE, TRANSACTION_TYPE_MAP, TRANSACTION_TYPES } = WEEKLY_FILE
 
 @Injectable()
@@ -135,22 +136,48 @@ export class PollCraResponseHandler extends BaseJob {
 
   /**
    * Sort files to ensure RSP (Response) files are processed before WKL (Weekly) files.
+   * Within the same file type, files are sorted by sequence number for deterministic ordering.
    * This is required by business to avoid processing errors when both file types are present.
+   *
+   * File naming convention: `<prefix>.<envFlag><typeFlag><seq>.<ext>`
+   * Example: craUserId.ARSP0001.txt
    */
   private sortFilesByType(
     files: Array<{ id: number; fileName: string }>,
   ): Array<{ id: number; fileName: string }> {
-    return files.sort((a, b) => {
+    return [...files].sort((a, b) => {
       const typeA = this.inboundFileService.getResponseFileType(a.fileName)
       const typeB = this.inboundFileService.getResponseFileType(b.fileName)
 
       // RSP files should be processed before WKL files
-      if (typeA === 'RSP' && typeB === 'WKL') return -1
-      if (typeA === 'WKL' && typeB === 'RSP') return 1
+      if (typeA === RESPONSE_FILE_TYPE.RSP && typeB === RESPONSE_FILE_TYPE.WKL) return -1
+      if (typeA === RESPONSE_FILE_TYPE.WKL && typeB === RESPONSE_FILE_TYPE.RSP) return 1
 
-      // Maintain original order for files of the same type
+      // For files of the same type, sort by sequence number
+      if (typeA === typeB) {
+        const seqA = this.extractSequenceNumber(a.fileName)
+        const seqB = this.extractSequenceNumber(b.fileName)
+        return seqA - seqB
+      }
+
       return 0
     })
+  }
+
+  /**
+   * Extract sequence number from CRA file name.
+   * File format: `<prefix>.<envFlag><typeFlag><seq>.<ext>`
+   * Example: craUserId.ARSP0001.txt -> 1
+   */
+  private extractSequenceNumber(fileName: string): number {
+    const parts = fileName.split('.')
+    if (parts.length < 2) return 0
+
+    const middle = parts[1] // e.g., "ARSP0001" or "PRSP0001"
+    const sequencePart = middle.slice(4) // Skip envFlag (1 char) + typeFlag (3 chars)
+    const sequence = parseInt(sequencePart, 10)
+
+    return isNaN(sequence) ? 0 : sequence
   }
 
   private async downloadAndRegisterNewFiles(): Promise<void> {

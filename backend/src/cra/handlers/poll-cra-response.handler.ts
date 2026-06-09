@@ -112,7 +112,7 @@ export class PollCraResponseHandler extends BaseJob {
       this.recordsWklUnmatchedRefused
     return {
       success: true,
-      message: `Processed ${totalRecordsProcessed} CRA response records from ${unprocessedResponseFiles.length} file(s)`,
+      message: `Processed ${totalRecordsProcessed} CRA response records from ${sortedFiles.length} file(s)`,
       metadata: {
         files_processed: sortedFiles.length,
         records_updated: totalUpdated,
@@ -153,31 +153,14 @@ export class PollCraResponseHandler extends BaseJob {
       if (typeA === RESPONSE_FILE_TYPE.RSP && typeB === RESPONSE_FILE_TYPE.WKL) return -1
       if (typeA === RESPONSE_FILE_TYPE.WKL && typeB === RESPONSE_FILE_TYPE.RSP) return 1
 
-      // For files of the same type, sort by sequence number
       if (typeA === typeB) {
-        const seqA = this.extractSequenceNumber(a.fileName)
-        const seqB = this.extractSequenceNumber(b.fileName)
+        const seqA = this.inboundFileService.getResponseFileSequenceNumber(a.fileName) ?? a.id
+        const seqB = this.inboundFileService.getResponseFileSequenceNumber(b.fileName) ?? b.id
         return seqA - seqB
       }
 
       return 0
     })
-  }
-
-  /**
-   * Extract sequence number from CRA file name.
-   * File format: `<prefix>.<envFlag><typeFlag><seq>`
-   * Example: craUserId.ARSP0001 -> 1
-   */
-  private extractSequenceNumber(fileName: string): number {
-    const parts = fileName.split('.')
-    if (parts.length < 2) return 0
-
-    const middle = parts[1] // e.g., "ARSP0001" or "PRSP0001"
-    const sequencePart = middle.slice(4) // Skip envFlag (1 char) + typeFlag (3 chars)
-    const sequence = parseInt(sequencePart, 10)
-
-    return isNaN(sequence) ? 0 : sequence
   }
 
   private async downloadAndRegisterNewFiles(): Promise<void> {

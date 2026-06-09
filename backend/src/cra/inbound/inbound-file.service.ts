@@ -36,6 +36,13 @@ export class InboundFileService {
     return SUPPORTED_RESPONSE_FILE_TYPES.find((type) => type === fileTypeFlag) ?? null
   }
 
+  getResponseFileSequenceNumber(fileName: string): number | null {
+    if (this.getResponseFileType(fileName) === null) return null
+    const fileMiddle = fileName.split('.')[1] ?? ''
+    const sequence = Number.parseInt(fileMiddle.slice(4, 8), 10)
+    return Number.isNaN(sequence) ? null : sequence
+  }
+
   isValidResponseFile(fileName: string): boolean {
     return this.getResponseFileType(fileName) !== null
   }

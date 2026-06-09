@@ -72,6 +72,11 @@ describe('PollCraResponseHandler', () => {
       getLocalFilePath: vi.fn().mockReturnValue('/tmp/cra/inbound/default.txt'),
       isValidResponseFile: vi.fn().mockReturnValue(true),
       getResponseFileType: vi.fn().mockReturnValue('RSP' satisfies ResponseFileType),
+      getResponseFileSequenceNumber: vi.fn().mockImplementation((fileName: string) => {
+        const fileMiddle = fileName.split('.')[1] ?? ''
+        const sequence = Number.parseInt(fileMiddle.slice(4, 8), 10)
+        return Number.isNaN(sequence) ? null : sequence
+      }),
     }
 
     mockInboundResponseService = {
@@ -189,10 +194,10 @@ describe('PollCraResponseHandler', () => {
     })
   }
 
-  describe('File sorting (RSP before WKL)', () => {
+  describe('File sorting (RSP before WKL, then by sequence)', () => {
     it('should process RSP files before WKL files when both are present', async () => {
-      const rspFileName = 'craUserId.ARSP0001.txt'
-      const wklFileName = 'craUserId.AWKL0001.txt'
+      const rspFileName = 'craUserId.ARSP0001'
+      const wklFileName = 'craUserId.AWKL0001'
 
       // Set up both files in the database (WKL listed first to test sorting)
       mockPrisma.transferFile.findMany.mockResolvedValue([
@@ -235,8 +240,8 @@ describe('PollCraResponseHandler', () => {
     })
 
     it('should sort files of the same type by sequence number', async () => {
-      const rspFile1 = 'craUserId.ARSP0001.txt'
-      const rspFile2 = 'craUserId.ARSP0002.txt'
+      const rspFile1 = 'craUserId.ARSP0001'
+      const rspFile2 = 'craUserId.ARSP0002'
 
       mockPrisma.transferFile.findMany.mockResolvedValue([
         { id: 2, fileName: rspFile2, isDetailsProcessed: false, isValid: true },
@@ -264,12 +269,12 @@ describe('PollCraResponseHandler', () => {
       expect(processOrder[1]).toBe(rspFile2)
     })
 
-    it('should handle multiple RSP and WKL files correctly', async () => {
+    it('should handle multiple RSP and WKL files in type then sequence order', async () => {
       const files = [
-        { id: 1, fileName: 'craUserId.AWKL0001.txt', isDetailsProcessed: false, isValid: true },
-        { id: 2, fileName: 'craUserId.ARSP0001.txt', isDetailsProcessed: false, isValid: true },
-        { id: 3, fileName: 'craUserId.AWKL0002.txt', isDetailsProcessed: false, isValid: true },
-        { id: 4, fileName: 'craUserId.ARSP0002.txt', isDetailsProcessed: false, isValid: true },
+        { id: 1, fileName: 'craUserId.AWKL0002', isDetailsProcessed: false, isValid: true },
+        { id: 2, fileName: 'craUserId.ARSP0002', isDetailsProcessed: false, isValid: true },
+        { id: 3, fileName: 'craUserId.AWKL0001', isDetailsProcessed: false, isValid: true },
+        { id: 4, fileName: 'craUserId.ARSP0001', isDetailsProcessed: false, isValid: true },
       ]
 
       mockPrisma.transferFile.findMany.mockResolvedValue(files)
@@ -300,11 +305,12 @@ describe('PollCraResponseHandler', () => {
 
       await handler.execute(mockContext)
 
-      // All RSP files should be processed before any WKL files
-      expect(processOrder[0]).toContain('RSP')
-      expect(processOrder[1]).toContain('RSP')
-      expect(processOrder[2]).toContain('WKL')
-      expect(processOrder[3]).toContain('WKL')
+      expect(processOrder).toEqual([
+        'craUserId.ARSP0001',
+        'craUserId.ARSP0002',
+        'craUserId.AWKL0001',
+        'craUserId.AWKL0002',
+      ])
     })
   })
 

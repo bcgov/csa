@@ -80,6 +80,7 @@ import {
   type LastSuccessfulRuns,
 } from './service/contacts-service'
 import type { AppEnvironment } from './types/runtime-config'
+import { buildPlacementDisplayValues } from './utils/mock-placement'
 
 // Environment-based toolbar background colors
 const getEnvBackgroundColor = (env?: AppEnvironment): string => {
@@ -109,14 +110,6 @@ const VALID_CSA_STATUSES = [
   'cra_error_cancellation', // CRA Error - Cancellation
   'on_hold', // On Hold
 ]
-
-const normalizeMatchValue = (value?: string): string => (value ?? '').trim().toUpperCase()
-
-const isMockSection54Placement = (contact: Contact): boolean =>
-  normalizeMatchValue(contact.placementLocation) === '0' &&
-  normalizeMatchValue(contact.locationType) === 'PL' &&
-  normalizeMatchValue(contact.locationSubType) === '54' &&
-  normalizeMatchValue(contact.placementStatus) === 'ACTIVE'
 
 // Valid CSA statuses for Add to Batch button
 const VALID_BATCH_STATUSES = [
@@ -2524,8 +2517,6 @@ function App() {
   // Note: Sorting is now handled by the backend API, so we just transform the data here
   const filteredData = useMemo(() => {
     const data = contacts.map((contact) => {
-      const hidePlacementDetails = isMockSection54Placement(contact)
-
       return {
         id: contact.id,
         firstName: contact.firstName || '',
@@ -2559,24 +2550,10 @@ function App() {
         birthProvince: contact.birthProvince || '',
         birthCountry: contact.birthCountry || '',
         // Placement fields
-        placementLocation: hidePlacementDetails ? '' : contact.placementLocation || '',
-        locationType: hidePlacementDetails ? '' : contact.locationType || '',
-        locationSubType: hidePlacementDetails ? '' : contact.locationSubType || '',
-        placementStatus: hidePlacementDetails ? '' : contact.placementStatus || '',
-        actualStartDate:
-          hidePlacementDetails || !contact.actualStartDate
-            ? ''
-            : formatDateYMD(contact.actualStartDate),
-        actualEndDate:
-          hidePlacementDetails || !contact.actualEndDate
-            ? ''
-            : formatDateYMD(contact.actualEndDate),
-        paidUnpaid: hidePlacementDetails ? '' : contact.paidUnpaid || '',
-        sourcePlacement: hidePlacementDetails ? '' : contact.sourcePlacement || '',
+        ...buildPlacementDisplayValues(contact, formatDateYMD),
         // Service provider and agreement fields
         serviceProviderName: contact.serviceProviderName || '',
         providerId: contact.providerId || '',
-        placeOfServiceName: hidePlacementDetails ? '' : contact.placeOfServiceName || '',
         agreementType: contact.agreementType || '',
         agreementStatus: contact.agreementStatus || '',
         agreementStartDate: contact.agreementStartDate

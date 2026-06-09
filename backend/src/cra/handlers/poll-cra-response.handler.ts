@@ -139,8 +139,8 @@ export class PollCraResponseHandler extends BaseJob {
    * Within the same file type, files are sorted by sequence number for deterministic ordering.
    * This is required by business to avoid processing errors when both file types are present.
    *
-   * File naming convention: `<prefix>.<envFlag><typeFlag><seq>.<ext>`
-   * Example: craUserId.ARSP0001.txt
+   * File naming convention: `<prefix>.<envFlag><typeFlag><seq>`
+   * Example: craUserId.ARSP0001
    */
   private sortFilesByType(
     files: Array<{ id: number; fileName: string }>,
@@ -166,8 +166,8 @@ export class PollCraResponseHandler extends BaseJob {
 
   /**
    * Extract sequence number from CRA file name.
-   * File format: `<prefix>.<envFlag><typeFlag><seq>.<ext>`
-   * Example: craUserId.ARSP0001.txt -> 1
+   * File format: `<prefix>.<envFlag><typeFlag><seq>`
+   * Example: craUserId.ARSP0001 -> 1
    */
   private extractSequenceNumber(fileName: string): number {
     const parts = fileName.split('.')

@@ -50,33 +50,14 @@ export class SendCraFileHandler extends BaseJob {
   async onStart(context: JobContext): Promise<void> {
     await super.onStart(context)
 
-    // Check if a specific batchId was provided (user-triggered from UI)
-    const batchId = context.metadata?.batchId as number | undefined
+    this.batch = await this.prisma.batch.findFirst({
+      where: { status: { in: [BATCH_STATUS.SYSTEM_ERROR, BATCH_STATUS.PENDING] } },
+      orderBy: { createdAt: 'asc' },
+    })
 
-    if (batchId) {
-      // User-triggered: process specific batch
-      this.batch = await this.prisma.batch.findUnique({
-        where: { id: batchId },
-      })
-
-      if (!this.batch) {
-        throw new Error(`Batch ${batchId} not found`)
-      }
-
-      this.logger.log(`Processing specific batch ${batchId} (user-triggered)`)
-    } else {
-      // Cron-triggered or standalone: process first pending batch (backwards compatible)
-      this.batch = await this.prisma.batch.findFirst({
-        where: { status: { in: [BATCH_STATUS.SYSTEM_ERROR, BATCH_STATUS.PENDING] } },
-        orderBy: { createdAt: 'asc' },
-      })
-
-      if (!this.batch) {
-        this.logger.log('No actionable batch found')
-        return
-      }
-
-      this.logger.log(`Processing oldest pending batch ${this.batch.id} (cron-triggered)`)
+    if (!this.batch) {
+      this.logger.log('No actionable batch found')
+      return
     }
 
     this.batchDetails = await this.prisma.contactBatchDetail.findMany({

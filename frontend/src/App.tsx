@@ -290,12 +290,10 @@ const parseFormattedDate = (dateStr: string): Date | null => {
   )
 }
 
-const getHoldReasonPreview = (reason: string): string => {
-  if (reason.length <= HOLD_REASON_PREVIEW_LENGTH) {
-    return reason
-  }
-  return `${reason.slice(0, HOLD_REASON_PREVIEW_LENGTH)}...`
-}
+// Returns true when the reason text needs to be clamped:
+// either it exceeds the character limit OR it contains more than 3 lines (newlines).
+const holdReasonNeedsClamp = (reason: string): boolean =>
+  reason.length > HOLD_REASON_PREVIEW_LENGTH || reason.split('\n').length > 3
 
 // Capitalize first letter of a string
 const capitalize = (str: string): string => {
@@ -3966,26 +3964,37 @@ function App() {
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
                           <TableCell
                             sx={
-                              row.holdReason && row.holdReason.length > HOLD_REASON_PREVIEW_LENGTH
+                              row.holdReason && holdReasonNeedsClamp(row.holdReason)
                                 ? { minWidth: 390, maxWidth: 450 }
                                 : undefined
                             }
                           >
                             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
                               {row.holdReason ? (
-                                row.holdReason.length > HOLD_REASON_PREVIEW_LENGTH ? (
-                                  <Tooltip title={row.holdReason} arrow>
+                                holdReasonNeedsClamp(row.holdReason) ? (
+                                  <Tooltip
+                                    title={
+                                      <span style={{ whiteSpace: 'pre-wrap' }}>
+                                        {row.holdReason}
+                                      </span>
+                                    }
+                                    arrow
+                                  >
                                     <Typography
                                       component="span"
                                       sx={{
                                         maxWidth: 430,
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 3,
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden',
                                         whiteSpace: 'pre-wrap',
                                         wordBreak: 'break-word',
                                         fontSize: 'inherit',
-                                        display: 'inline-block',
+                                        cursor: 'default',
                                       }}
                                     >
-                                      {getHoldReasonPreview(row.holdReason)}
+                                      {row.holdReason}
                                     </Typography>
                                   </Tooltip>
                                 ) : (

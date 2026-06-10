@@ -333,10 +333,10 @@ export default function WeeklyFileProcessingTab() {
         </Box>
       )}
 
-      <Typography variant="h6" sx={{ fontWeight: 500, mb: 2, textAlign: 'left' }}>
-        Details{selectedFileName ? ` - ${selectedFileName}` : ''}
-      </Typography>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 500, textAlign: 'left' }}>
+          Details{selectedFileName ? ` - ${selectedFileName}` : ''}
+        </Typography>
         <Button
           variant="contained"
           onClick={handleConfirmReprocess}

@@ -56,7 +56,7 @@ USER 1001
 # Use the injection script as the entrypoint
 ENTRYPOINT ["/usr/local/bin/inject-env.sh"]
 
-EXPOSE 3000 3001
+EXPOSE 3000 3001 3003
 
 # Boilerplate, not used in OpenShift/Kubernetes
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO /dev/null http://localhost:3000/ || exit 1

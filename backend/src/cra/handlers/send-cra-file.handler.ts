@@ -23,7 +23,7 @@ import { OutboundDataService } from '../outbound/outbound-data.service'
 import { OutboundFileService } from '../outbound/outbound-file.service'
 import { CraTransferService } from '../transfer/cra-transfer.service'
 
-const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
+const { DESTINATION_ID, FILE_DIRECTION, FILE_TYPE, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
 @Injectable()
 export class SendCraFileHandler extends BaseJob {
@@ -112,6 +112,7 @@ export class SendCraFileHandler extends BaseJob {
         batchId: this.batch.id,
         destinationId: DESTINATION_ID,
         direction: FILE_DIRECTION.OUTBOUND,
+        fileType: FILE_TYPE.REQUEST,
         fileName,
         deliveredAt: new Date(),
         referenceNumbers: this.batchDetails

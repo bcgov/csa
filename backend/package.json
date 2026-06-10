@@ -22,6 +22,7 @@
     "job:sync-icm": "node dist/jobs/entrypoints/sync-icm",
     "job:auto-batch": "node dist/jobs/entrypoints/auto-batch",
     "job:backfill-ooc-agreement-lines": "node dist/jobs/entrypoints/backfill-ooc-agreement-lines",
+    "job:backfill-wkl-file-records": "node dist/jobs/entrypoints/backfill-wkl-file-records",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "make-badges": "istanbul-badges-readme --logo=vitest --exitCode=1",

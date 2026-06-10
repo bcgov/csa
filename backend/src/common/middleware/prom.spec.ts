@@ -1,10 +1,6 @@
 import type { Response } from 'express'
 import { vi } from 'vitest'
-import {
-  METRICS_ALIAS_PATH,
-  METRICS_PATH,
-  servePrometheusMetrics,
-} from './prom'
+import { METRICS_ALIAS_PATH, METRICS_PATH, servePrometheusMetrics } from './prom'
 
 vi.mock('prom-client', () => ({
   Registry: vi.fn().mockImplementation(() => ({

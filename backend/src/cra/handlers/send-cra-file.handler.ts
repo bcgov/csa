@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { readFile } from 'fs/promises'
-import { appendSystemComment, pacificToday } from 'src/common/utils'
 import type { Batch, Contact, ContactBatchDetail } from '@prisma/client'
 import { Prisma } from '@prisma/client'
+import { readFile } from 'fs/promises'
 import { BatchesService } from 'src/api/batches/batches.service'
 import { ContactsService } from 'src/api/contacts/contacts.service'
 import { PrismaService } from 'src/common/database/prisma.service'
@@ -13,6 +12,7 @@ import {
   BATCH_STATUS,
   CSA_EVENT,
 } from 'src/common/state-machine/constants'
+import { appendSystemComment, pacificToday } from 'src/common/utils'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'

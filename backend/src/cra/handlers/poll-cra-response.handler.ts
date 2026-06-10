@@ -23,9 +23,14 @@ import { WklAssociatedRecordProcessorService } from '../inbound/wkl-associated-r
 import { WeeklyContactMatcherService } from '../inbound/weekly-contact-matcher.service'
 import { WklFileRecordService } from '../inbound/wkl-file-record.service'
 import { CraTransferService } from '../transfer/cra-transfer.service'
-
-const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY, WEEKLY_FILE, WKL_MATCH_STATUS } =
-  CRA_DATA_HANDLING_CONSTANT
+const {
+  DESTINATION_ID,
+  FILE_DIRECTION,
+  UPDATED_BY,
+  WEEKLY_FILE,
+  RESPONSE_FILE_TYPE,
+  WKL_MATCH_STATUS,
+} = CRA_DATA_HANDLING_CONSTANT
 const { STATUS: WKL_STATUS, RECEIVE_MODE, TRANSACTION_TYPE_MAP, TRANSACTION_TYPES } = WEEKLY_FILE
 
 interface WklRecordContext {
@@ -87,7 +92,10 @@ export class PollCraResponseHandler extends BaseJob {
       where: { direction: FILE_DIRECTION.INBOUND, isDetailsProcessed: false, isValid: true },
     })
 
-    if (unprocessedResponseFiles.length === 0) {
+    // Sort files to ensure RSP files are processed before WKL files
+    const sortedFiles = this.sortFilesByType(unprocessedResponseFiles)
+
+    if (sortedFiles.length === 0) {
       return {
         success: true,
         message: 'No new CRA response files to process',
@@ -96,7 +104,7 @@ export class PollCraResponseHandler extends BaseJob {
     }
 
     let totalRecordsProcessed = 0
-    for (const responseFile of unprocessedResponseFiles) {
+    for (const responseFile of sortedFiles) {
       totalRecordsProcessed += await this.processResponseFile(responseFile)
     }
 
@@ -120,9 +128,9 @@ export class PollCraResponseHandler extends BaseJob {
       this.recordsWklUnmatchedRefused
     return {
       success: true,
-      message: `Processed ${totalRecordsProcessed} CRA response records from ${unprocessedResponseFiles.length} file(s)`,
+      message: `Processed ${totalRecordsProcessed} CRA response records from ${sortedFiles.length} file(s)`,
       metadata: {
-        files_processed: unprocessedResponseFiles.length,
+        files_processed: sortedFiles.length,
         records_updated: totalUpdated,
         records_accepted: this.recordsAccepted,
         records_rejected: this.recordsRejected,
@@ -140,6 +148,35 @@ export class PollCraResponseHandler extends BaseJob {
         },
       },
     }
+  }
+
+  /**
+   * Sort files to ensure RSP (Response) files are processed before WKL (Weekly) files.
+   * Within the same file type, files are sorted by sequence number for deterministic ordering.
+   * This is required by business to avoid processing errors when both file types are present.
+   *
+   * File naming convention: `<prefix>.<envFlag><typeFlag><seq>`
+   * Example: craUserId.ARSP0001
+   */
+  private sortFilesByType(
+    files: Array<{ id: number; fileName: string }>,
+  ): Array<{ id: number; fileName: string }> {
+    return [...files].sort((a, b) => {
+      const typeA = this.inboundFileService.getResponseFileType(a.fileName)
+      const typeB = this.inboundFileService.getResponseFileType(b.fileName)
+
+      // RSP files should be processed before WKL files
+      if (typeA === RESPONSE_FILE_TYPE.RSP && typeB === RESPONSE_FILE_TYPE.WKL) return -1
+      if (typeA === RESPONSE_FILE_TYPE.WKL && typeB === RESPONSE_FILE_TYPE.RSP) return 1
+
+      if (typeA === typeB) {
+        const seqA = this.inboundFileService.getResponseFileSequenceNumber(a.fileName) ?? a.id
+        const seqB = this.inboundFileService.getResponseFileSequenceNumber(b.fileName) ?? b.id
+        return seqA - seqB
+      }
+
+      return 0
+    })
   }
 
   private async downloadAndRegisterNewFiles(): Promise<void> {

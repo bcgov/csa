@@ -1,6 +1,6 @@
 import type { INestApplication } from '@nestjs/common'
-import type { TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
+import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { Prisma } from '@prisma/client'
 import { JobRunner } from 'src/jobs/job-runner.service'
@@ -267,6 +267,96 @@ describe('JobsController', () => {
       mockJobsService.getJob.mockResolvedValue(null)
 
       await request(app.getHttpServer()).get('/jobs/999').expect(404)
+    })
+  })
+
+  describe('POST /jobs/send-cra-file', () => {
+    it('should create a job and return jobRunId when OpenShift is enabled', async () => {
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(true)
+      mockOpenshiftJobLauncher.launchJob.mockResolvedValue({
+        success: true,
+        jobName: 'csa-run-cra-file-transfer-789',
+        message: 'Job launched successfully',
+      })
+      mockJobsService.createJob.mockResolvedValue({ id: 789 })
+
+      const res = await request(app.getHttpServer()).post('/jobs/send-cra-file').expect(201)
+
+      expect(res.body).toEqual({
+        jobRunId: 789,
+        message: 'Job launched successfully',
+        openshiftJobName: 'csa-run-cra-file-transfer-789',
+      })
+      expect(mockJobsService.createJob).toHaveBeenCalledWith({
+        jobType: 'SEND_CRA_FILE',
+        jobTrigger: 'END_USER',
+      })
+      expect(mockOpenshiftJobLauncher.launchJob).toHaveBeenCalledWith('SEND_CRA_FILE', 789)
+    })
+
+    it('should fail request and mark job as failed when launchJob fails', async () => {
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(true)
+      mockOpenshiftJobLauncher.launchJob.mockResolvedValue({
+        success: false,
+        jobName: '',
+        message: 'CronJob csa-run-cra-file-transfer not found',
+      })
+      mockJobsService.createJob.mockResolvedValue({ id: 456 })
+
+      const res = await request(app.getHttpServer()).post('/jobs/send-cra-file').expect(503)
+
+      expect(res.body.message).toBe('CronJob csa-run-cra-file-transfer not found')
+      expect(mockJobsService.markFailed).toHaveBeenCalledWith(
+        456,
+        'CronJob csa-run-cra-file-transfer not found',
+      )
+    })
+
+    it('should return 409 when createJob throws P2002 (race condition)', async () => {
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(true)
+      const uniqueErr = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0',
+      })
+      mockJobsService.createJob.mockRejectedValue(uniqueErr)
+
+      const res = await request(app.getHttpServer()).post('/jobs/send-cra-file').expect(409)
+
+      expect(res.body.message).toContain('SEND_CRA_FILE')
+      expect(res.body.message).toContain('already running')
+    })
+
+    it('should run in API process when OpenShift is disabled and DEPLOY_ENV is local', async () => {
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(false)
+      mockConfigService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+        if (key === 'app.deployEnv') return 'local'
+        return defaultValue
+      })
+      mockJobsService.createJob.mockResolvedValue({ id: 555 })
+      mockJobRunner.executeJob.mockResolvedValue({ success: true })
+
+      const res = await request(app.getHttpServer()).post('/jobs/send-cra-file').expect(201)
+
+      expect(res.body).toEqual({
+        jobRunId: 555,
+        message: 'Running SEND_CRA_FILE in API process (DEPLOY_ENV=local)',
+      })
+      expect(mockJobRunner.executeJob).toHaveBeenCalledWith(555)
+      expect(mockOpenshiftJobLauncher.launchJob).not.toHaveBeenCalled()
+    })
+
+    it('should return 503 when OpenShift is disabled and DEPLOY_ENV is dev', async () => {
+      mockOpenshiftJobLauncher.isEnabled.mockReturnValue(false)
+      mockConfigService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+        if (key === 'app.deployEnv') return 'dev'
+        return defaultValue
+      })
+
+      const res = await request(app.getHttpServer()).post('/jobs/send-cra-file').expect(503)
+
+      expect(res.body.message).toContain('DEPLOY_ENV is dev')
+      expect(mockJobsService.createJob).not.toHaveBeenCalled()
+      expect(mockJobRunner.executeJob).not.toHaveBeenCalled()
     })
   })
 })

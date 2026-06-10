@@ -262,7 +262,7 @@ export default function WeeklyFileProcessingTab() {
         </Alert>
       )}
 
-      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+      <Typography variant="h6" sx={{ fontWeight: 500, mb: 2 }}>
         Weekly Report
       </Typography>
       <TableContainer component={Paper} sx={{ boxShadow: 1, mb: 4 }}>
@@ -333,7 +333,7 @@ export default function WeeklyFileProcessingTab() {
         </Box>
       )}
 
-      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+      <Typography variant="h6" sx={{ fontWeight: 500, mb: 2 }}>
         Details{selectedFileName ? ` - ${selectedFileName}` : ''}
       </Typography>
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>

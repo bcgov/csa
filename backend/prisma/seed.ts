@@ -269,6 +269,7 @@ async function seedBatches() {
   const batches = batchStatuses.map((status, i) => {
     const batchDate = addDays(now, -30 + i * 5)
     return {
+      batchNumber: i + 1,
       batchDate,
       status,
       recordCount: faker.number.int({ min: 5, max: 50 }),

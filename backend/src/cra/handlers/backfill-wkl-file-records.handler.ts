@@ -24,7 +24,7 @@ export class BackfillWklFileRecordsHandler extends BaseJob {
       message:
         `WKL file records backfill complete: ${result.filesProcessed} file(s) processed, ` +
         `${result.filesSkipped} skipped, ${result.recordsUpserted} record(s) upserted`,
-      metadata: result,
+      metadata: result as unknown as Record<string, unknown>,
     }
   }
 }

@@ -867,6 +867,7 @@ function App() {
       holdReason: 'holdReason',
       lastUpdated: 'lastUpdatedAt',
       lastUpdatedBy: 'lastUpdatedBy',
+      needsReview: 'needsReview',
     }),
     [],
   )
@@ -1176,8 +1177,13 @@ function App() {
       try {
         const numericColumns = ['age']
         // Dropdown columns should use exact matching (eq), not partial matching (like)
-        const exactMatchColumns = ['csaStatus', 'caseStatus']
-        const columnFilters: Array<{ key: string; op: string; value: string | number }> = []
+        const exactMatchColumns = ['csaStatus', 'caseStatus', 'needsReview']
+        const booleanColumns = ['needsReview']
+        const columnFilters: Array<{
+          key: string
+          op: string
+          value: string | number | boolean
+        }> = []
 
         // Build filter conditions for all active column filters
         for (const [column, query] of Object.entries(filters)) {
@@ -1189,16 +1195,20 @@ function App() {
 
           const isNumericColumn = numericColumns.includes(column)
           const isExactMatchColumn = exactMatchColumns.includes(column)
+          const isBooleanColumn = booleanColumns.includes(column)
           // Use 'eq' for numeric and dropdown columns, 'like' for text search columns
           const op = isNumericColumn || isExactMatchColumn ? 'eq' : 'like'
 
-          let value: string | number = query
+          let value: string | number | boolean = query
           if (isNumericColumn) {
             const parsedValue = parseInt(query, 10)
             if (isNaN(parsedValue)) {
               continue // Skip invalid numeric input
             }
             value = parsedValue
+          } else if (isBooleanColumn) {
+            // Convert string 'true'/'false' to boolean
+            value = query === 'true'
           }
 
           columnFilters.push({ key: backendField, op, value })

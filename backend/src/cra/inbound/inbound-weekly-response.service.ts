@@ -44,10 +44,7 @@ export class InboundWeeklyResponseService {
         headerRecord = this.parseHeader(line)
       } else if (line.startsWith(RECORD_TYPE_CODE.REPORT_DATE_RANGE_RECORD)) {
         reporttitle2 = line
-      } else if (
-        line.startsWith(RECORD_TYPE_CODE.DATA_RECORD) &&
-        line.slice(14, 15) === RECEIVE_MODE.ELECTQRONIC
-      ) {
+      } else if (line.startsWith(RECORD_TYPE_CODE.DATA_RECORD)) {
         detailRecords.push(this.parseDetail(line))
       } else if (line.startsWith(RECORD_TYPE_CODE.TRAILER_MESSAGE)) {
         trailerMessage = line
@@ -56,12 +53,17 @@ export class InboundWeeklyResponseService {
       }
     }
 
+    const electronicRecordCount = detailRecords.filter(
+      (record) => record.receiveMode === RECEIVE_MODE.ELECTQRONIC,
+    ).length
+
     this.logger.log(
       `Weekly Response File Summary:\n` +
         `  File = ${path.basename(filePath)}\n` +
         `  Report Range = ${reporttitle2}\n` +
         `  Total Records in File = ${trailerRecord?.recordCount}\n` +
-        `  Total Electronic records = ${detailRecords.length}\n` +
+        `  Total Detail records = ${detailRecords.length}\n` +
+        `  Total Electronic records = ${electronicRecordCount}\n` +
         `  Trailer Message = ${trailerMessage}`,
     )
 

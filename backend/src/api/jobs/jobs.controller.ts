@@ -12,8 +12,8 @@ import {
   ServiceUnavailableException,
   UseGuards,
 } from '@nestjs/common'
-import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { ConfigService } from '@nestjs/config'
+import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { Prisma } from '@prisma/client'
 import type { DeployEnv } from 'src/config/app.config'
 import { JobStatus } from 'src/jobs/enums/job-status.enum'
@@ -233,6 +233,14 @@ export class JobsController {
   @ApiResponse({ status: 503, description: 'Failed to launch OpenShift Job' })
   async autoBatch() {
     return this.launchOpenShiftJob(JobType.AUTO_BATCH)
+  }
+
+  @Post('send-cra-file')
+  @ApiResponse({ status: 201, description: 'SEND_CRA_FILE job started' })
+  @ApiResponse({ status: 409, description: 'SEND_CRA_FILE is already running' })
+  @ApiResponse({ status: 503, description: 'Failed to launch OpenShift Job' })
+  async sendCraFile() {
+    return this.launchOpenShiftJob(JobType.SEND_CRA_FILE)
   }
 
   @Get(':id')

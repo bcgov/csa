@@ -668,6 +668,78 @@ function App() {
     checkAndResumeRunningSendCraFileJob()
   }, [isAuthenticated])
 
+  // Helper function to check for running Send CRA file job before new operations
+  // Prevents conflicting Send CRA operations and waits for completion
+  // Returns true if a job is running (action should be blocked), false otherwise
+  const checkAndHandleRunningSendCraFileJob = async (): Promise<boolean> => {
+    try {
+      const runningJob = await getRunningSendCraFileJob()
+      if (runningJob) {
+        // Found a running job - lock the UI and wait for completion
+        setIsRunningSendCraFile(true)
+        setSendCraFileJobState('running')
+        setSnackbar({
+          open: true,
+          message: 'A Send CRA file job is currently running. Please wait...',
+          severity: 'info',
+        })
+
+        // Wait for the job to complete
+        const completedJob = await waitForSendCraFileJobCompletion(runningJob.id, (job) => {
+          if (job.status === 'RUNNING') {
+            const progress = getJobRunProgressUpdate(job, 'Send CRA file job is still running...')
+            setSnackbar({
+              open: true,
+              message: progress.message,
+              severity: progress.severity,
+            })
+          }
+        })
+
+        // Handle completion
+        if (completedJob.status === 'SUCCESS') {
+          const metadata = completedJob.metadata as {
+            batch_id?: number
+            batchId?: number
+            file_path?: string
+            filePath?: string
+            record_count?: number
+            recordCount?: number
+            contacts_count?: number
+            contactsCount?: number
+          } | null
+          const batchId = metadata?.batch_id ?? metadata?.batchId
+
+          setSendCraFileJobState('success')
+          setSnackbar({
+            open: true,
+            message: batchId
+              ? `Send CRA file job completed for batch ${batchId}. Please try your action again.`
+              : 'Send CRA file job completed successfully. Please try your action again.',
+            severity: 'success',
+          })
+
+          const updatedBatches = await getAllBatches()
+          setBatches(updatedBatches)
+        } else {
+          setSendCraFileJobState('failed')
+          setSnackbar({
+            open: true,
+            message: completedJob.error || 'Send CRA file job failed',
+            severity: 'error',
+          })
+        }
+
+        setIsRunningSendCraFile(false)
+        return true // Job was running, action should be blocked
+      }
+      return false // No job running, can proceed
+    } catch (err) {
+      console.error('Failed to check for running Send CRA file job:', err)
+      return false
+    }
+  }
+
   const handleConfirmSendCraDialogClose = () => {
     setConfirmSendCraDialogOpen(false)
   }
@@ -692,6 +764,8 @@ function App() {
     if (!selectedBatch) return
 
     if (await checkAndHandleRunningEligibilityJob()) return
+
+    if (await checkAndHandleRunningSendCraFileJob()) return
 
     setIsRunningSendCraFile(true)
     setSendCraFileJobState('running')
@@ -1435,6 +1509,7 @@ function App() {
 
     // Check if eligibility job is running
     if (await checkAndHandleRunningEligibilityJob()) return
+    if (await checkAndHandleRunningSendCraFileJob()) return
 
     // Separate selected contacts into hold and resume groups
     const toHold: number[] = []
@@ -1657,6 +1732,7 @@ function App() {
 
     // Check if eligibility job is running
     if (await checkAndHandleRunningEligibilityJob()) return
+    if (await checkAndHandleRunningSendCraFileJob()) return
 
     try {
       const response = await updateEligibilityStatus(selected, 'ELIGIBLE')
@@ -1725,6 +1801,7 @@ function App() {
 
     // Check if eligibility job is running
     if (await checkAndHandleRunningEligibilityJob()) return
+    if (await checkAndHandleRunningSendCraFileJob()) return
 
     try {
       const response = await updateNotEligibleStatusAlt(selected, 'SET_NOT_ELIGIBLE')
@@ -1795,6 +1872,7 @@ function App() {
 
     // Check if eligibility job is running
     if (await checkAndHandleRunningEligibilityJob()) return
+    if (await checkAndHandleRunningSendCraFileJob()) return
 
     try {
       const response = await updateOver18Status(selected, 'AGE_OUT')
@@ -2030,6 +2108,7 @@ function App() {
 
     // Check if eligibility job is running
     if (await checkAndHandleRunningEligibilityJob()) return
+    if (await checkAndHandleRunningSendCraFileJob()) return
 
     try {
       const response = await addContactsToBatch(selected)
@@ -2279,6 +2358,7 @@ function App() {
 
     // Check if eligibility job is running
     if (await checkAndHandleRunningEligibilityJob()) return
+    if (await checkAndHandleRunningSendCraFileJob()) return
 
     try {
       const result = await removeContactFromBatch(selectedChild)
@@ -2369,6 +2449,7 @@ function App() {
 
     // Check if eligibility job is running
     if (await checkAndHandleRunningEligibilityJob()) return
+    if (await checkAndHandleRunningSendCraFileJob()) return
 
     try {
       // Map selected batch_contact IDs to their corresponding contact IDs

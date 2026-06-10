@@ -18,7 +18,11 @@ describe('filterValidOocAgreementLineItems', () => {
 
   it('skips lines missing required join keys', () => {
     const items = [
-      { Id: 'mock-line-001', 'Agreement Id': 'mock-agreement-001', 'ICM Person ID': 'mock-person-001' },
+      {
+        Id: 'mock-line-001',
+        'Agreement Id': 'mock-agreement-001',
+        'ICM Person ID': 'mock-person-001',
+      },
       { Id: 'mock-line-002', 'Agreement Id': 'mock-agreement-002', 'ICM Person ID': '' },
       { Id: '', 'Agreement Id': 'mock-agreement-003', 'ICM Person ID': 'mock-person-003' },
       { Id: 'mock-line-004', 'Agreement Id': '', 'ICM Person ID': 'mock-person-004' },
@@ -34,7 +38,11 @@ describe('filterValidOocAgreementLineItems', () => {
     const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {})
 
     filterValidOocAgreementLineItems([
-      { Id: 'mock-line-001', 'Agreement Id': 'mock-agreement-001', 'ICM Person ID': 'mock-person-001' },
+      {
+        Id: 'mock-line-001',
+        'Agreement Id': 'mock-agreement-001',
+        'ICM Person ID': 'mock-person-001',
+      },
       { Id: 'mock-line-002', 'Agreement Id': 'mock-agreement-002', 'ICM Person ID': '' },
     ])
 

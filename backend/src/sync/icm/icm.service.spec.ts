@@ -68,7 +68,11 @@ describe('IcmService', () => {
       }
 
       mockIcmDataSource.fetchAll.mockResolvedValue([
-        { Id: 'mock-line-001', 'Agreement Id': 'mock-agreement-001', 'ICM Person ID': 'mock-person-001' },
+        {
+          Id: 'mock-line-001',
+          'Agreement Id': 'mock-agreement-001',
+          'ICM Person ID': 'mock-person-001',
+        },
         { Id: 'mock-line-002', 'Agreement Id': 'mock-agreement-002', 'ICM Person ID': '' },
       ])
 

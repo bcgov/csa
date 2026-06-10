@@ -43,6 +43,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { OnHoldDialog } from './components/OnHoldDialog'
+import WeeklyFileProcessingTab from './components/WeeklyFileProcessingTab'
 import { getRuntimeConfig } from './config/keycloak.config'
 import { useAuth } from './context/AuthContext'
 import logo from './icons/image.png'
@@ -3210,6 +3211,7 @@ function App() {
             >
               <Tab label="Eligibility List" />
               <Tab label="Batch Requests" />
+              <Tab label="Weekly File Processing" />
             </Tabs>
 
             {/* Last Successful Runs Info */}
@@ -7297,6 +7299,8 @@ function App() {
                 </Box>
               </Box>
             )}
+
+            {selectedTab === 2 && <WeeklyFileProcessingTab />}
           </Box>
 
           {/* Sort and Filter Menus - Outside tabs so they're always available */}

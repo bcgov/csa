@@ -9,25 +9,28 @@ import { JobRunner } from '../job-runner.service'
 
 // One-time full load of ICM cases into stg_icm_cases (populates CLOSED_DT)
 async function bootstrap() {
-  const logger = new AppLogger('BackfillIcmCasesJob')
+  const logger = new AppLogger('BackfillIcmCaseCloseDatesJob')
 
   try {
-    logger.log('Bootstrapping ICM cases backfill job...')
+    logger.log('Bootstrapping ICM case close dates backfill job...')
 
     const app = await NestFactory.createApplicationContext(SyncModule, {
       logger: customLogger,
     })
 
     const jobRunner = app.get(JobRunner)
-    const result = await jobRunner.runJobType(JobType.BACKFILL_ICM_CASES, JobTrigger.END_USER)
+    const result = await jobRunner.runJobType(
+      JobType.BACKFILL_ICM_CASE_CLOSE_DATES,
+      JobTrigger.END_USER,
+    )
 
     await app.close()
 
     if (result.success) {
-      logger.log('ICM cases backfill completed successfully')
+      logger.log('ICM case close dates backfill completed successfully')
       process.exit(0)
     } else {
-      logger.error(`ICM cases backfill failed: ${result.message}`)
+      logger.error(`ICM case close dates backfill failed: ${result.message}`)
       process.exit(1)
     }
   } catch (error) {

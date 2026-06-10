@@ -80,6 +80,7 @@ import {
   type LastSuccessfulRuns,
 } from './service/contacts-service'
 import type { AppEnvironment } from './types/runtime-config'
+import { buildPlacementDisplayValues } from './utils/mock-placement'
 
 // Environment-based toolbar background colors
 const getEnvBackgroundColor = (env?: AppEnvironment): string => {
@@ -290,12 +291,10 @@ const parseFormattedDate = (dateStr: string): Date | null => {
   )
 }
 
-const getHoldReasonPreview = (reason: string): string => {
-  if (reason.length <= HOLD_REASON_PREVIEW_LENGTH) {
-    return reason
-  }
-  return `${reason.slice(0, HOLD_REASON_PREVIEW_LENGTH)}...`
-}
+// Returns true when the reason text needs to be clamped:
+// either it exceeds the character limit OR it contains more than 3 lines (newlines).
+const holdReasonNeedsClamp = (reason: string): boolean =>
+  reason.length > HOLD_REASON_PREVIEW_LENGTH || reason.split('\n').length > 3
 
 // Capitalize first letter of a string
 const capitalize = (str: string): string => {
@@ -1022,7 +1021,8 @@ function App() {
     }
 
     // If column filter is active, re-apply all column filters on page change
-    if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+    // (but not while a full-text global search is active — it owns the results then)
+    if (!isSearchActive && isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
       performColumnFiltersSearch(activeColumnFilters, currentPage)
     } else if (!isSearchActive) {
       // Only fetch regular contacts when no column filter or search is active
@@ -2321,7 +2321,7 @@ function App() {
   const getBatchHistoryUniqueValues = (column: string) => {
     // Transform API data to match the table structure, then get unique values
     const transformedData = contactBatchHistory.map((item) => ({
-      batchId: String(item.batch.id),
+      batchId: String(item.batch.batchNumber),
       batchDate: item.batch.batchDate ? formatDateYMD(item.batch.batchDate) : '',
       batchRequestStatus: item.batch.statusLabel || item.batch.status || '',
       transactionType: capitalize(item.transactionType) || '',
@@ -2400,7 +2400,7 @@ function App() {
       // Map API fields to display fields - must match filteredBatchRequests transformation
       switch (column) {
         case 'batchId':
-          return String(batch.id)
+          return String(batch.batchNumber)
         case 'batchDate':
           return batch.batchDate ? formatDateYMD(batch.batchDate) : ''
         case 'status':
@@ -2516,67 +2516,61 @@ function App() {
   // Apply filters and sorting to data - always use API data
   // Note: Sorting is now handled by the backend API, so we just transform the data here
   const filteredData = useMemo(() => {
-    const data = contacts.map((contact) => ({
-      id: contact.id,
-      firstName: contact.firstName || '',
-      middleName: contact.middleName || '',
-      lastName: contact.lastName || '',
-      akaLastName: contact.akaLastName || '',
-      akaFirstName: contact.akaFirstName || '',
-      personIdIcm: contact.personIdIcm || '',
-      personIdMis: contact.personIdMis || '',
-      gender: contact.gender || '',
-      dob: contact.dateOfBirth ? formatDateYMD(contact.dateOfBirth) : '',
-      age: contact.age || 0,
-      din: contact.din || '',
-      csaStatus: contact.csaStatusLabel || contact.csaStatus || '', // Display label
-      csaStatusRaw: contact.csaStatus || '', // Raw value for validation logic
-      statusEffective: contact.csaStatusEffectiveDate
-        ? formatDateTimeYMDHMS(contact.csaStatusEffectiveDate)
-        : '',
-      caseNumber: contact.caseNumber || '',
-      caseType: contact.caseType || '',
-      caseStatus: contact.caseStatus || '',
-      caseLoad: contact.caseLoad || '',
-      legacyFile: contact.legacyFileNumber || '',
-      serviceOffice: contact.serviceOffice || '',
-      assignedTo: contact.assignedTo || '',
-      effectiveLegalStatus: contact.effectiveLegalStatus || '',
-      effectiveDate: contact.effectiveDate ? formatDateYMD(contact.effectiveDate) : '',
-      expiryDate: contact.expiryDate ? formatDateYMD(contact.expiryDate) : '',
-      // Birth location
-      birthCity: contact.birthCity || '',
-      birthProvince: contact.birthProvince || '',
-      birthCountry: contact.birthCountry || '',
-      // Placement fields
-      placementLocation: contact.placementLocation || '',
-      locationType: contact.locationType || '',
-      locationSubType: contact.locationSubType || '',
-      placementStatus: contact.placementStatus || '',
-      actualStartDate: contact.actualStartDate ? formatDateYMD(contact.actualStartDate) : '',
-      actualEndDate: contact.actualEndDate ? formatDateYMD(contact.actualEndDate) : '',
-      paidUnpaid: contact.paidUnpaid || '',
-      sourcePlacement: contact.sourcePlacement || '',
-      // Service provider and agreement fields
-      serviceProviderName: contact.serviceProviderName || '',
-      providerId: contact.providerId || '',
-      placeOfServiceName: contact.placeOfServiceName || '',
-      agreementType: contact.agreementType || '',
-      agreementStatus: contact.agreementStatus || '',
-      agreementStartDate: contact.agreementStartDate
-        ? formatDateYMD(contact.agreementStartDate)
-        : '',
-      agreementEndDate: contact.agreementEndDate ? formatDateYMD(contact.agreementEndDate) : '',
-      terminationDate: contact.terminationDate ? formatDateYMD(contact.terminationDate) : '',
-      mcfdContract: contact.mcfdContract || '',
-      product: contact.product || '',
-      isOver18: contact.isOver18 || false,
-      cgwrks3: contact.holdBy || '',
-      holdReason: contact.holdReason || '',
-      lastUpdated: contact.lastUpdatedAt ? formatDateTimeYMDHMS(contact.lastUpdatedAt) : '',
-      lastUpdatedBy: contact.lastUpdatedBy || '',
-      needsReview: contact.needsReview || false,
-    }))
+    const data = contacts.map((contact) => {
+      return {
+        id: contact.id,
+        firstName: contact.firstName || '',
+        middleName: contact.middleName || '',
+        lastName: contact.lastName || '',
+        akaLastName: contact.akaLastName || '',
+        akaFirstName: contact.akaFirstName || '',
+        personIdIcm: contact.personIdIcm || '',
+        personIdMis: contact.personIdMis || '',
+        gender: contact.gender || '',
+        dob: contact.dateOfBirth ? formatDateYMD(contact.dateOfBirth) : '',
+        age: contact.age || 0,
+        din: contact.din || '',
+        csaStatus: contact.csaStatusLabel || contact.csaStatus || '', // Display label
+        csaStatusRaw: contact.csaStatus || '', // Raw value for validation logic
+        statusEffective: contact.csaStatusEffectiveDate
+          ? formatDateTimeYMDHMS(contact.csaStatusEffectiveDate)
+          : '',
+        caseNumber: contact.caseNumber || '',
+        caseType: contact.caseType || '',
+        caseStatus: contact.caseStatus || '',
+        caseLoad: contact.caseLoad || '',
+        legacyFile: contact.legacyFileNumber || '',
+        serviceOffice: contact.serviceOffice || '',
+        assignedTo: contact.assignedTo || '',
+        effectiveLegalStatus: contact.effectiveLegalStatus || '',
+        effectiveDate: contact.effectiveDate ? formatDateYMD(contact.effectiveDate) : '',
+        expiryDate: contact.expiryDate ? formatDateYMD(contact.expiryDate) : '',
+        // Birth location
+        birthCity: contact.birthCity || '',
+        birthProvince: contact.birthProvince || '',
+        birthCountry: contact.birthCountry || '',
+        // Placement fields
+        ...buildPlacementDisplayValues(contact, formatDateYMD),
+        // Service provider and agreement fields
+        serviceProviderName: contact.serviceProviderName || '',
+        providerId: contact.providerId || '',
+        agreementType: contact.agreementType || '',
+        agreementStatus: contact.agreementStatus || '',
+        agreementStartDate: contact.agreementStartDate
+          ? formatDateYMD(contact.agreementStartDate)
+          : '',
+        agreementEndDate: contact.agreementEndDate ? formatDateYMD(contact.agreementEndDate) : '',
+        terminationDate: contact.terminationDate ? formatDateYMD(contact.terminationDate) : '',
+        mcfdContract: contact.mcfdContract || '',
+        product: contact.product || '',
+        isOver18: contact.isOver18 || false,
+        cgwrks3: contact.holdBy || '',
+        holdReason: contact.holdReason || '',
+        lastUpdated: contact.lastUpdatedAt ? formatDateTimeYMDHMS(contact.lastUpdatedAt) : '',
+        lastUpdatedBy: contact.lastUpdatedBy || '',
+        needsReview: contact.needsReview || false,
+      }
+    })
 
     return data
   }, [contacts])
@@ -2710,7 +2704,7 @@ function App() {
     // Map API data to match the expected table structure
     let data = contactBatchHistory.map((item) => ({
       id: item.id,
-      batchId: String(item.batch.id),
+      batchId: String(item.batch.batchNumber),
       batchDate: item.batch.batchDate ? formatDateYMD(item.batch.batchDate) : '',
       batchRequestStatus: item.batch.statusLabel || item.batch.status || '',
       transactionType: capitalize(item.transactionType) || '',
@@ -2860,7 +2854,7 @@ function App() {
     // Transform API data to match table structure
     let data = batches.map((batch) => ({
       id: batch.id,
-      batchId: String(batch.id),
+      batchId: String(batch.batchNumber),
       batchDate: batch.batchDate ? formatDateYMD(batch.batchDate) : '',
       status: batch.statusLabel || batch.status,
       recordCount: batch.recordCount,
@@ -3966,26 +3960,37 @@ function App() {
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
                           <TableCell
                             sx={
-                              row.holdReason && row.holdReason.length > HOLD_REASON_PREVIEW_LENGTH
+                              row.holdReason && holdReasonNeedsClamp(row.holdReason)
                                 ? { minWidth: 390, maxWidth: 450 }
                                 : undefined
                             }
                           >
                             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
                               {row.holdReason ? (
-                                row.holdReason.length > HOLD_REASON_PREVIEW_LENGTH ? (
-                                  <Tooltip title={row.holdReason} arrow>
+                                holdReasonNeedsClamp(row.holdReason) ? (
+                                  <Tooltip
+                                    title={
+                                      <span style={{ whiteSpace: 'pre-wrap' }}>
+                                        {row.holdReason}
+                                      </span>
+                                    }
+                                    arrow
+                                  >
                                     <Typography
                                       component="span"
                                       sx={{
                                         maxWidth: 430,
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 3,
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden',
                                         whiteSpace: 'pre-wrap',
                                         wordBreak: 'break-word',
                                         fontSize: 'inherit',
-                                        display: 'inline-block',
+                                        cursor: 'default',
                                       }}
                                     >
-                                      {getHoldReasonPreview(row.holdReason)}
+                                      {row.holdReason}
                                     </Typography>
                                   </Tooltip>
                                 ) : (

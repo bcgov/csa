@@ -16,6 +16,7 @@ import { JobsApiModule } from './jobs/jobs.module'
 import { HealthController } from './health/health.controller'
 import { MetricsController } from './metrics/metrics.controller'
 import { MockModule } from './mock/mock.module'
+import { WeeklyFilesModule } from './weekly-files/weekly-files.module'
 
 const enableMockApi = process.env.USE_MOCK_DATA === 'true'
 @Module({
@@ -31,6 +32,7 @@ const enableMockApi = process.env.USE_MOCK_DATA === 'true'
     JobsApiModule,
     StateMachineModule,
     AdminModule,
+    WeeklyFilesModule,
     ...(enableMockApi ? [MockModule] : []),
   ],
   controllers: [AppController, MetricsController, HealthController],

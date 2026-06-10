@@ -357,6 +357,7 @@ export class ContactsService {
     contactId: number,
     nextState: string,
     additionalData?: Record<string, unknown>,
+    origin?: string,
   ): Promise<TransitionResult> {
     const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
     if (!contact) {
@@ -380,7 +381,10 @@ export class ContactsService {
       },
     })
 
-    this.logger.log(`Contact ${contactId}: ${currentState}->${nextState} [FORCE/WKL] by SYSTEM`)
+    const originSuffix = origin ? ` [origin: ${origin}]` : ''
+    this.logger.log(
+      `Contact ${contactId}: ${currentState}->${nextState} [FORCE/WKL] by SYSTEM${originSuffix}`,
+    )
 
     return { success: true, from: currentState, to: nextState }
   }
@@ -719,6 +723,7 @@ export class ContactsService {
         batch: {
           select: {
             id: true,
+            batchNumber: true,
             batchDate: true,
             status: true,
             systemComments: true,

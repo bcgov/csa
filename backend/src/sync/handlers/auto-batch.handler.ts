@@ -7,9 +7,8 @@ import { IcmSyncBackService, SyncBackResult } from '../icm/icm-sync-back.service
 import { AutoBatchService } from '../eligibility/auto-batch.service'
 
 /*
- * Finds all contacts in eligible or not_eligible_in_pay status and adds them
- * to the pending batch, then syncs updated statuses back to ICM.
- * Triggered independently — decoupled from eligibility.
+ * Finds eligible contacts, adds them via BatchesService (same as UI), then syncs
+ * flagged statuses back to ICM. Triggered independently — decoupled from eligibility.
  */
 @Injectable()
 export class AutoBatchHandler extends BaseJob {

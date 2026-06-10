@@ -2078,6 +2078,8 @@ function App() {
         if (apiFilters.includes(preDefinedFilter)) {
           if (isSearchActive && searchTerm.trim().length >= 3) {
             await performFullTextSearch(searchTerm.trim(), currentPage)
+          } else if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+            await performColumnFiltersSearch(activeColumnFilters, currentPage)
           } else {
             await fetchContacts(currentPage)
           }

@@ -166,7 +166,7 @@ export class WeeklyFilesService {
       throw new BadRequestException('Cannot associate a record that has already been processed')
     }
 
-    const detail = record.recordData as DetailRecord04
+    const detail = record.recordData as unknown as DetailRecord04
     if (detail.receiveMode !== RECEIVE_MODE.ELECTQRONIC) {
       throw new BadRequestException('Only electronic records can be associated')
     }
@@ -274,7 +274,7 @@ export class WeeklyFilesService {
         continue
       }
 
-      const detail = record.recordData as DetailRecord04
+      const detail = record.recordData as unknown as DetailRecord04
       const result = await this.wklAssociatedRecordProcessor.processAssociatedRecord(
         detail,
         record.contact.id,

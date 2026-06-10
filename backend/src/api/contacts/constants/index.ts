@@ -20,6 +20,7 @@ export const ALLOWED_FILTER_SORT_FIELDS = [
   'assignedTo',
   'holdBy',
   'holdReason',
+  'needsReview',
 ] as const
 
 export const CSA_STATUSES = {

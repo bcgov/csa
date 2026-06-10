@@ -915,6 +915,7 @@ function App() {
         const numericColumns = ['age']
         // Dropdown columns should use exact matching (eq), not partial matching (like)
         const exactMatchColumns = ['csaStatus', 'caseStatus', 'needsReview']
+        const booleanColumns = ['needsReview']
         const columnFilters: Array<{
           key: string
           op: string
@@ -931,6 +932,7 @@ function App() {
 
           const isNumericColumn = numericColumns.includes(column)
           const isExactMatchColumn = exactMatchColumns.includes(column)
+          const isBooleanColumn = booleanColumns.includes(column)
           // Use 'eq' for numeric and dropdown columns, 'like' for text search columns
           const op = isNumericColumn || isExactMatchColumn ? 'eq' : 'like'
 
@@ -941,7 +943,7 @@ function App() {
               continue // Skip invalid numeric input
             }
             value = parsedValue
-          } else if (column === 'needsReview') {
+          } else if (isBooleanColumn) {
             // Convert string 'true'/'false' to boolean
             value = query === 'true'
           }

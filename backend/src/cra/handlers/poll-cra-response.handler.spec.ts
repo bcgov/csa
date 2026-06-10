@@ -129,6 +129,12 @@ describe('PollCraResponseHandler', () => {
       },
       batch: {
         findUnique: vi.fn().mockResolvedValue({ systemComments: null }),
+        findMany: vi
+          .fn()
+          .mockImplementation(({ where }: { where?: { id?: { in?: number[] } } }) => {
+            const ids = where?.id?.in ?? []
+            return Promise.resolve(ids.map((id) => ({ id, batchNumber: id })))
+          }),
       },
     }
 
@@ -1454,7 +1460,7 @@ describe('PollCraResponseHandler', () => {
 
     describe('Unmatched WKL records (no batch detail, contact found)', () => {
       const matchedContact = { id: 99, din: null, caseNumber: 'CASE-42' }
-      const unmatchedBatch = { id: 500 }
+      const unmatchedBatch = { id: 500, batchNumber: 5 }
       const createdBatchDetail = {
         id: 600,
         contactId: 99,

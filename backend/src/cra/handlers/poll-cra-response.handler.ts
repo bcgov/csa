@@ -126,6 +126,7 @@ export class PollCraResponseHandler extends BaseJob {
       this.recordsWklRefused +
       this.recordsWklUnmatchedApproved +
       this.recordsWklUnmatchedRefused
+
     return {
       success: true,
       message: `Processed ${totalRecordsProcessed} CRA response records from ${sortedFiles.length} file(s)`,
@@ -141,6 +142,7 @@ export class PollCraResponseHandler extends BaseJob {
         records_wkl_unmatched_approved: this.recordsWklUnmatchedApproved,
         records_wkl_unmatched_refused: this.recordsWklUnmatchedRefused,
         records_wkl_unmatched_skipped: this.recordsWklUnmatchedSkipped,
+        batch_ids: [...this.processedBatchIds],
         syncResult,
         craNewRecordsInWkl: {
           count: this.newCraRecordsInWkl.length,

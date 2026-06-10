@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from 'src/common/database/prisma.service'
 import {
   BATCH_DETAIL_STATUS,
@@ -24,6 +25,24 @@ import { BulkOperationResponse } from '../contacts/interfaces'
 
 const { BATCH_INITIATED_BY, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
+/**
+ * Batch creation locking (pg_advisory_xact_lock class 2847).
+ *
+ * Two problems, one fix:
+ * 1. Internal id gaps — concurrent pending-batch creation raced on
+ *    batches_pending_unique; failed inserts still advanced the SERIAL.
+ * 2. Business batch numbers — batch_number is sequential (1, 2, 3…) and
+ *    shown in the UI instead of the internal id.
+ *
+ * Lock 0 serializes MAX(batch_number)+1 across all batch types.
+ * Lock 1 serializes find-or-create for the single pending batch.
+ * Lock 2 serializes find-or-create for the CRA WKL unmatched in_progress batch.
+ */
+const BATCH_ADVISORY_LOCK_CLASS = 2847
+const BATCH_NUMBER_ADVISORY_LOCK_OBJECT = 0
+const PENDING_BATCH_ADVISORY_LOCK_OBJECT = 1
+const WKL_UNMATCHED_BATCH_ADVISORY_LOCK_OBJECT = 2
+
 class TransitionSkipError extends Error {
   constructor(public readonly reason: string) {
     super(reason)
@@ -33,6 +52,7 @@ class TransitionSkipError extends Error {
 export interface BatchOperationResult extends BulkOperationResponse {
   batch: {
     id: number
+    batchNumber: number
     batchDate: Date | null
     status: string
     recordCount: number
@@ -62,6 +82,16 @@ export class BatchesService {
         `Immediate ICM sync failed for contact ${contactId}: ${(err as Error).message}`,
       )
     })
+  }
+
+  private async nextBatchNumber(tx: Prisma.TransactionClient): Promise<number> {
+    await tx.$executeRaw(
+      Prisma.sql`SELECT pg_advisory_xact_lock(${BATCH_ADVISORY_LOCK_CLASS}, ${BATCH_NUMBER_ADVISORY_LOCK_OBJECT})`,
+    )
+    const rows = await tx.$queryRaw<{ next: number }[]>(
+      Prisma.sql`SELECT COALESCE(MAX(batch_number), 0) + 1 AS next FROM csa.batches`,
+    )
+    return Number(rows[0].next)
   }
 
   async findAll() {
@@ -207,13 +237,22 @@ export class BatchesService {
   }
 
   async findOrCreatePendingBatch() {
-    let pendingBatch = await this.prisma.batch.findFirst({
-      where: { status: BATCH_STATUS.PENDING },
-    })
+    const pendingBatch = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(${BATCH_ADVISORY_LOCK_CLASS}, ${PENDING_BATCH_ADVISORY_LOCK_OBJECT})`,
+      )
 
-    if (!pendingBatch) {
-      pendingBatch = await this.prisma.batch.create({
+      const existing = await tx.batch.findFirst({
+        where: { status: BATCH_STATUS.PENDING },
+      })
+      if (existing) {
+        return existing
+      }
+
+      const batchNumber = await this.nextBatchNumber(tx)
+      return tx.batch.create({
         data: {
+          batchNumber,
           batchDate: null,
           status: BATCH_STATUS.PENDING,
           recordCount: 0,
@@ -221,37 +260,46 @@ export class BatchesService {
           createdAt: new Date(),
         },
       })
-    }
+    })
 
     return enrichLabels(pendingBatch)
   }
 
   async createWklBatchForUnmatchedRecords(header: HeaderRecord) {
-    const existingBatch = await this.prisma.batch.findFirst({
-      where: {
-        initiatedBy: BATCH_INITIATED_BY.CRA,
-        status: BATCH_STATUS.IN_PROGRESS,
-      },
-    })
-
-    if (existingBatch) {
-      this.logger.warn(
-        `Attempted to create WKL batch for unmatched records, but batch ${existingBatch.id} is already in progress. ` +
-          `This should not happen as we check for unmatched records before creating the batch, but it could occur in rare cases of high concurrency. ` +
-          `Please review batch ${existingBatch.id} for details.`,
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(${BATCH_ADVISORY_LOCK_CLASS}, ${WKL_UNMATCHED_BATCH_ADVISORY_LOCK_OBJECT})`,
       )
-      return existingBatch
-    }
-    const systemComments = appendSystemComment(`CRA initiated batch from WKL file`, null)
-    return this.prisma.batch.create({
-      data: {
-        batchDate: parseWklDate(header.processDate),
-        initiatedBy: BATCH_INITIATED_BY.CRA,
-        status: BATCH_STATUS.IN_PROGRESS,
-        recordCount: 0,
-        systemComments,
-        createdAt: new Date(),
-      },
+
+      const existingBatch = await tx.batch.findFirst({
+        where: {
+          initiatedBy: BATCH_INITIATED_BY.CRA,
+          status: BATCH_STATUS.IN_PROGRESS,
+        },
+      })
+
+      if (existingBatch) {
+        this.logger.warn(
+          `Attempted to create WKL batch for unmatched records, but batch ${existingBatch.id} is already in progress. ` +
+            `This should not happen as we check for unmatched records before creating the batch, but it could occur in rare cases of high concurrency. ` +
+            `Please review batch ${existingBatch.id} for details.`,
+        )
+        return existingBatch
+      }
+
+      const batchNumber = await this.nextBatchNumber(tx)
+      const systemComments = appendSystemComment(`CRA initiated batch from WKL file`, null)
+      return tx.batch.create({
+        data: {
+          batchNumber,
+          batchDate: parseWklDate(header.processDate),
+          initiatedBy: BATCH_INITIATED_BY.CRA,
+          status: BATCH_STATUS.IN_PROGRESS,
+          recordCount: 0,
+          systemComments,
+          createdAt: new Date(),
+        },
+      })
     })
   }
 

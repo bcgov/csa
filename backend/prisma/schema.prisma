@@ -116,6 +116,7 @@ model ContactAuditTrail {
 
 model Batch {
   id                  Int                  @id @default(autoincrement())
+  batchNumber         Int                  @unique @map("batch_number")
   batchDate           DateTime?            @map("batch_date") @db.Date
   status              String
   recordCount         Int                  @map("record_count")

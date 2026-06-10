@@ -21,6 +21,7 @@ const mockContext: JobContext = {
 
 const makeBatch = (overrides = {}) => ({
   id: 10,
+  batchNumber: 10,
   batchDate: null,
   status: 'pending',
   recordCount: 2,

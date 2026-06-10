@@ -33,6 +33,11 @@ describe('InboundFileService', () => {
       expect(service.getResponseFileType('craUserId.AWKL0001.txt')).toBe('WKL')
     })
 
+    it('returns RSP and WKL for filenames without an extension', () => {
+      expect(service.getResponseFileType('craUserId.ARSP0001')).toBe('RSP')
+      expect(service.getResponseFileType('craUserId.AWKL0001')).toBe('WKL')
+    })
+
     it('returns null when the env flag does not match (RSP from prod while running in test)', () => {
       expect(service.getResponseFileType('craUserId.PRSP0001.txt')).toBeNull()
     })
@@ -63,10 +68,33 @@ describe('InboundFileService', () => {
     })
   })
 
+  describe('getResponseFileSequenceNumber', () => {
+    it('returns the 4-digit sequence for a valid response file', () => {
+      expect(service.getResponseFileSequenceNumber('craUserId.ARSP0001.txt')).toBe(1)
+      expect(service.getResponseFileSequenceNumber('craUserId.AWKL0042.txt')).toBe(42)
+      expect(service.getResponseFileSequenceNumber('craUserId.ARSP9999-extra.txt')).toBe(9999)
+    })
+
+    it('returns the 4-digit sequence for filenames without an extension', () => {
+      expect(service.getResponseFileSequenceNumber('craUserId.ARSP0001')).toBe(1)
+      expect(service.getResponseFileSequenceNumber('craUserId.AWKL0042')).toBe(42)
+    })
+
+    it('returns null when the env flag does not match', () => {
+      expect(service.getResponseFileSequenceNumber('craUserId.PRSP0001.txt')).toBeNull()
+    })
+
+    it('returns null for unsupported response file types', () => {
+      expect(service.getResponseFileSequenceNumber('craUserId.AMRR0001.txt')).toBeNull()
+    })
+  })
+
   describe('isValidResponseFile', () => {
     it('returns true for any filename that resolves to a supported ResponseFileType', () => {
       expect(service.isValidResponseFile('craUserId.ARSP0001.txt')).toBe(true)
       expect(service.isValidResponseFile('craUserId.AWKL0001.txt')).toBe(true)
+      expect(service.isValidResponseFile('craUserId.ARSP0001')).toBe(true)
+      expect(service.isValidResponseFile('craUserId.AWKL0001')).toBe(true)
     })
 
     it('returns false when getResponseFileType would return null', () => {

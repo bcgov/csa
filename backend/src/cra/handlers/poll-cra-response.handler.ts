@@ -8,11 +8,11 @@ import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_DETAIL_EVENT, CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
 
 import { pacificToday, parseWklDate } from 'src/common/utils'
-import { CANCEL_REASON } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
+import { CANCEL_REASON } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { IcmSyncBackService, SyncBackResult } from 'src/sync/icm/icm-sync-back.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { InboundFileService } from '../inbound/inbound-file.service'
@@ -22,7 +22,8 @@ import type { DetailRecord04, HeaderRecord } from '../inbound/inbound-weekly.int
 import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import { WeeklyContactMatcherService } from '../inbound/weekly-contact-matcher.service'
 import { CraTransferService } from '../transfer/cra-transfer.service'
-const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
+const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY, WEEKLY_FILE, RESPONSE_FILE_TYPE } =
+  CRA_DATA_HANDLING_CONSTANT
 const { STATUS: WKL_STATUS, RECEIVE_MODE, TRANSACTION_TYPE_MAP, TRANSACTION_TYPES } = WEEKLY_FILE
 
 @Injectable()
@@ -75,7 +76,10 @@ export class PollCraResponseHandler extends BaseJob {
       where: { direction: FILE_DIRECTION.INBOUND, isDetailsProcessed: false, isValid: true },
     })
 
-    if (unprocessedResponseFiles.length === 0) {
+    // Sort files to ensure RSP files are processed before WKL files
+    const sortedFiles = this.sortFilesByType(unprocessedResponseFiles)
+
+    if (sortedFiles.length === 0) {
       return {
         success: true,
         message: 'No new CRA response files to process',
@@ -84,7 +88,7 @@ export class PollCraResponseHandler extends BaseJob {
     }
 
     let totalRecordsProcessed = 0
-    for (const responseFile of unprocessedResponseFiles) {
+    for (const responseFile of sortedFiles) {
       totalRecordsProcessed += await this.processResponseFile(responseFile)
     }
 
@@ -108,9 +112,9 @@ export class PollCraResponseHandler extends BaseJob {
       this.recordsWklUnmatchedRefused
     return {
       success: true,
-      message: `Processed ${totalRecordsProcessed} CRA response records from ${unprocessedResponseFiles.length} file(s)`,
+      message: `Processed ${totalRecordsProcessed} CRA response records from ${sortedFiles.length} file(s)`,
       metadata: {
-        files_processed: unprocessedResponseFiles.length,
+        files_processed: sortedFiles.length,
         records_updated: totalUpdated,
         records_accepted: this.recordsAccepted,
         records_rejected: this.recordsRejected,
@@ -128,6 +132,35 @@ export class PollCraResponseHandler extends BaseJob {
         },
       },
     }
+  }
+
+  /**
+   * Sort files to ensure RSP (Response) files are processed before WKL (Weekly) files.
+   * Within the same file type, files are sorted by sequence number for deterministic ordering.
+   * This is required by business to avoid processing errors when both file types are present.
+   *
+   * File naming convention: `<prefix>.<envFlag><typeFlag><seq>`
+   * Example: craUserId.ARSP0001
+   */
+  private sortFilesByType(
+    files: Array<{ id: number; fileName: string }>,
+  ): Array<{ id: number; fileName: string }> {
+    return [...files].sort((a, b) => {
+      const typeA = this.inboundFileService.getResponseFileType(a.fileName)
+      const typeB = this.inboundFileService.getResponseFileType(b.fileName)
+
+      // RSP files should be processed before WKL files
+      if (typeA === RESPONSE_FILE_TYPE.RSP && typeB === RESPONSE_FILE_TYPE.WKL) return -1
+      if (typeA === RESPONSE_FILE_TYPE.WKL && typeB === RESPONSE_FILE_TYPE.RSP) return 1
+
+      if (typeA === typeB) {
+        const seqA = this.inboundFileService.getResponseFileSequenceNumber(a.fileName) ?? a.id
+        const seqB = this.inboundFileService.getResponseFileSequenceNumber(b.fileName) ?? b.id
+        return seqA - seqB
+      }
+
+      return 0
+    })
   }
 
   private async downloadAndRegisterNewFiles(): Promise<void> {

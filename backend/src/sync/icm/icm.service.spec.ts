@@ -68,8 +68,8 @@ describe('IcmService', () => {
       }
 
       mockIcmDataSource.fetchAll.mockResolvedValue([
-        { Id: 'LINE-1', 'Agreement Id': 'AGR-1', 'ICM Person ID': 'PERSON-1' },
-        { Id: 'LINE-2', 'Agreement Id': 'AGR-2', 'ICM Person ID': '' },
+        { Id: 'mock-line-001', 'Agreement Id': 'mock-agreement-001', 'ICM Person ID': 'mock-person-001' },
+        { Id: 'mock-line-002', 'Agreement Id': 'mock-agreement-002', 'ICM Person ID': '' },
       ])
 
       const result = await service.ingestResource(filteredConfig)

@@ -98,16 +98,16 @@ describe('MockIcmDataSource', () => {
         JSON.stringify({
           items: [
             {
-              Id: 'LINE-a11f8820',
+              Id: 'mock-line-001',
               Updated: '05/26/2026 10:00:00',
-              'Agreement Id': 'AGR-c1d94e55',
-              'ICM Person ID': 'KP-mock-44001',
+              'Agreement Id': 'mock-agreement-001',
+              'ICM Person ID': 'mock-person-001',
             },
             {
-              Id: 'LINE-b22e9931',
+              Id: 'mock-line-002',
               Updated: '05/26/2026 10:00:00',
-              'Agreement Id': 'AGR-c1d94e55',
-              'ICM Person ID': 'KP-mock-44001',
+              'Agreement Id': 'mock-agreement-001',
+              'ICM Person ID': 'mock-person-001',
             },
           ],
         }),
@@ -117,9 +117,9 @@ describe('MockIcmDataSource', () => {
 
       expect(results).toHaveLength(2)
       expect(results[0]).toMatchObject({
-        Id: 'LINE-a11f8820',
-        'Agreement Id': 'AGR-c1d94e55',
-        'ICM Person ID': 'KP-mock-44001',
+        Id: 'mock-line-001',
+        'Agreement Id': 'mock-agreement-001',
+        'ICM Person ID': 'mock-person-001',
       })
     })
 

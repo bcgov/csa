@@ -6889,6 +6889,18 @@ function App() {
                   </Box>
                 </Box>
 
+                {/* Send CRA file running banner */}
+                {isRunningSendCraFile && (
+                  <Box sx={{ mb: 2 }}>
+                    <Alert severity="info" sx={{ mb: 1 }}>
+                      Send CRA file job is running. Please do not make any manual batch
+                      modifications while the job is in progress. This banner will disappear once
+                      the job is complete.
+                    </Alert>
+                    <LinearProgress />
+                  </Box>
+                )}
+
                 {/* Batch Requests Table */}
                 <TableContainer component={Paper} sx={{ boxShadow: 1 }}>
                   <Table size="small">

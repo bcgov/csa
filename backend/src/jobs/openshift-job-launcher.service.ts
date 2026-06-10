@@ -1,8 +1,8 @@
 import * as k8s from '@kubernetes/client-node'
 import { Injectable, Logger } from '@nestjs/common'
 import { existsSync, readFileSync } from 'fs'
-import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JOB_RUN_ID_FLAG, stripJobRunIdArgs } from 'src/jobs/entrypoints/job-entrypoint-args'
+import { JobType } from 'src/jobs/enums/job-type.enum'
 import { OPENSHIFT_CRONJOB_NAMES } from './openshift.constants'
 
 export interface LaunchJobResult {
@@ -34,6 +34,7 @@ export class OpenshiftJobLauncher {
     this.cronJobNames = {
       [JobType.RUN_ELIGIBILITY]: OPENSHIFT_CRONJOB_NAMES.RUN_ELIGIBILITY,
       [JobType.AUTO_BATCH]: OPENSHIFT_CRONJOB_NAMES.AUTO_BATCH,
+      [JobType.SEND_CRA_FILE]: OPENSHIFT_CRONJOB_NAMES.SEND_CRA_FILE,
     }
 
     const kc = new k8s.KubeConfig()

@@ -91,6 +91,7 @@ model Contact {
   // Relations
   contactBatchDetails        ContactBatchDetail[]
   auditTrailEntries          ContactAuditTrail[]
+  wklFileRecords             WklFileRecord[]
 
   @@map("contacts")
   @@schema("csa")
@@ -144,6 +145,7 @@ model ContactBatchDetail {
   craMatchingSnapshot Json?    @map("cra_matching_snapshot") @db.JsonB
   batch               Batch    @relation(fields: [batchId], references: [id])
   contact             Contact  @relation(fields: [contactId], references: [id])
+  wklFileRecords      WklFileRecord[]
 
   @@unique([contactId, batchId], name: "contact_batch_unique")
   @@map("contact_batch_details")
@@ -155,6 +157,7 @@ model TransferFile {
   batchId          Int?      @map("batch_id")
   destinationId    String    @map("destination_id")
   direction        String
+  fileType         String?   @map("file_type")
   fileName         String    @map("file_name")
   deliveredAt      DateTime? @map("delivered_at") @db.Timestamptz()
   downloadedAt     DateTime? @map("downloaded_at") @db.Timestamptz()
@@ -164,8 +167,34 @@ model TransferFile {
   isValid          Boolean   @default(true) @map("is_valid")
   sequenceNumber   Int?      @map("sequence_number")
   batch            Batch?    @relation(fields: [batchId], references: [id])
+  wklFileRecords   WklFileRecord[]
 
   @@map("transfer_files")
+  @@schema("csa")
+}
+
+model WklFileRecord {
+  id             Int       @id @default(autoincrement())
+  transferFileId Int       @map("transfer_file_id")
+  recordIndex    Int       @map("record_index")
+  weeklyFileDate DateTime? @map("weekly_file_date") @db.Date
+  recordData     Json      @map("record_data") @db.JsonB
+  matchStatus    String    @map("match_status")
+  contactId      Int?      @map("contact_id")
+  batchDetailId  Int?      @map("batch_detail_id")
+  matchedBy      String?   @map("matched_by")
+  processedAt    DateTime? @map("processed_at") @db.Timestamptz()
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  transferFile TransferFile        @relation(fields: [transferFileId], references: [id])
+  contact      Contact?            @relation(fields: [contactId], references: [id])
+  batchDetail  ContactBatchDetail? @relation(fields: [batchDetailId], references: [id])
+
+  @@unique([transferFileId, recordIndex], name: "wkl_file_record_unique")
+  @@index([transferFileId])
+  @@index([matchStatus])
+  @@index([contactId])
+  @@map("wkl_file_records")
   @@schema("csa")
 }
 

@@ -14,6 +14,18 @@ export const CRA_DATA_HANDLING_CONSTANT = {
     INBOUND: 'INBOUND',
     OUTBOUND: 'OUTBOUND',
   },
+  FILE_TYPE: {
+    WKL: 'WKL',
+    RSP: 'RSP',
+    REQUEST: 'REQUEST',
+  },
+  WKL_MATCH_STATUS: {
+    MATCHED: 'matched',
+    UNMATCHED: 'unmatched',
+    ASSOCIATED: 'associated',
+    SKIPPED: 'skipped',
+    NA: 'na',
+  },
   UPDATED_BY: {
     SYSTEM: 'SYSTEM',
   },

@@ -725,6 +725,15 @@ export const startAutoBatchJob = async (): Promise<{ jobRunId: number }> => {
 }
 
 /**
+ * Start SEND_CRA_FILE job for the selected pending batch
+ * Returns the job run ID for tracking
+ */
+export const startSendCraFileJob = async (): Promise<{ jobRunId: number }> => {
+  const response = await APIService.getAxiosInstance().post('/jobs/send-cra-file')
+  return response.data
+}
+
+/**
  * Check if there's a running auto-batch job
  * Returns the running job if found, null otherwise
  */
@@ -737,6 +746,79 @@ export const getRunningAutoBatchJob = async (): Promise<JobRun | null> => {
     },
   })
   return response.data.data.length > 0 ? response.data.data[0] : null
+}
+
+/**
+ * Check if there's a running SEND_CRA_FILE job
+ * Returns the running job if found, null otherwise
+ */
+export const getRunningSendCraFileJob = async (): Promise<JobRun | null> => {
+  const response = await APIService.getAxiosInstance().get<JobsResponse>('/jobs', {
+    params: {
+      jobType: 'SEND_CRA_FILE',
+      status: 'RUNNING',
+      limit: 1,
+    },
+  })
+  return response.data.data.length > 0 ? response.data.data[0] : null
+}
+
+/**
+ * Wait for a running SEND_CRA_FILE job to complete
+ * @param jobId - The job ID to monitor
+ * @param onProgress - Optional callback for progress updates
+ */
+export const waitForSendCraFileJobCompletion = async (
+  jobId: number,
+  onProgress?: (job: JobRun) => void,
+): Promise<JobRun> => {
+  const pollInterval = 10000 // 10 seconds
+  const maxAttempts = 60 // 10 minutes max
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const job = await getJobStatus(jobId)
+
+    if (onProgress) {
+      onProgress(job)
+    }
+
+    if (job.status === 'SUCCESS' || job.status === 'FAILED') {
+      return job
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, pollInterval))
+  }
+
+  throw new Error('SEND_CRA_FILE job timed out')
+}
+
+/**
+ * Run SEND_CRA_FILE job and poll until complete
+ * @param onProgress - Optional callback for progress updates
+ */
+export const runSendCraFileWithPolling = async (
+  onProgress?: (job: JobRun) => void,
+): Promise<JobRun> => {
+  const { jobRunId } = await startSendCraFileJob()
+
+  const pollInterval = 10000 // 10 seconds
+  const maxAttempts = 60 // 10 minutes max
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const job = await getJobStatus(jobRunId)
+
+    if (onProgress) {
+      onProgress(job)
+    }
+
+    if (job.status === 'SUCCESS' || job.status === 'FAILED') {
+      return job
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, pollInterval))
+  }
+
+  throw new Error('SEND_CRA_FILE job timed out')
 }
 
 /**

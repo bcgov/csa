@@ -1,7 +1,10 @@
+import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import CloseIcon from '@mui/icons-material/Close'
 import EditIcon from '@mui/icons-material/Edit'
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import FilterAltOffIcon from '@mui/icons-material/FilterAltOff'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
@@ -58,6 +61,7 @@ import {
   getJobRunProgressUpdate,
   getLastSuccessfulRuns,
   getRunningEligibilityJob,
+  getRunningSendCraFileJob,
   holdContacts,
   removeContactFromBatch,
   removeContactsFromBatch,
@@ -65,11 +69,13 @@ import {
   runAutoBatchWithPolling,
   runEligibilityForAllWithPolling,
   runEligibilityForContact,
+  runSendCraFileWithPolling,
   updateEligibilityStatus,
   updateHoldReason,
   updateNotEligibleStatusAlt,
   updateOver18Status,
   waitForEligibilityJobCompletion,
+  waitForSendCraFileJobCompletion,
   type Batch,
   type BatchContactDetail,
   type Contact,
@@ -373,6 +379,13 @@ function App() {
   const [isRunningAutoBatch, setIsRunningAutoBatch] = useState(false)
   const [confirmAutoBatchDialogOpen, setConfirmAutoBatchDialogOpen] = useState(false)
 
+  // Send CRA File job state
+  const [isRunningSendCraFile, setIsRunningSendCraFile] = useState(false)
+  const [confirmSendCraDialogOpen, setConfirmSendCraDialogOpen] = useState(false)
+  const [sendCraFileJobState, setSendCraFileJobState] = useState<
+    'idle' | 'running' | 'success' | 'failed'
+  >('idle')
+
   // On Hold dialog state
   const [onHoldDialogOpen, setOnHoldDialogOpen] = useState(false)
   const [onHoldDialogMode, setOnHoldDialogMode] = useState<'hold' | 'resume' | 'edit'>('hold')
@@ -581,6 +594,182 @@ function App() {
   // Batch details state
   const [batchDetails, setBatchDetails] = useState<BatchContactDetail[]>([])
   const [loadingBatchDetails, setLoadingBatchDetails] = useState(false)
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    const checkAndResumeRunningSendCraFileJob = async () => {
+      try {
+        const runningJob = await getRunningSendCraFileJob()
+        if (!runningJob) return
+
+        setIsRunningSendCraFile(true)
+        setSendCraFileJobState('running')
+        const initialProgress = getJobRunProgressUpdate(
+          runningJob,
+          'Send CRA file job is running in the background...',
+        )
+        setSnackbar({
+          open: true,
+          message: initialProgress.message,
+          severity: initialProgress.severity,
+        })
+
+        const completedJob = await waitForSendCraFileJobCompletion(runningJob.id, (job) => {
+          if (job.status === 'RUNNING') {
+            const progress = getJobRunProgressUpdate(job, 'Send CRA file job is still running...')
+            setSnackbar({
+              open: true,
+              message: progress.message,
+              severity: progress.severity,
+            })
+          }
+        })
+
+        if (completedJob.status === 'SUCCESS') {
+          const metadata = completedJob.metadata as {
+            batch_id?: number
+            batchId?: number
+            file_path?: string
+            filePath?: string
+            record_count?: number
+            recordCount?: number
+            contacts_count?: number
+            contactsCount?: number
+          } | null
+          const batchId = metadata?.batch_id ?? metadata?.batchId
+
+          setSendCraFileJobState('success')
+          setSnackbar({
+            open: true,
+            message: batchId
+              ? `Send CRA file job completed for batch ${batchId}.`
+              : 'Send CRA file job completed successfully.',
+            severity: 'success',
+          })
+
+          const updatedBatches = await getAllBatches()
+          setBatches(updatedBatches)
+        } else {
+          setSendCraFileJobState('failed')
+          setSnackbar({
+            open: true,
+            message: completedJob.error || 'Send CRA file job failed',
+            severity: 'error',
+          })
+        }
+
+        setIsRunningSendCraFile(false)
+      } catch (err) {
+        console.error('Failed to check for running SEND_CRA_FILE job:', err)
+      }
+    }
+
+    checkAndResumeRunningSendCraFileJob()
+  }, [isAuthenticated])
+
+  const handleConfirmSendCraDialogClose = () => {
+    setConfirmSendCraDialogOpen(false)
+  }
+
+  const handleSendToCraClick = () => {
+    setConfirmSendCraDialogOpen(true)
+  }
+
+  const refreshBatchRequestsAfterSendCra = async () => {
+    const updatedBatches = await getAllBatches()
+    setBatches(updatedBatches)
+
+    if (selectedBatch) {
+      const updatedDetails = await getBatchContacts(selectedBatch)
+      setBatchDetails(updatedDetails)
+    }
+  }
+
+  const handleConfirmSendCra = async () => {
+    setConfirmSendCraDialogOpen(false)
+
+    if (!selectedBatch) return
+
+    if (await checkAndHandleRunningEligibilityJob()) return
+
+    setIsRunningSendCraFile(true)
+    setSendCraFileJobState('running')
+
+    try {
+      setSnackbar({
+        open: true,
+        message: 'Starting Send CRA file job...',
+        severity: 'info',
+      })
+
+      const runningJob = await getRunningSendCraFileJob()
+      const job: JobRun = runningJob
+        ? await waitForSendCraFileJobCompletion(runningJob.id, (pollJob) => {
+            if (pollJob.status === 'RUNNING') {
+              const progress = getJobRunProgressUpdate(pollJob, 'Send CRA file job is running...')
+              setSnackbar({
+                open: true,
+                message: progress.message,
+                severity: progress.severity,
+              })
+            }
+          })
+        : await runSendCraFileWithPolling((pollJob) => {
+            if (pollJob.status === 'RUNNING') {
+              const progress = getJobRunProgressUpdate(pollJob, 'Send CRA file job is running...')
+              setSnackbar({
+                open: true,
+                message: progress.message,
+                severity: progress.severity,
+              })
+            }
+          })
+
+      if (job.status === 'SUCCESS') {
+        const metadata = job.metadata as {
+          batch_id?: number
+          batchId?: number
+          file_path?: string
+          filePath?: string
+          record_count?: number
+          recordCount?: number
+          contacts_count?: number
+          contactsCount?: number
+        } | null
+        const batchId = metadata?.batch_id ?? metadata?.batchId ?? selectedBatch
+        const recordCount = metadata?.record_count ?? metadata?.recordCount ?? 0
+        const contactsCount = metadata?.contacts_count ?? metadata?.contactsCount ?? 0
+
+        setSendCraFileJobState('success')
+        setSnackbar({
+          open: true,
+          message:
+            recordCount > 0 || contactsCount > 0
+              ? `Send CRA file complete for batch ${batchId}: ${recordCount || contactsCount} record${(recordCount || contactsCount) === 1 ? '' : 's'} sent.`
+              : `Send CRA file complete for batch ${batchId}.`,
+          severity: 'success',
+        })
+
+        await refreshBatchRequestsAfterSendCra()
+      } else {
+        setSendCraFileJobState('failed')
+        throw new Error(job.error || 'Send CRA file job failed')
+      }
+    } catch (error: any) {
+      console.error('Send CRA file error:', error)
+      const errorMessage =
+        error?.response?.data?.message || error?.message || 'Failed to send CRA file'
+      setSendCraFileJobState('failed')
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error',
+      })
+    } finally {
+      setIsRunningSendCraFile(false)
+    }
+  }
 
   const recordsPerPage = 10
   const [isSearchActive, setIsSearchActive] = useState(false)
@@ -2645,12 +2834,25 @@ function App() {
   }, [selectedBatchHistoryId, contactBatchHistory])
 
   // Check if Remove from Batch button in Batch Details should be enabled
+  const selectedBatchData = useMemo(
+    () => batches.find((batch) => batch.id === selectedBatch) ?? null,
+    [batches, selectedBatch],
+  )
+
   const canRemoveFromBatchDetails = useMemo(() => {
     if (selectedBatchDetails.length === 0) return false
 
-    const currentBatch = batches.find((batch) => batch.id === selectedBatch)
-    return currentBatch?.status === 'pending'
-  }, [selectedBatchDetails, batches, selectedBatch])
+    return selectedBatchData?.status?.toLowerCase() === 'pending'
+  }, [selectedBatchDetails, selectedBatchData])
+
+  // Check if Send to CRA button should be enabled
+  const canSendToCra = useMemo(() => {
+    return (
+      selectedBatchData !== null &&
+      selectedBatchData.status?.toLowerCase() === 'pending' &&
+      selectedBatchData.recordCount > 0
+    )
+  }, [selectedBatchData])
 
   // Check if CSA Eligible button should be enabled
   const canUpdateEligibility = useMemo(() => {
@@ -6647,6 +6849,43 @@ function App() {
                         </Button>
                       </span>
                     </Tooltip>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        disabled={
+                          !canSendToCra ||
+                          isRunningEligibilityAll ||
+                          isRunningAutoBatch ||
+                          isRunningSendCraFile
+                        }
+                        onClick={handleSendToCraClick}
+                        sx={{
+                          textTransform: 'none',
+                          minWidth: 'auto',
+                          '&.Mui-disabled': {
+                            opacity: 0.5,
+                          },
+                        }}
+                      >
+                        {isRunningSendCraFile ? 'Sending to CRA...' : 'Send to CRA'}
+                      </Button>
+                      {sendCraFileJobState === 'running' && (
+                        <Tooltip title="Send CRA file job is running" arrow>
+                          <AccessTimeIcon fontSize="small" color="info" />
+                        </Tooltip>
+                      )}
+                      {sendCraFileJobState === 'success' && (
+                        <Tooltip title="Send CRA file job completed successfully" arrow>
+                          <CheckCircleIcon fontSize="small" color="success" />
+                        </Tooltip>
+                      )}
+                      {sendCraFileJobState === 'failed' && (
+                        <Tooltip title="Send CRA file job failed" arrow>
+                          <ErrorOutlineIcon fontSize="small" color="error" />
+                        </Tooltip>
+                      )}
+                    </Box>
                   </Box>
                 </Box>
 
@@ -7738,6 +7977,30 @@ function App() {
             No
           </Button>
           <Button onClick={handleAutoBatchAll} variant="contained" autoFocus>
+            Yes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirmation Dialog for Send to CRA */}
+      <Dialog
+        open={confirmSendCraDialogOpen}
+        onClose={handleConfirmSendCraDialogClose}
+        aria-labelledby="confirm-send-cra-dialog-title"
+        aria-describedby="confirm-send-cra-dialog-description"
+      >
+        <DialogTitle id="confirm-send-cra-dialog-title">Send CRA File</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="confirm-send-cra-dialog-description">
+            This will generate the CRA file and send it to CRA. You won&apos;t be able to make
+            further modifications to this batch. Do you want to proceed?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleConfirmSendCraDialogClose} color="inherit">
+            No
+          </Button>
+          <Button onClick={handleConfirmSendCra} variant="contained" autoFocus>
             Yes
           </Button>
         </DialogActions>

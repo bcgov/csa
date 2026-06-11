@@ -539,8 +539,6 @@ type JobStatusResult = Awaited<ReturnType<typeof getJobStatus>>
 type PollJobUntilCompleteOptions = {
   jobId: number
   pollIntervalMs: number
-  maxAttempts?: number
-  timeoutMessage?: string
   onProgress?: (job: JobStatusResult) => void
 }
 
@@ -550,32 +548,8 @@ const waitForNextPoll = (pollIntervalMs: number): Promise<void> =>
 const pollJobUntilComplete = async ({
   jobId,
   pollIntervalMs,
-  maxAttempts,
-  timeoutMessage,
   onProgress,
 }: PollJobUntilCompleteOptions): Promise<JobStatusResult> => {
-  for (let attempt = 0; attempt < maxAttempts!; attempt++) {
-    const job = await getJobStatus(jobId)
-
-    if (onProgress) {
-      onProgress(job)
-    }
-
-    if (job.status === 'SUCCESS' || job.status === 'FAILED') {
-      return job
-    }
-
-    await waitForNextPoll(pollIntervalMs)
-  }
-
-  throw new Error(timeoutMessage ?? 'Job polling timed out')
-}
-
-const pollJobUntilCompleteUnbounded = async (
-  jobId: number,
-  pollIntervalMs: number,
-  onProgress?: (job: JobStatusResult) => void,
-): Promise<JobStatusResult> => {
   while (true) {
     const job = await getJobStatus(jobId)
 
@@ -603,8 +577,6 @@ export const runEligibilityForAllWithPolling = async (
   return pollJobUntilComplete({
     jobId: jobRunId,
     pollIntervalMs: 10000,
-    maxAttempts: 60,
-    timeoutMessage: 'Eligibility job timed out',
     onProgress,
   })
 }
@@ -710,8 +682,6 @@ export const waitForEligibilityJobCompletion = async (
   return pollJobUntilComplete({
     jobId,
     pollIntervalMs: 10000,
-    maxAttempts: 60,
-    timeoutMessage: 'Eligibility job timed out',
     onProgress,
   })
 }
@@ -728,8 +698,6 @@ export const waitForAutoBatchJobCompletion = async (
   return pollJobUntilComplete({
     jobId,
     pollIntervalMs: 5000,
-    maxAttempts: 60,
-    timeoutMessage: 'Auto-batch job timed out',
     onProgress,
   })
 }
@@ -791,7 +759,11 @@ export const waitForSendCraFileJobCompletion = async (
   jobId: number,
   onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
-  return pollJobUntilCompleteUnbounded(jobId, 10000, onProgress)
+  return pollJobUntilComplete({
+    jobId,
+    pollIntervalMs: 10000,
+    onProgress,
+  })
 }
 
 /**
@@ -803,7 +775,11 @@ export const runSendCraFileWithPolling = async (
 ): Promise<JobRun> => {
   const { jobRunId } = await startSendCraFileJob()
 
-  return pollJobUntilCompleteUnbounded(jobRunId, 10000, onProgress)
+  return pollJobUntilComplete({
+    jobId: jobRunId,
+    pollIntervalMs: 10000,
+    onProgress,
+  })
 }
 
 /**
@@ -818,8 +794,6 @@ export const runAutoBatchWithPolling = async (
   return pollJobUntilComplete({
     jobId: jobRunId,
     pollIntervalMs: 5000,
-    maxAttempts: 60,
-    timeoutMessage: 'Auto-batch job timed out',
     onProgress,
   })
 }

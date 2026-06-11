@@ -453,6 +453,8 @@ export class PollCraResponseHandler extends BaseJob {
         : parseWklDate(detail.careStartDate)
     const cancelReasonCode =
       wklType === 'cancellation' ? detail.careEndReasonCode?.trim() : undefined
+
+    // Additional data for contact update
     const additionalData: Record<string, unknown> = {
       ...(careDate
         ? wklType === 'cancellation'
@@ -463,10 +465,17 @@ export class PollCraResponseHandler extends BaseJob {
       ...(cancelReasonCode ? { cancelReasonCode } : {}),
     }
 
+    // Additional data for batch detail update (preserve effective date and reason)
+    const batchDetailAdditionalData: Record<string, unknown> = {
+      ...(careDate ? { effectiveDate: careDate } : {}),
+      ...(cancelReasonCode ? { cancelReasonCode } : {}),
+    }
+
     if (isApproved) {
       await this.batchesService.updateBatchDetailStatus(
         batchDetail.id,
         BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
+        { additionalData: batchDetailAdditionalData },
       )
       await this.contactsService.updateCsaStatus(
         batchDetail.contactId,
@@ -486,6 +495,7 @@ export class PollCraResponseHandler extends BaseJob {
       await this.batchesService.updateBatchDetailStatus(
         batchDetail.id,
         BATCH_DETAIL_EVENT.CRA_WKL_REFUSED,
+        { additionalData: batchDetailAdditionalData },
       )
       await this.contactsService.updateCsaStatus(
         batchDetail.contactId,

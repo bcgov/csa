@@ -8,6 +8,7 @@ describe('BatchesService', () => {
   let mockPrisma: any
   let mockStateMachine: any
   let mockContactsService: any
+  let mockIcmSyncBackService: any
 
   const buildHeader = (): HeaderRecord => ({
     tranCode: TranCode.HEADER,
@@ -19,13 +20,22 @@ describe('BatchesService', () => {
 
   beforeEach(() => {
     mockPrisma = {
-      contactBatchDetail: { findMany: vi.fn() },
+      contactBatchDetail: {
+        findMany: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        count: vi.fn(),
+      },
       batch: {
         findUnique: vi.fn(),
         update: vi.fn(),
         findMany: vi.fn(),
         findFirst: vi.fn(),
         create: vi.fn(),
+      },
+      contact: {
+        findMany: vi.fn(),
+        update: vi.fn(),
       },
       $executeRaw: vi.fn().mockResolvedValue(undefined),
       $queryRaw: vi.fn().mockResolvedValue([{ next: 5 }]),
@@ -38,9 +48,20 @@ describe('BatchesService', () => {
       transitionBatch: vi.fn(),
     }
 
-    mockContactsService = {}
+    mockContactsService = {
+      updateCsaStatus: vi.fn(),
+    }
 
-    service = new BatchesService(mockPrisma, mockStateMachine, mockContactsService)
+    mockIcmSyncBackService = {
+      syncSingleContact: vi.fn().mockResolvedValue(undefined),
+    }
+
+    service = new BatchesService(
+      mockPrisma,
+      mockStateMachine,
+      mockContactsService,
+      mockIcmSyncBackService,
+    )
   })
 
   describe('aggregateBatchStatus', () => {
@@ -425,5 +446,190 @@ describe('BatchesService', () => {
         })
       },
     )
+  })
+
+  describe('findBatchContacts - User Story 39432', () => {
+    it('should use batch detail effectiveDate and cancelReasonCode when available', async () => {
+      const batchDetailDate = new Date('2025-01-15')
+      const contactDate = new Date('2025-03-20')
+
+      mockPrisma.batch.findUnique.mockResolvedValue({ id: 1 })
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
+        {
+          id: 1,
+          transactionType: 'cancellation',
+          effectiveDate: batchDetailDate,
+          cancelReasonCode: '14',
+          contact: {
+            careEndDate: contactDate,
+            cancelReasonCode: '21',
+          },
+        },
+      ])
+
+      const results = await service.findBatchContacts(1)
+
+      expect(results[0].effectiveDate).toBe(batchDetailDate.toISOString().split('T')[0])
+      expect(results[0].cancelReasonCode).toBe('14')
+      expect(results[0].cancelReasonLabel).toBe('Child Died')
+    })
+
+    it('should fall back to contact values when batch detail fields are null (backward compatibility)', async () => {
+      const contactDate = new Date('2025-03-20')
+
+      mockPrisma.batch.findUnique.mockResolvedValue({ id: 1 })
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
+        {
+          id: 1,
+          transactionType: 'cancellation',
+          effectiveDate: null,
+          cancelReasonCode: null,
+          contact: {
+            careEndDate: contactDate,
+            cancelReasonCode: '21',
+          },
+        },
+      ])
+
+      const results = await service.findBatchContacts(1)
+
+      expect(results[0].effectiveDate).toBe(contactDate.toISOString().split('T')[0])
+      expect(results[0].cancelReasonCode).toBe('21')
+      expect(results[0].cancelReasonLabel).toBe('Child Left')
+    })
+
+    it('should use batch detail effectiveDate for application transactions', async () => {
+      const batchDetailDate = new Date('2025-01-15')
+      const contactDate = new Date('2025-03-20')
+
+      mockPrisma.batch.findUnique.mockResolvedValue({ id: 1 })
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
+        {
+          id: 1,
+          transactionType: 'application',
+          effectiveDate: batchDetailDate,
+          cancelReasonCode: null,
+          contact: {
+            effectiveDate: contactDate,
+            careEndDate: null,
+            cancelReasonCode: null,
+          },
+        },
+      ])
+
+      const results = await service.findBatchContacts(1)
+
+      expect(results[0].effectiveDate).toBe(batchDetailDate.toISOString().split('T')[0])
+      expect(results[0].cancelReasonCode).toBeNull()
+      expect(results[0].cancelReasonLabel).toBeNull()
+    })
+  })
+
+  describe('addContactsToPendingBatch - User Story 39432', () => {
+    it('should capture effectiveDate and cancelReasonCode snapshots for cancellation batches', async () => {
+      const contact = {
+        id: 1,
+        caseNumber: 'CASE-1',
+        csaStatus: 'not_eligible_in_pay',
+        effectiveDate: new Date('2024-01-01'),
+        careEndDate: new Date('2025-02-20'),
+        cancelReasonCode: '14',
+      }
+
+      mockPrisma.batch.findFirst.mockResolvedValue({ id: 1, status: 'pending' })
+      mockPrisma.contact.findMany.mockResolvedValue([contact])
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([])
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: true,
+        to: 'in_batch_cancellation',
+      })
+      mockPrisma.contactBatchDetail.create.mockResolvedValue({ id: 10 })
+      mockPrisma.contactBatchDetail.update.mockResolvedValue({})
+      mockPrisma.batch.update.mockResolvedValue({})
+
+      await service.addContactsToPendingBatch([1], 'user@test.com')
+
+      expect(mockPrisma.contactBatchDetail.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          effectiveDate: new Date('2025-02-20'), // careEndDate for cancellations
+          cancelReasonCode: '14',
+          transactionType: 'cancellation',
+        }),
+      })
+    })
+
+    it('should capture effectiveDate and null cancelReasonCode for application batches', async () => {
+      const contact = {
+        id: 2,
+        caseNumber: 'CASE-2',
+        csaStatus: 'eligible',
+        effectiveDate: new Date('2025-01-15'),
+        careEndDate: null,
+        cancelReasonCode: null,
+      }
+
+      mockPrisma.batch.findFirst.mockResolvedValue({ id: 1, status: 'pending' })
+      mockPrisma.contact.findMany.mockResolvedValue([contact])
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([])
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: true,
+        to: 'in_batch_application',
+      })
+      mockPrisma.contactBatchDetail.create.mockResolvedValue({ id: 11 })
+      mockPrisma.contactBatchDetail.update.mockResolvedValue({})
+      mockPrisma.batch.update.mockResolvedValue({})
+
+      await service.addContactsToPendingBatch([2], 'user@test.com')
+
+      expect(mockPrisma.contactBatchDetail.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          effectiveDate: new Date('2025-01-15'), // effectiveDate for applications
+          cancelReasonCode: null,
+          transactionType: 'application',
+        }),
+      })
+    })
+
+    it('should apply default values for cancellation when blank and capture them', async () => {
+      const contact = {
+        id: 3,
+        caseNumber: 'CASE-3',
+        csaStatus: 'not_eligible_in_pay',
+        effectiveDate: new Date('2024-01-01'),
+        careEndDate: null,
+        cancelReasonCode: null,
+      }
+
+      mockPrisma.batch.findFirst.mockResolvedValue({ id: 1, status: 'pending' })
+      mockPrisma.contact.findMany.mockResolvedValue([contact])
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([])
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: true,
+        to: 'in_batch_cancellation',
+      })
+      mockPrisma.contact.update.mockResolvedValue({})
+      mockPrisma.contactBatchDetail.create.mockResolvedValue({ id: 12 })
+      mockPrisma.contactBatchDetail.update.mockResolvedValue({})
+      mockPrisma.batch.update.mockResolvedValue({})
+
+      await service.addContactsToPendingBatch([3], 'user@test.com')
+
+      // Verify defaults were applied to contact
+      expect(mockPrisma.contact.update).toHaveBeenCalledWith({
+        where: { id: 3 },
+        data: expect.objectContaining({
+          careEndDate: expect.any(Date),
+          cancelReasonCode: '21', // CHILD_LEFT default
+        }),
+      })
+
+      // Verify defaults were captured in batch detail
+      expect(mockPrisma.contactBatchDetail.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          effectiveDate: expect.any(Date),
+          cancelReasonCode: '21',
+        }),
+      })
+    })
   })
 })

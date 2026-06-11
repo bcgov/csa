@@ -741,15 +741,8 @@ export class ContactsService {
     })
 
     return details.map((detail) => {
-      // Use batch detail's stored values (preserved at time of batching)
-      // Fall back to contact values for backwards compatibility with old records
-      const effectiveDate =
-        detail.effectiveDate ??
-        (detail.transactionType === TRANSACTION_TYPES.CANCELLATION
-          ? detail.contact.careEndDate
-          : detail.contact.effectiveDate)
-
-      const cancelReasonCode = detail.cancelReasonCode ?? detail.contact.cancelReasonCode
+      const effectiveDate = detail.effectiveDate
+      const cancelReasonCode = detail.cancelReasonCode
       const cancelReasonLabel = getCancelReasonLabel(cancelReasonCode, detail.transactionType)
 
       return enrichLabels({

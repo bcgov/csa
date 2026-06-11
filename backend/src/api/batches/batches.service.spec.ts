@@ -474,26 +474,26 @@ describe('BatchesService', () => {
       expect(results[0].cancelReasonLabel).toBe('Child Died')
     })
 
-    it('should fall back to contact values when batch detail fields are null (backward compatibility)', async () => {
-      const contactDate = new Date('2025-03-20')
+    it('should use batch detail snapshot values for cancellation transactions', async () => {
+      const batchDetailDate = new Date('2025-03-20')
 
       mockPrisma.batch.findUnique.mockResolvedValue({ id: 1 })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
         {
           id: 1,
           transactionType: 'cancellation',
-          effectiveDate: null,
-          cancelReasonCode: null,
+          effectiveDate: batchDetailDate,
+          cancelReasonCode: '21',
           contact: {
-            careEndDate: contactDate,
-            cancelReasonCode: '21',
+            careEndDate: null,
+            cancelReasonCode: null,
           },
         },
       ])
 
       const results = await service.findBatchContacts(1)
 
-      expect(results[0].effectiveDate).toBe(contactDate.toISOString().split('T')[0])
+      expect(results[0].effectiveDate).toBe(batchDetailDate.toISOString().split('T')[0])
       expect(results[0].cancelReasonCode).toBe('21')
       expect(results[0].cancelReasonLabel).toBe('Child Left')
     })

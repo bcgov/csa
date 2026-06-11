@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
 import { RunEligibilityHandler } from './run-eligibility.handler'
 import { EligibilityService } from '../eligibility/eligibility.service'
+import { IcmInboundCsaSyncService } from '../icm/icm-inbound-csa-sync.service'
 import { IcmSyncBackService } from '../icm/icm-sync-back.service'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
@@ -27,6 +28,7 @@ const mockEligibilityResult = {
 describe('RunEligibilityHandler', () => {
   let handler: RunEligibilityHandler
   let mockEligibilityService: { run: ReturnType<typeof vi.fn> }
+  let mockInboundSyncService: { syncFromStaging: ReturnType<typeof vi.fn> }
   let mockSyncBackService: { syncFlaggedWithRetry: ReturnType<typeof vi.fn> }
   let mockJobsService: { getLastSuccessTimestamp: ReturnType<typeof vi.fn> }
   let mockConfigService: { get: ReturnType<typeof vi.fn> }
@@ -34,6 +36,9 @@ describe('RunEligibilityHandler', () => {
   beforeEach(async () => {
     mockEligibilityService = {
       run: vi.fn().mockResolvedValue(mockEligibilityResult),
+    }
+    mockInboundSyncService = {
+      syncFromStaging: vi.fn().mockResolvedValue({ candidates: 2, updated: 2, skipped: 0 }),
     }
     mockSyncBackService = {
       syncFlaggedWithRetry: vi
@@ -51,6 +56,7 @@ describe('RunEligibilityHandler', () => {
       providers: [
         RunEligibilityHandler,
         { provide: EligibilityService, useValue: mockEligibilityService },
+        { provide: IcmInboundCsaSyncService, useValue: mockInboundSyncService },
         { provide: IcmSyncBackService, useValue: mockSyncBackService },
         { provide: JobsService, useValue: mockJobsService },
         { provide: ConfigService, useValue: mockConfigService },
@@ -64,16 +70,28 @@ describe('RunEligibilityHandler', () => {
     expect(handler.jobType).toBe(JobType.RUN_ELIGIBILITY)
   })
 
-  it('should run eligibility then sync-back and return success', async () => {
+  it('should run inbound sync, eligibility, then sync-back and return success', async () => {
     const result = await handler.execute(mockContext)
 
     expect(result.success).toBe(true)
     expect(result.message).toContain('100 processed')
     expect(result.message).toContain('25 updated')
+    expect(mockInboundSyncService.syncFromStaging).toHaveBeenCalledWith(null)
     expect(mockEligibilityService.run).toHaveBeenCalledWith(null) // null = full load (no prior success)
     expect(mockSyncBackService.syncFlaggedWithRetry).toHaveBeenCalledOnce()
     expect(result.metadata).toHaveProperty('stepCounts')
+    expect(result.metadata).toHaveProperty('inboundSyncResult')
     expect(result.metadata).toHaveProperty('syncResult')
+  })
+
+  it('should succeed even if inbound sync throws', async () => {
+    mockInboundSyncService.syncFromStaging.mockRejectedValue(new Error('query failed'))
+
+    const result = await handler.execute(mockContext)
+
+    expect(result.success).toBe(true)
+    expect(mockEligibilityService.run).toHaveBeenCalledWith(null)
+    expect(result.metadata).toMatchObject({ inboundSyncResult: null })
   })
 
   it('should succeed even if sync-back throws', async () => {

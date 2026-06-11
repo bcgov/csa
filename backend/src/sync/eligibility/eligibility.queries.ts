@@ -1,11 +1,7 @@
-import { CSA_STATUS_LABELS } from 'src/common/state-machine/constants/csa-status.constants'
+import { buildIcmCsaStatusCaseSql } from '../icm/icm-csa-status-sql'
 import { PROTECTED_STATUSES_SQL } from './eligibility.config'
 
-const ICM_STATUS_CASE = `CASE UPPER(TRIM(cases.X_CSA_PAY_STATUS))\n${Object.entries(
-  CSA_STATUS_LABELS,
-)
-  .map(([code, label]) => `      WHEN '${label.toUpperCase()}' THEN '${code}'`)
-  .join('\n')}\n      ELSE NULL\n    END`
+const ICM_STATUS_CASE = buildIcmCsaStatusCaseSql('cases.X_CSA_PAY_STATUS')
 
 /** Shared ICM/MIS arms for staging change detection ($1 = since timestamp). */
 function buildStagingDataChangedUnions(options: {

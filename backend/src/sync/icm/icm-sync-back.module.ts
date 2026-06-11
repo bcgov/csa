@@ -10,6 +10,7 @@ import { syncConfig } from 'src/config/sync.config'
 import { IcmApiDataSource } from './data-source/icm-api-data-source'
 import { IcmDataSource } from './data-source/icm-data-source'
 import { MockIcmDataSource } from './data-source/mock-icm-data-source'
+import { IcmInboundCsaSyncService } from './icm-inbound-csa-sync.service'
 import { IcmSyncBackService } from './icm-sync-back.service'
 
 @Module({
@@ -37,7 +38,8 @@ import { IcmSyncBackService } from './icm-sync-back.service'
       inject: [ConfigService, HttpService, KeycloakAuthService],
     },
     IcmSyncBackService,
+    IcmInboundCsaSyncService,
   ],
-  exports: [IcmSyncBackService, IcmDataSource],
+  exports: [IcmSyncBackService, IcmInboundCsaSyncService, IcmDataSource],
 })
 export class IcmSyncBackModule {}

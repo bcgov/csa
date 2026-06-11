@@ -14,7 +14,6 @@ import { ContactsModule } from './contacts/contacts.module'
 import { AuditTrailModule } from './audit-trail/audit-trail.module'
 import { JobsApiModule } from './jobs/jobs.module'
 import { HealthController } from './health/health.controller'
-import { MetricsController } from './metrics/metrics.controller'
 import { MockModule } from './mock/mock.module'
 import { WeeklyFilesModule } from './weekly-files/weekly-files.module'
 
@@ -35,7 +34,7 @@ const enableMockApi = process.env.USE_MOCK_DATA === 'true'
     WeeklyFilesModule,
     ...(enableMockApi ? [MockModule] : []),
   ],
-  controllers: [AppController, MetricsController, HealthController],
+  controllers: [AppController, HealthController],
   providers: [AppService, PrismaService],
 })
 export class ApiModule {
@@ -46,6 +45,7 @@ export class ApiModule {
       .apply(HTTPLoggerMiddleware)
       .exclude(
         { path: 'metrics', method: RequestMethod.ALL },
+        { path: 'prom-metrics', method: RequestMethod.ALL },
         { path: 'health', method: RequestMethod.ALL },
       )
       .forRoutes('*')

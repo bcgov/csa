@@ -2,18 +2,18 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
-import { BackfillIcmCasesHandler } from './backfill-icm-cases.handler'
+import { BackfillIcmCaseCloseDatesHandler } from './backfill-icm-case-close-dates.handler'
 import { IcmService } from '../icm/icm.service'
 
 const mockContext: JobContext = {
   jobRunId: 1,
-  jobType: JobType.BACKFILL_ICM_CASES,
+  jobType: JobType.BACKFILL_ICM_CASE_CLOSE_DATES,
   jobTrigger: JobTrigger.END_USER,
   retryCount: 0,
 }
 
-describe('BackfillIcmCasesHandler', () => {
-  let handler: BackfillIcmCasesHandler
+describe('BackfillIcmCaseCloseDatesHandler', () => {
+  let handler: BackfillIcmCaseCloseDatesHandler
   let mockIcmService: { ingestResource: ReturnType<typeof vi.fn> }
 
   beforeEach(async () => {
@@ -26,14 +26,17 @@ describe('BackfillIcmCasesHandler', () => {
     }
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [BackfillIcmCasesHandler, { provide: IcmService, useValue: mockIcmService }],
+      providers: [
+        BackfillIcmCaseCloseDatesHandler,
+        { provide: IcmService, useValue: mockIcmService },
+      ],
     }).compile()
 
-    handler = module.get<BackfillIcmCasesHandler>(BackfillIcmCasesHandler)
+    handler = module.get<BackfillIcmCaseCloseDatesHandler>(BackfillIcmCaseCloseDatesHandler)
   })
 
-  it('should have jobType BACKFILL_ICM_CASES', () => {
-    expect(handler.jobType).toBe(JobType.BACKFILL_ICM_CASES)
+  it('should have jobType BACKFILL_ICM_CASE_CLOSE_DATES', () => {
+    expect(handler.jobType).toBe(JobType.BACKFILL_ICM_CASE_CLOSE_DATES)
   })
 
   describe('execute', () => {

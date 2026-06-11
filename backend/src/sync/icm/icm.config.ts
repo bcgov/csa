@@ -6,7 +6,11 @@ import {
   getAgeCutoffDate,
 } from 'src/common/utils'
 import { IcmApiRecord } from './data-source/icm-data-source'
-import { expandAgreementLineItems, OOC_AGREEMENT_LINES_QUERY_HIERARCHY } from './agreement-lines'
+import {
+  filterValidOocAgreementLineItems,
+  OOC_AGREEMENT_LINES_FIELDS,
+  OOC_AGREEMENT_LINES_SEARCH_SPEC,
+} from './agreement-lines'
 import {
   FieldMapEntry,
   STG_AGREEMENT_LINE_MAP,
@@ -27,10 +31,10 @@ export interface IcmApiConfig {
   cursorLabel: string | string[]
   searchSpec?: () => string
   fieldMap: FieldMapEntry[]
-  /** Nested ICM fetch (e.g. Agreements + AgreementLines). */
-  queryHierarchy?: Record<string, unknown>
-  /** Normalizes hierarchical API items before staging upsert. */
-  transformItems?: (items: IcmApiRecord[]) => IcmApiRecord[]
+  /** ICM `fields` query param for flat business-object reads. */
+  fields?: string
+  /** Drops invalid API rows before staging upsert. */
+  filterItems?: (items: IcmApiRecord[]) => IcmApiRecord[]
 }
 // TODO: date may not need DateTime as query params
 // Configs for ingesting ICM data into staging tables
@@ -85,12 +89,13 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
   },
   {
     name: 'ooc_agreement_lines',
-    endpoint: '/Agreements/Agreements',
+    endpoint: '/AgreementLines/AgreementLine',
     stagingTable: 'stg_icm_agreement_line',
     primaryKey: 'ROW_ID',
     cursorLabel: 'Updated',
-    queryHierarchy: OOC_AGREEMENT_LINES_QUERY_HIERARCHY,
-    transformItems: expandAgreementLineItems,
+    searchSpec: () => OOC_AGREEMENT_LINES_SEARCH_SPEC,
+    fields: OOC_AGREEMENT_LINES_FIELDS,
+    filterItems: filterValidOocAgreementLineItems,
     fieldMap: STG_AGREEMENT_LINE_MAP,
   },
   {
@@ -104,12 +109,6 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     fieldMap: STG_ORDER_MAP,
   },
 ]
-
-export const OOC_AGREEMENT_LINES_INGEST_NAME = 'ooc_agreement_lines'
-
-export function isOocAgreementLinesConfig(config: IcmApiConfig): boolean {
-  return config.name === OOC_AGREEMENT_LINES_INGEST_NAME
-}
 
 export const ICM_UPDATE_BATCH_LIMIT = 100
 

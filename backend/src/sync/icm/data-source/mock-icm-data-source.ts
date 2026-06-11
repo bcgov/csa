@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import * as fs from 'fs'
 import * as path from 'path'
-import { IcmApiConfig, isOocAgreementLinesConfig } from '../icm.config'
+import { IcmApiConfig } from '../icm.config'
 import { IcmApiRecord, IcmContactUpdatePayload, IcmDataSource } from './icm-data-source'
 
 @Injectable()
@@ -9,11 +9,6 @@ export class MockIcmDataSource extends IcmDataSource {
   private readonly logger = new Logger(MockIcmDataSource.name)
 
   async fetchAll(config: IcmApiConfig, lastUpdated?: Date): Promise<IcmApiRecord[]> {
-    if (isOocAgreementLinesConfig(config)) {
-      this.logger.warn(`${config.name}: returning empty result (temporary)`)
-      return []
-    }
-
     const mockDir = path.join(__dirname, '..', '..', 'mock-data', 'icm')
     const mockFile = path.join(mockDir, `${config.name}.json`)
 
@@ -27,9 +22,8 @@ export class MockIcmDataSource extends IcmDataSource {
     const items: IcmApiRecord[] = parsed?.items ?? []
 
     if (!lastUpdated) {
-      const records = config.transformItems ? config.transformItems(items) : items
-      this.logger.log(`Loaded ${records.length} mock records for ${config.name}`)
-      return records
+      this.logger.log(`Loaded ${items.length} mock records for ${config.name}`)
+      return items
     }
 
     const labels = Array.isArray(config.cursorLabel) ? config.cursorLabel : [config.cursorLabel]
@@ -45,12 +39,10 @@ export class MockIcmDataSource extends IcmDataSource {
       return cursorDates.some((d) => d > lastUpdated)
     })
 
-    const records = config.transformItems ? config.transformItems(filtered) : filtered
-
     this.logger.log(
-      `Loaded ${records.length}/${items.length} mock records for ${config.name} (after ${lastUpdated.toISOString()})`,
+      `Loaded ${filtered.length}/${items.length} mock records for ${config.name} (after ${lastUpdated.toISOString()})`,
     )
-    return records
+    return filtered
   }
 
   async updateContacts(contacts: IcmContactUpdatePayload[]): Promise<void> {

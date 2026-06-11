@@ -22,7 +22,8 @@ export class IcmService {
   ) {}
 
   async ingestResource(config: IcmApiConfig, lastUpdated?: Date): Promise<IcmResult> {
-    const records = await this.icmDataSource.fetchAll(config, lastUpdated)
+    const fetched = await this.icmDataSource.fetchAll(config, lastUpdated)
+    const records = config.filterItems ? config.filterItems(fetched) : fetched
 
     for (let i = 0; i < records.length; i += BATCH_SIZE) {
       const batch = records.slice(i, i + BATCH_SIZE)

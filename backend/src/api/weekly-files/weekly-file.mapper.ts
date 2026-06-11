@@ -96,6 +96,7 @@ export function toWeeklyFileRecordDto(record: {
   processedAt: Date | null
   recordData: unknown
   contact: { caseNumber: string; personIdIcm: string } | null
+  batchDetail: { batch: { batchNumber: number } } | null
 }): WeeklyFileRecordDto {
   const data = record.recordData as DetailRecord04
 
@@ -123,6 +124,10 @@ export function toWeeklyFileRecordDto(record: {
     completionDate: formatWklDateString(data.completionDate),
     associatedCaseNumber: record.contact?.caseNumber ?? null,
     associatedPersonIdIcm: record.contact?.personIdIcm ?? null,
+    batchReqId:
+      record.matchStatus === WKL_MATCH_STATUS.MATCHED && record.batchDetail
+        ? String(record.batchDetail.batch.batchNumber)
+        : null,
     matchedBy: record.matchedBy,
     processedAt: record.processedAt?.toISOString() ?? null,
   }

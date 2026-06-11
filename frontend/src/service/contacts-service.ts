@@ -534,22 +534,24 @@ export const getJobStatus = async (jobId: number): Promise<JobRun> => {
   return response.data
 }
 
-/**
- * Run eligibility query for all contacts and poll until complete
- * @param onProgress - Optional callback for progress updates
- */
-export const runEligibilityForAllWithPolling = async (
-  onProgress?: (job: JobRun) => void,
-): Promise<JobRun> => {
-  // Start the job
-  const { jobRunId } = await startEligibilityJob()
+type JobStatusResult = Awaited<ReturnType<typeof getJobStatus>>
 
-  // Poll for completion
-  const pollInterval = 10000 // 10 seconds
-  const maxAttempts = 60 // 10 minutes max
+type PollJobUntilCompleteOptions = {
+  jobId: number
+  pollIntervalMs: number
+  onProgress?: (job: JobStatusResult) => void
+}
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const job = await getJobStatus(jobRunId)
+const waitForNextPoll = (pollIntervalMs: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+
+const pollJobUntilComplete = async ({
+  jobId,
+  pollIntervalMs,
+  onProgress,
+}: PollJobUntilCompleteOptions): Promise<JobStatusResult> => {
+  while (true) {
+    const job = await getJobStatus(jobId)
 
     if (onProgress) {
       onProgress(job)
@@ -559,11 +561,24 @@ export const runEligibilityForAllWithPolling = async (
       return job
     }
 
-    // Wait before next poll
-    await new Promise((resolve) => setTimeout(resolve, pollInterval))
+    await waitForNextPoll(pollIntervalMs)
   }
+}
 
-  throw new Error('Eligibility job timed out')
+/**
+ * Run eligibility query for all contacts and poll until complete
+ * @param onProgress - Optional callback for progress updates
+ */
+export const runEligibilityForAllWithPolling = async (
+  onProgress?: (job: JobRun) => void,
+): Promise<JobRun> => {
+  const { jobRunId } = await startEligibilityJob()
+
+  return pollJobUntilComplete({
+    jobId: jobRunId,
+    pollIntervalMs: 10000,
+    onProgress,
+  })
 }
 
 /**
@@ -664,25 +679,11 @@ export const waitForEligibilityJobCompletion = async (
   jobId: number,
   onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
-  const pollInterval = 10000 // 10 seconds
-  const maxAttempts = 60 // 10 minutes max
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const job = await getJobStatus(jobId)
-
-    if (onProgress) {
-      onProgress(job)
-    }
-
-    if (job.status === 'SUCCESS' || job.status === 'FAILED') {
-      return job
-    }
-
-    // Wait before next poll
-    await new Promise((resolve) => setTimeout(resolve, pollInterval))
-  }
-
-  throw new Error('Eligibility job timed out')
+  return pollJobUntilComplete({
+    jobId,
+    pollIntervalMs: 10000,
+    onProgress,
+  })
 }
 
 /**
@@ -694,25 +695,11 @@ export const waitForAutoBatchJobCompletion = async (
   jobId: number,
   onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
-  const pollInterval = 5000 // 5 seconds
-  const maxAttempts = 60 // 5 minutes max
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const job = await getJobStatus(jobId)
-
-    if (onProgress) {
-      onProgress(job)
-    }
-
-    if (job.status === 'SUCCESS' || job.status === 'FAILED') {
-      return job
-    }
-
-    // Wait before next poll
-    await new Promise((resolve) => setTimeout(resolve, pollInterval))
-  }
-
-  throw new Error('Auto-batch job timed out')
+  return pollJobUntilComplete({
+    jobId,
+    pollIntervalMs: 5000,
+    onProgress,
+  })
 }
 
 /**
@@ -721,6 +708,15 @@ export const waitForAutoBatchJobCompletion = async (
  */
 export const startAutoBatchJob = async (): Promise<{ jobRunId: number }> => {
   const response = await APIService.getAxiosInstance().post('/jobs/auto-batch')
+  return response.data
+}
+
+/**
+ * Start SEND_CRA_FILE job for the selected pending batch
+ * Returns the job run ID for tracking
+ */
+export const startSendCraFileJob = async (): Promise<{ jobRunId: number }> => {
+  const response = await APIService.getAxiosInstance().post('/jobs/send-cra-file')
   return response.data
 }
 
@@ -740,33 +736,64 @@ export const getRunningAutoBatchJob = async (): Promise<JobRun | null> => {
 }
 
 /**
+ * Check if there's a running SEND_CRA_FILE job
+ * Returns the running job if found, null otherwise
+ */
+export const getRunningSendCraFileJob = async (): Promise<JobRun | null> => {
+  const response = await APIService.getAxiosInstance().get<JobsResponse>('/jobs', {
+    params: {
+      jobType: 'SEND_CRA_FILE',
+      status: 'RUNNING',
+      limit: 1,
+    },
+  })
+  return response.data.data.length > 0 ? response.data.data[0] : null
+}
+
+/**
+ * Wait for a running SEND_CRA_FILE job to complete (polls indefinitely until SUCCESS or FAILED)
+ * @param jobId - The job ID to monitor
+ * @param onProgress - Optional callback for progress updates
+ */
+export const waitForSendCraFileJobCompletion = async (
+  jobId: number,
+  onProgress?: (job: JobRun) => void,
+): Promise<JobRun> => {
+  return pollJobUntilComplete({
+    jobId,
+    pollIntervalMs: 10000,
+    onProgress,
+  })
+}
+
+/**
+ * Run SEND_CRA_FILE job and poll until complete (polls indefinitely until SUCCESS or FAILED)
+ * @param onProgress - Optional callback for progress updates
+ */
+export const runSendCraFileWithPolling = async (
+  onProgress?: (job: JobRun) => void,
+): Promise<JobRun> => {
+  const { jobRunId } = await startSendCraFileJob()
+
+  return pollJobUntilComplete({
+    jobId: jobRunId,
+    pollIntervalMs: 10000,
+    onProgress,
+  })
+}
+
+/**
  * Run auto-batch job for all eligible contacts and poll until complete
  * @param onProgress - Optional callback for progress updates
  */
 export const runAutoBatchWithPolling = async (
   onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
-  // Start the job
   const { jobRunId } = await startAutoBatchJob()
 
-  // Poll for completion
-  const pollInterval = 5000 // 5 seconds
-  const maxAttempts = 60 // 5 minutes max
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const job = await getJobStatus(jobRunId)
-
-    if (onProgress) {
-      onProgress(job)
-    }
-
-    if (job.status === 'SUCCESS' || job.status === 'FAILED') {
-      return job
-    }
-
-    // Wait before next poll
-    await new Promise((resolve) => setTimeout(resolve, pollInterval))
-  }
-
-  throw new Error('Auto-batch job timed out')
+  return pollJobUntilComplete({
+    jobId: jobRunId,
+    pollIntervalMs: 5000,
+    onProgress,
+  })
 }

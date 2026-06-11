@@ -4,8 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { of } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { IcmApiConfig } from '../icm.config'
-import * as icmConfig from '../icm.config'
-import { expandAgreementLineItems, OOC_AGREEMENT_LINES_QUERY_HIERARCHY } from '../agreement-lines'
+import { OOC_AGREEMENT_LINES_FIELDS, OOC_AGREEMENT_LINES_SEARCH_SPEC } from '../agreement-lines'
 import { IcmApiDataSource } from './icm-api-data-source'
 import { IcmContactUpdatePayload } from './icm-data-source'
 
@@ -25,8 +24,6 @@ describe('IcmApiDataSource', () => {
   let keycloakAuthService: { getBearerToken: ReturnType<typeof vi.fn> }
 
   beforeEach(async () => {
-    vi.spyOn(icmConfig, 'isOocAgreementLinesConfig').mockReturnValue(false)
-
     httpService = { get: vi.fn(), put: vi.fn() }
 
     keycloakAuthService = {
@@ -57,25 +54,7 @@ describe('IcmApiDataSource', () => {
     service = module.get<IcmApiDataSource>(IcmApiDataSource)
   })
 
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
   describe('fetchAll', () => {
-    it('should return empty for ooc agreement lines ingest', async () => {
-      vi.spyOn(icmConfig, 'isOocAgreementLinesConfig').mockReturnValue(true)
-
-      const oocConfig: IcmApiConfig = {
-        ...mockConfig,
-        name: 'ooc_agreement_lines',
-      }
-
-      const results = await service.fetchAll(oocConfig)
-
-      expect(results).toEqual([])
-      expect(httpService.get).not.toHaveBeenCalled()
-    })
-
     it('should paginate until fewer items than page size', async () => {
       httpService.get
         .mockReturnValueOnce(
@@ -147,11 +126,13 @@ describe('IcmApiDataSource', () => {
       expect(callUrl).toContain('ExecutionMode=ForwardOnly')
     })
 
-    it('should send QueryHierarchy and omit GetChildren when configured', async () => {
+    it('should send fields param for agreement lines endpoint', async () => {
       const oocConfig: IcmApiConfig = {
         ...mockConfig,
         name: 'ooc_agreement_lines',
-        queryHierarchy: OOC_AGREEMENT_LINES_QUERY_HIERARCHY,
+        endpoint: '/AgreementLines/AgreementLine',
+        searchSpec: () => OOC_AGREEMENT_LINES_SEARCH_SPEC,
+        fields: OOC_AGREEMENT_LINES_FIELDS,
       }
 
       httpService.get.mockReturnValue(of({ status: 200, headers: {}, data: { items: [] } }))
@@ -159,15 +140,20 @@ describe('IcmApiDataSource', () => {
       await service.fetchAll(oocConfig)
 
       const callUrl = decodeURIComponent(httpService.get.mock.calls[0][0]).replace(/\+/g, ' ')
-      expect(callUrl).toContain('QueryHierarchy=')
+      expect(callUrl).toContain('/AgreementLines/AgreementLine')
+      expect(callUrl).toContain('ViewMode=Catalog')
+      expect(callUrl).toContain('GetChildren=false')
+      expect(callUrl).toContain('fields=Id,Updated,ICM Person ID,Agreement Id')
       expect(callUrl).toContain("[Agreement Type] = 'Out of Care'")
-      expect(callUrl).not.toContain('GetChildren=false')
     })
 
-    it('should apply transformItems after fetch', async () => {
+    it('should return flat agreement line items from paginated response', async () => {
       const oocConfig: IcmApiConfig = {
         ...mockConfig,
-        transformItems: expandAgreementLineItems,
+        name: 'ooc_agreement_lines',
+        endpoint: '/AgreementLines/AgreementLine',
+        searchSpec: () => OOC_AGREEMENT_LINES_SEARCH_SPEC,
+        fields: OOC_AGREEMENT_LINES_FIELDS,
       }
 
       httpService.get.mockReturnValue(
@@ -177,8 +163,16 @@ describe('IcmApiDataSource', () => {
           data: {
             items: [
               {
-                Id: 'AGR-1',
-                AgreementLines: [{ Id: 'LINE-1', 'ICM Person ID': 'PERSON-1' }],
+                Id: 'mock-line-001',
+                'Agreement Id': 'mock-agreement-001',
+                'ICM Person ID': 'mock-person-001',
+                Updated: '05/26/2026 10:00:00',
+              },
+              {
+                Id: 'mock-line-002',
+                'Agreement Id': 'mock-agreement-001',
+                'ICM Person ID': 'mock-person-001',
+                Updated: '05/26/2026 10:00:00',
               },
             ],
           },
@@ -187,11 +181,12 @@ describe('IcmApiDataSource', () => {
 
       const results = await service.fetchAll(oocConfig)
 
-      expect(results).toHaveLength(1)
-      expect(results[0]).toMatchObject({
-        Id: 'LINE-1',
-        'Agreement Id': 'AGR-1',
-        'ICM Person ID': 'PERSON-1',
+      expect(results).toHaveLength(2)
+      expect(results[1]).toMatchObject({
+        Id: 'mock-line-002',
+        'Agreement Id': 'mock-agreement-001',
+        'ICM Person ID': 'mock-person-001',
+        Updated: '05/26/2026 10:00:00',
       })
     })
 

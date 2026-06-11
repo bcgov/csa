@@ -1,14 +1,14 @@
 {
 	metrics
 	auto_https off
-	admin 127.0.0.1:3003
+	admin :3003
 	order coraza_waf first
 }
 
 :3000 {
 	log {
 		output stdout
-		format console
+		format json
 		level info
 	}
 

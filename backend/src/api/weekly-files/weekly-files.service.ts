@@ -15,7 +15,11 @@ import {
   toWeeklyFileRecordDto,
   toWeeklyFileSummaryDto,
 } from './weekly-file.mapper'
-import { assertCanAssociate, assertCanDissociate, assertCanReprocess } from './wkl-record.validation'
+import {
+  assertCanAssociate,
+  assertCanDissociate,
+  assertCanReprocess,
+} from './wkl-record.validation'
 
 const { FILE_DIRECTION, FILE_TYPE, WKL_MATCH_STATUS } = CRA_DATA_HANDLING_CONSTANT
 
@@ -259,9 +263,7 @@ export class WeeklyFilesService {
     try {
       await this.icmSyncBackService.syncFlaggedWithRetry()
     } catch (err) {
-      this.logger.warn(
-        `ICM sync-back failed after WKL record reprocess: ${(err as Error).message}`,
-      )
+      this.logger.warn(`ICM sync-back failed after WKL record reprocess: ${(err as Error).message}`)
     }
 
     const updated = await this.prisma.wklFileRecord.findFirst({

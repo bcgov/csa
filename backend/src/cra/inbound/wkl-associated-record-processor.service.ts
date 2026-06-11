@@ -85,9 +85,10 @@ export class WklAssociatedRecordProcessorService {
 
     if (!batchDetail) {
       if (!ctx.unmatchedWklBatchId.value) {
-        const batch = ctx.preferExistingInProgressDetail && ctx.batchDate
-          ? await this.batchesService.findOrCreateWklBatchForUnmatchedRecords(ctx.batchDate)
-          : await this.batchesService.createWklBatchForUnmatchedRecords(ctx.header)
+        const batch =
+          ctx.preferExistingInProgressDetail && ctx.batchDate
+            ? await this.batchesService.findOrCreateWklBatchForUnmatchedRecords(ctx.batchDate)
+            : await this.batchesService.createWklBatchForUnmatchedRecords(ctx.header)
         ctx.unmatchedWklBatchId.value = batch.id
         ctx.processedBatchIds.add(batch.id)
       }

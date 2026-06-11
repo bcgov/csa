@@ -265,9 +265,7 @@ export class BatchesService {
     return enrichLabels(pendingBatch)
   }
 
-  async findInProgressBatchDetailForContact(
-    contactId: number,
-  ): Promise<MatchedBatchDetail | null> {
+  async findInProgressBatchDetailForContact(contactId: number): Promise<MatchedBatchDetail | null> {
     const details = await this.prisma.contactBatchDetail.findMany({
       where: {
         contactId,

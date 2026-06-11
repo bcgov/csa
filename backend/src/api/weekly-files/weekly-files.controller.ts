@@ -81,7 +81,10 @@ export class WeeklyFilesController {
 
   @Post(':id/records/:recordId/reprocess')
   @HttpCode(200)
-  @ApiResponse({ status: 200, description: 'Confirmed (reprocessed) a single associated WKL record' })
+  @ApiResponse({
+    status: 200,
+    description: 'Confirmed (reprocessed) a single associated WKL record',
+  })
   reprocessRecord(
     @Param('id', ParseIntPipe) id: number,
     @Param('recordId', ParseIntPipe) recordId: number,

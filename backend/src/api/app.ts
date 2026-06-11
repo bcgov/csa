@@ -19,7 +19,7 @@ export async function bootstrap() {
   app.enableCors({ origin: false })
   app.set('trust proxy', 1)
   app.use(metricsMiddleware)
-  app.get(METRICS_ALIAS_PATH, servePrometheusMetrics)
+  app.use(METRICS_ALIAS_PATH, servePrometheusMetrics)
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   )

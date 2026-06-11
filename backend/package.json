@@ -24,6 +24,7 @@
     "job:backfill-ooc-agreement-lines": "node dist/jobs/entrypoints/backfill-ooc-agreement-lines",
     "job:backfill-icm-case-close-dates": "node dist/jobs/entrypoints/backfill-icm-case-close-dates",
     "job:backfill-wkl-file-records": "node dist/jobs/entrypoints/backfill-wkl-file-records",
+    "job:backfill-batch-effective-date-reason": "node dist/jobs/entrypoints/backfill-batch-effective-date-reason",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "make-badges": "istanbul-badges-readme --logo=vitest --exitCode=1",

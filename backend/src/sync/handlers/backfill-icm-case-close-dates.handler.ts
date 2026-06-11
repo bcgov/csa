@@ -30,8 +30,7 @@ export class BackfillIcmCaseCloseDatesHandler extends BaseJob {
 
     return {
       success: true,
-      message:
-        `ICM case close dates backfill complete: ${result.fetched} fetched, ${result.upserted} upserted`,
+      message: `ICM case close dates backfill complete: ${result.fetched} fetched, ${result.upserted} upserted`,
       metadata: {
         lastUpdated: null,
         result,

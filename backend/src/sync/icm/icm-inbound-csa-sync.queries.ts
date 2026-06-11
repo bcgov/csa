@@ -17,6 +17,7 @@ export interface IcmInboundCsaDriftRow {
 /**
  * Finds CSA master contacts whose ICM case CSA fields differ from staging.
  * Only includes cases ingested since `since` and contacts not flagged for outbound sync.
+ * Empty ICM values are included so intentional field clears in ICM propagate to CSA.
  */
 export function buildFindIcmCsaDriftSql(): string {
   return `
@@ -53,16 +54,10 @@ export function buildFindIcmCsaDriftSql(): string {
     INNER JOIN csa.contacts c ON c.case_number = rc.CASE_NUM
     WHERE c.icm_integration_status = false
       AND (
-        (rc.icm_din IS NOT NULL AND rc.icm_din IS DISTINCT FROM NULLIF(TRIM(c.din), ''))
-        OR (rc.icm_csa_status IS NOT NULL AND rc.icm_csa_status IS DISTINCT FROM c.csa_status)
-        OR (
-          rc.icm_csa_status_effective_date IS NOT NULL
-          AND rc.icm_csa_status_effective_date IS DISTINCT FROM c.csa_status_effective_date
-        )
-        OR (
-          rc.icm_csa_sent_date IS NOT NULL
-          AND rc.icm_csa_sent_date IS DISTINCT FROM c.csa_sent_date
-        )
+        rc.icm_din IS DISTINCT FROM NULLIF(TRIM(c.din), '')
+        OR rc.icm_csa_status IS DISTINCT FROM c.csa_status
+        OR rc.icm_csa_status_effective_date IS DISTINCT FROM c.csa_status_effective_date
+        OR rc.icm_csa_sent_date IS DISTINCT FROM c.csa_sent_date
         OR rc.X_CONTACT_NUM IS DISTINCT FROM c.person_id_icm
         OR rc.CONTACT_ROW_ID IS DISTINCT FROM c.contact_id_icm
       )

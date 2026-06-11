@@ -10,5 +10,7 @@ describe('buildFindIcmCsaDriftSql', () => {
     expect(sql).toContain('cases.ingested_at >= $1::timestamptz')
     expect(sql).toContain("WHEN 'IN PAY' THEN 'in_pay'")
     expect(sql).toContain('rc.X_CONTACT_NUM IS DISTINCT FROM c.person_id_icm')
+    expect(sql).not.toContain('rc.icm_din IS NOT NULL')
+    expect(sql).toContain('rc.icm_din IS DISTINCT FROM NULLIF(TRIM(c.din), \'\')')
   })
 })

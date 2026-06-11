@@ -67,6 +67,39 @@ describe('IcmInboundCsaSyncService', () => {
     )
   })
 
+  it('should clear CSA fields when ICM values are empty', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([
+      {
+        contactId: 8,
+        caseNumber: '1-66666',
+        currentCsaStatus: 'eligible',
+        personIdIcm: 'ICM-8',
+        contactIdIcm: 'CONTACT-8',
+        din: null,
+        csaStatus: null,
+        csaStatusEffectiveDate: null,
+        csaSentDate: null,
+      },
+    ])
+
+    const result = await service.syncFromStaging(new Date('2026-06-01'))
+
+    expect(result).toEqual({ candidates: 1, updated: 1, skipped: 0 })
+    expect(mockPrisma.contact.update).toHaveBeenCalledWith({
+      where: { id: 8 },
+      data: {
+        personIdIcm: 'ICM-8',
+        contactIdIcm: 'CONTACT-8',
+        din: null,
+        csaStatus: null,
+        csaStatusEffectiveDate: null,
+        csaSentDate: null,
+        lastUpdatedAt: expect.any(Date),
+        lastUpdatedBy: 'ICM_INBOUND_SYNC',
+      },
+    })
+  })
+
   it('should not update CSA status or effective date when current status is protected', async () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValue([
       {

@@ -76,25 +76,17 @@ export class IcmInboundCsaSyncService {
       lastUpdatedBy: ICM_INBOUND_SYNC_ACTOR,
     }
 
-    if (row.din != null) {
-      data.din = row.din
-    }
+    data.din = row.din
     if (!statusProtected) {
-      if (row.csaStatus != null) {
-        data.csaStatus = row.csaStatus
-      }
-      if (row.csaStatusEffectiveDate != null) {
-        data.csaStatusEffectiveDate = row.csaStatusEffectiveDate
-      }
-    } else if (row.csaStatus != null && row.csaStatus !== row.currentCsaStatus) {
+      data.csaStatus = row.csaStatus
+      data.csaStatusEffectiveDate = row.csaStatusEffectiveDate
+    } else if (row.csaStatus !== row.currentCsaStatus) {
       this.logger.warn(
         `Preserving protected CSA status '${row.currentCsaStatus}' for contact ${row.contactId} ` +
-          `(case ${row.caseNumber}); ICM has '${row.csaStatus}'`,
+          `(case ${row.caseNumber}); ICM has '${row.csaStatus ?? ''}'`,
       )
     }
-    if (row.csaSentDate != null) {
-      data.csaSentDate = row.csaSentDate
-    }
+    data.csaSentDate = row.csaSentDate
 
     await this.prisma.contact.update({
       where: { id: row.contactId },

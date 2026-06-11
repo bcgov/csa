@@ -27,7 +27,7 @@ describe('prom metrics', () => {
       end: vi.fn(),
     } as unknown as Response
 
-    await servePrometheusMetrics({} as never, res, vi.fn())
+    await servePrometheusMetrics({} as never, res)
 
     expect(res.set).toHaveBeenCalledWith('Content-Type', register.contentType)
     expect(register.metrics).toHaveBeenCalledTimes(1)

@@ -22,7 +22,7 @@
     "job:sync-icm": "node dist/jobs/entrypoints/sync-icm",
     "job:auto-batch": "node dist/jobs/entrypoints/auto-batch",
     "job:backfill-ooc-agreement-lines": "node dist/jobs/entrypoints/backfill-ooc-agreement-lines",
-    "job:backfill-icm-cases": "node dist/jobs/entrypoints/backfill-icm-cases",
+    "job:backfill-icm-case-close-dates": "node dist/jobs/entrypoints/backfill-icm-case-close-dates",
     "job:backfill-wkl-file-records": "node dist/jobs/entrypoints/backfill-wkl-file-records",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

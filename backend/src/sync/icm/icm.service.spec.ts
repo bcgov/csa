@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { IcmService, BATCH_SIZE } from './icm.service'
 import { IcmDataSource } from './data-source/icm-data-source'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { filterValidOocAgreementLineItems } from './agreement-lines'
 import { IcmApiConfig } from './icm.config'
 import { FieldMapEntry } from './field-maps'
 
@@ -56,6 +57,29 @@ describe('IcmService', () => {
       expect(result.name).toBe('cases')
       expect(result.fetched).toBe(2)
       expect(result.upserted).toBe(2)
+      expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
+    })
+
+    it('should apply filterItems before upsert', async () => {
+      const filteredConfig: IcmApiConfig = {
+        ...testConfig,
+        name: 'ooc_agreement_lines',
+        filterItems: filterValidOocAgreementLineItems,
+      }
+
+      mockIcmDataSource.fetchAll.mockResolvedValue([
+        {
+          Id: 'mock-line-001',
+          'Agreement Id': 'mock-agreement-001',
+          'ICM Person ID': 'mock-person-001',
+        },
+        { Id: 'mock-line-002', 'Agreement Id': 'mock-agreement-002', 'ICM Person ID': '' },
+      ])
+
+      const result = await service.ingestResource(filteredConfig)
+
+      expect(result.fetched).toBe(1)
+      expect(result.upserted).toBe(1)
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
     })
 

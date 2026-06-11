@@ -8,6 +8,11 @@ import {
   Box,
   Button,
   Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   IconButton,
   InputAdornment,
   Menu,
@@ -32,7 +37,7 @@ import {
   dissociateWeeklyFileRecord,
   getWeeklyFileRecords,
   getWeeklyFiles,
-  reprocessWeeklyFile,
+  reprocessWeeklyFileRecord,
   type WeeklyFileRecord,
   type WeeklyFileSummary,
 } from '../service/weekly-files-service'
@@ -40,8 +45,10 @@ import {
 const SUMMARY_PAGE_SIZE = 10
 const DETAILS_PAGE_SIZE = 20
 const SEARCH_PAGE_SIZE = 10
+const CHILD_SEARCH_MIN_LENGTH = 3
 const MANUAL_REVIEW_WARNING =
   'This weekly response record is not matched to a CSA master contact. Search and select a child record below to associate manually.'
+const ASSOCIATED_RECORD_INFO = 'Contact associated, click Confirm to reprocess this record.'
 
 type SortDirection = 'asc' | 'desc'
 type WeeklyReportColumn = 'weeklyFileDate' | 'csaProcessingDate'
@@ -94,6 +101,7 @@ export default function WeeklyFileProcessingTab() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [savingAssociation, setSavingAssociation] = useState(false)
   const [reprocessing, setReprocessing] = useState(false)
+  const [reprocessConfirmOpen, setReprocessConfirmOpen] = useState(false)
 
   const [weeklyReportSearchTerm, setWeeklyReportSearchTerm] = useState('')
   const [weeklyReportColumnFilters, setWeeklyReportColumnFilters] = useState<
@@ -199,9 +207,9 @@ export default function WeeklyFileProcessingTab() {
         const response = await getWeeklyFileRecords(selectedFileId, recordsPage, DETAILS_PAGE_SIZE)
         setRecords(response.data)
         setRecordsTotalPages(Math.max(response.totalPages, 1))
-        if (selectedRecordId && !response.data.some((record) => record.id === selectedRecordId)) {
-          setSelectedRecordId(null)
-        }
+        setSelectedRecordId((prev) =>
+          prev && !response.data.some((record) => record.id === prev) ? null : prev,
+        )
       } catch (err) {
         console.error('Failed to fetch weekly file records:', err)
         setError('Failed to load weekly file details. Please try again.')
@@ -212,7 +220,7 @@ export default function WeeklyFileProcessingTab() {
     }
 
     void loadRecords()
-  }, [selectedFileId, recordsPage, selectedRecordId])
+  }, [selectedFileId, recordsPage])
 
   useEffect(() => {
     setSelectedSearchContactId(null)
@@ -226,6 +234,19 @@ export default function WeeklyFileProcessingTab() {
     () => records.find((record) => record.id === selectedRecordId) ?? null,
     [records, selectedRecordId],
   )
+
+  const selectedRecordMatchStatus = selectedRecord?.matchStatus?.toLowerCase() ?? ''
+  const isSelectedRecordUnmatched = selectedRecordMatchStatus === 'unmatched'
+  const isSelectedRecordAssociated = selectedRecordMatchStatus === 'associated'
+  const hasAssociatedPendingRecords = records.some(
+    (record) => record.matchStatus?.toLowerCase() === 'associated' && !record.processedAt,
+  )
+  const canReprocessSelectedRecord =
+    !!selectedFileId &&
+    !!selectedRecordId &&
+    isSelectedRecordAssociated &&
+    !selectedRecord?.processedAt &&
+    hasAssociatedPendingRecords
 
   const getWeeklyReportFieldValue = (
     file: WeeklyFileSummary,
@@ -436,7 +457,16 @@ export default function WeeklyFileProcessingTab() {
   }
 
   const runChildSearch = async (page = 1) => {
-    if (!childSearchTerm.trim()) {
+    const trimmedSearchTerm = childSearchTerm.trim()
+
+    if (!trimmedSearchTerm) {
+      setSearchedChildren([])
+      setChildSearchTotalPages(1)
+      return
+    }
+
+    if (trimmedSearchTerm.length < CHILD_SEARCH_MIN_LENGTH) {
+      setActionError(`Please enter at least ${CHILD_SEARCH_MIN_LENGTH} characters to search.`)
       setSearchedChildren([])
       setChildSearchTotalPages(1)
       return
@@ -445,7 +475,7 @@ export default function WeeklyFileProcessingTab() {
     setLoadingChildSearch(true)
     setActionError(null)
     try {
-      const response = await fullTextSearchContacts(childSearchTerm.trim(), page, SEARCH_PAGE_SIZE)
+      const response = await fullTextSearchContacts(trimmedSearchTerm, page, SEARCH_PAGE_SIZE)
       setSearchedChildren(response.data)
       setChildSearchTotalPages(Math.max(response.totalPages, 1))
     } catch (err) {
@@ -472,22 +502,21 @@ export default function WeeklyFileProcessingTab() {
   }
 
   const handleConfirmReprocess = async () => {
-    if (!selectedFileId) return
+    if (!selectedFileId || !selectedRecordId) return
 
     setReprocessing(true)
     setActionError(null)
     setActionMessage(null)
     try {
-      const result = await reprocessWeeklyFile(selectedFileId)
+      await reprocessWeeklyFileRecord(selectedFileId, selectedRecordId)
       await Promise.all([refreshWeeklyFiles(), refreshSelectedFileRecords()])
 
-      setActionMessage(
-        `Reprocess complete: ${result.processedRecordIds.length} processed, ${result.skippedRecords.length} skipped.`,
-      )
+      setActionMessage(`Reprocess complete for record ${selectedRecordId}.`)
     } catch (err: any) {
       console.error('Failed to reprocess weekly file:', err)
-      setActionError(err?.response?.data?.message || 'Failed to reprocess weekly file.')
+      setActionError(err?.response?.data?.message || 'Failed to reprocess weekly file record.')
     } finally {
+      setReprocessConfirmOpen(false)
       setReprocessing(false)
     }
   }
@@ -501,7 +530,7 @@ export default function WeeklyFileProcessingTab() {
     try {
       await associateWeeklyFileRecord(selectedFileId, selectedRecordId, selectedSearchContactId)
       await refreshSelectedFileRecords()
-      setActionMessage('Record associated successfully.')
+      setActionMessage('Contact associated, click Confirm to reprocess this record.')
     } catch (err: any) {
       console.error('Failed to associate weekly file record:', err)
       setActionError(err?.response?.data?.message || 'Failed to associate record.')
@@ -660,12 +689,14 @@ export default function WeeklyFileProcessingTab() {
               <TableCell sx={{ fontWeight: 600 }}>Total records count</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>&apos;E&apos; records count</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Matched count</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Unmatched count</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Associated count</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loadingFiles ? (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
                     Loading weekly files...
                   </Typography>
@@ -673,7 +704,7 @@ export default function WeeklyFileProcessingTab() {
               </TableRow>
             ) : filteredWeeklyFiles.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
                     {weeklyReportSearchTerm.trim()
                       ? 'No weekly files match the current search'
@@ -701,6 +732,8 @@ export default function WeeklyFileProcessingTab() {
                   <TableCell>{file.totalCount}</TableCell>
                   <TableCell>{file.eCount}</TableCell>
                   <TableCell>{file.matchedCount}</TableCell>
+                  <TableCell>{file.unmatchedCount}</TableCell>
+                  <TableCell>{file.associatedCount}</TableCell>
                 </TableRow>
               ))
             )}
@@ -727,8 +760,8 @@ export default function WeeklyFileProcessingTab() {
         </Typography>
         <Button
           variant="contained"
-          onClick={handleConfirmReprocess}
-          disabled={!selectedFileId || reprocessing}
+          onClick={() => setReprocessConfirmOpen(true)}
+          disabled={!canReprocessSelectedRecord || reprocessing}
         >
           Confirm
         </Button>
@@ -988,14 +1021,14 @@ export default function WeeklyFileProcessingTab() {
                   <TableCell>{record.lastName}</TableCell>
                   <TableCell>{record.initial}</TableCell>
                   <TableCell>{record.gender}</TableCell>
-                  <TableCell>{valueOrBlank(record.dateOfBirth)}</TableCell>
+                  <TableCell>{formatDateDisplay(record.dateOfBirth)}</TableCell>
                   <TableCell>{record.birthCity}</TableCell>
                   <TableCell>{record.birthProvince}</TableCell>
                   <TableCell>{record.birthCountry}</TableCell>
-                  <TableCell>{valueOrBlank(record.careStartDate)}</TableCell>
-                  <TableCell>{valueOrBlank(record.careEndDate)}</TableCell>
+                  <TableCell>{formatDateDisplay(record.careStartDate)}</TableCell>
+                  <TableCell>{formatDateDisplay(record.careEndDate)}</TableCell>
                   <TableCell>{record.cancelReasonCode}</TableCell>
-                  <TableCell>{valueOrBlank(record.completionDate)}</TableCell>
+                  <TableCell>{formatDateDisplay(record.completionDate)}</TableCell>
                   <TableCell>{valueOrBlank(record.associatedCaseNumber)}</TableCell>
                   <TableCell>{valueOrBlank(record.associatedPersonIdIcm)}</TableCell>
                 </TableRow>
@@ -1024,20 +1057,25 @@ export default function WeeklyFileProcessingTab() {
             Child Search
           </Typography>
 
-          {selectedRecord.csaMatchFound !== 'Yes' && (
+          {isSelectedRecordUnmatched && (
             <Alert severity="warning" sx={{ mb: 2 }}>
               {MANUAL_REVIEW_WARNING}
+            </Alert>
+          )}
+          {isSelectedRecordAssociated && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              {ASSOCIATED_RECORD_INFO}
             </Alert>
           )}
 
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
             <TextField
               size="small"
-              placeholder="Search CSA Master"
+              placeholder="Search CSA Master (min 3 chars)"
               value={childSearchTerm}
               onChange={(e) => setChildSearchTerm(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && childSearchTerm.trim().length >= CHILD_SEARCH_MIN_LENGTH) {
                   setChildSearchPage(1)
                   void runChildSearch(1)
                 }
@@ -1050,14 +1088,21 @@ export default function WeeklyFileProcessingTab() {
                 setChildSearchPage(1)
                 void runChildSearch(1)
               }}
-              disabled={!childSearchTerm.trim() || loadingChildSearch}
+              disabled={
+                childSearchTerm.trim().length < CHILD_SEARCH_MIN_LENGTH || loadingChildSearch
+              }
             >
               Search
             </Button>
             <Button
               variant="contained"
               onClick={handleAssociate}
-              disabled={!selectedSearchContactId || savingAssociation || !selectedRecordId}
+              disabled={
+                !selectedSearchContactId ||
+                savingAssociation ||
+                !selectedRecordId ||
+                !isSelectedRecordUnmatched
+              }
             >
               Associate
             </Button>
@@ -1065,7 +1110,7 @@ export default function WeeklyFileProcessingTab() {
               variant="outlined"
               color="error"
               onClick={handleDissociate}
-              disabled={savingAssociation || !selectedRecordId}
+              disabled={savingAssociation || !selectedRecordId || !isSelectedRecordAssociated}
             >
               Dissociate
             </Button>
@@ -1353,6 +1398,30 @@ export default function WeeklyFileProcessingTab() {
           </Box>
         </Box>
       </Menu>
+
+      <Dialog
+        open={reprocessConfirmOpen}
+        onClose={() => !reprocessing && setReprocessConfirmOpen(false)}
+      >
+        <DialogTitle>Confirm Reprocess</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Confirm reprocess for record {selectedRecordId}? This action only applies to the
+            selected associated record.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReprocessConfirmOpen(false)} disabled={reprocessing}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmReprocess}
+            disabled={!canReprocessSelectedRecord || reprocessing}
+          >
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

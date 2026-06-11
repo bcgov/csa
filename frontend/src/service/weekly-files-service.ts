@@ -101,3 +101,13 @@ export const reprocessWeeklyFile = async (fileId: number): Promise<ReprocessWeek
   const response = await APIService.getAxiosInstance().post(`/weekly-files/${fileId}/reprocess`)
   return response.data
 }
+
+export const reprocessWeeklyFileRecord = async (
+  fileId: number,
+  recordId: number,
+): Promise<WeeklyFileRecord> => {
+  const response = await APIService.getAxiosInstance().post(
+    `/weekly-files/${fileId}/records/${recordId}/reprocess`,
+  )
+  return response.data
+}

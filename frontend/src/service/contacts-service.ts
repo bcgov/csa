@@ -554,7 +554,7 @@ const pollJobUntilComplete = async ({
   timeoutMessage,
   onProgress,
 }: PollJobUntilCompleteOptions): Promise<JobStatusResult> => {
-  for (let attempt = 0; maxAttempts === undefined || attempt < maxAttempts; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts!; attempt++) {
     const job = await getJobStatus(jobId)
 
     if (onProgress) {
@@ -569,6 +569,26 @@ const pollJobUntilComplete = async ({
   }
 
   throw new Error(timeoutMessage ?? 'Job polling timed out')
+}
+
+const pollJobUntilCompleteUnbounded = async (
+  jobId: number,
+  pollIntervalMs: number,
+  onProgress?: (job: JobStatusResult) => void,
+): Promise<JobStatusResult> => {
+  while (true) {
+    const job = await getJobStatus(jobId)
+
+    if (onProgress) {
+      onProgress(job)
+    }
+
+    if (job.status === 'SUCCESS' || job.status === 'FAILED') {
+      return job
+    }
+
+    await waitForNextPoll(pollIntervalMs)
+  }
 }
 
 /**
@@ -763,7 +783,7 @@ export const getRunningSendCraFileJob = async (): Promise<JobRun | null> => {
 }
 
 /**
- * Wait for a running SEND_CRA_FILE job to complete
+ * Wait for a running SEND_CRA_FILE job to complete (polls indefinitely until SUCCESS or FAILED)
  * @param jobId - The job ID to monitor
  * @param onProgress - Optional callback for progress updates
  */
@@ -771,15 +791,11 @@ export const waitForSendCraFileJobCompletion = async (
   jobId: number,
   onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
-  return pollJobUntilComplete({
-    jobId,
-    pollIntervalMs: 10000,
-    onProgress,
-  })
+  return pollJobUntilCompleteUnbounded(jobId, 10000, onProgress)
 }
 
 /**
- * Run SEND_CRA_FILE job and poll until complete
+ * Run SEND_CRA_FILE job and poll until complete (polls indefinitely until SUCCESS or FAILED)
  * @param onProgress - Optional callback for progress updates
  */
 export const runSendCraFileWithPolling = async (
@@ -787,11 +803,7 @@ export const runSendCraFileWithPolling = async (
 ): Promise<JobRun> => {
   const { jobRunId } = await startSendCraFileJob()
 
-  return pollJobUntilComplete({
-    jobId: jobRunId,
-    pollIntervalMs: 10000,
-    onProgress,
-  })
+  return pollJobUntilCompleteUnbounded(jobRunId, 10000, onProgress)
 }
 
 /**

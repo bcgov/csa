@@ -5,6 +5,25 @@ import { WeeklyFilesService } from './weekly-files.service'
 
 const { WKL_MATCH_STATUS } = CRA_DATA_HANDLING_CONSTANT
 
+const wklRecordDtoInclude = {
+  contact: {
+    select: {
+      id: true,
+      caseNumber: true,
+      personIdIcm: true,
+    },
+  },
+  batchDetail: {
+    select: {
+      batch: {
+        select: {
+          batchNumber: true,
+        },
+      },
+    },
+  },
+} as const
+
 const electronicRecordData = {
   transactionType: 'C',
   receiveMode: 'E',
@@ -205,14 +224,7 @@ describe('WeeklyFilesService', () => {
           matchedBy: null,
           processedAt: null,
         },
-        include: {
-          contact: {
-            select: {
-              caseNumber: true,
-              personIdIcm: true,
-            },
-          },
-        },
+        include: wklRecordDtoInclude,
       })
       expect(result.matchStatus).toBe(WKL_MATCH_STATUS.ASSOCIATED)
       expect(result.associatedCaseNumber).toBe('1-99')
@@ -315,14 +327,7 @@ describe('WeeklyFilesService', () => {
           matchedBy: null,
           processedAt: null,
         },
-        include: {
-          contact: {
-            select: {
-              caseNumber: true,
-              personIdIcm: true,
-            },
-          },
-        },
+        include: wklRecordDtoInclude,
       })
       expect(result.matchStatus).toBe(WKL_MATCH_STATUS.UNMATCHED)
     })
@@ -356,6 +361,10 @@ describe('WeeklyFilesService', () => {
         {
           id: 5,
           recordIndex: 0,
+          matchStatus: WKL_MATCH_STATUS.ASSOCIATED,
+          contactId: 99,
+          processedAt: null,
+          batchDetailId: null,
           weeklyFileDate: new Date('2025-04-20'),
           recordData: electronicRecordData,
           contact: { id: 99, caseNumber: '1-99' },
@@ -427,6 +436,8 @@ describe('WeeklyFilesService', () => {
         {
           id: 5,
           recordIndex: 0,
+          matchStatus: WKL_MATCH_STATUS.ASSOCIATED,
+          contactId: 99,
           weeklyFileDate: new Date('2025-04-20'),
           processedAt: null,
           batchDetailId: null,
@@ -452,6 +463,8 @@ describe('WeeklyFilesService', () => {
         {
           id: 5,
           recordIndex: 0,
+          matchStatus: WKL_MATCH_STATUS.ASSOCIATED,
+          contactId: 99,
           weeklyFileDate: new Date('2025-04-20'),
           processedAt: null,
           batchDetailId: null,
@@ -461,6 +474,8 @@ describe('WeeklyFilesService', () => {
         {
           id: 6,
           recordIndex: 1,
+          matchStatus: WKL_MATCH_STATUS.ASSOCIATED,
+          contactId: 100,
           weeklyFileDate: new Date('2025-04-20'),
           processedAt: null,
           batchDetailId: null,

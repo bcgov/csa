@@ -36,7 +36,7 @@ describe('EligibilityService', () => {
     'stg_icm_legal_authority_admin',
     'stg_icm_legal_authority',
     'stg_icm_agreement',
-    // 'stg_icm_agreement_line', // temporary: agreement line ingest returns empty
+    'stg_icm_agreement_line',
     'stg_icm_orders',
     'stg_mis_payments',
     'stg_mis_contracts',

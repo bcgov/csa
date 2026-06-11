@@ -1,52 +1,40 @@
+import { Logger } from '@nestjs/common'
 import { IcmApiRecord } from './data-source/icm-data-source'
 
-/** ICM QueryHierarchy for Out of Care agreements with nested agreement lines. */
-export const OOC_AGREEMENT_LINES_QUERY_HIERARCHY = {
-  Agreements: {
-    AgreementLines: {
-      fields: 'Id, ICM Person ID',
-    },
-    fields: 'Id, Updated',
-    searchspec:
-      "([Agreement Status] = 'Active' OR [Agreement Status] = 'Inactive') AND [Agreement Type] = 'Out of Care'",
-  },
-} as const
+/** OOC agreement line SearchSpec for flat /AgreementLines/AgreementLine reads. */
+export const OOC_AGREEMENT_LINES_SEARCH_SPEC =
+  "([Agreement Status] = 'Active' OR [Agreement Status] = 'Inactive') AND [Agreement Type] = 'Out of Care'"
 
-type AgreementLineRecord = Record<string, string | number | null | undefined>
+/** Fields required for stg_icm_agreement_line (join bridge). */
+export const OOC_AGREEMENT_LINES_FIELDS = 'Id,Updated,ICM Person ID,Agreement Id'
 
-/**
- * Expands hierarchical agreement responses into one staging row per agreement line.
- * Persists only join keys (line id, agreement id, person id) plus header Updated for ICM cursor.
- */
-export function expandAgreementLineItems(items: IcmApiRecord[]): IcmApiRecord[] {
-  const result: IcmApiRecord[] = []
+const REQUIRED_JOIN_KEYS = ['Id', 'Agreement Id', 'ICM Person ID'] as const
+const logger = new Logger('OocAgreementLines')
 
-  for (const agreement of items) {
-    const agreementId = agreement['Id']
-    if (agreementId == null || String(agreementId).trim() === '') continue
+function hasNonEmptyField(record: IcmApiRecord, label: string): boolean {
+  const value = record[label]
+  return value != null && String(value).trim() !== ''
+}
 
-    const updated = agreement['Updated']
-    const linesRaw = agreement['AgreementLines']
-    const lines: AgreementLineRecord[] = Array.isArray(linesRaw)
-      ? (linesRaw as AgreementLineRecord[])
-      : linesRaw != null && typeof linesRaw === 'object'
-        ? [linesRaw as AgreementLineRecord]
-        : []
+function missingJoinKeyLabels(record: IcmApiRecord): string[] {
+  return REQUIRED_JOIN_KEYS.filter((label) => !hasNonEmptyField(record, label))
+}
 
-    for (const line of lines) {
-      const lineId = line['Id']
-      const personId = line['ICM Person ID']
-      if (lineId == null || String(lineId).trim() === '') continue
-      if (personId == null || String(personId).trim() === '') continue
+/** Skip lines missing join keys required by stg_icm_agreement_line NOT NULL columns. */
+export function filterValidOocAgreementLineItems(items: IcmApiRecord[]): IcmApiRecord[] {
+  const valid: IcmApiRecord[] = []
 
-      result.push({
-        Id: lineId,
-        'Agreement Id': agreementId,
-        'ICM Person ID': String(personId).trim(),
-        Updated: updated ?? null,
-      })
+  for (const record of items) {
+    const missing = missingJoinKeyLabels(record)
+    if (missing.length === 0) {
+      valid.push(record)
+      continue
     }
+
+    logger.warn(
+      `Skipping agreement line missing join keys (${missing.join(', ')}): Id=${record['Id'] ?? '(empty)'}`,
+    )
   }
 
-  return result
+  return valid
 }

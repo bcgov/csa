@@ -15,6 +15,7 @@ export interface WeeklyFileSummary {
 
 export interface WeeklyFileRecord {
   id: number
+  batchId: number | null
   recordIndex: number
   csaMatchFound: 'Yes' | 'No' | 'N/A'
   matchStatus: string

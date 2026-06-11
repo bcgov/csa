@@ -4,7 +4,7 @@ import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
 import { AutoBatchHandler } from './handlers/auto-batch.handler'
-import { BackfillIcmCasesHandler } from './handlers/backfill-icm-cases.handler'
+import { BackfillIcmCaseCloseDatesHandler } from './handlers/backfill-icm-case-close-dates.handler'
 import { BackfillOocAgreementLinesHandler } from './handlers/backfill-ooc-agreement-lines.handler'
 import { IngestDataHandler } from './handlers/ingest-data.handler'
 import { IngestIcmHandler } from './handlers/ingest-icm.handler'
@@ -45,7 +45,7 @@ describe('SyncModule', () => {
 
   it('should register all 8 sync handlers', () => {
     expect(registry.hasHandler(JobType.AUTO_BATCH)).toBe(true)
-    expect(registry.hasHandler(JobType.BACKFILL_ICM_CASES)).toBe(true)
+    expect(registry.hasHandler(JobType.BACKFILL_ICM_CASE_CLOSE_DATES)).toBe(true)
     expect(registry.hasHandler(JobType.BACKFILL_OOC_AGREEMENT_LINES)).toBe(true)
     expect(registry.hasHandler(JobType.INGEST_DATA)).toBe(true)
     expect(registry.hasHandler(JobType.INGEST_ICM)).toBe(true)
@@ -56,7 +56,9 @@ describe('SyncModule', () => {
 
   it('should register handlers with correct types', () => {
     expect(registry.getHandler(JobType.AUTO_BATCH)).toBeInstanceOf(AutoBatchHandler)
-    expect(registry.getHandler(JobType.BACKFILL_ICM_CASES)).toBeInstanceOf(BackfillIcmCasesHandler)
+    expect(registry.getHandler(JobType.BACKFILL_ICM_CASE_CLOSE_DATES)).toBeInstanceOf(
+      BackfillIcmCaseCloseDatesHandler,
+    )
     expect(registry.getHandler(JobType.BACKFILL_OOC_AGREEMENT_LINES)).toBeInstanceOf(
       BackfillOocAgreementLinesHandler,
     )
@@ -69,7 +71,7 @@ describe('SyncModule', () => {
 
   it('should export all handler providers', () => {
     expect(module.get(AutoBatchHandler)).toBeDefined()
-    expect(module.get(BackfillIcmCasesHandler)).toBeDefined()
+    expect(module.get(BackfillIcmCaseCloseDatesHandler)).toBeDefined()
     expect(module.get(BackfillOocAgreementLinesHandler)).toBeDefined()
     expect(module.get(IngestDataHandler)).toBeDefined()
     expect(module.get(IngestIcmHandler)).toBeDefined()

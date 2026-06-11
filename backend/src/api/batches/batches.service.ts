@@ -258,6 +258,73 @@ export class BatchesService {
     return enrichLabels(pendingBatch)
   }
 
+  async findInProgressBatchDetailForContact(contactId: number): Promise<MatchedBatchDetail | null> {
+    const details = await this.prisma.contactBatchDetail.findMany({
+      where: {
+        contactId,
+        status: BATCH_DETAIL_STATUS.IN_PROGRESS,
+        batch: {
+          status: { in: [BATCH_STATUS.IN_PROGRESS, BATCH_STATUS.PARTIALLY_PROCESSED] },
+        },
+      },
+      select: {
+        id: true,
+        contactId: true,
+        batchId: true,
+        transactionType: true,
+        systemComments: true,
+        contact: { select: { din: true } },
+      },
+      orderBy: { id: 'desc' },
+    })
+
+    if (details.length === 0) {
+      return null
+    }
+
+    if (details.length > 1) {
+      this.logger.error(
+        `Contact ${contactId} has ${details.length} in-progress batch details; using ${details[0].id}`,
+      )
+    }
+
+    return details[0]
+  }
+
+  async findOrCreateWklBatchForUnmatchedRecords(batchDate: Date) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(${BATCH_ADVISORY_LOCK_CLASS}, ${WKL_UNMATCHED_BATCH_ADVISORY_LOCK_OBJECT})`,
+      )
+
+      const existingBatch = await tx.batch.findFirst({
+        where: {
+          initiatedBy: BATCH_INITIATED_BY.CRA,
+          batchDate,
+        },
+        orderBy: { id: 'desc' },
+      })
+
+      if (existingBatch) {
+        return existingBatch
+      }
+
+      const batchNumber = await this.nextBatchNumber(tx)
+      const systemComments = appendSystemComment(`CRA initiated batch from WKL file`, null)
+      return tx.batch.create({
+        data: {
+          batchNumber,
+          batchDate,
+          initiatedBy: BATCH_INITIATED_BY.CRA,
+          status: BATCH_STATUS.IN_PROGRESS,
+          recordCount: 0,
+          systemComments,
+          createdAt: new Date(),
+        },
+      })
+    })
+  }
+
   async createWklBatchForUnmatchedRecords(header: HeaderRecord) {
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw(

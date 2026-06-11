@@ -358,6 +358,77 @@ describe('BatchesService', () => {
     })
   })
 
+  describe('findInProgressBatchDetailForContact', () => {
+    it('returns the in-progress batch detail for a contact', async () => {
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
+        {
+          id: 10,
+          contactId: 99,
+          batchId: 500,
+          transactionType: 'application',
+          systemComments: null,
+          contact: { din: '123456789' },
+        },
+      ])
+
+      const detail = await service.findInProgressBatchDetailForContact(99)
+
+      expect(detail).toEqual({
+        id: 10,
+        contactId: 99,
+        batchId: 500,
+        transactionType: 'application',
+        systemComments: null,
+        contact: { din: '123456789' },
+      })
+    })
+
+    it('returns null when contact has no in-progress batch detail', async () => {
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([])
+
+      const detail = await service.findInProgressBatchDetailForContact(99)
+
+      expect(detail).toBeNull()
+    })
+  })
+
+  describe('findOrCreateWklBatchForUnmatchedRecords', () => {
+    it('returns existing CRA batch for the batch date', async () => {
+      const batchDate = new Date('2025-04-21')
+      const existing = { id: 67, batchNumber: 3, initiatedBy: 'CRA', batchDate }
+      mockPrisma.batch.findFirst.mockResolvedValue(existing)
+
+      const batch = await service.findOrCreateWklBatchForUnmatchedRecords(batchDate)
+
+      expect(mockPrisma.batch.create).not.toHaveBeenCalled()
+      expect(batch).toBe(existing)
+    })
+
+    it('creates a CRA batch when none exists for the batch date', async () => {
+      const batchDate = new Date('2025-04-21')
+      mockPrisma.batch.findFirst.mockResolvedValue(null)
+      mockPrisma.batch.create.mockResolvedValue({
+        id: 99,
+        batchNumber: 5,
+        initiatedBy: 'CRA',
+        status: 'in_progress',
+        batchDate,
+      })
+
+      const batch = await service.findOrCreateWklBatchForUnmatchedRecords(batchDate)
+
+      expect(mockPrisma.batch.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          batchNumber: 5,
+          batchDate,
+          initiatedBy: 'CRA',
+          status: 'in_progress',
+        }),
+      })
+      expect(batch.id).toBe(99)
+    })
+  })
+
   describe('createWklBatchForUnmatchedRecords', () => {
     it('should create a batch with initiatedBy CRA and status in_progress', async () => {
       mockPrisma.batch.findFirst.mockResolvedValue(null)

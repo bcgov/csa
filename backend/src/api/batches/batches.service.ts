@@ -213,15 +213,8 @@ export class BatchesService {
     })
 
     return details.map((detail) => {
-      // Compute effectiveDate based on transaction type:
-      // - Application: Legal Authority's Effective Date (contact.effectiveDate)
-      // - Cancellation: Child's Care End Date (contact.careEndDate)
-      const effectiveDate =
-        detail.transactionType === TRANSACTION_TYPES.CANCELLATION
-          ? detail.contact.careEndDate
-          : detail.contact.effectiveDate
-
-      const cancelReasonCode = detail.contact.cancelReasonCode
+      const effectiveDate = detail.effectiveDate
+      const cancelReasonCode = detail.cancelReasonCode
       const cancelReasonLabel = getCancelReasonLabel(cancelReasonCode, detail.transactionType)
 
       return enrichLabels({
@@ -390,6 +383,7 @@ export class BatchesService {
         csaStatus: true,
         cancelReasonCode: true,
         careEndDate: true,
+        effectiveDate: true,
       },
     })
     const existingContactMap = new Map(existingContacts.map((c) => [c.id, c]))
@@ -440,14 +434,24 @@ export class BatchesService {
             const updates: Record<string, unknown> = {}
             if (!contact.careEndDate) {
               updates.careEndDate = pacificToday()
+              contact.careEndDate = pacificToday()
             }
             if (!contact.cancelReasonCode) {
               updates.cancelReasonCode = CANCEL_REASON.CHILD_LEFT
+              contact.cancelReasonCode = CANCEL_REASON.CHILD_LEFT
             }
             if (Object.keys(updates).length > 0) {
               await tx.contact.update({ where: { id: contactId }, data: updates })
             }
           }
+
+          // Capture snapshot of effective date and cancellation reason at time of batching
+          const effectiveDate =
+            transactionType === TRANSACTION_TYPES.CANCELLATION
+              ? contact.careEndDate
+              : contact.effectiveDate
+          const cancelReasonCode =
+            transactionType === TRANSACTION_TYPES.CANCELLATION ? contact.cancelReasonCode : null
 
           const batchDetail = await tx.contactBatchDetail.create({
             data: {
@@ -455,6 +459,8 @@ export class BatchesService {
               batchId: pendingBatch.id,
               transactionType,
               status: BATCH_STATUS.PENDING,
+              effectiveDate,
+              cancelReasonCode,
               createdAt: now,
               createdBy: userId,
               lastUpdatedAt: now,

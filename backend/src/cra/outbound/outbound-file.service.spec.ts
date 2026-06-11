@@ -180,12 +180,15 @@ describe('OutboundDataService->OutboundFileService integration', () => {
   })
 
   it('should produce valid application record with correct field positions', () => {
+    const contact = makeContact()
     const batchDetails = [
       {
         id: 100,
         transactionType: 'application',
         referenceNumber: 'LFN001-100',
-        contact: makeContact(),
+        effectiveDate: contact.effectiveDate,
+        cancelReasonCode: contact.cancelReasonCode,
+        contact,
       },
     ]
 
@@ -222,12 +225,15 @@ describe('OutboundDataService->OutboundFileService integration', () => {
   })
 
   it('should produce valid cancellation record with correct field positions', () => {
+    const contact = makeContact()
     const batchDetails = [
       {
         id: 200,
         transactionType: 'cancellation',
         referenceNumber: 'LFN001-200',
-        contact: makeContact(),
+        effectiveDate: contact.careEndDate,
+        cancelReasonCode: contact.cancelReasonCode,
+        contact,
       },
     ]
 
@@ -250,12 +256,15 @@ describe('OutboundDataService->OutboundFileService integration', () => {
   })
 
   it('should map gender Non-Binary to X in file output', () => {
+    const contact = makeContact({ gender: 'Non-Binary' })
     const batchDetails = [
       {
         id: 100,
         transactionType: 'application',
         referenceNumber: 'LFN001-100',
-        contact: makeContact({ gender: 'Non-Binary' }),
+        effectiveDate: contact.effectiveDate,
+        cancelReasonCode: contact.cancelReasonCode,
+        contact,
       },
     ]
 

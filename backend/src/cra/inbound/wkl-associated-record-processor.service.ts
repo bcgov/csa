@@ -116,6 +116,8 @@ export class WklAssociatedRecordProcessorService {
       wklType === 'cancellation'
         ? detail.careEndReasonCode?.trim() || CANCEL_REASON.CHILD_LEFT
         : undefined
+
+    // Additional data for contact update
     const additionalData: Record<string, unknown> = {
       ...(careDate
         ? wklType === 'cancellation'
@@ -126,12 +128,19 @@ export class WklAssociatedRecordProcessorService {
       ...(cancelReasonCode ? { cancelReasonCode } : {}),
     }
 
+    // Additional data for batch detail update (preserve effective date and reason)
+    const batchDetailAdditionalData: Record<string, unknown> = {
+      ...(careDate ? { effectiveDate: careDate } : {}),
+      ...(cancelReasonCode ? { cancelReasonCode } : {}),
+    }
+
     if (isApproved) {
       const nextState =
         wklType === 'application' ? CSA_STATUS.IN_PAY : CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY
       await this.batchesService.updateBatchDetailStatus(
         batchDetail.id,
         BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
+        { additionalData: batchDetailAdditionalData },
       )
       await this.contactsService.forceUpdateCsaStatus(
         batchDetail.contactId,
@@ -148,6 +157,7 @@ export class WklAssociatedRecordProcessorService {
       await this.batchesService.updateBatchDetailStatus(
         batchDetail.id,
         BATCH_DETAIL_EVENT.CRA_WKL_REFUSED,
+        { additionalData: batchDetailAdditionalData },
       )
       await this.contactsService.forceUpdateCsaStatus(
         batchDetail.contactId,

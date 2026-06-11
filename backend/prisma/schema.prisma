@@ -132,21 +132,23 @@ model Batch {
 }
 
 model ContactBatchDetail {
-  id              Int      @id @default(autoincrement())
-  contactId       Int      @map("contact_id")
-  batchId         Int      @map("batch_id")
-  transactionType String   @map("transaction_type")
-  referenceNumber String?  @unique @map("reference_number")
-  systemComments  String?  @map("system_comments")
-  createdAt       DateTime @map("created_at") @db.Timestamptz()
-  createdBy       String   @map("created_by")
-  lastUpdatedAt   DateTime @map("last_updated_at") @db.Timestamptz() @updatedAt
-  lastUpdatedBy   String   @map("last_updated_by")
-  status              String?
-  craMatchingSnapshot Json?    @map("cra_matching_snapshot") @db.JsonB
-  batch               Batch    @relation(fields: [batchId], references: [id])
-  contact             Contact  @relation(fields: [contactId], references: [id])
-  wklFileRecords      WklFileRecord[]
+  id                Int       @id @default(autoincrement())
+  contactId         Int       @map("contact_id")
+  batchId           Int       @map("batch_id")
+  transactionType   String    @map("transaction_type")
+  referenceNumber   String?   @unique @map("reference_number")
+  systemComments    String?   @map("system_comments")
+  createdAt         DateTime  @map("created_at") @db.Timestamptz()
+  createdBy         String    @map("created_by")
+  lastUpdatedAt     DateTime  @map("last_updated_at") @db.Timestamptz() @updatedAt
+  lastUpdatedBy     String    @map("last_updated_by")
+  status            String?
+  craMatchingSnapshot Json?   @map("cra_matching_snapshot") @db.JsonB
+  effectiveDate     DateTime? @db.Date @map("effective_date")
+  cancelReasonCode  String?   @map("cancel_reason_code")
+  batch             Batch     @relation(fields: [batchId], references: [id])
+  contact           Contact   @relation(fields: [contactId], references: [id])
+  wklFileRecords    WklFileRecord[]
 
   @@unique([contactId, batchId], name: "contact_batch_unique")
   @@map("contact_batch_details")

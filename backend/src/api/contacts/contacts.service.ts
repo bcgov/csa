@@ -741,12 +741,8 @@ export class ContactsService {
     })
 
     return details.map((detail) => {
-      const effectiveDate =
-        detail.transactionType === TRANSACTION_TYPES.CANCELLATION
-          ? detail.contact.careEndDate
-          : detail.contact.effectiveDate
-
-      const cancelReasonCode = detail.contact.cancelReasonCode
+      const effectiveDate = detail.effectiveDate
+      const cancelReasonCode = detail.cancelReasonCode
       const cancelReasonLabel = getCancelReasonLabel(cancelReasonCode, detail.transactionType)
 
       return enrichLabels({

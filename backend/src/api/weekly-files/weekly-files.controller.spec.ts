@@ -24,6 +24,7 @@ describe('WeeklyFilesController', () => {
     findRecords: vi.fn(),
     associateRecord: vi.fn(),
     dissociateRecord: vi.fn(),
+    reprocessRecord: vi.fn(),
     reprocess: vi.fn(),
   }
 
@@ -95,6 +96,22 @@ describe('WeeklyFilesController', () => {
       .expect({ id: 5, matchStatus: 'unmatched', csaMatchFound: 'No' })
 
     expect(mockWeeklyFilesService.dissociateRecord).toHaveBeenCalledWith(1, 5)
+  })
+
+  it('POST /weekly-files/:id/records/:recordId/reprocess confirms a single record', async () => {
+    mockWeeklyFilesService.reprocessRecord.mockResolvedValue({
+      id: 5,
+      matchStatus: 'matched',
+      csaMatchFound: 'Yes',
+    })
+
+    await request(app.getHttpServer())
+      .post('/weekly-files/1/records/5/reprocess')
+      .set('X-Test-Username', 'JDOE')
+      .expect(200)
+      .expect({ id: 5, matchStatus: 'matched', csaMatchFound: 'Yes' })
+
+    expect(mockWeeklyFilesService.reprocessRecord).toHaveBeenCalledWith(1, 5, 'JDOE')
   })
 
   it('POST /weekly-files/:id/reprocess reprocesses associated records', async () => {

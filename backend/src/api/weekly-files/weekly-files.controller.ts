@@ -79,6 +79,17 @@ export class WeeklyFilesController {
     return this.weeklyFilesService.dissociateRecord(id, recordId)
   }
 
+  @Post(':id/records/:recordId/reprocess')
+  @HttpCode(200)
+  @ApiResponse({ status: 200, description: 'Confirmed (reprocessed) a single associated WKL record' })
+  reprocessRecord(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('recordId', ParseIntPipe) recordId: number,
+    @CurrentUser() userId: string,
+  ): Promise<WeeklyFileRecordDto> {
+    return this.weeklyFilesService.reprocessRecord(id, recordId, userId)
+  }
+
   @Post(':id/reprocess')
   @HttpCode(200)
   @ApiResponse({ status: 200, description: 'Reprocessed associated WKL records' })

@@ -147,6 +147,49 @@ describe('IcmApiDataSource', () => {
       expect(callUrl).toContain("[Agreement Type] = 'Out of Care'")
     })
 
+    it('should return flat agreement line items from paginated response', async () => {
+      const oocConfig: IcmApiConfig = {
+        ...mockConfig,
+        name: 'ooc_agreement_lines',
+        endpoint: '/AgreementLines/AgreementLine',
+        searchSpec: () => OOC_AGREEMENT_LINES_SEARCH_SPEC,
+        fields: OOC_AGREEMENT_LINES_FIELDS,
+      }
+
+      httpService.get.mockReturnValue(
+        of({
+          status: 200,
+          headers: {},
+          data: {
+            items: [
+              {
+                Id: 'mock-line-001',
+                'Agreement Id': 'mock-agreement-001',
+                'ICM Person ID': 'mock-person-001',
+                Updated: '05/26/2026 10:00:00',
+              },
+              {
+                Id: 'mock-line-002',
+                'Agreement Id': 'mock-agreement-001',
+                'ICM Person ID': 'mock-person-001',
+                Updated: '05/26/2026 10:00:00',
+              },
+            ],
+          },
+        }),
+      )
+
+      const results = await service.fetchAll(oocConfig)
+
+      expect(results).toHaveLength(2)
+      expect(results[1]).toMatchObject({
+        Id: 'mock-line-002',
+        'Agreement Id': 'mock-agreement-001',
+        'ICM Person ID': 'mock-person-001',
+        Updated: '05/26/2026 10:00:00',
+      })
+    })
+
     it('should include workspace param when configured', async () => {
       configService.get.mockImplementation((key: string) => {
         if (key === 'icm.workspace') return 'int_release_5.4'

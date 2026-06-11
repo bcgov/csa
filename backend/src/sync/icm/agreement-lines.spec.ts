@@ -53,4 +53,31 @@ describe('filterValidOocAgreementLineItems', () => {
 
     warnSpy.mockRestore()
   })
+
+  it('filters flat AgreementLines API items', () => {
+    const items = [
+      {
+        Id: 'mock-line-001',
+        'Agreement Id': 'mock-agreement-001',
+        'ICM Person ID': '',
+        Updated: '05/26/2026 10:00:00',
+      },
+      {
+        Id: 'mock-line-002',
+        'Agreement Id': 'mock-agreement-001',
+        'ICM Person ID': 'mock-person-001',
+        Updated: '05/26/2026 10:00:00',
+      },
+    ]
+
+    const result = filterValidOocAgreementLineItems(items)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      Id: 'mock-line-002',
+      'Agreement Id': 'mock-agreement-001',
+      'ICM Person ID': 'mock-person-001',
+      Updated: '05/26/2026 10:00:00',
+    })
+  })
 })

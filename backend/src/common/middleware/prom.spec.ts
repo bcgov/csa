@@ -3,10 +3,10 @@ import { vi } from 'vitest'
 import { METRICS_ALIAS_PATH, METRICS_PATH, servePrometheusMetrics } from './prom'
 
 vi.mock('prom-client', () => ({
-  Registry: vi.fn().mockImplementation(() => ({
-    contentType: 'text/plain; version=0.0.4; charset=utf-8',
-    metrics: vi.fn().mockResolvedValue('http_requests_total 1'),
-  })),
+  Registry: class {
+    contentType = 'text/plain; version=0.0.4; charset=utf-8'
+    metrics = vi.fn().mockResolvedValue('http_requests_total 1')
+  },
   collectDefaultMetrics: vi.fn(),
 }))
 

@@ -2,10 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { PROTECTED_STATUSES } from '../eligibility/eligibility.config'
-import {
-  buildFindIcmCsaDriftSql,
-  IcmInboundCsaDriftRow,
-} from './icm-inbound-csa-sync.queries'
+import { buildFindIcmCsaDriftSql, IcmInboundCsaDriftRow } from './icm-inbound-csa-sync.queries'
 
 export const ICM_INBOUND_SYNC_ACTOR = 'ICM_INBOUND_SYNC'
 
@@ -89,10 +86,7 @@ export class IcmInboundCsaSyncService {
       if (row.csaStatusEffectiveDate != null) {
         data.csaStatusEffectiveDate = row.csaStatusEffectiveDate
       }
-    } else if (
-      row.csaStatus != null &&
-      row.csaStatus !== row.currentCsaStatus
-    ) {
+    } else if (row.csaStatus != null && row.csaStatus !== row.currentCsaStatus) {
       this.logger.warn(
         `Preserving protected CSA status '${row.currentCsaStatus}' for contact ${row.contactId} ` +
           `(case ${row.caseNumber}); ICM has '${row.csaStatus}'`,

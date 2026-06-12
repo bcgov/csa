@@ -940,7 +940,6 @@ function App() {
   // Audit Trail search, filter, and sort states
   const [auditTrailSearchTerm, setAuditTrailSearchTerm] = useState('')
   const [auditTrailColumnFilters, setAuditTrailColumnFilters] = useState<Record<string, string[]>>({
-    date: [],
     actionedBy: [],
     operation: [],
     field: [],
@@ -6724,7 +6723,6 @@ function App() {
                                     onClick={() => {
                                       setAuditTrailSearchTerm('')
                                       setAuditTrailColumnFilters({
-                                        date: [],
                                         actionedBy: [],
                                         operation: [],
                                         field: [],
@@ -6762,19 +6760,6 @@ function App() {
                                       >
                                         Date
                                       </span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => handleAuditTrailFilterClick(e, 'date')}
-                                        sx={{
-                                          padding: 0.5,
-                                          color:
-                                            auditTrailColumnFilters.date?.length > 0
-                                              ? '#1976d2'
-                                              : '#666',
-                                        }}
-                                      >
-                                        <FilterListIcon fontSize="small" />
-                                      </IconButton>
                                     </Box>
                                   </TableCell>
                                   <TableCell sx={{ fontWeight: 600 }}>

@@ -15,7 +15,7 @@ export interface WeeklyFileSummary {
 
 export interface WeeklyFileRecord {
   id: number
-  batchId: number | null
+  batchNumber: number | null
   recordIndex: number
   csaMatchFound: 'Yes' | 'No' | 'N/A'
   matchStatus: string
@@ -57,9 +57,11 @@ export interface ReprocessWeeklyFileResult {
 export const getWeeklyFiles = async (
   page: number = 1,
   limit: number = 10,
+  signal?: AbortSignal,
 ): Promise<PaginatedResponse<WeeklyFileSummary>> => {
   const response = await APIService.getAxiosInstance().get('/weekly-files', {
     params: { page, limit },
+    signal,
   })
   return response.data
 }
@@ -68,9 +70,11 @@ export const getWeeklyFileRecords = async (
   fileId: number,
   page: number = 1,
   limit: number = 10,
+  signal?: AbortSignal,
 ): Promise<PaginatedResponse<WeeklyFileRecord>> => {
   const response = await APIService.getAxiosInstance().get(`/weekly-files/${fileId}/records`, {
     params: { page, limit },
+    signal,
   })
   return response.data
 }

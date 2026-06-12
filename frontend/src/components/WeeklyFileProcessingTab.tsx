@@ -30,7 +30,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { fullTextSearchContacts, type Contact } from '../service/contacts-service'
 import {
   associateWeeklyFileRecord,
@@ -54,11 +54,21 @@ type SortDirection = 'asc' | 'desc'
 type WeeklyReportColumn = 'weeklyFileDate' | 'csaProcessingDate'
 type WeeklyDetailsColumn =
   | 'csaMatchFound'
-  | 'batchId'
+  | 'batchNumber'
   | 'transactionType'
   | 'transactionSource'
   | 'craStatus'
   | 'matchedBy'
+
+const WEEKLY_REPORT_COLUMNS: WeeklyReportColumn[] = ['weeklyFileDate', 'csaProcessingDate']
+const WEEKLY_DETAILS_COLUMNS: WeeklyDetailsColumn[] = [
+  'csaMatchFound',
+  'batchNumber',
+  'transactionType',
+  'transactionSource',
+  'craStatus',
+  'matchedBy',
+]
 
 type SortConfig<T> = {
   column: T
@@ -79,6 +89,69 @@ const valueOrBlank = (value: string | null | undefined): string => value ?? ''
 
 const compareStrings = (left: string, right: string): number =>
   left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' })
+
+const isAbortError = (err: unknown): boolean => {
+  if (!err || typeof err !== 'object') return false
+  const maybeErr = err as { name?: string; code?: string }
+  return maybeErr.name === 'CanceledError' || maybeErr.code === 'ERR_CANCELED'
+}
+
+const filterAndSortRows = <T, C extends string>(
+  rows: T[],
+  columns: C[],
+  getValue: (row: T, column: C) => string,
+  searchTerm: string,
+  columnFilters: Record<C, string[]>,
+  sortConfig: SortConfig<C>,
+): T[] => {
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase()
+  const rowsWithFields = rows.map((row) => {
+    const fields = columns.reduce(
+      (acc, column) => {
+        acc[column] = getValue(row, column)
+        return acc
+      },
+      {} as Record<C, string>,
+    )
+    return { row, fields }
+  })
+
+  const filteredRows = rowsWithFields.filter(({ fields }) => {
+    if (
+      normalizedSearchTerm &&
+      !columns.some((column) => fields[column].toLowerCase().includes(normalizedSearchTerm))
+    ) {
+      return false
+    }
+
+    return columns.every((column) => {
+      const filters = columnFilters[column]
+      return filters.length === 0 || filters.includes(fields[column])
+    })
+  })
+
+  if (sortConfig) {
+    const { column, direction } = sortConfig
+    filteredRows.sort((left, right) => {
+      const comparison = compareStrings(left.fields[column], right.fields[column])
+      return direction === 'asc' ? comparison : -comparison
+    })
+  }
+
+  return filteredRows.map(({ row }) => row)
+}
+
+const toggleColumnFilterValue = <T extends string>(
+  previous: Record<T, string[]>,
+  column: T,
+  value: string,
+): Record<T, string[]> => {
+  const current = previous[column] ?? []
+  const next = current.includes(value)
+    ? current.filter((item) => item !== value)
+    : [...current, value]
+  return { ...previous, [column]: next }
+}
 
 export default function WeeklyFileProcessingTab() {
   const [weeklyFiles, setWeeklyFiles] = useState<WeeklyFileSummary[]>([])
@@ -133,7 +206,7 @@ export default function WeeklyFileProcessingTab() {
     Record<WeeklyDetailsColumn, string[]>
   >({
     csaMatchFound: [],
-    batchId: [],
+    batchNumber: [],
     transactionType: [],
     transactionSource: [],
     craStatus: [],
@@ -159,28 +232,26 @@ export default function WeeklyFileProcessingTab() {
   const [loadingFiles, setLoadingFiles] = useState(false)
   const [loadingRecords, setLoadingRecords] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const childSearchRequestIdRef = useRef(0)
 
   useEffect(() => {
+    const abortController = new AbortController()
+
     const loadWeeklyFiles = async () => {
       setLoadingFiles(true)
       setError(null)
       try {
-        const response = await getWeeklyFiles(weeklyFilesPage, SUMMARY_PAGE_SIZE)
+        const response = await getWeeklyFiles(
+          weeklyFilesPage,
+          SUMMARY_PAGE_SIZE,
+          abortController.signal,
+        )
         setWeeklyFiles(response.data)
         setWeeklyFilesTotalPages(Math.max(response.totalPages, 1))
-
-        if (!selectedFileId && response.data.length > 0) {
-          setSelectedFileId(response.data[0].id)
-          setRecordsPage(1)
-          setSelectedRecordId(null)
-        }
-
-        if (selectedFileId && !response.data.some((file) => file.id === selectedFileId)) {
-          setSelectedFileId(response.data[0]?.id ?? null)
-          setRecordsPage(1)
-          setSelectedRecordId(null)
-        }
       } catch (err) {
+        if (isAbortError(err)) {
+          return
+        }
         console.error('Failed to fetch weekly files:', err)
         setError('Failed to load weekly files. Please try again.')
         setWeeklyFiles([])
@@ -190,9 +261,39 @@ export default function WeeklyFileProcessingTab() {
     }
 
     void loadWeeklyFiles()
-  }, [weeklyFilesPage, selectedFileId])
+
+    return () => {
+      abortController.abort()
+    }
+  }, [weeklyFilesPage])
 
   useEffect(() => {
+    if (weeklyFiles.length === 0) {
+      if (selectedFileId !== null) {
+        setSelectedFileId(null)
+        setRecordsPage(1)
+        setSelectedRecordId(null)
+      }
+      return
+    }
+
+    if (selectedFileId === null) {
+      setSelectedFileId(weeklyFiles[0].id)
+      setRecordsPage(1)
+      setSelectedRecordId(null)
+      return
+    }
+
+    if (!weeklyFiles.some((file) => file.id === selectedFileId)) {
+      setSelectedFileId(weeklyFiles[0].id)
+      setRecordsPage(1)
+      setSelectedRecordId(null)
+    }
+  }, [weeklyFiles, selectedFileId])
+
+  useEffect(() => {
+    const abortController = new AbortController()
+
     const loadRecords = async () => {
       if (!selectedFileId) {
         setRecords([])
@@ -204,13 +305,21 @@ export default function WeeklyFileProcessingTab() {
       setLoadingRecords(true)
       setError(null)
       try {
-        const response = await getWeeklyFileRecords(selectedFileId, recordsPage, DETAILS_PAGE_SIZE)
+        const response = await getWeeklyFileRecords(
+          selectedFileId,
+          recordsPage,
+          DETAILS_PAGE_SIZE,
+          abortController.signal,
+        )
         setRecords(response.data)
         setRecordsTotalPages(Math.max(response.totalPages, 1))
         setSelectedRecordId((prev) =>
           prev && !response.data.some((record) => record.id === prev) ? null : prev,
         )
       } catch (err) {
+        if (isAbortError(err)) {
+          return
+        }
         console.error('Failed to fetch weekly file records:', err)
         setError('Failed to load weekly file details. Please try again.')
         setRecords([])
@@ -220,12 +329,19 @@ export default function WeeklyFileProcessingTab() {
     }
 
     void loadRecords()
+
+    return () => {
+      abortController.abort()
+    }
   }, [selectedFileId, recordsPage])
 
   useEffect(() => {
+    childSearchRequestIdRef.current += 1
+    setLoadingChildSearch(false)
     setSelectedSearchContactId(null)
     setSearchedChildren([])
     setChildSearchPage(1)
+    setChildSearchTotalPages(1)
     setActionError(null)
     setActionMessage(null)
   }, [selectedRecordId])
@@ -262,8 +378,8 @@ export default function WeeklyFileProcessingTab() {
     switch (column) {
       case 'csaMatchFound':
         return record.csaMatchFound
-      case 'batchId':
-        return valueOrBlank(record.batchId?.toString())
+      case 'batchNumber':
+        return valueOrBlank(record.batchNumber?.toString())
       case 'transactionType':
         return record.transactionType
       case 'transactionSource':
@@ -272,88 +388,31 @@ export default function WeeklyFileProcessingTab() {
         return record.craStatus
       case 'matchedBy':
         return valueOrBlank(record.matchedBy)
+      default:
+        return ''
     }
   }
 
   const filteredWeeklyFiles = useMemo(() => {
-    const search = weeklyReportSearchTerm.trim().toLowerCase()
-    const rows = [...weeklyFiles].filter((file) => {
-      if (!search) return true
-
-      const searchableFields = [
-        getWeeklyReportFieldValue(file, 'weeklyFileDate'),
-        getWeeklyReportFieldValue(file, 'csaProcessingDate'),
-      ]
-
-      return searchableFields.some((field) => field.toLowerCase().includes(search))
-    })
-
-    for (const [column, filters] of Object.entries(weeklyReportColumnFilters) as Array<
-      [WeeklyReportColumn, string[]]
-    >) {
-      if (filters.length > 0) {
-        rows.splice(
-          0,
-          rows.length,
-          ...rows.filter((file) => filters.includes(getWeeklyReportFieldValue(file, column))),
-        )
-      }
-    }
-
-    if (weeklyReportSortConfig) {
-      const { column, direction } = weeklyReportSortConfig
-      rows.sort((left, right) => {
-        const leftValue = getWeeklyReportFieldValue(left, column)
-        const rightValue = getWeeklyReportFieldValue(right, column)
-        const comparison = compareStrings(leftValue, rightValue)
-        return direction === 'asc' ? comparison : -comparison
-      })
-    }
-
-    return rows
+    return filterAndSortRows(
+      weeklyFiles,
+      WEEKLY_REPORT_COLUMNS,
+      getWeeklyReportFieldValue,
+      weeklyReportSearchTerm,
+      weeklyReportColumnFilters,
+      weeklyReportSortConfig,
+    )
   }, [weeklyFiles, weeklyReportSearchTerm, weeklyReportColumnFilters, weeklyReportSortConfig])
 
   const filteredRecords = useMemo(() => {
-    const search = detailsSearchTerm.trim().toLowerCase()
-    const rows = [...records].filter((record) => {
-      if (!search) return true
-
-      const searchableFields = [
-        getDetailsFieldValue(record, 'csaMatchFound'),
-        getDetailsFieldValue(record, 'batchId'),
-        getDetailsFieldValue(record, 'transactionType'),
-        getDetailsFieldValue(record, 'transactionSource'),
-        getDetailsFieldValue(record, 'craStatus'),
-        getDetailsFieldValue(record, 'matchedBy'),
-      ]
-
-      return searchableFields.some((field) => field.toLowerCase().includes(search))
-    })
-
-    for (const [column, filters] of Object.entries(detailsColumnFilters) as Array<
-      [WeeklyDetailsColumn, string[]]
-    >) {
-      if (filters.length > 0) {
-        rows.splice(
-          0,
-          rows.length,
-          ...rows.filter((record) => filters.includes(getDetailsFieldValue(record, column))),
-        )
-      }
-    }
-
-    if (detailsSortConfig) {
-      const { column, direction } = detailsSortConfig
-      rows.sort((left, right) => {
-        const comparison = compareStrings(
-          getDetailsFieldValue(left, column),
-          getDetailsFieldValue(right, column),
-        )
-        return direction === 'asc' ? comparison : -comparison
-      })
-    }
-
-    return rows
+    return filterAndSortRows(
+      records,
+      WEEKLY_DETAILS_COLUMNS,
+      getDetailsFieldValue,
+      detailsSearchTerm,
+      detailsColumnFilters,
+      detailsSortConfig,
+    )
   }, [detailsSearchTerm, records, detailsColumnFilters, detailsSortConfig])
 
   const handleWeeklyReportSortClick = (
@@ -386,13 +445,7 @@ export default function WeeklyFileProcessingTab() {
   }
 
   const handleWeeklyReportFilterChange = (column: WeeklyReportColumn, value: string) => {
-    setWeeklyReportColumnFilters((prev) => {
-      const current = prev[column] ?? []
-      const next = current.includes(value)
-        ? current.filter((item) => item !== value)
-        : [...current, value]
-      return { ...prev, [column]: next }
-    })
+    setWeeklyReportColumnFilters((prev) => toggleColumnFilterValue(prev, column, value))
   }
 
   const clearWeeklyReportColumnFilter = (column: WeeklyReportColumn) => {
@@ -436,13 +489,7 @@ export default function WeeklyFileProcessingTab() {
   }
 
   const handleDetailsFilterChange = (column: WeeklyDetailsColumn, value: string) => {
-    setDetailsColumnFilters((prev) => {
-      const current = prev[column] ?? []
-      const next = current.includes(value)
-        ? current.filter((item) => item !== value)
-        : [...current, value]
-      return { ...prev, [column]: next }
-    })
+    setDetailsColumnFilters((prev) => toggleColumnFilterValue(prev, column, value))
   }
 
   const clearDetailsColumnFilter = (column: WeeklyDetailsColumn) => {
@@ -457,6 +504,7 @@ export default function WeeklyFileProcessingTab() {
   }
 
   const runChildSearch = async (page = 1) => {
+    const requestId = ++childSearchRequestIdRef.current
     const trimmedSearchTerm = childSearchTerm.trim()
 
     if (!trimmedSearchTerm) {
@@ -476,15 +524,23 @@ export default function WeeklyFileProcessingTab() {
     setActionError(null)
     try {
       const response = await fullTextSearchContacts(trimmedSearchTerm, page, SEARCH_PAGE_SIZE)
+      if (requestId !== childSearchRequestIdRef.current) {
+        return
+      }
       setSearchedChildren(response.data)
       setChildSearchTotalPages(Math.max(response.totalPages, 1))
     } catch (err) {
+      if (requestId !== childSearchRequestIdRef.current) {
+        return
+      }
       console.error('Failed to search contacts:', err)
       setActionError('Failed to search contacts. Please try again.')
       setSearchedChildren([])
       setChildSearchTotalPages(1)
     } finally {
-      setLoadingChildSearch(false)
+      if (requestId === childSearchRequestIdRef.current) {
+        setLoadingChildSearch(false)
+      }
     }
   }
 
@@ -805,7 +861,7 @@ export default function WeeklyFileProcessingTab() {
                 setDetailsSearchTerm('')
                 setDetailsColumnFilters({
                   csaMatchFound: [],
-                  batchId: [],
+                  batchNumber: [],
                   transactionType: [],
                   transactionSource: [],
                   craStatus: [],
@@ -854,17 +910,17 @@ export default function WeeklyFileProcessingTab() {
               <TableCell>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <span
-                    onClick={(e) => handleDetailsSortClick(e, 'batchId')}
+                    onClick={(e) => handleDetailsSortClick(e, 'batchNumber')}
                     style={{ cursor: 'pointer', userSelect: 'none', fontWeight: 600 }}
                   >
                     Batch ID
                   </span>
                   <IconButton
                     size="small"
-                    onClick={(e) => handleDetailsFilterClick(e, 'batchId')}
+                    onClick={(e) => handleDetailsFilterClick(e, 'batchNumber')}
                     sx={{
                       padding: 0.5,
-                      color: detailsColumnFilters.batchId.length > 0 ? '#1976d2' : '#666',
+                      color: detailsColumnFilters.batchNumber.length > 0 ? '#1976d2' : '#666',
                     }}
                   >
                     <FilterListIcon fontSize="small" />
@@ -1011,7 +1067,7 @@ export default function WeeklyFileProcessingTab() {
                     <Radio checked={selectedRecordId === record.id} />
                   </TableCell>
                   <TableCell>{record.csaMatchFound}</TableCell>
-                  <TableCell>{valueOrBlank(record.batchId?.toString())}</TableCell>
+                  <TableCell>{valueOrBlank(record.batchNumber?.toString())}</TableCell>
                   <TableCell>{record.transactionType}</TableCell>
                   <TableCell>{record.transactionSource}</TableCell>
                   <TableCell>{record.craStatus}</TableCell>
@@ -1073,7 +1129,15 @@ export default function WeeklyFileProcessingTab() {
               size="small"
               placeholder="Search CSA Master (min 3 chars)"
               value={childSearchTerm}
-              onChange={(e) => setChildSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setChildSearchTerm(e.target.value)
+                childSearchRequestIdRef.current += 1
+                setLoadingChildSearch(false)
+                setSelectedSearchContactId(null)
+                setSearchedChildren([])
+                setChildSearchPage(1)
+                setChildSearchTotalPages(1)
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && childSearchTerm.trim().length >= CHILD_SEARCH_MIN_LENGTH) {
                   setChildSearchPage(1)

@@ -1,6 +1,6 @@
+import { parseWklDate } from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 import type { DetailRecord04 } from 'src/cra/inbound/inbound-weekly.interface'
-import { parseWklDate } from 'src/common/utils'
 import type { WeeklyFileRecordDto, WeeklyFileSummaryDto } from './dto/weekly-file.dto'
 
 const { WKL_MATCH_STATUS, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
@@ -124,9 +124,9 @@ export function toWeeklyFileRecordDto(record: {
     completionDate: formatWklDateString(data.completionDate),
     associatedCaseNumber: record.contact?.caseNumber ?? null,
     associatedPersonIdIcm: record.contact?.personIdIcm ?? null,
-    batchReqId:
+    batchNumber:
       record.matchStatus === WKL_MATCH_STATUS.MATCHED && record.batchDetail
-        ? String(record.batchDetail.batch.batchNumber)
+        ? record.batchDetail.batch.batchNumber
         : null,
     matchedBy: record.matchedBy,
     processedAt: record.processedAt?.toISOString() ?? null,

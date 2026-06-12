@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
+import { describe, expect, it } from 'vitest'
 import {
   aggregateWeeklyFileCounts,
   toCsaMatchFound,
@@ -99,7 +99,7 @@ describe('weekly-file.mapper', () => {
       craStatus: 'COMPLETED',
       associatedCaseNumber: '1-123',
       associatedPersonIdIcm: 'ICM-1',
-      batchReqId: '1042',
+      batchNumber: 1042,
       matchedBy: 'SYSTEM',
     })
     expect(dto.dateOfBirth).toBe('2010-03-15')

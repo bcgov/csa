@@ -110,6 +110,12 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
   },
 ]
 
+export const OOC_AGREEMENT_LINES_INGEST_NAME = 'ooc_agreement_lines'
+
+export function isOocAgreementLinesConfig(config: IcmApiConfig): boolean {
+  return config.name === OOC_AGREEMENT_LINES_INGEST_NAME
+}
+
 export const ICM_UPDATE_BATCH_LIMIT = 100
 
 export const ICM_SYNC_CONFIGS: IcmApiConfig[] = [

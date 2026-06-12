@@ -59,6 +59,20 @@ type WeeklyDetailsColumn =
   | 'transactionSource'
   | 'craStatus'
   | 'matchedBy'
+type ChildSearchColumn =
+  | 'din'
+  | 'firstName'
+  | 'lastName'
+  | 'middleName'
+  | 'gender'
+  | 'dateOfBirth'
+  | 'akaLastName'
+  | 'akaFirstName'
+  | 'personIdIcm'
+  | 'personIdMis'
+  | 'caseNumber'
+  | 'legacyFileNumber'
+  | 'birthPlace'
 
 const WEEKLY_REPORT_COLUMNS: WeeklyReportColumn[] = ['weeklyFileDate', 'csaProcessingDate']
 const WEEKLY_DETAILS_COLUMNS: WeeklyDetailsColumn[] = [
@@ -69,6 +83,37 @@ const WEEKLY_DETAILS_COLUMNS: WeeklyDetailsColumn[] = [
   'craStatus',
   'matchedBy',
 ]
+const CHILD_SEARCH_COLUMNS: ChildSearchColumn[] = [
+  'din',
+  'firstName',
+  'lastName',
+  'middleName',
+  'gender',
+  'dateOfBirth',
+  'akaLastName',
+  'akaFirstName',
+  'personIdIcm',
+  'personIdMis',
+  'caseNumber',
+  'legacyFileNumber',
+  'birthPlace',
+]
+
+const CHILD_SEARCH_COLUMN_LABELS: Record<ChildSearchColumn, string> = {
+  din: 'DIN',
+  firstName: 'First Name',
+  lastName: 'Last Name',
+  middleName: 'Middle Name',
+  gender: 'Gender',
+  dateOfBirth: 'Date of Birth',
+  akaLastName: 'AKA Last Name',
+  akaFirstName: 'AKA First Name',
+  personIdIcm: 'Person ID ICM',
+  personIdMis: 'Person ID MIS',
+  caseNumber: 'Case Number',
+  legacyFileNumber: 'Legacy File Num',
+  birthPlace: 'Birth Place',
+}
 
 type SortConfig<T> = {
   column: T
@@ -227,6 +272,44 @@ export default function WeeklyFileProcessingTab() {
   }>({
     element: null,
     column: 'csaMatchFound',
+  })
+  const [detailsSelectionFilterAnchor, setDetailsSelectionFilterAnchor] =
+    useState<HTMLElement | null>(null)
+  const [detailsShowSelectedOnly, setDetailsShowSelectedOnly] = useState(false)
+
+  const [childSearchColumnFilters, setChildSearchColumnFilters] = useState<
+    Record<ChildSearchColumn, string[]>
+  >({
+    din: [],
+    firstName: [],
+    lastName: [],
+    middleName: [],
+    gender: [],
+    dateOfBirth: [],
+    akaLastName: [],
+    akaFirstName: [],
+    personIdIcm: [],
+    personIdMis: [],
+    caseNumber: [],
+    legacyFileNumber: [],
+    birthPlace: [],
+  })
+  const [childSearchFilterSearchTerm, setChildSearchFilterSearchTerm] = useState('')
+  const [childSearchSortConfig, setChildSearchSortConfig] =
+    useState<SortConfig<ChildSearchColumn>>(null)
+  const [childSearchSortAnchor, setChildSearchSortAnchor] = useState<{
+    element: HTMLElement | null
+    column: ChildSearchColumn
+  }>({
+    element: null,
+    column: 'din',
+  })
+  const [childSearchFilterAnchor, setChildSearchFilterAnchor] = useState<{
+    element: HTMLElement | null
+    column: ChildSearchColumn
+  }>({
+    element: null,
+    column: 'din',
   })
 
   const [loadingFiles, setLoadingFiles] = useState(false)
@@ -393,6 +476,48 @@ export default function WeeklyFileProcessingTab() {
     }
   }
 
+  const getBirthPlace = useCallback((contact: Contact): string => {
+    return [contact.birthCity, contact.birthProvince, contact.birthCountry]
+      .filter((value) => !!value)
+      .join(', ')
+  }, [])
+
+  const getChildSearchFieldValue = useCallback(
+    (child: Contact, column: ChildSearchColumn): string => {
+      switch (column) {
+        case 'din':
+          return valueOrBlank(child.din)
+        case 'firstName':
+          return valueOrBlank(child.firstName)
+        case 'lastName':
+          return valueOrBlank(child.lastName)
+        case 'middleName':
+          return valueOrBlank(child.middleName)
+        case 'gender':
+          return valueOrBlank(child.gender)
+        case 'dateOfBirth':
+          return valueOrBlank(child.dateOfBirth)
+        case 'akaLastName':
+          return valueOrBlank(child.akaLastName)
+        case 'akaFirstName':
+          return valueOrBlank(child.akaFirstName)
+        case 'personIdIcm':
+          return valueOrBlank(child.personIdIcm)
+        case 'personIdMis':
+          return valueOrBlank(child.personIdMis)
+        case 'caseNumber':
+          return valueOrBlank(child.caseNumber)
+        case 'legacyFileNumber':
+          return valueOrBlank(child.legacyFileNumber)
+        case 'birthPlace':
+          return getBirthPlace(child)
+        default:
+          return ''
+      }
+    },
+    [getBirthPlace],
+  )
+
   const filteredWeeklyFiles = useMemo(() => {
     return filterAndSortRows(
       weeklyFiles,
@@ -405,7 +530,7 @@ export default function WeeklyFileProcessingTab() {
   }, [weeklyFiles, weeklyReportSearchTerm, weeklyReportColumnFilters, weeklyReportSortConfig])
 
   const filteredRecords = useMemo(() => {
-    return filterAndSortRows(
+    const recordsAfterSearchFilterSort = filterAndSortRows(
       records,
       WEEKLY_DETAILS_COLUMNS,
       getDetailsFieldValue,
@@ -413,7 +538,35 @@ export default function WeeklyFileProcessingTab() {
       detailsColumnFilters,
       detailsSortConfig,
     )
-  }, [detailsSearchTerm, records, detailsColumnFilters, detailsSortConfig])
+
+    if (!detailsShowSelectedOnly) {
+      return recordsAfterSearchFilterSort
+    }
+
+    if (!selectedRecordId) {
+      return []
+    }
+
+    return recordsAfterSearchFilterSort.filter((record) => record.id === selectedRecordId)
+  }, [
+    detailsSearchTerm,
+    records,
+    detailsColumnFilters,
+    detailsSortConfig,
+    detailsShowSelectedOnly,
+    selectedRecordId,
+  ])
+
+  const filteredSearchedChildren = useMemo(() => {
+    return filterAndSortRows(
+      searchedChildren,
+      CHILD_SEARCH_COLUMNS,
+      getChildSearchFieldValue,
+      '',
+      childSearchColumnFilters,
+      childSearchSortConfig,
+    )
+  }, [searchedChildren, childSearchColumnFilters, childSearchSortConfig, getChildSearchFieldValue])
 
   const handleWeeklyReportSortClick = (
     event: React.MouseEvent<HTMLElement>,
@@ -488,6 +641,10 @@ export default function WeeklyFileProcessingTab() {
     setDetailsFilterSearchTerm('')
   }
 
+  const handleDetailsSelectionFilterClose = () => {
+    setDetailsSelectionFilterAnchor(null)
+  }
+
   const handleDetailsFilterChange = (column: WeeklyDetailsColumn, value: string) => {
     setDetailsColumnFilters((prev) => toggleColumnFilterValue(prev, column, value))
   }
@@ -499,6 +656,52 @@ export default function WeeklyFileProcessingTab() {
 
   const getDetailsUniqueValues = (column: WeeklyDetailsColumn): string[] => {
     return Array.from(new Set(records.map((record) => getDetailsFieldValue(record, column))))
+      .filter((value) => value !== '')
+      .sort((a, b) => compareStrings(a, b))
+  }
+
+  const handleChildSearchSortClick = (
+    event: React.MouseEvent<HTMLElement>,
+    column: ChildSearchColumn,
+  ) => {
+    setChildSearchSortAnchor({ element: event.currentTarget, column })
+  }
+
+  const handleChildSearchSortClose = () => {
+    setChildSearchSortAnchor({ ...childSearchSortAnchor, element: null })
+  }
+
+  const handleChildSearchSort = (column: ChildSearchColumn, direction: SortDirection) => {
+    setChildSearchSortConfig({ column, direction })
+    handleChildSearchSortClose()
+  }
+
+  const handleChildSearchFilterClick = (
+    event: React.MouseEvent<HTMLElement>,
+    column: ChildSearchColumn,
+  ) => {
+    setChildSearchFilterAnchor({ element: event.currentTarget, column })
+    setChildSearchFilterSearchTerm('')
+  }
+
+  const handleChildSearchFilterClose = () => {
+    setChildSearchFilterAnchor({ ...childSearchFilterAnchor, element: null })
+    setChildSearchFilterSearchTerm('')
+  }
+
+  const handleChildSearchFilterChange = (column: ChildSearchColumn, value: string) => {
+    setChildSearchColumnFilters((prev) => toggleColumnFilterValue(prev, column, value))
+  }
+
+  const clearChildSearchColumnFilter = (column: ChildSearchColumn) => {
+    setChildSearchColumnFilters((prev) => ({ ...prev, [column]: [] }))
+    setChildSearchFilterSearchTerm('')
+  }
+
+  const getChildSearchUniqueValues = (column: ChildSearchColumn): string[] => {
+    return Array.from(
+      new Set(searchedChildren.map((child) => getChildSearchFieldValue(child, column))),
+    )
       .filter((value) => value !== '')
       .sort((a, b) => compareStrings(a, b))
   }
@@ -878,6 +1081,7 @@ export default function WeeklyFileProcessingTab() {
               disabled={
                 !detailsSearchTerm &&
                 !detailsSortConfig &&
+                !detailsShowSelectedOnly &&
                 Object.values(detailsColumnFilters).every((arr) => arr.length === 0)
               }
               onClick={() => {
@@ -891,6 +1095,7 @@ export default function WeeklyFileProcessingTab() {
                   matchedBy: [],
                 })
                 setDetailsSortConfig(null)
+                setDetailsShowSelectedOnly(false)
               }}
               sx={{
                 textTransform: 'none',
@@ -909,7 +1114,21 @@ export default function WeeklyFileProcessingTab() {
         <Table size="small">
           <TableHead>
             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableCell sx={{ fontWeight: 600 }} />
+              <TableCell>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <span style={{ fontWeight: 600 }}>Selected</span>
+                  <IconButton
+                    size="small"
+                    onClick={(e) => setDetailsSelectionFilterAnchor(e.currentTarget)}
+                    sx={{
+                      padding: 0.5,
+                      color: detailsShowSelectedOnly ? '#1976d2' : '#666',
+                    }}
+                  >
+                    <FilterListIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              </TableCell>
               <TableCell>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <span
@@ -1175,6 +1394,46 @@ export default function WeeklyFileProcessingTab() {
             >
               Search
             </Button>
+            <Tooltip title="Clear child search filters and sorting" arrow>
+              <span>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<FilterAltOffIcon />}
+                  disabled={
+                    !childSearchSortConfig &&
+                    Object.values(childSearchColumnFilters).every((arr) => arr.length === 0)
+                  }
+                  onClick={() => {
+                    setChildSearchColumnFilters({
+                      din: [],
+                      firstName: [],
+                      lastName: [],
+                      middleName: [],
+                      gender: [],
+                      dateOfBirth: [],
+                      akaLastName: [],
+                      akaFirstName: [],
+                      personIdIcm: [],
+                      personIdMis: [],
+                      caseNumber: [],
+                      legacyFileNumber: [],
+                      birthPlace: [],
+                    })
+                    setChildSearchSortConfig(null)
+                  }}
+                  sx={{
+                    textTransform: 'none',
+                    minWidth: 'auto',
+                    '&.Mui-disabled': {
+                      opacity: 0.5,
+                    },
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              </span>
+            </Tooltip>
             <Button
               variant="contained"
               onClick={handleAssociate}
@@ -1202,41 +1461,54 @@ export default function WeeklyFileProcessingTab() {
               <TableHead>
                 <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                   <TableCell sx={{ fontWeight: 600 }} />
-                  <TableCell sx={{ fontWeight: 600 }}>DIN</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>First Name</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Last Name</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Middle Name</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Gender</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Date of Birth</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>AKA Last Name</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>AKA First Name</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Person ID ICM</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Person ID MIS</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Case Number</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Legacy File Num</TableCell>
+                  {CHILD_SEARCH_COLUMNS.map((column) => (
+                    <TableCell key={column}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <span
+                          onClick={(e) => handleChildSearchSortClick(e, column)}
+                          style={{ cursor: 'pointer', userSelect: 'none', fontWeight: 600 }}
+                        >
+                          {CHILD_SEARCH_COLUMN_LABELS[column]}
+                        </span>
+                        {column !== 'dateOfBirth' && (
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleChildSearchFilterClick(e, column)}
+                            sx={{
+                              padding: 0.5,
+                              color:
+                                childSearchColumnFilters[column].length > 0 ? '#1976d2' : '#666',
+                            }}
+                          >
+                            <FilterListIcon fontSize="small" />
+                          </IconButton>
+                        )}
+                      </Box>
+                    </TableCell>
+                  ))}
                 </TableRow>
               </TableHead>
               <TableBody>
                 {loadingChildSearch ? (
                   <TableRow>
-                    <TableCell colSpan={13} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={14} align="center" sx={{ py: 4 }}>
                       <Typography variant="body2" color="text.secondary">
                         Searching contacts...
                       </Typography>
                     </TableCell>
                   </TableRow>
-                ) : searchedChildren.length === 0 ? (
+                ) : filteredSearchedChildren.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={13} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={14} align="center" sx={{ py: 4 }}>
                       <Typography variant="body2" color="text.secondary">
-                        {childSearchTerm.trim()
-                          ? 'No matching child records found'
+                        {childSearchTerm.trim().length >= CHILD_SEARCH_MIN_LENGTH
+                          ? 'No matching child records found for current filters'
                           : 'Search to list child records'}
                       </Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  searchedChildren.map((child) => (
+                  filteredSearchedChildren.map((child) => (
                     <TableRow
                       key={child.id}
                       hover
@@ -1263,6 +1535,7 @@ export default function WeeklyFileProcessingTab() {
                       <TableCell>{valueOrBlank(child.personIdMis)}</TableCell>
                       <TableCell>{valueOrBlank(child.caseNumber)}</TableCell>
                       <TableCell>{valueOrBlank(child.legacyFileNumber)}</TableCell>
+                      <TableCell>{getBirthPlace(child)}</TableCell>
                     </TableRow>
                   ))
                 )}
@@ -1333,6 +1606,32 @@ export default function WeeklyFileProcessingTab() {
         </MenuItem>
         <MenuItem
           onClick={() => handleDetailsSort(detailsSortAnchor.column, 'desc')}
+          sx={{ gap: 1.5 }}
+        >
+          <ArrowDownwardIcon fontSize="small" />
+          <Typography variant="body2">Sort Descending</Typography>
+        </MenuItem>
+      </Menu>
+
+      <Menu
+        anchorEl={childSearchSortAnchor.element}
+        open={Boolean(childSearchSortAnchor.element)}
+        onClose={handleChildSearchSortClose}
+        PaperProps={{
+          sx: {
+            width: 200,
+          },
+        }}
+      >
+        <MenuItem
+          onClick={() => handleChildSearchSort(childSearchSortAnchor.column, 'asc')}
+          sx={{ gap: 1.5 }}
+        >
+          <ArrowUpwardIcon fontSize="small" />
+          <Typography variant="body2">Sort Ascending</Typography>
+        </MenuItem>
+        <MenuItem
+          onClick={() => handleChildSearchSort(childSearchSortAnchor.column, 'desc')}
           sx={{ gap: 1.5 }}
         >
           <ArrowDownwardIcon fontSize="small" />
@@ -1414,6 +1713,47 @@ export default function WeeklyFileProcessingTab() {
       </Menu>
 
       <Menu
+        anchorEl={detailsSelectionFilterAnchor}
+        open={Boolean(detailsSelectionFilterAnchor)}
+        onClose={handleDetailsSelectionFilterClose}
+        PaperProps={{
+          sx: {
+            width: 260,
+          },
+        }}
+      >
+        <Box sx={{ p: 2 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+            Filter by Selected
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Checkbox
+              size="small"
+              checked={detailsShowSelectedOnly}
+              onChange={(e) => setDetailsShowSelectedOnly(e.target.checked)}
+              disabled={!selectedRecordId}
+            />
+            <Typography variant="body2">
+              Show selected row only
+              {!selectedRecordId ? ' (select a row first)' : ''}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+            <Button
+              size="small"
+              onClick={() => {
+                setDetailsShowSelectedOnly(false)
+                handleDetailsSelectionFilterClose()
+              }}
+              sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+            >
+              Clear
+            </Button>
+          </Box>
+        </Box>
+      </Menu>
+
+      <Menu
         anchorEl={detailsFilterAnchor.element}
         open={Boolean(detailsFilterAnchor.element)}
         onClose={handleDetailsFilterClose}
@@ -1472,6 +1812,76 @@ export default function WeeklyFileProcessingTab() {
                       detailsColumnFilters[detailsFilterAnchor.column]?.includes(value) || false
                     }
                     onChange={() => handleDetailsFilterChange(detailsFilterAnchor.column, value)}
+                  />
+                  <Typography variant="body2">{value}</Typography>
+                </Box>
+              ))}
+          </Box>
+        </Box>
+      </Menu>
+
+      <Menu
+        anchorEl={childSearchFilterAnchor.element}
+        open={Boolean(childSearchFilterAnchor.element)}
+        onClose={handleChildSearchFilterClose}
+        PaperProps={{
+          sx: {
+            maxHeight: 400,
+            width: 250,
+          },
+        }}
+      >
+        <Box sx={{ p: 2 }}>
+          <Box
+            sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}
+          >
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              Filter by {CHILD_SEARCH_COLUMN_LABELS[childSearchFilterAnchor.column]}
+            </Typography>
+            <Button
+              size="small"
+              onClick={() => {
+                clearChildSearchColumnFilter(childSearchFilterAnchor.column)
+                handleChildSearchFilterClose()
+              }}
+              sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+            >
+              Clear
+            </Button>
+          </Box>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder="Search"
+            value={childSearchFilterSearchTerm}
+            onChange={(e) => setChildSearchFilterSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Box component="span" sx={{ fontSize: '18px' }}>
+                    🔍
+                  </Box>
+                </InputAdornment>
+              ),
+            }}
+            sx={{ mb: 1 }}
+          />
+          <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+            {getChildSearchUniqueValues(childSearchFilterAnchor.column)
+              .filter((value) =>
+                value.toLowerCase().includes(childSearchFilterSearchTerm.toLowerCase()),
+              )
+              .map((value) => (
+                <Box key={value} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
+                  <Checkbox
+                    size="small"
+                    checked={
+                      childSearchColumnFilters[childSearchFilterAnchor.column]?.includes(value) ||
+                      false
+                    }
+                    onChange={() =>
+                      handleChildSearchFilterChange(childSearchFilterAnchor.column, value)
+                    }
                   />
                   <Typography variant="body2">{value}</Typography>
                 </Box>

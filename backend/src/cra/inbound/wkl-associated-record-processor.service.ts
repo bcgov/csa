@@ -16,6 +16,10 @@ export interface WklUnmatchedProcessContext {
   processedBatchIds: Set<number>
   header: HeaderRecord
   origin: string
+  /** CSA processing date (Pacific calendar date) for manual confirm batch lookup */
+  batchDate?: Date
+  /** When true, reuse an existing in-progress batch detail or find/create batch by batchDate */
+  preferExistingInProgressDetail?: boolean
 }
 
 export interface WklUnmatchedProcessCounters {
@@ -55,20 +59,49 @@ export class WklAssociatedRecordProcessorService {
         `transaction type ${wklType}, status ${detail.status} [origin: ${ctx.origin}]`,
     )
 
-    if (!ctx.unmatchedWklBatchId.value) {
-      const batch = await this.batchesService.createWklBatchForUnmatchedRecords(ctx.header)
-      ctx.unmatchedWklBatchId.value = batch.id
-      ctx.processedBatchIds.add(batch.id)
+    let batchDetail: Awaited<
+      ReturnType<BatchesService['createBatchDetailsForWklUnmatchedRecords']>
+    > | null = null
+
+    if (ctx.preferExistingInProgressDetail) {
+      batchDetail = await this.batchesService.findInProgressBatchDetailForContact(contactId)
+      if (batchDetail) {
+        if (batchDetail.transactionType !== wklType) {
+          this.logger.warn(
+            `WKL: transaction type mismatch for contact ${contactId} — ` +
+              `WKL says ${wklType}, batch detail says ${batchDetail.transactionType} ` +
+              `[origin: ${ctx.origin}]`,
+          )
+          counters.skipped++
+          return null
+        }
+        ctx.processedBatchIds.add(batchDetail.batchId)
+        this.logger.log(
+          `Using existing in-progress batch detail ${batchDetail.id} for contactId ${contactId} ` +
+            `[origin: ${ctx.origin}]`,
+        )
+      }
     }
 
-    const batchDetail = await this.batchesService.createBatchDetailsForWklUnmatchedRecords(
-      ctx.unmatchedWklBatchId.value,
-      contactId,
-      wklType,
-      detail.status,
-      caseNumber,
-      this.weeklyContactMatcher.buildWklMatchingSnapshot(detail),
-    )
+    if (!batchDetail) {
+      if (!ctx.unmatchedWklBatchId.value) {
+        const batch =
+          ctx.preferExistingInProgressDetail && ctx.batchDate
+            ? await this.batchesService.findOrCreateWklBatchForUnmatchedRecords(ctx.batchDate)
+            : await this.batchesService.createWklBatchForUnmatchedRecords(ctx.header)
+        ctx.unmatchedWklBatchId.value = batch.id
+        ctx.processedBatchIds.add(batch.id)
+      }
+
+      batchDetail = await this.batchesService.createBatchDetailsForWklUnmatchedRecords(
+        ctx.unmatchedWklBatchId.value,
+        contactId,
+        wklType,
+        detail.status,
+        caseNumber,
+        this.weeklyContactMatcher.buildWklMatchingSnapshot(detail),
+      )
+    }
 
     const isApproved =
       detail.status?.toLowerCase() === WKL_STATUS.COMPLETED ||
@@ -83,6 +116,8 @@ export class WklAssociatedRecordProcessorService {
       wklType === 'cancellation'
         ? detail.careEndReasonCode?.trim() || CANCEL_REASON.CHILD_LEFT
         : undefined
+
+    // Additional data for contact update
     const additionalData: Record<string, unknown> = {
       ...(careDate
         ? wklType === 'cancellation'
@@ -93,12 +128,19 @@ export class WklAssociatedRecordProcessorService {
       ...(cancelReasonCode ? { cancelReasonCode } : {}),
     }
 
+    // Additional data for batch detail update (preserve effective date and reason)
+    const batchDetailAdditionalData: Record<string, unknown> = {
+      ...(careDate ? { effectiveDate: careDate } : {}),
+      ...(cancelReasonCode ? { cancelReasonCode } : {}),
+    }
+
     if (isApproved) {
       const nextState =
         wklType === 'application' ? CSA_STATUS.IN_PAY : CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY
       await this.batchesService.updateBatchDetailStatus(
         batchDetail.id,
         BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
+        { additionalData: batchDetailAdditionalData },
       )
       await this.contactsService.forceUpdateCsaStatus(
         batchDetail.contactId,
@@ -115,6 +157,7 @@ export class WklAssociatedRecordProcessorService {
       await this.batchesService.updateBatchDetailStatus(
         batchDetail.id,
         BATCH_DETAIL_EVENT.CRA_WKL_REFUSED,
+        { additionalData: batchDetailAdditionalData },
       )
       await this.contactsService.forceUpdateCsaStatus(
         batchDetail.contactId,

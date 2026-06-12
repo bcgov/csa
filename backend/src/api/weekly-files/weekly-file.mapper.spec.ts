@@ -82,6 +82,9 @@ describe('weekly-file.mapper', () => {
         caseNumber: '1-123',
         personIdIcm: 'ICM-1',
       },
+      batchDetail: {
+        batch: { batchNumber: 1042 },
+      },
     })
 
     expect(dto).toMatchObject({
@@ -96,6 +99,7 @@ describe('weekly-file.mapper', () => {
       craStatus: 'COMPLETED',
       associatedCaseNumber: '1-123',
       associatedPersonIdIcm: 'ICM-1',
+      batchReqId: '1042',
       matchedBy: 'SYSTEM',
     })
     expect(dto.dateOfBirth).toBe('2010-03-15')

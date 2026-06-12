@@ -118,6 +118,8 @@ describe('BatchesService', () => {
           batchId: 1,
           transactionType: 'application',
           status: 'pending',
+          effectiveDate: new Date('2025-01-01'),
+          cancelReasonCode: null,
           contact: {
             id: 100,
             lastName: 'Doe',
@@ -182,6 +184,8 @@ describe('BatchesService', () => {
           batchId: 1,
           transactionType: 'cancellation',
           status: 'pending',
+          effectiveDate: new Date('2025-06-15'),
+          cancelReasonCode: '21',
           contact: {
             id: 101,
             lastName: 'Smith',

@@ -99,6 +99,12 @@ export class WeeklyFileRecordDto {
   @ApiProperty({ nullable: true })
   associatedPersonIdIcm: string | null
 
+  @ApiProperty({
+    nullable: true,
+    description: 'Batch Request batch number when CSA Match Found is Yes',
+  })
+  batchReqId: string | null
+
   @ApiProperty({ nullable: true })
   matchedBy: string | null
 

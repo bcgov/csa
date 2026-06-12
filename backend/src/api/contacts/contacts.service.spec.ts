@@ -1363,6 +1363,8 @@ describe('ContactsService', () => {
           batchId: 5,
           transactionType: 'application',
           status: 'approved',
+          effectiveDate: new Date('2025-06-01'),
+          cancelReasonCode: null,
           batch: { id: 5, batchDate: new Date('2026-01-15'), status: 'processed' },
           contact: {
             effectiveDate: new Date('2025-06-01'),
@@ -1407,7 +1409,7 @@ describe('ContactsService', () => {
       })
     })
 
-    it('should use careEndDate as effectiveDate for cancellation transactions', async () => {
+    it('should use batch detail snapshot for cancellation transactions', async () => {
       const contact = { id: 1, firstName: 'John', lastName: 'Doe' }
       const batchDetails = [
         {
@@ -1416,6 +1418,8 @@ describe('ContactsService', () => {
           batchId: 6,
           transactionType: 'cancellation',
           status: 'approved',
+          effectiveDate: new Date('2026-01-15'),
+          cancelReasonCode: '21',
           batch: { id: 6, batchDate: new Date('2026-02-20'), status: 'processed' },
           contact: {
             effectiveDate: new Date('2025-06-01'),

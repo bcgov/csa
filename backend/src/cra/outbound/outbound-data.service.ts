@@ -20,6 +20,8 @@ export interface BatchDetailWithContact {
   id: number
   transactionType: string
   referenceNumber: string | null
+  effectiveDate: Date | null
+  cancelReasonCode: string | null
   contact: {
     id: number
     firstName: string
@@ -34,12 +36,9 @@ export interface BatchDetailWithContact {
     birthProvince: string | null
     birthCountry: string | null
     din: string | null
-    effectiveDate: Date | null
     legacyFileNumber: string | null
     prevRecipientFirstName: string | null
     prevRecipientLastName: string | null
-    cancelReasonCode: string | null
-    careEndDate: Date | null
   }
 }
 
@@ -118,12 +117,12 @@ export class OutboundDataService {
       prevRecipGivenName: contact.prevRecipientFirstName ?? '',
       prevRecipSurName: contact.prevRecipientLastName ?? '',
 
-      appStartDate: isApplication ? this.formatDate(contact.effectiveDate) : '',
+      appStartDate: isApplication ? this.formatDate(batchDetail.effectiveDate) : '',
       newBornCode: isApplication ? this.calculateNewBornCode(contact.dateOfBirth, contact.din) : '',
       filler2: '',
 
-      cancelEndDate: isApplication ? '' : this.formatDate(contact.careEndDate),
-      cancelReasonCode: isApplication ? '' : (contact.cancelReasonCode ?? ''),
+      cancelEndDate: isApplication ? '' : this.formatDate(batchDetail.effectiveDate),
+      cancelReasonCode: isApplication ? '' : (batchDetail.cancelReasonCode ?? ''),
 
       ccraDinNum: contact.din ?? '',
       filler3: '',

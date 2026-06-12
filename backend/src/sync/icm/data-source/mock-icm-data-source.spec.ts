@@ -83,6 +83,46 @@ describe('MockIcmDataSource', () => {
       expect(results).toHaveLength(2)
     })
 
+    it('should load flat ooc agreement line mock records', async () => {
+      const oocConfig: IcmApiConfig = {
+        name: 'ooc_agreement_lines',
+        endpoint: '/AgreementLines/AgreementLine',
+        stagingTable: 'stg_icm_agreement_line',
+        primaryKey: 'ROW_ID',
+        cursorLabel: 'Updated',
+        fieldMap: [],
+      }
+
+      vi.mocked(fs.existsSync).mockReturnValue(true)
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({
+          items: [
+            {
+              Id: 'mock-line-001',
+              Updated: '05/26/2026 10:00:00',
+              'Agreement Id': 'mock-agreement-001',
+              'ICM Person ID': 'mock-person-001',
+            },
+            {
+              Id: 'mock-line-002',
+              Updated: '05/26/2026 10:00:00',
+              'Agreement Id': 'mock-agreement-001',
+              'ICM Person ID': 'mock-person-001',
+            },
+          ],
+        }),
+      )
+
+      const results = await service.fetchAll(oocConfig)
+
+      expect(results).toHaveLength(2)
+      expect(results[0]).toMatchObject({
+        Id: 'mock-line-001',
+        'Agreement Id': 'mock-agreement-001',
+        'ICM Person ID': 'mock-person-001',
+      })
+    })
+
     it('should include records with missing or unparseable cursor field', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true)
       vi.mocked(fs.readFileSync).mockReturnValue(

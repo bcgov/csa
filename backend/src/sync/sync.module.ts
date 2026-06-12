@@ -9,7 +9,7 @@ import { syncConfig } from 'src/config/sync.config'
 import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
 import { AutoBatchHandler } from './handlers/auto-batch.handler'
-import { BackfillIcmCasesHandler } from './handlers/backfill-icm-cases.handler'
+import { BackfillIcmCaseCloseDatesHandler } from './handlers/backfill-icm-case-close-dates.handler'
 import { BackfillOocAgreementLinesHandler } from './handlers/backfill-ooc-agreement-lines.handler'
 import { IngestDataHandler } from './handlers/ingest-data.handler'
 import { IngestIcmHandler } from './handlers/ingest-icm.handler'
@@ -53,7 +53,7 @@ import { MisService } from './mis/mis.service'
     MisService,
     AutoBatchService,
     AutoBatchHandler,
-    BackfillIcmCasesHandler,
+    BackfillIcmCaseCloseDatesHandler,
     BackfillOocAgreementLinesHandler,
     IngestDataHandler,
     IngestIcmHandler,
@@ -63,7 +63,7 @@ import { MisService } from './mis/mis.service'
   ],
   exports: [
     AutoBatchHandler,
-    BackfillIcmCasesHandler,
+    BackfillIcmCaseCloseDatesHandler,
     BackfillOocAgreementLinesHandler,
     IngestDataHandler,
     IngestIcmHandler,
@@ -76,7 +76,7 @@ export class SyncModule implements OnModuleInit {
   constructor(
     private readonly registry: JobRegistry,
     private readonly autoBatchHandler: AutoBatchHandler,
-    private readonly backfillIcmCasesHandler: BackfillIcmCasesHandler,
+    private readonly backfillIcmCaseCloseDatesHandler: BackfillIcmCaseCloseDatesHandler,
     private readonly backfillOocAgreementLinesHandler: BackfillOocAgreementLinesHandler,
     private readonly ingestDataHandler: IngestDataHandler,
     private readonly ingestIcmHandler: IngestIcmHandler,
@@ -87,7 +87,10 @@ export class SyncModule implements OnModuleInit {
 
   onModuleInit() {
     this.registry.register(this.autoBatchHandler.jobType, this.autoBatchHandler)
-    this.registry.register(this.backfillIcmCasesHandler.jobType, this.backfillIcmCasesHandler)
+    this.registry.register(
+      this.backfillIcmCaseCloseDatesHandler.jobType,
+      this.backfillIcmCaseCloseDatesHandler,
+    )
     this.registry.register(
       this.backfillOocAgreementLinesHandler.jobType,
       this.backfillOocAgreementLinesHandler,

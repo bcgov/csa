@@ -213,15 +213,8 @@ export class BatchesService {
     })
 
     return details.map((detail) => {
-      // Compute effectiveDate based on transaction type:
-      // - Application: Legal Authority's Effective Date (contact.effectiveDate)
-      // - Cancellation: Child's Care End Date (contact.careEndDate)
-      const effectiveDate =
-        detail.transactionType === TRANSACTION_TYPES.CANCELLATION
-          ? detail.contact.careEndDate
-          : detail.contact.effectiveDate
-
-      const cancelReasonCode = detail.contact.cancelReasonCode
+      const effectiveDate = detail.effectiveDate
+      const cancelReasonCode = detail.cancelReasonCode
       const cancelReasonLabel = getCancelReasonLabel(cancelReasonCode, detail.transactionType)
 
       return enrichLabels({
@@ -263,6 +256,73 @@ export class BatchesService {
     })
 
     return enrichLabels(pendingBatch)
+  }
+
+  async findInProgressBatchDetailForContact(contactId: number): Promise<MatchedBatchDetail | null> {
+    const details = await this.prisma.contactBatchDetail.findMany({
+      where: {
+        contactId,
+        status: BATCH_DETAIL_STATUS.IN_PROGRESS,
+        batch: {
+          status: { in: [BATCH_STATUS.IN_PROGRESS, BATCH_STATUS.PARTIALLY_PROCESSED] },
+        },
+      },
+      select: {
+        id: true,
+        contactId: true,
+        batchId: true,
+        transactionType: true,
+        systemComments: true,
+        contact: { select: { din: true } },
+      },
+      orderBy: { id: 'desc' },
+    })
+
+    if (details.length === 0) {
+      return null
+    }
+
+    if (details.length > 1) {
+      this.logger.error(
+        `Contact ${contactId} has ${details.length} in-progress batch details; using ${details[0].id}`,
+      )
+    }
+
+    return details[0]
+  }
+
+  async findOrCreateWklBatchForUnmatchedRecords(batchDate: Date) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(${BATCH_ADVISORY_LOCK_CLASS}, ${WKL_UNMATCHED_BATCH_ADVISORY_LOCK_OBJECT})`,
+      )
+
+      const existingBatch = await tx.batch.findFirst({
+        where: {
+          initiatedBy: BATCH_INITIATED_BY.CRA,
+          batchDate,
+        },
+        orderBy: { id: 'desc' },
+      })
+
+      if (existingBatch) {
+        return existingBatch
+      }
+
+      const batchNumber = await this.nextBatchNumber(tx)
+      const systemComments = appendSystemComment(`CRA initiated batch from WKL file`, null)
+      return tx.batch.create({
+        data: {
+          batchNumber,
+          batchDate,
+          initiatedBy: BATCH_INITIATED_BY.CRA,
+          status: BATCH_STATUS.IN_PROGRESS,
+          recordCount: 0,
+          systemComments,
+          createdAt: new Date(),
+        },
+      })
+    })
   }
 
   async createWklBatchForUnmatchedRecords(header: HeaderRecord) {
@@ -323,6 +383,7 @@ export class BatchesService {
         csaStatus: true,
         cancelReasonCode: true,
         careEndDate: true,
+        effectiveDate: true,
       },
     })
     const existingContactMap = new Map(existingContacts.map((c) => [c.id, c]))
@@ -387,14 +448,24 @@ export class BatchesService {
             const updates: Record<string, unknown> = {}
             if (!contact.careEndDate) {
               updates.careEndDate = pacificToday()
+              contact.careEndDate = pacificToday()
             }
             if (!contact.cancelReasonCode) {
               updates.cancelReasonCode = CANCEL_REASON.CHILD_LEFT
+              contact.cancelReasonCode = CANCEL_REASON.CHILD_LEFT
             }
             if (Object.keys(updates).length > 0) {
               await tx.contact.update({ where: { id: contactId }, data: updates })
             }
           }
+
+          // Capture snapshot of effective date and cancellation reason at time of batching
+          const effectiveDate =
+            transactionType === TRANSACTION_TYPES.CANCELLATION
+              ? contact.careEndDate
+              : contact.effectiveDate
+          const cancelReasonCode =
+            transactionType === TRANSACTION_TYPES.CANCELLATION ? contact.cancelReasonCode : null
 
           const batchDetail = await tx.contactBatchDetail.create({
             data: {
@@ -402,6 +473,8 @@ export class BatchesService {
               batchId: pendingBatch.id,
               transactionType,
               status: BATCH_STATUS.PENDING,
+              effectiveDate,
+              cancelReasonCode,
               createdAt: now,
               createdBy: userId,
               lastUpdatedAt: now,

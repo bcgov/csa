@@ -1132,11 +1132,9 @@ export default function WeeklyFileProcessingTab() {
 
       {selectedRecord && (
         <Box sx={{ mt: 4 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              Child Search
-            </Typography>
-          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 500, mb: 1, textAlign: 'left' }}>
+            Child Search
+          </Typography>
 
           {isSelectedRecordUnmatched && (
             <Alert severity="warning" sx={{ mb: 2 }}>

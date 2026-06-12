@@ -30,7 +30,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fullTextSearchContacts, type Contact } from '../service/contacts-service'
 import {
   associateWeeklyFileRecord,
@@ -503,46 +503,69 @@ export default function WeeklyFileProcessingTab() {
       .sort((a, b) => compareStrings(a, b))
   }
 
-  const runChildSearch = async (page = 1) => {
-    const requestId = ++childSearchRequestIdRef.current
+  const runChildSearch = useCallback(
+    async (page = 1) => {
+      const requestId = ++childSearchRequestIdRef.current
+      const trimmedSearchTerm = childSearchTerm.trim()
+
+      if (!trimmedSearchTerm) {
+        setSearchedChildren([])
+        setChildSearchTotalPages(1)
+        return
+      }
+
+      if (trimmedSearchTerm.length < CHILD_SEARCH_MIN_LENGTH) {
+        setActionError(`Please enter at least ${CHILD_SEARCH_MIN_LENGTH} characters to search.`)
+        setSearchedChildren([])
+        setChildSearchTotalPages(1)
+        return
+      }
+
+      setLoadingChildSearch(true)
+      setActionError(null)
+      try {
+        const response = await fullTextSearchContacts(trimmedSearchTerm, page, SEARCH_PAGE_SIZE)
+        if (requestId !== childSearchRequestIdRef.current) {
+          return
+        }
+        setSearchedChildren(response.data)
+        setChildSearchTotalPages(Math.max(response.totalPages, 1))
+      } catch (err) {
+        if (requestId !== childSearchRequestIdRef.current) {
+          return
+        }
+        console.error('Failed to search contacts:', err)
+        setActionError('Failed to search contacts. Please try again.')
+        setSearchedChildren([])
+        setChildSearchTotalPages(1)
+      } finally {
+        if (requestId === childSearchRequestIdRef.current) {
+          setLoadingChildSearch(false)
+        }
+      }
+    },
+    [childSearchTerm],
+  )
+
+  useEffect(() => {
     const trimmedSearchTerm = childSearchTerm.trim()
 
-    if (!trimmedSearchTerm) {
-      setSearchedChildren([])
-      setChildSearchTotalPages(1)
-      return
-    }
-
     if (trimmedSearchTerm.length < CHILD_SEARCH_MIN_LENGTH) {
-      setActionError(`Please enter at least ${CHILD_SEARCH_MIN_LENGTH} characters to search.`)
+      childSearchRequestIdRef.current += 1
+      setLoadingChildSearch(false)
       setSearchedChildren([])
+      setChildSearchPage(1)
       setChildSearchTotalPages(1)
       return
     }
 
-    setLoadingChildSearch(true)
-    setActionError(null)
-    try {
-      const response = await fullTextSearchContacts(trimmedSearchTerm, page, SEARCH_PAGE_SIZE)
-      if (requestId !== childSearchRequestIdRef.current) {
-        return
-      }
-      setSearchedChildren(response.data)
-      setChildSearchTotalPages(Math.max(response.totalPages, 1))
-    } catch (err) {
-      if (requestId !== childSearchRequestIdRef.current) {
-        return
-      }
-      console.error('Failed to search contacts:', err)
-      setActionError('Failed to search contacts. Please try again.')
-      setSearchedChildren([])
-      setChildSearchTotalPages(1)
-    } finally {
-      if (requestId === childSearchRequestIdRef.current) {
-        setLoadingChildSearch(false)
-      }
-    }
-  }
+    setChildSearchPage(1)
+    const searchTimer = window.setTimeout(() => {
+      void runChildSearch(1)
+    }, 400)
+
+    return () => window.clearTimeout(searchTimer)
+  }, [childSearchTerm, runChildSearch])
 
   const refreshSelectedFileRecords = async () => {
     if (!selectedFileId) return
@@ -1109,9 +1132,11 @@ export default function WeeklyFileProcessingTab() {
 
       {selectedRecord && (
         <Box sx={{ mt: 4 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-            Child Search
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              Child Search
+            </Typography>
+          </Box>
 
           {isSelectedRecordUnmatched && (
             <Alert severity="warning" sx={{ mb: 2 }}>
@@ -1137,12 +1162,6 @@ export default function WeeklyFileProcessingTab() {
                 setSearchedChildren([])
                 setChildSearchPage(1)
                 setChildSearchTotalPages(1)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && childSearchTerm.trim().length >= CHILD_SEARCH_MIN_LENGTH) {
-                  setChildSearchPage(1)
-                  void runChildSearch(1)
-                }
               }}
               sx={{ width: 320 }}
             />

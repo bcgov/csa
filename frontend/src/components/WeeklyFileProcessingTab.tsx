@@ -351,26 +351,28 @@ export default function WeeklyFileProcessingTab() {
   }, [weeklyFilesPage])
 
   useEffect(() => {
-    if (weeklyFiles.length === 0) {
-      if (selectedFileId !== null) {
-        setSelectedFileId(null)
+    const resetSelection = (nextSelectedFileId: number | null) => {
+      const timerId = window.setTimeout(() => {
+        setSelectedFileId(nextSelectedFileId)
         setRecordsPage(1)
         setSelectedRecordId(null)
+      }, 0)
+      return () => window.clearTimeout(timerId)
+    }
+
+    if (weeklyFiles.length === 0) {
+      if (selectedFileId !== null) {
+        return resetSelection(null)
       }
       return
     }
 
     if (selectedFileId === null) {
-      setSelectedFileId(weeklyFiles[0].id)
-      setRecordsPage(1)
-      setSelectedRecordId(null)
-      return
+      return resetSelection(weeklyFiles[0].id)
     }
 
     if (!weeklyFiles.some((file) => file.id === selectedFileId)) {
-      setSelectedFileId(weeklyFiles[0].id)
-      setRecordsPage(1)
-      setSelectedRecordId(null)
+      return resetSelection(weeklyFiles[0].id)
     }
   }, [weeklyFiles, selectedFileId])
 
@@ -420,13 +422,18 @@ export default function WeeklyFileProcessingTab() {
 
   useEffect(() => {
     childSearchRequestIdRef.current += 1
-    setLoadingChildSearch(false)
-    setSelectedSearchContactId(null)
-    setSearchedChildren([])
-    setChildSearchPage(1)
-    setChildSearchTotalPages(1)
-    setActionError(null)
-    setActionMessage(null)
+
+    const timerId = window.setTimeout(() => {
+      setLoadingChildSearch(false)
+      setSelectedSearchContactId(null)
+      setSearchedChildren([])
+      setChildSearchPage(1)
+      setChildSearchTotalPages(1)
+      setActionError(null)
+      setActionMessage(null)
+    }, 0)
+
+    return () => window.clearTimeout(timerId)
   }, [selectedRecordId])
 
   const selectedRecord = useMemo(
@@ -755,11 +762,15 @@ export default function WeeklyFileProcessingTab() {
 
     if (trimmedSearchTerm.length < CHILD_SEARCH_MIN_LENGTH) {
       childSearchRequestIdRef.current += 1
-      setLoadingChildSearch(false)
-      setSearchedChildren([])
-      setChildSearchPage(1)
-      setChildSearchTotalPages(1)
-      return
+
+      const timerId = window.setTimeout(() => {
+        setLoadingChildSearch(false)
+        setSearchedChildren([])
+        setChildSearchPage(1)
+        setChildSearchTotalPages(1)
+      }, 0)
+
+      return () => window.clearTimeout(timerId)
     }
 
     setChildSearchPage(1)

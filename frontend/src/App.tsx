@@ -46,6 +46,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { OnHoldDialog } from './components/OnHoldDialog'
+import WeeklyFileProcessingTab from './components/WeeklyFileProcessingTab'
 import { getRuntimeConfig } from './config/keycloak.config'
 import { useAuth } from './context/AuthContext'
 import logo from './icons/image.png'
@@ -944,7 +945,6 @@ function App() {
   // Audit Trail search, filter, and sort states
   const [auditTrailSearchTerm, setAuditTrailSearchTerm] = useState('')
   const [auditTrailColumnFilters, setAuditTrailColumnFilters] = useState<Record<string, string[]>>({
-    date: [],
     actionedBy: [],
     operation: [],
     field: [],
@@ -3622,6 +3622,7 @@ function App() {
             >
               <Tab label="Eligibility List" />
               <Tab label="Batch Requests" />
+              <Tab label="Weekly File Processing" />
             </Tabs>
 
             {/* Last Successful Runs Info */}
@@ -6751,7 +6752,6 @@ function App() {
                                     onClick={() => {
                                       setAuditTrailSearchTerm('')
                                       setAuditTrailColumnFilters({
-                                        date: [],
                                         actionedBy: [],
                                         operation: [],
                                         field: [],
@@ -6789,19 +6789,6 @@ function App() {
                                       >
                                         Date
                                       </span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => handleAuditTrailFilterClick(e, 'date')}
-                                        sx={{
-                                          padding: 0.5,
-                                          color:
-                                            auditTrailColumnFilters.date?.length > 0
-                                              ? '#1976d2'
-                                              : '#666',
-                                        }}
-                                      >
-                                        <FilterListIcon fontSize="small" />
-                                      </IconButton>
                                     </Box>
                                   </TableCell>
                                   <TableCell sx={{ fontWeight: 600 }}>
@@ -7774,6 +7761,8 @@ function App() {
                 </Box>
               </Box>
             )}
+
+            {selectedTab === 2 && <WeeklyFileProcessingTab />}
           </Box>
 
           {/* Sort and Filter Menus - Outside tabs so they're always available */}

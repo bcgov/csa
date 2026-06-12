@@ -46,6 +46,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { OnHoldDialog } from './components/OnHoldDialog'
+import WeeklyFileProcessingTab from './components/WeeklyFileProcessingTab'
 import { getRuntimeConfig } from './config/keycloak.config'
 import { useAuth } from './context/AuthContext'
 import logo from './icons/image.png'
@@ -404,12 +405,17 @@ function App() {
   // Effect to show CSA access alert from auth context
   useEffect(() => {
     if (csaAccessAlert) {
-      setSnackbar({
-        open: true,
-        message: csaAccessAlert,
-        severity: 'error',
-      })
-      clearCsaAccessAlert()
+      const alertMessage = csaAccessAlert
+      const timerId = window.setTimeout(() => {
+        setSnackbar({
+          open: true,
+          message: alertMessage,
+          severity: 'error',
+        })
+        clearCsaAccessAlert()
+      }, 0)
+
+      return () => window.clearTimeout(timerId)
     }
   }, [csaAccessAlert, clearCsaAccessAlert])
 
@@ -939,7 +945,6 @@ function App() {
   // Audit Trail search, filter, and sort states
   const [auditTrailSearchTerm, setAuditTrailSearchTerm] = useState('')
   const [auditTrailColumnFilters, setAuditTrailColumnFilters] = useState<Record<string, string[]>>({
-    date: [],
     actionedBy: [],
     operation: [],
     field: [],
@@ -1314,12 +1319,16 @@ function App() {
 
     // If column filter is active, re-apply all column filters on page change
     // (but not while a full-text global search is active — it owns the results then)
-    if (!isSearchActive && isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
-      performColumnFiltersSearch(activeColumnFilters, currentPage)
-    } else if (!isSearchActive) {
-      // Only fetch regular contacts when no column filter or search is active
-      fetchContacts(currentPage)
-    }
+    const timerId = window.setTimeout(() => {
+      if (!isSearchActive && isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+        performColumnFiltersSearch(activeColumnFilters, currentPage)
+      } else if (!isSearchActive) {
+        // Only fetch regular contacts when no column filter or search is active
+        fetchContacts(currentPage)
+      }
+    }, 0)
+
+    return () => window.clearTimeout(timerId)
   }, [
     preDefinedFilter,
     currentPage,
@@ -2917,7 +2926,11 @@ function App() {
 
     const stillVisible = filteredData.some((child) => child.id === selectedChild)
     if (!stillVisible) {
-      clearSelectedChildContext()
+      const timerId = window.setTimeout(() => {
+        clearSelectedChildContext()
+      }, 0)
+
+      return () => window.clearTimeout(timerId)
     }
   }, [selectedChild, filteredData])
 
@@ -3412,19 +3425,35 @@ function App() {
 
   // Reset pagination when filters/search change
   useEffect(() => {
-    setBatchRequestsPage(1)
+    const timerId = window.setTimeout(() => {
+      setBatchRequestsPage(1)
+    }, 0)
+
+    return () => window.clearTimeout(timerId)
   }, [batchRequestsSearchTerm, batchRequestsColumnFilters])
 
   useEffect(() => {
-    setBatchDetailsPage(1)
+    const timerId = window.setTimeout(() => {
+      setBatchDetailsPage(1)
+    }, 0)
+
+    return () => window.clearTimeout(timerId)
   }, [batchDetailsSearchTerm, batchDetailsColumnFilters, selectedBatch])
 
   useEffect(() => {
-    setBatchHistoryPage(1)
+    const timerId = window.setTimeout(() => {
+      setBatchHistoryPage(1)
+    }, 0)
+
+    return () => window.clearTimeout(timerId)
   }, [batchHistorySearchTerm, batchHistoryColumnFilters, selectedChild])
 
   useEffect(() => {
-    setAuditTrailPage(1)
+    const timerId = window.setTimeout(() => {
+      setAuditTrailPage(1)
+    }, 0)
+
+    return () => window.clearTimeout(timerId)
   }, [auditTrailSearchTerm, auditTrailColumnFilters, selectedChild])
 
   return (
@@ -3593,6 +3622,7 @@ function App() {
             >
               <Tab label="Eligibility List" />
               <Tab label="Batch Requests" />
+              <Tab label="Weekly File Processing" />
             </Tabs>
 
             {/* Last Successful Runs Info */}
@@ -6722,7 +6752,6 @@ function App() {
                                     onClick={() => {
                                       setAuditTrailSearchTerm('')
                                       setAuditTrailColumnFilters({
-                                        date: [],
                                         actionedBy: [],
                                         operation: [],
                                         field: [],
@@ -6760,19 +6789,6 @@ function App() {
                                       >
                                         Date
                                       </span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => handleAuditTrailFilterClick(e, 'date')}
-                                        sx={{
-                                          padding: 0.5,
-                                          color:
-                                            auditTrailColumnFilters.date?.length > 0
-                                              ? '#1976d2'
-                                              : '#666',
-                                        }}
-                                      >
-                                        <FilterListIcon fontSize="small" />
-                                      </IconButton>
                                     </Box>
                                   </TableCell>
                                   <TableCell sx={{ fontWeight: 600 }}>
@@ -7745,6 +7761,8 @@ function App() {
                 </Box>
               </Box>
             )}
+
+            {selectedTab === 2 && <WeeklyFileProcessingTab />}
           </Box>
 
           {/* Sort and Filter Menus - Outside tabs so they're always available */}

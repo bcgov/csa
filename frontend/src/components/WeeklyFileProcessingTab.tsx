@@ -773,8 +773,8 @@ export default function WeeklyFileProcessingTab() {
       return () => window.clearTimeout(timerId)
     }
 
-    setChildSearchPage(1)
     const searchTimer = window.setTimeout(() => {
+      setChildSearchPage(1)
       void runChildSearch(1)
     }, 400)
 

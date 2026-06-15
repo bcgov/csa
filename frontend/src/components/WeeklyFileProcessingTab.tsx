@@ -43,7 +43,7 @@ import {
 } from '../service/weekly-files-service'
 
 const SUMMARY_PAGE_SIZE = 10
-const DETAILS_PAGE_SIZE = 20
+const DETAILS_PAGE_SIZE = 10
 const SEARCH_PAGE_SIZE = 10
 const CHILD_SEARCH_MIN_LENGTH = 3
 const MANUAL_REVIEW_WARNING =
@@ -77,11 +77,11 @@ type ChildSearchColumn =
 const WEEKLY_REPORT_COLUMNS: WeeklyReportColumn[] = ['weeklyFileDate', 'csaProcessingDate']
 const WEEKLY_DETAILS_COLUMNS: WeeklyDetailsColumn[] = [
   'csaMatchFound',
+  'matchedBy',
   'batchNumber',
   'transactionType',
   'transactionSource',
   'craStatus',
-  'matchedBy',
 ]
 const CHILD_SEARCH_COLUMNS: ChildSearchColumn[] = [
   'din',
@@ -128,6 +128,19 @@ const formatDateDisplay = (value: string | null): string => {
   const month = parsed.toLocaleString('en-US', { month: 'short' })
   const day = String(parsed.getDate()).padStart(2, '0')
   return `${parsed.getFullYear()}-${month}-${day}`
+}
+
+const formatDateTimeDisplay = (value: string | null): string => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+
+  const month = parsed.toLocaleString('en-US', { month: 'short' })
+  const day = String(parsed.getDate()).padStart(2, '0')
+  const hours = String(parsed.getHours()).padStart(2, '0')
+  const minutes = String(parsed.getMinutes()).padStart(2, '0')
+  const seconds = String(parsed.getSeconds()).padStart(2, '0')
+  return `${parsed.getFullYear()}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
 const valueOrBlank = (value: string | null | undefined): string => value ?? ''
@@ -982,14 +995,12 @@ export default function WeeklyFileProcessingTab() {
               <TableCell sx={{ fontWeight: 600 }}>Total records count</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>&apos;E&apos; records count</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Matched count</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Unmatched count</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Associated count</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loadingFiles ? (
               <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
                     Loading weekly files...
                   </Typography>
@@ -997,7 +1008,7 @@ export default function WeeklyFileProcessingTab() {
               </TableRow>
             ) : filteredWeeklyFiles.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
                     {weeklyReportSearchTerm.trim()
                       ? 'No weekly files match the current search'
@@ -1021,12 +1032,10 @@ export default function WeeklyFileProcessingTab() {
                   }}
                 >
                   <TableCell>{formatDateDisplay(file.weeklyFileDate)}</TableCell>
-                  <TableCell>{formatDateDisplay(file.csaProcessingDate)}</TableCell>
+                  <TableCell>{formatDateTimeDisplay(file.csaProcessingDate)}</TableCell>
                   <TableCell>{file.totalCount}</TableCell>
                   <TableCell>{file.eCount}</TableCell>
                   <TableCell>{file.matchedCount}</TableCell>
-                  <TableCell>{file.unmatchedCount}</TableCell>
-                  <TableCell>{file.associatedCount}</TableCell>
                 </TableRow>
               ))
             )}
@@ -1163,10 +1172,30 @@ export default function WeeklyFileProcessingTab() {
               <TableCell>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <span
+                    onClick={(e) => handleDetailsSortClick(e, 'matchedBy')}
+                    style={{ cursor: 'pointer', userSelect: 'none', fontWeight: 600 }}
+                  >
+                    Matched By
+                  </span>
+                  <IconButton
+                    size="small"
+                    onClick={(e) => handleDetailsFilterClick(e, 'matchedBy')}
+                    sx={{
+                      padding: 0.5,
+                      color: detailsColumnFilters.matchedBy.length > 0 ? '#1976d2' : '#666',
+                    }}
+                  >
+                    <FilterListIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              </TableCell>
+              <TableCell>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <span
                     onClick={(e) => handleDetailsSortClick(e, 'batchNumber')}
                     style={{ cursor: 'pointer', userSelect: 'none', fontWeight: 600 }}
                   >
-                    Batch ID
+                    Batch Req ID
                   </span>
                   <IconButton
                     size="small"
@@ -1240,26 +1269,6 @@ export default function WeeklyFileProcessingTab() {
                   </IconButton>
                 </Box>
               </TableCell>
-              <TableCell>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <span
-                    onClick={(e) => handleDetailsSortClick(e, 'matchedBy')}
-                    style={{ cursor: 'pointer', userSelect: 'none', fontWeight: 600 }}
-                  >
-                    Matched By
-                  </span>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => handleDetailsFilterClick(e, 'matchedBy')}
-                    sx={{
-                      padding: 0.5,
-                      color: detailsColumnFilters.matchedBy.length > 0 ? '#1976d2' : '#666',
-                    }}
-                  >
-                    <FilterListIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-              </TableCell>
               <TableCell sx={{ fontWeight: 600 }}>DIN</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>First Name</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Last Name</TableCell>
@@ -1320,11 +1329,11 @@ export default function WeeklyFileProcessingTab() {
                     <Radio checked={selectedRecordId === record.id} />
                   </TableCell>
                   <TableCell>{record.csaMatchFound}</TableCell>
+                  <TableCell>{valueOrBlank(record.matchedBy)}</TableCell>
                   <TableCell>{valueOrBlank(record.batchNumber?.toString())}</TableCell>
                   <TableCell>{record.transactionType}</TableCell>
                   <TableCell>{record.transactionSource}</TableCell>
                   <TableCell>{record.craStatus}</TableCell>
-                  <TableCell>{valueOrBlank(record.matchedBy)}</TableCell>
                   <TableCell>{record.din}</TableCell>
                   <TableCell>{record.firstName}</TableCell>
                   <TableCell>{record.lastName}</TableCell>

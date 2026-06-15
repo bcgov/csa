@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { TRANSACTION_TYPES } from 'src/api/contacts/constants'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { getCancelReasonCodeOrDefault, getEffectiveDateOrDefault } from 'src/common/utils'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
@@ -49,16 +50,16 @@ export class BackfillBatchEffectiveDateReasonHandler extends BaseJob {
 
     for (const detail of batchDetails) {
       try {
-        // Determine effective date based on transaction type
+        // Determine effective date using utility function with automatic defaults
         const effectiveDate =
           detail.transactionType === TRANSACTION_TYPES.CANCELLATION
-            ? detail.contact.careEndDate
-            : detail.contact.effectiveDate
+            ? getEffectiveDateOrDefault(detail.contact.careEndDate)
+            : getEffectiveDateOrDefault(detail.contact.effectiveDate)
 
-        // Determine cancellation reason (only for cancellations)
+        // Determine cancellation reason using utility function with automatic defaults
         const cancelReasonCode =
           detail.transactionType === TRANSACTION_TYPES.CANCELLATION
-            ? detail.contact.cancelReasonCode
+            ? getCancelReasonCodeOrDefault(detail.contact.cancelReasonCode)
             : null
 
         await this.prisma.contactBatchDetail.update({

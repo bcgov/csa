@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BATCH_DETAIL_STATUS, BATCH_EVENT, BATCH_STATUS } from 'src/common/state-machine/constants'
+import { HeaderRecord, RecordTypeCode, TranCode } from 'src/cra/inbound/inbound-weekly.interface'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BatchesService } from './batches.service'
-import { RecordTypeCode, TranCode, HeaderRecord } from 'src/cra/inbound/inbound-weekly.interface'
 
 describe('BatchesService', () => {
   let service: BatchesService
@@ -486,6 +486,11 @@ describe('BatchesService', () => {
         craMatchingSnapshot: snapshot,
         contact: { din: null },
       })
+      mockPrisma.contact.findUnique = vi.fn().mockResolvedValue({
+        effectiveDate: new Date('2025-01-15'),
+        careEndDate: new Date('2025-02-20'),
+        cancelReasonCode: '21',
+      })
       mockPrisma.$transaction = vi.fn().mockImplementation(async (cb: any) =>
         cb({
           contactBatchDetail: {
@@ -678,27 +683,17 @@ describe('BatchesService', () => {
         success: true,
         to: 'in_batch_cancellation',
       })
-      mockPrisma.contact.update.mockResolvedValue({})
       mockPrisma.contactBatchDetail.create.mockResolvedValue({ id: 12 })
       mockPrisma.contactBatchDetail.update.mockResolvedValue({})
       mockPrisma.batch.update.mockResolvedValue({})
 
       await service.addContactsToPendingBatch([3], 'user@test.com')
 
-      // Verify defaults were applied to contact
-      expect(mockPrisma.contact.update).toHaveBeenCalledWith({
-        where: { id: 3 },
-        data: expect.objectContaining({
-          careEndDate: expect.any(Date),
-          cancelReasonCode: '21', // CHILD_LEFT default
-        }),
-      })
-
-      // Verify defaults were captured in batch detail
+      // Verify defaults were captured in batch detail (contacts table is not updated)
       expect(mockPrisma.contactBatchDetail.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          effectiveDate: expect.any(Date),
-          cancelReasonCode: '21',
+          effectiveDate: expect.any(Date), // careEndDate was null, so defaults to current date
+          cancelReasonCode: '21', // defaults to CHILD_LEFT
         }),
       })
     })

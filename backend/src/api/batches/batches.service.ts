@@ -10,14 +10,17 @@ import {
 } from 'src/common/state-machine/constants'
 import type { TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
-import { appendSystemComment, enrichLabels, pacificToday, parseWklDate } from 'src/common/utils'
+import {
+  appendSystemComment,
+  enrichLabels,
+  getCancelReasonCodeOrDefault,
+  getEffectiveDateOrDefault,
+  parseWklDate,
+} from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 import { HeaderRecord } from 'src/cra/inbound/inbound-weekly.interface'
 import { MatchedBatchDetail } from 'src/cra/inbound/weekly-contact-matcher.service'
-import {
-  CANCEL_REASON,
-  getCancelReasonLabel,
-} from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
+import { getCancelReasonLabel } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
 import { ContactsService } from '../contacts/contacts.service'
@@ -429,29 +432,16 @@ export class BatchesService {
 
           const caseNumber = contact.caseNumber ?? ''
 
-          // Per FDD BL-05: default cancellation fields when blank
-          if (transactionType === TRANSACTION_TYPES.CANCELLATION) {
-            const updates: Record<string, unknown> = {}
-            if (!contact.careEndDate) {
-              updates.careEndDate = pacificToday()
-              contact.careEndDate = pacificToday()
-            }
-            if (!contact.cancelReasonCode) {
-              updates.cancelReasonCode = CANCEL_REASON.CHILD_LEFT
-              contact.cancelReasonCode = CANCEL_REASON.CHILD_LEFT
-            }
-            if (Object.keys(updates).length > 0) {
-              await tx.contact.update({ where: { id: contactId }, data: updates })
-            }
-          }
-
-          // Capture snapshot of effective date and cancellation reason at time of batching
+          // Per FDD BL-05: apply defaults for batch details without modifying contacts table
+          // Capture snapshot of effective date and cancellation reason using utility functions
           const effectiveDate =
             transactionType === TRANSACTION_TYPES.CANCELLATION
-              ? contact.careEndDate
-              : contact.effectiveDate
+              ? getEffectiveDateOrDefault(contact.careEndDate)
+              : getEffectiveDateOrDefault(contact.effectiveDate)
           const cancelReasonCode =
-            transactionType === TRANSACTION_TYPES.CANCELLATION ? contact.cancelReasonCode : null
+            transactionType === TRANSACTION_TYPES.CANCELLATION
+              ? getCancelReasonCodeOrDefault(contact.cancelReasonCode)
+              : null
 
           const batchDetail = await tx.contactBatchDetail.create({
             data: {
@@ -758,6 +748,17 @@ export class BatchesService {
       )
       return existingDetail
     }
+
+    // Fetch contact to get effective date and cancellation reason
+    const contact = await this.prisma.contact.findUnique({
+      where: { id: contactId },
+      select: {
+        effectiveDate: true,
+        careEndDate: true,
+        cancelReasonCode: true,
+      },
+    })
+
     this.logger.log(
       `Creating batch detail for contact ${contactId} in batch ${batchId} with CRA status ${craStatus}`,
     )
@@ -767,6 +768,17 @@ export class BatchesService {
       childBirthDate:
         parseWklDate(craMatchingSnapshot.childBirthDate) ?? craMatchingSnapshot.childBirthDate,
     }
+
+    // Apply defaults for effective date and cancellation reason without modifying contacts table
+    const effectiveDate =
+      transactionType === TRANSACTION_TYPES.CANCELLATION
+        ? getEffectiveDateOrDefault(contact?.careEndDate)
+        : getEffectiveDateOrDefault(contact?.effectiveDate)
+    const cancelReasonCode =
+      transactionType === TRANSACTION_TYPES.CANCELLATION
+        ? getCancelReasonCodeOrDefault(contact?.cancelReasonCode)
+        : null
+
     return await this.prisma.$transaction(async (tx) => {
       // Start in IN_PROGRESS — the caller fires CRA_WKL_APPROVED/REFUSED
       // next, and those events are only valid from IN_PROGRESS.
@@ -776,6 +788,8 @@ export class BatchesService {
           batchId,
           transactionType,
           status: BATCH_DETAIL_STATUS.IN_PROGRESS,
+          effectiveDate,
+          cancelReasonCode,
           craMatchingSnapshot: snapshot,
           createdAt: now,
           createdBy: UPDATED_BY.SYSTEM,

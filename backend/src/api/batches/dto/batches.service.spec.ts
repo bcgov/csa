@@ -458,10 +458,16 @@ describe('BatchesService', () => {
 
       await service.addContactsToPendingBatch([1], 'user1')
 
-      expect(mockPrismaService.contact.update).toHaveBeenCalledWith({
-        where: { id: 1 },
-        data: { careEndDate: expect.any(Date), cancelReasonCode: '21' },
+      // Verify defaults were captured in batch detail (contacts table is not updated)
+      expect(mockPrismaService.contactBatchDetail.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          effectiveDate: expect.any(Date), // careEndDate was null, defaults to current date
+          cancelReasonCode: '21', // defaults to CHILD_LEFT
+        }),
       })
+
+      // Verify contact table was NOT updated
+      expect(mockPrismaService.contact.update).not.toHaveBeenCalled()
     })
 
     it('should not overwrite cancelReasonCode and careEndDate when already populated', async () => {

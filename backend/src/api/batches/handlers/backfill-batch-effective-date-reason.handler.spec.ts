@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TRANSACTION_TYPES } from 'src/api/contacts/constants'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BackfillBatchEffectiveDateReasonHandler } from './backfill-batch-effective-date-reason.handler'
 
 describe('BackfillBatchEffectiveDateReasonHandler', () => {
@@ -132,13 +132,22 @@ describe('BackfillBatchEffectiveDateReasonHandler', () => {
       expect(mockPrisma.contactBatchDetail.update).toHaveBeenCalledTimes(3)
     })
 
-    it('should handle null values in contact fields', async () => {
+    it('should apply default values when contact fields are null', async () => {
       const batchDetails = [
         {
           id: 1,
           transactionType: TRANSACTION_TYPES.APPLICATION,
           contact: {
             effectiveDate: null,
+            careEndDate: null,
+            cancelReasonCode: null,
+          },
+        },
+        {
+          id: 2,
+          transactionType: TRANSACTION_TYPES.CANCELLATION,
+          contact: {
+            effectiveDate: new Date('2024-01-01'),
             careEndDate: null,
             cancelReasonCode: null,
           },
@@ -151,11 +160,23 @@ describe('BackfillBatchEffectiveDateReasonHandler', () => {
       const result = await handler.execute({} as any)
 
       expect(result.success).toBe(true)
-      expect(mockPrisma.contactBatchDetail.update).toHaveBeenCalledWith({
+      expect(result.metadata?.updated).toBe(2)
+
+      // For application with null effectiveDate, defaults to current date
+      expect(mockPrisma.contactBatchDetail.update).toHaveBeenNthCalledWith(1, {
         where: { id: 1 },
         data: {
-          effectiveDate: null,
+          effectiveDate: expect.any(Date), // Defaults to current date
           cancelReasonCode: null,
+        },
+      })
+
+      // For cancellation with null careEndDate and cancelReasonCode, defaults both
+      expect(mockPrisma.contactBatchDetail.update).toHaveBeenNthCalledWith(2, {
+        where: { id: 2 },
+        data: {
+          effectiveDate: expect.any(Date), // careEndDate was null, defaults to current date
+          cancelReasonCode: '21', // Defaults to CHILD_LEFT
         },
       })
     })

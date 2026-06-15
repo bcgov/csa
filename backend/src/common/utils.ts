@@ -1,4 +1,5 @@
 import { DateTime } from 'luxon'
+import { CANCEL_REASON } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import {
   BATCH_DETAIL_STATUS_LABELS,
   BATCH_STATUS_LABELS,
@@ -165,6 +166,23 @@ export function pacificTodayISO(): string {
 
 export function pacificNowISO(): string {
   return DateTime.now().setZone(PACIFIC_ZONE).toFormat('yyyy-MM-dd HH:mm:ss')
+}
+
+/**
+ * Returns the provided date as-is if available, otherwise defaults to current date (Pacific timezone).
+ * Used for effective_date and care_end_date fields in batch processing.
+ * No date normalization is applied - values are preserved exactly as stored in the database.
+ */
+export function getEffectiveDateOrDefault(date: Date | null): Date {
+  return date ?? pacificToday()
+}
+
+/**
+ * Returns the cancellation reason code as-is if available, otherwise defaults to '21' (CANCEL_REASON.CHILD_LEFT).
+ * Used for cancel_reason_code field in batch processing for cancellation transactions.
+ */
+export function getCancelReasonCodeOrDefault(code: string | null): string {
+  return code ?? CANCEL_REASON.CHILD_LEFT
 }
 
 export function appendSystemComment(

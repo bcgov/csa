@@ -91,13 +91,13 @@ describe('weekly-file.mapper', () => {
       id: 10,
       recordIndex: 2,
       csaMatchFound: 'Yes',
-      transactionType: 'A = Application',
-      transactionSource: 'E = Electronic',
+      transactionType: 'Application',
+      transactionSource: 'Electronic',
       din: '123456789',
       firstName: 'JOHN',
       lastName: 'DOE',
-      gender: 'M = Man / Boy',
-      birthCountry: 'CA = Canada',
+      gender: 'Man / Boy',
+      birthCountry: 'Canada',
       craStatus: 'COMPLETED',
       associatedCaseNumber: '1-123',
       associatedPersonIdIcm: 'ICM-1',
@@ -125,9 +125,9 @@ describe('weekly-file.mapper', () => {
       batchDetail: null,
     })
 
-    expect(dto.transactionType).toBe('U = CRA Update')
-    expect(dto.transactionSource).toBe("' ' = Other")
-    expect(dto.gender).toBe('X = Unknown')
-    expect(dto.birthCountry).toBe('EX = Outside Canada')
+    expect(dto.transactionType).toBe('CRA Update')
+    expect(dto.transactionSource).toBe('Other')
+    expect(dto.gender).toBe('Unknown')
+    expect(dto.birthCountry).toBe('Outside Canada')
   })
 })

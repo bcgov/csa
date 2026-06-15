@@ -7,25 +7,25 @@ const { WKL_MATCH_STATUS, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
 const { RECEIVE_MODE } = WEEKLY_FILE
 
 const TRANSACTION_TYPE_LABELS: Record<string, string> = {
-  A: 'A = Application',
-  C: 'C = Cancellation',
-  U: 'U = CRA Update',
+  A: 'Application',
+  C: 'Cancellation',
+  U: 'CRA Update',
 }
 
 const TRANSACTION_SOURCE_LABELS: Record<string, string> = {
-  E: 'E = Electronic',
-  '': "' ' = Other",
+  E: 'Electronic',
+  '': 'Other',
 }
 
 const GENDER_LABELS: Record<string, string> = {
-  M: 'M = Man / Boy',
-  F: 'F = Woman / Girl',
-  X: 'X = Unknown',
+  M: 'Man / Boy',
+  F: 'Woman / Girl',
+  X: 'Unknown',
 }
 
 const BIRTH_COUNTRY_LABELS: Record<string, string> = {
-  CA: 'CA = Canada',
-  EX: 'EX = Outside Canada',
+  CA: 'Canada',
+  EX: 'Outside Canada',
 }
 
 export interface WeeklyFileCounts {

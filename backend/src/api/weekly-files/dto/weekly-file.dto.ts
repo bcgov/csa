@@ -45,10 +45,12 @@ export class WeeklyFileRecordDto {
   @ApiProperty()
   matchStatus: string
 
-  @ApiProperty({ description: 'A = Application, C = Cancellation, U = CRA Update' })
+  @ApiProperty({
+    description: 'Mapped display value: A = Application, C = Cancellation, U = CRA Update',
+  })
   transactionType: string
 
-  @ApiProperty({ description: 'E = Electronic, ** = Other' })
+  @ApiProperty({ description: "Mapped display value: E = Electronic, ' ' = Other" })
   transactionSource: string
 
   @ApiProperty()
@@ -63,7 +65,9 @@ export class WeeklyFileRecordDto {
   @ApiProperty()
   initial: string
 
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Mapped display value: M = Man / Boy, F = Woman / Girl, X = Unknown',
+  })
   gender: string
 
   @ApiProperty({ nullable: true })
@@ -75,7 +79,7 @@ export class WeeklyFileRecordDto {
   @ApiProperty()
   birthProvince: string
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Mapped display value: CA = Canada, EX = Outside Canada' })
   birthCountry: string
 
   @ApiProperty({ nullable: true })

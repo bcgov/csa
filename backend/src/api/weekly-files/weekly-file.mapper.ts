@@ -6,6 +6,28 @@ import type { WeeklyFileRecordDto, WeeklyFileSummaryDto } from './dto/weekly-fil
 const { WKL_MATCH_STATUS, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
 const { RECEIVE_MODE } = WEEKLY_FILE
 
+const TRANSACTION_TYPE_LABELS: Record<string, string> = {
+  A: 'A = Application',
+  C: 'C = Cancellation',
+  U: 'U = CRA Update',
+}
+
+const TRANSACTION_SOURCE_LABELS: Record<string, string> = {
+  E: 'E = Electronic',
+  '': "' ' = Other",
+}
+
+const GENDER_LABELS: Record<string, string> = {
+  M: 'M = Man / Boy',
+  F: 'F = Woman / Girl',
+  X: 'X = Unknown',
+}
+
+const BIRTH_COUNTRY_LABELS: Record<string, string> = {
+  CA: 'CA = Canada',
+  EX: 'EX = Outside Canada',
+}
+
 export interface WeeklyFileCounts {
   totalCount: number
   eCount: number
@@ -105,18 +127,17 @@ export function toWeeklyFileRecordDto(record: {
     recordIndex: record.recordIndex,
     csaMatchFound: toCsaMatchFound(record.matchStatus),
     matchStatus: record.matchStatus,
-    transactionType: data.transactionType?.trim() ?? '',
-    transactionSource:
-      data.receiveMode === RECEIVE_MODE.ELECTQRONIC ? RECEIVE_MODE.ELECTQRONIC : '**',
+    transactionType: formatTransactionType(data.transactionType),
+    transactionSource: formatTransactionSource(data.receiveMode),
     din: data.childDin?.trim() ?? '',
     firstName: data.childGivenName?.trim() ?? '',
     lastName: data.childSurName?.trim() ?? '',
     initial: data.childInitial?.trim() ?? '',
-    gender: data.childSex?.trim() ?? '',
+    gender: formatGender(data.childSex),
     dateOfBirth: formatWklDateString(data.childBirthDate),
     birthCity: data.childBirthCity?.trim() ?? '',
     birthProvince: data.childBirthProv?.trim() ?? '',
-    birthCountry: data.childBirthCountry?.trim() ?? '',
+    birthCountry: formatBirthCountry(data.childBirthCountry),
     careStartDate: formatWklDateString(data.careStartDate),
     careEndDate: formatWklDateString(data.careEndDate),
     cancelReasonCode: data.careEndReasonCode?.trim() ?? '',
@@ -147,4 +168,24 @@ function formatWklDateString(value: string | undefined): string | null {
 function formatCraStatus(status: string | undefined): string {
   if (!status?.trim()) return ''
   return status.trim().toUpperCase().replace(/-/g, ' ')
+}
+
+function formatTransactionType(value: string | undefined): string {
+  const normalized = value?.trim().toUpperCase() ?? ''
+  return TRANSACTION_TYPE_LABELS[normalized] ?? normalized
+}
+
+function formatTransactionSource(value: string | undefined): string {
+  const normalized = value?.trim().toUpperCase() ?? ''
+  return TRANSACTION_SOURCE_LABELS[normalized] ?? normalized
+}
+
+function formatGender(value: string | undefined): string {
+  const normalized = value?.trim().toUpperCase() ?? ''
+  return GENDER_LABELS[normalized] ?? normalized
+}
+
+function formatBirthCountry(value: string | undefined): string {
+  const normalized = value?.trim().toUpperCase() ?? ''
+  return BIRTH_COUNTRY_LABELS[normalized] ?? normalized
 }

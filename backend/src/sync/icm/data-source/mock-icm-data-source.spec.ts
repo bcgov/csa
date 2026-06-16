@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { MockIcmDataSource } from './mock-icm-data-source'
 import { IcmApiConfig } from '../icm.config'
-import * as icmConfig from '../icm.config'
 import * as fs from 'fs'
 
 vi.mock('fs')
@@ -20,7 +19,6 @@ describe('MockIcmDataSource', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
-    vi.spyOn(icmConfig, 'isOocAgreementLinesConfig').mockReturnValue(false)
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [MockIcmDataSource],
@@ -30,20 +28,6 @@ describe('MockIcmDataSource', () => {
   })
 
   describe('fetchAll', () => {
-    it('should return empty for ooc agreement lines ingest', async () => {
-      vi.spyOn(icmConfig, 'isOocAgreementLinesConfig').mockReturnValue(true)
-
-      const oocConfig: IcmApiConfig = {
-        ...testConfig,
-        name: 'ooc_agreement_lines',
-      }
-
-      const results = await service.fetchAll(oocConfig)
-
-      expect(results).toEqual([])
-      expect(fs.existsSync).not.toHaveBeenCalled()
-    })
-
     it('should read mock .json file and return items', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true)
       vi.mocked(fs.readFileSync).mockReturnValue(

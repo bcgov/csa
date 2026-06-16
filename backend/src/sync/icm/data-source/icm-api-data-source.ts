@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config'
 import { firstValueFrom } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { formatDatePacific } from 'src/common/utils'
-import { ICM_UPDATE_BATCH_LIMIT, IcmApiConfig, isOocAgreementLinesConfig } from '../icm.config'
+import { ICM_UPDATE_BATCH_LIMIT, IcmApiConfig } from '../icm.config'
 import { IcmApiRecord, IcmContactUpdatePayload, IcmDataSource } from './icm-data-source'
 
 const PAGE_SIZE = 100
@@ -22,12 +22,6 @@ export class IcmApiDataSource extends IcmDataSource {
   }
 
   async fetchAll(config: IcmApiConfig, lastUpdated?: Date): Promise<IcmApiRecord[]> {
-    // Temporary: agreement line ICM API is not ready in test — fake an empty paginated response.
-    if (isOocAgreementLinesConfig(config)) {
-      this.logger.warn(`${config.name}: returning empty result (temporary)`)
-      return []
-    }
-
     const icmApiUrl = this.configService.get<string>('admin.icmApiUrl')!
     const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
     const timeout = this.configService.get<number>('sync.icmRequestTimeoutMs')!

@@ -91,11 +91,13 @@ describe('weekly-file.mapper', () => {
       id: 10,
       recordIndex: 2,
       csaMatchFound: 'Yes',
-      transactionType: 'A',
-      transactionSource: 'E',
+      transactionType: 'Application',
+      transactionSource: 'Electronic',
       din: '123456789',
       firstName: 'JOHN',
       lastName: 'DOE',
+      gender: 'Man / Boy',
+      birthCountry: 'Canada',
       craStatus: 'COMPLETED',
       associatedCaseNumber: '1-123',
       associatedPersonIdIcm: 'ICM-1',
@@ -103,5 +105,29 @@ describe('weekly-file.mapper', () => {
       matchedBy: 'SYSTEM',
     })
     expect(dto.dateOfBirth).toBe('2010-03-15')
+  })
+
+  it('maps non-electronic, update, unknown gender, and outside-canada values to display labels', () => {
+    const dto = toWeeklyFileRecordDto({
+      id: 11,
+      recordIndex: 3,
+      matchStatus: WKL_MATCH_STATUS.UNMATCHED,
+      matchedBy: null,
+      processedAt: null,
+      recordData: {
+        ...baseRecordData,
+        transactionType: 'U',
+        receiveMode: ' ',
+        childSex: 'X',
+        childBirthCountry: 'EX',
+      },
+      contact: null,
+      batchDetail: null,
+    })
+
+    expect(dto.transactionType).toBe('CRA Update')
+    expect(dto.transactionSource).toBe('Other')
+    expect(dto.gender).toBe('Unknown')
+    expect(dto.birthCountry).toBe('Outside Canada')
   })
 })

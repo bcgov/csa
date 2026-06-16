@@ -390,6 +390,7 @@ describe('BatchesService', () => {
           transactionType: 'application',
           systemComments: null,
           contact: { din: '123456789' },
+          batch: { initiatedBy: 'Ministry' },
         },
       ])
 
@@ -402,6 +403,7 @@ describe('BatchesService', () => {
         transactionType: 'application',
         systemComments: null,
         contact: { din: '123456789' },
+        initiatedBy: 'Ministry',
       })
     })
 
@@ -499,7 +501,7 @@ describe('BatchesService', () => {
       mockPrisma.contactBatchDetail.findFirst = vi.fn().mockResolvedValue(null)
       mockPrisma.contactBatchDetail.create = vi.fn().mockResolvedValue({ id: 1 })
       mockPrisma.contactBatchDetail.update = vi.fn().mockResolvedValue({})
-      mockPrisma.contactBatchDetail.findUnique = vi.fn().mockResolvedValue({
+      mockPrisma.contactBatchDetail.findUniqueOrThrow = vi.fn().mockResolvedValue({
         id: 1,
         contactId: 1,
         batchId: 1,
@@ -513,7 +515,7 @@ describe('BatchesService', () => {
           contactBatchDetail: {
             create: mockPrisma.contactBatchDetail.create,
             update: mockPrisma.contactBatchDetail.update,
-            findUnique: mockPrisma.contactBatchDetail.findUnique,
+            findUniqueOrThrow: mockPrisma.contactBatchDetail.findUniqueOrThrow,
           },
         }),
       )

@@ -68,6 +68,8 @@ export interface MatchedBatchDetail {
   transactionType: string
   systemComments: string | null
   contact: { din: string | null }
+  /** Who created the owning batch (MINISTRY or CRA). */
+  initiatedBy: string
 }
 
 export interface MatchedContact {
@@ -85,6 +87,7 @@ export type SnapshotBatchDetailCandidate = {
   systemComments: string | null
   craMatchingSnapshot: unknown
   contact: { din: string | null }
+  batch: { initiatedBy: string }
 }
 
 @Injectable()
@@ -114,6 +117,7 @@ export class WeeklyContactMatcherService {
         systemComments: true,
         craMatchingSnapshot: true,
         contact: { select: { din: true } },
+        batch: { select: { initiatedBy: true } },
       },
     })
   }
@@ -179,6 +183,7 @@ export class WeeklyContactMatcherService {
         systemComments: true,
         craMatchingSnapshot: true,
         contact: { select: { din: true } },
+        batch: { select: { initiatedBy: true } },
       },
     })
   }
@@ -205,6 +210,7 @@ export class WeeklyContactMatcherService {
         systemComments: true,
         craMatchingSnapshot: true,
         contact: { select: { din: true } },
+        batch: { select: { initiatedBy: true } },
       },
     })
 
@@ -246,6 +252,7 @@ export class WeeklyContactMatcherService {
       transactionType: detail.transactionType,
       systemComments: detail.systemComments,
       contact: detail.contact,
+      initiatedBy: detail.batch.initiatedBy,
     }
   }
 

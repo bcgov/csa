@@ -117,6 +117,8 @@ export class OutboundDataService {
       prevRecipGivenName: contact.prevRecipientFirstName ?? '',
       prevRecipSurName: contact.prevRecipientLastName ?? '',
 
+      // batchDetail.effectiveDate is the snapshot transaction date: it carries the
+      // application start date here and the care END date for cancellations below.
       appStartDate: isApplication ? this.formatDate(batchDetail.effectiveDate) : '',
       newBornCode: isApplication ? this.calculateNewBornCode(contact.dateOfBirth, contact.din) : '',
       filler2: '',

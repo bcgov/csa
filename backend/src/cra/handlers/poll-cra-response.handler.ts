@@ -20,6 +20,7 @@ import { InboundWeeklyResponseService } from '../inbound/inbound-weekly-response
 import type { DetailRecord04, HeaderRecord } from '../inbound/inbound-weekly.interface'
 import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import { WklAssociatedRecordProcessorService } from '../inbound/wkl-associated-record-processor.service'
+import { buildWklUpdatePayloads } from '../inbound/wkl-snapshot-data'
 import { WeeklyContactMatcherService } from '../inbound/weekly-contact-matcher.service'
 import { WklFileRecordService } from '../inbound/wkl-file-record.service'
 import { CraTransferService } from '../transfer/cra-transfer.service'
@@ -30,6 +31,7 @@ const {
   WEEKLY_FILE,
   RESPONSE_FILE_TYPE,
   WKL_MATCH_STATUS,
+  BATCH_INITIATED_BY,
 } = CRA_DATA_HANDLING_CONSTANT
 const { STATUS: WKL_STATUS, RECEIVE_MODE, TRANSACTION_TYPE_MAP, TRANSACTION_TYPES } = WEEKLY_FILE
 
@@ -446,30 +448,12 @@ export class PollCraResponseHandler extends BaseJob {
         `isApproved: ${isApproved}, isRefused: ${isRefused}`,
     )
 
-    const din = detail.childDin?.trim()
-    const careDate =
-      wklType === 'cancellation'
-        ? parseWklDate(detail.careEndDate)
-        : parseWklDate(detail.careStartDate)
-    const cancelReasonCode =
-      wklType === 'cancellation' ? detail.careEndReasonCode?.trim() : undefined
+    const { contactData: additionalData, batchDetailData } = buildWklUpdatePayloads(detail, wklType)
 
-    // Additional data for contact update
-    const additionalData: Record<string, unknown> = {
-      ...(careDate
-        ? wklType === 'cancellation'
-          ? { careEndDate: careDate }
-          : { effectiveDate: careDate }
-        : {}),
-      ...(din ? { din } : {}),
-      ...(cancelReasonCode ? { cancelReasonCode } : {}),
-    }
-
-    // Additional data for batch detail update (preserve effective date and reason)
-    const batchDetailAdditionalData: Record<string, unknown> = {
-      ...(careDate ? { effectiveDate: careDate } : {}),
-      ...(cancelReasonCode ? { cancelReasonCode } : {}),
-    }
+    // Only CRA-initiated batch details receive the WKL cancellation snapshot.
+    // Ministry-initiated batch details keep the snapshot captured at batch time.
+    const batchDetailAdditionalData =
+      batchDetail.initiatedBy === BATCH_INITIATED_BY.CRA ? batchDetailData : {}
 
     if (isApproved) {
       await this.batchesService.updateBatchDetailStatus(

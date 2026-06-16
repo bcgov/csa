@@ -274,6 +274,7 @@ export class BatchesService {
         transactionType: true,
         systemComments: true,
         contact: { select: { din: true } },
+        batch: { select: { initiatedBy: true } },
       },
       orderBy: { id: 'desc' },
     })
@@ -288,7 +289,8 @@ export class BatchesService {
       )
     }
 
-    return details[0]
+    const { batch, ...detail } = details[0]
+    return { ...detail, initiatedBy: batch.initiatedBy }
   }
 
   async findOrCreateWklBatchForUnmatchedRecords(batchDate: Date) {
@@ -770,7 +772,8 @@ export class BatchesService {
         `Attempted to create WKL batch detail for contact ${contactId} in batch ${batchId}, but it already exists. ` +
           `Please review batch detail ${existingDetail.id} for details.`,
       )
-      return existingDetail
+      // This method only ever operates on the CRA-initiated unmatched batch.
+      return { ...existingDetail, initiatedBy: BATCH_INITIATED_BY.CRA }
     }
     this.logger.log(
       `Creating batch detail for contact ${contactId} in batch ${batchId} with CRA status ${craStatus}`,
@@ -801,7 +804,7 @@ export class BatchesService {
         where: { id: batchDetail.id },
         data: { referenceNumber: `${caseNumber}-${batchDetail.id}` },
       })
-      return await tx.contactBatchDetail.findUnique({
+      const created = await tx.contactBatchDetail.findUniqueOrThrow({
         where: { id: batchDetail.id },
         select: {
           id: true,
@@ -813,6 +816,8 @@ export class BatchesService {
           contact: { select: { din: true } },
         },
       })
+      // This method only ever operates on the CRA-initiated unmatched batch.
+      return { ...created, initiatedBy: BATCH_INITIATED_BY.CRA }
     })
   }
 }

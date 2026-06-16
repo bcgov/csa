@@ -2,8 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { BatchesService } from 'src/api/batches/batches.service'
 import { ContactsService } from 'src/api/contacts/contacts.service'
 import { BATCH_DETAIL_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
-import { pacificToday, parseWklDate } from 'src/common/utils'
-import { CANCEL_REASON } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
+import { buildWklUpdatePayloads } from './wkl-snapshot-data'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import type { DetailRecord04, HeaderRecord } from './inbound-weekly.interface'
 import { WeeklyContactMatcherService } from './weekly-contact-matcher.service'
@@ -107,32 +106,8 @@ export class WklAssociatedRecordProcessorService {
       detail.status?.toLowerCase() === WKL_STATUS.COMPLETED ||
       detail.status?.toLowerCase() === WKL_STATUS.UPDATED
     const isRefused = detail.status?.toLowerCase() === WKL_STATUS.ABANDONED
-    const din = detail.childDin?.trim()
-    const careDate =
-      wklType === 'cancellation'
-        ? (parseWklDate(detail.careEndDate) ?? pacificToday())
-        : parseWklDate(detail.careStartDate)
-    const cancelReasonCode =
-      wklType === 'cancellation'
-        ? detail.careEndReasonCode?.trim() || CANCEL_REASON.CHILD_LEFT
-        : undefined
-
-    // Additional data for contact update
-    const additionalData: Record<string, unknown> = {
-      ...(careDate
-        ? wklType === 'cancellation'
-          ? { careEndDate: careDate }
-          : { effectiveDate: careDate }
-        : {}),
-      ...(din ? { din } : {}),
-      ...(cancelReasonCode ? { cancelReasonCode } : {}),
-    }
-
-    // Additional data for batch detail update (preserve effective date and reason)
-    const batchDetailAdditionalData: Record<string, unknown> = {
-      ...(careDate ? { effectiveDate: careDate } : {}),
-      ...(cancelReasonCode ? { cancelReasonCode } : {}),
-    }
+    const { contactData: additionalData, batchDetailData: batchDetailAdditionalData } =
+      buildWklUpdatePayloads(detail, wklType)
 
     if (isApproved) {
       const nextState =

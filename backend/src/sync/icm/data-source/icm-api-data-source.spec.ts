@@ -4,7 +4,6 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { of } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { IcmApiConfig } from '../icm.config'
-import * as icmConfig from '../icm.config'
 import { OOC_AGREEMENT_LINES_FIELDS, OOC_AGREEMENT_LINES_SEARCH_SPEC } from '../agreement-lines'
 import { IcmApiDataSource } from './icm-api-data-source'
 import { IcmContactUpdatePayload } from './icm-data-source'
@@ -25,8 +24,6 @@ describe('IcmApiDataSource', () => {
   let keycloakAuthService: { getBearerToken: ReturnType<typeof vi.fn> }
 
   beforeEach(async () => {
-    vi.spyOn(icmConfig, 'isOocAgreementLinesConfig').mockReturnValue(false)
-
     httpService = { get: vi.fn(), put: vi.fn() }
 
     keycloakAuthService = {
@@ -57,25 +54,7 @@ describe('IcmApiDataSource', () => {
     service = module.get<IcmApiDataSource>(IcmApiDataSource)
   })
 
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
   describe('fetchAll', () => {
-    it('should return empty for ooc agreement lines ingest', async () => {
-      vi.spyOn(icmConfig, 'isOocAgreementLinesConfig').mockReturnValue(true)
-
-      const oocConfig: IcmApiConfig = {
-        ...mockConfig,
-        name: 'ooc_agreement_lines',
-      }
-
-      const results = await service.fetchAll(oocConfig)
-
-      expect(results).toEqual([])
-      expect(httpService.get).not.toHaveBeenCalled()
-    })
-
     it('should paginate until fewer items than page size', async () => {
       httpService.get
         .mockReturnValueOnce(

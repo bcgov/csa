@@ -266,10 +266,18 @@ describe('BatchesService', () => {
         systemComments: 'existing comment',
       })
       mockPrisma.batch.update.mockResolvedValue({})
+      vi.spyOn(service, 'updateBatchStatus').mockResolvedValue({
+        success: false,
+        reason: 'Invalid transition',
+      })
 
       await service.aggregateBatchStatus(1)
 
-      expect(service.updateBatchStatus).not.toHaveBeenCalled()
+      expect(service.updateBatchStatus).toHaveBeenCalledWith(
+        1,
+        BATCH_EVENT.CRA_PARTIALLY_PROCESSED,
+        expect.objectContaining({ additionalData: expect.any(Object) }),
+      )
       expect(mockPrisma.batch.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: {
@@ -288,10 +296,18 @@ describe('BatchesService', () => {
         systemComments: '[2026-06-15 04:47:35] All refused by CRA.',
       })
       mockPrisma.batch.update.mockResolvedValue({})
+      vi.spyOn(service, 'updateBatchStatus').mockResolvedValue({
+        success: false,
+        reason: 'Invalid transition',
+      })
 
       await service.aggregateBatchStatus(1)
 
-      expect(service.updateBatchStatus).not.toHaveBeenCalled()
+      expect(service.updateBatchStatus).toHaveBeenCalledWith(
+        1,
+        BATCH_EVENT.CRA_ALL_PROCESSED,
+        expect.objectContaining({ additionalData: expect.any(Object) }),
+      )
       expect(mockPrisma.batch.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: {

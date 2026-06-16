@@ -568,12 +568,22 @@ export class BatchesService {
       const batchMessage = this.getWklSystemComment(hasApproved, hasRefused, false)
       const batch = await this.prisma.batch.findUnique({
         where: { id: batchId },
-        select: { systemComments: true },
+        select: { status: true, systemComments: true },
       })
       const systemComments = appendSystemComment(batchMessage, batch?.systemComments ?? null)
-      await this.updateBatchStatus(batchId, BATCH_EVENT.CRA_ALL_PROCESSED, {
-        additionalData: { systemComments },
-      })
+
+      if (batch?.status === BATCH_STATUS.PROCESSED) {
+        // Already processed (e.g. a second WKL confirm added to this batch);
+        // transition is invalid so update comments directly.
+        await this.prisma.batch.update({
+          where: { id: batchId },
+          data: { systemComments },
+        })
+      } else {
+        await this.updateBatchStatus(batchId, BATCH_EVENT.CRA_ALL_PROCESSED, {
+          additionalData: { systemComments },
+        })
+      }
       return
     }
 

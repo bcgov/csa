@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BATCH_DETAIL_STATUS, BATCH_EVENT, BATCH_STATUS } from 'src/common/state-machine/constants'
+import { HeaderRecord, RecordTypeCode, TranCode } from 'src/cra/inbound/inbound-weekly.interface'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BatchesService } from './batches.service'
-import { RecordTypeCode, TranCode, HeaderRecord } from 'src/cra/inbound/inbound-weekly.interface'
 
 describe('BatchesService', () => {
   let service: BatchesService
@@ -274,6 +274,28 @@ describe('BatchesService', () => {
         where: { id: 1 },
         data: {
           systemComments: expect.stringContaining('All accepted by CRA so far.'),
+        },
+      })
+    })
+
+    it('should update comments directly when batch is already processed and new detail creates a mix', async () => {
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
+        { status: BATCH_DETAIL_STATUS.APPROVED },
+        { status: BATCH_DETAIL_STATUS.REFUSED },
+      ])
+      mockPrisma.batch.findUnique.mockResolvedValue({
+        status: BATCH_STATUS.PROCESSED,
+        systemComments: '[2026-06-15 04:47:35] All refused by CRA.',
+      })
+      mockPrisma.batch.update.mockResolvedValue({})
+
+      await service.aggregateBatchStatus(1)
+
+      expect(service.updateBatchStatus).not.toHaveBeenCalled()
+      expect(mockPrisma.batch.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          systemComments: expect.stringContaining('Some accepted, some refused by CRA.'),
         },
       })
     })

@@ -547,28 +547,16 @@ export class BatchesService {
       const batchMessage = this.getWklSystemComment(hasApproved, hasRefused, true)
       const batch = await this.prisma.batch.findUnique({
         where: { id: batchId },
-        select: { systemComments: true },
+        select: { status: true, systemComments: true },
       })
       const systemComments = appendSystemComment(batchMessage, batch?.systemComments ?? null)
 
-      const transition = await this.updateBatchStatus(
-        batchId,
-        BATCH_EVENT.CRA_PARTIALLY_PROCESSED,
-        {
+      if (batch?.status === BATCH_STATUS.IN_PROGRESS) {
+        await this.updateBatchStatus(batchId, BATCH_EVENT.CRA_PARTIALLY_PROCESSED, {
           additionalData: { systemComments },
-        },
-      )
-      if (!transition.success) {
-        if (transition.reason !== 'Invalid transition') {
-          this.logger.warn(
-            `Batch ${batchId}: unable to apply ${BATCH_EVENT.CRA_PARTIALLY_PROCESSED} (${transition.reason})`,
-          )
-          return
-        }
-
-        this.logger.log(
-          `Batch ${batchId}: ${BATCH_EVENT.CRA_PARTIALLY_PROCESSED} skipped (invalid transition); updating comments only`,
-        )
+        })
+      } else {
+        // Already partially_processed, just update comments
         await this.prisma.batch.update({
           where: { id: batchId },
           data: { systemComments },
@@ -585,26 +573,9 @@ export class BatchesService {
         select: { systemComments: true },
       })
       const systemComments = appendSystemComment(batchMessage, batch?.systemComments ?? null)
-
-      const transition = await this.updateBatchStatus(batchId, BATCH_EVENT.CRA_ALL_PROCESSED, {
+      await this.updateBatchStatus(batchId, BATCH_EVENT.CRA_ALL_PROCESSED, {
         additionalData: { systemComments },
       })
-      if (!transition.success) {
-        if (transition.reason !== 'Invalid transition') {
-          this.logger.warn(
-            `Batch ${batchId}: unable to apply ${BATCH_EVENT.CRA_ALL_PROCESSED} (${transition.reason})`,
-          )
-          return
-        }
-
-        this.logger.log(
-          `Batch ${batchId}: ${BATCH_EVENT.CRA_ALL_PROCESSED} skipped (invalid transition); updating comments only`,
-        )
-        await this.prisma.batch.update({
-          where: { id: batchId },
-          data: { systemComments },
-        })
-      }
       return
     }
 

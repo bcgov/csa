@@ -186,6 +186,28 @@ describe('BatchesService', () => {
       })
     })
 
+    it('should update comments directly when approved + refused and batch is already processed', async () => {
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
+        { status: BATCH_DETAIL_STATUS.APPROVED },
+        { status: BATCH_DETAIL_STATUS.REFUSED },
+      ])
+      mockPrisma.batch.findUnique.mockResolvedValue({
+        status: BATCH_STATUS.PROCESSED,
+        systemComments: 'existing comment',
+      })
+      mockPrisma.batch.update.mockResolvedValue({})
+
+      await service.aggregateBatchStatus(1)
+
+      expect(service.updateBatchStatus).not.toHaveBeenCalled()
+      expect(mockPrisma.batch.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: {
+          systemComments: expect.stringContaining('Some accepted, some refused by CRA.'),
+        },
+      })
+    })
+
     it('should transition to CRA_PARTIALLY_PROCESSED with "All accepted so far" when approved + in_progress and batch is in_progress', async () => {
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([
         { status: BATCH_DETAIL_STATUS.APPROVED },

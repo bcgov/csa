@@ -298,6 +298,18 @@ const parseFormattedDate = (dateStr: string): Date | null => {
   )
 }
 
+// System comments are prepended with newest first, one entry per line.
+// Batch Requests should display only the latest entry.
+const latestSystemComment = (comments: string | null | undefined): string => {
+  if (!comments) return ''
+  return (
+    comments
+      .split('\n')
+      .find((line) => line.trim())
+      ?.trim() || ''
+  )
+}
+
 // Returns true when the reason text needs to be clamped:
 // either it exceeds the character limit OR it contains more than 3 lines (newlines).
 const holdReasonNeedsClamp = (reason: string): boolean =>
@@ -2756,7 +2768,7 @@ function App() {
         case 'createdDate':
           return formatDateTimeYMD(batch.createdAt)
         case 'systemComments':
-          return batch.systemComments || ''
+          return latestSystemComment(batch.systemComments)
         default:
           return ''
       }
@@ -3256,7 +3268,7 @@ function App() {
       recordCount: batch.recordCount,
       initiatedBy: batch.initiatedBy || '',
       createdDate: formatDateTimeYMD(batch.createdAt),
-      systemComments: batch.systemComments || '',
+      systemComments: latestSystemComment(batch.systemComments),
     }))
 
     // Apply global search across all columns

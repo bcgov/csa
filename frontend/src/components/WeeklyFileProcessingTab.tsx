@@ -8,11 +8,6 @@ import {
   Box,
   Button,
   Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   IconButton,
   InputAdornment,
   Menu,
@@ -232,7 +227,6 @@ export default function WeeklyFileProcessingTab() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [savingAssociation, setSavingAssociation] = useState(false)
   const [reprocessing, setReprocessing] = useState(false)
-  const [reprocessConfirmOpen, setReprocessConfirmOpen] = useState(false)
 
   const [weeklyReportSearchTerm, setWeeklyReportSearchTerm] = useState('')
   const [weeklyReportColumnFilters, setWeeklyReportColumnFilters] = useState<
@@ -822,7 +816,6 @@ export default function WeeklyFileProcessingTab() {
       console.error('Failed to reprocess weekly file:', err)
       setActionError(err?.response?.data?.message || 'Failed to reprocess weekly file record.')
     } finally {
-      setReprocessConfirmOpen(false)
       setReprocessing(false)
     }
   }
@@ -1062,7 +1055,7 @@ export default function WeeklyFileProcessingTab() {
         </Typography>
         <Button
           variant="contained"
-          onClick={() => setReprocessConfirmOpen(true)}
+          onClick={handleConfirmReprocess}
           disabled={!canReprocessSelectedRecord || reprocessing}
         >
           Confirm
@@ -1909,30 +1902,6 @@ export default function WeeklyFileProcessingTab() {
           </Box>
         </Box>
       </Menu>
-
-      <Dialog
-        open={reprocessConfirmOpen}
-        onClose={() => !reprocessing && setReprocessConfirmOpen(false)}
-      >
-        <DialogTitle>Confirm Reprocess</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Confirm reprocess for record {selectedRecordId}? This action only applies to the
-            selected associated record.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setReprocessConfirmOpen(false)} disabled={reprocessing}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirmReprocess}
-            disabled={!canReprocessSelectedRecord || reprocessing}
-          >
-            Confirm
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   )
 }

@@ -253,6 +253,24 @@ describe('selectPrimaryRecords', () => {
       )
       expect(result.primaryOrder).toBeNull()
     })
+
+    it('falls back to contractNumber when ICM agreementRowId has no matching order', () => {
+      const placement = makePlacement({
+        source: 'ICM',
+        agreementRowId: 'AGR-MISSING',
+        contractNumber: ' CON-1 ',
+      })
+      const matchingMisOrder = makeOrder({
+        source: 'MIS',
+        contractNumber: 'con-1',
+        orderNumber: 'MIS-MATCH',
+      })
+
+      const result = selectPrimaryRecords(
+        makeProfile({ placements: [placement], orders: [matchingMisOrder] }),
+      )
+      expect(result.primaryOrder!.orderNumber).toBe('MIS-MATCH')
+    })
   })
 
   describe('agreement matching', () => {
@@ -291,6 +309,46 @@ describe('selectPrimaryRecords', () => {
 
       const result = selectPrimaryRecords(
         makeProfile({ placements: [placement], agreements: [makeAgreement()] }),
+      )
+      expect(result.primaryAgreement).toBeNull()
+    })
+
+    it('falls back to contractNumber when ICM agreementRowId has no matching agreement', () => {
+      const placement = makePlacement({
+        source: 'ICM',
+        agreementRowId: 'AGR-MISSING',
+        contractNumber: ' CON-1 ',
+        providerId: 'RE-1',
+      })
+      const matchingMisAgreement = makeAgreement({
+        source: 'MIS',
+        contractNumber: 'con-1',
+        providerId: 're-1',
+        agreementType: 'MIS-CONTRACT',
+      })
+
+      const result = selectPrimaryRecords(
+        makeProfile({ placements: [placement], agreements: [matchingMisAgreement] }),
+      )
+      expect(result.primaryAgreement!.agreementType).toBe('MIS-CONTRACT')
+    })
+
+    it('does not match MIS agreement with different providerId on fallback', () => {
+      const placement = makePlacement({
+        source: 'ICM',
+        agreementRowId: 'AGR-MISSING',
+        contractNumber: 'CON-1',
+        providerId: 'RE-1',
+      })
+      const wrongProviderAgreement = makeAgreement({
+        source: 'MIS',
+        contractNumber: 'CON-1',
+        providerId: 'RE-2',
+        agreementType: 'WRONG-PROVIDER',
+      })
+
+      const result = selectPrimaryRecords(
+        makeProfile({ placements: [placement], agreements: [wrongProviderAgreement] }),
       )
       expect(result.primaryAgreement).toBeNull()
     })
@@ -512,6 +570,132 @@ describe('selectPrimaryRecords', () => {
         makeProfile({
           misLegalAuthCode: 'OPT',
           agreements: [fchAgreement],
+        }),
+        referenceDate,
+      )
+
+      expect(result.primaryPlacement).toBeNull()
+      expect(result.primaryAgreement).toBeNull()
+      expect(result.primaryOrder).toBeNull()
+    })
+
+    it('falls back to MIS active contract when no ICM OOC agreement exists', () => {
+      const misPlacement = makePlacement({
+        source: 'MIS',
+        type: 'Placement',
+        contractNumber: 'CON-MIS',
+        providerId: 'RE-1',
+      })
+      const misAgreement = makeAgreement({
+        source: 'MIS',
+        contractNumber: 'CON-MIS',
+        providerId: 'RE-1',
+        agreementStatus: 'Active',
+        agreementType: '003',
+      })
+      const misPayment = makeOrder({
+        source: 'MIS',
+        contractNumber: 'CON-MIS',
+        orderStatus: 'Closed',
+        orderNumber: 'PMT-APR',
+        effectiveStartDate: new Date('2026-04-10T00:00:00Z'),
+      })
+
+      const result = selectPrimaryRecords(
+        makeProfile({
+          misLegalAuthCode: 'OPC',
+          placements: [misPlacement],
+          agreements: [misAgreement],
+          orders: [misPayment],
+        }),
+        referenceDate,
+      )
+
+      expect(result.primaryPlacement).toBeNull()
+      expect(result.primaryAgreement!.source).toBe('MIS')
+      expect(result.primaryAgreement!.contractNumber).toBe('CON-MIS')
+      expect(result.primaryOrder!.orderNumber).toBe('PMT-APR')
+    })
+
+    it('falls back to MIS latest ended contract when no active MIS contract exists', () => {
+      const misPlacement = makePlacement({
+        source: 'MIS',
+        type: 'Placement',
+        contractNumber: 'CON-MIS',
+        providerId: 'RE-1',
+      })
+      const olderContract = makeAgreement({
+        source: 'MIS',
+        contractNumber: 'CON-MIS',
+        providerId: 'RE-1',
+        agreementStatus: 'Ended',
+        agreementEndDate: new Date('2026-01-01T00:00:00Z'),
+      })
+      const newerContract = makeAgreement({
+        source: 'MIS',
+        contractNumber: 'CON-MIS',
+        providerId: 'RE-1',
+        agreementStatus: 'Ended',
+        agreementEndDate: new Date('2026-03-01T00:00:00Z'),
+      })
+      const misPayment = makeOrder({
+        source: 'MIS',
+        contractNumber: 'CON-MIS',
+        orderStatus: 'Closed',
+        orderNumber: 'PMT-APR',
+        effectiveStartDate: new Date('2026-04-15T00:00:00Z'),
+      })
+
+      const result = selectPrimaryRecords(
+        makeProfile({
+          misLegalAuthCode: 'OPO',
+          placements: [misPlacement],
+          agreements: [olderContract, newerContract],
+          orders: [misPayment],
+        }),
+        referenceDate,
+      )
+
+      expect(result.primaryPlacement).toBeNull()
+      expect(result.primaryAgreement!.source).toBe('MIS')
+      expect(result.primaryAgreement!.agreementEndDate).toEqual(new Date('2026-03-01T00:00:00Z'))
+      expect(result.primaryOrder!.orderNumber).toBe('PMT-APR')
+    })
+
+    it('does not select MIS contract when contract matches but providerId differs', () => {
+      const result = selectPrimaryRecords(
+        makeProfile({
+          misLegalAuthCode: 'OPO',
+          placements: [
+            makePlacement({
+              source: 'MIS',
+              contractNumber: 'CON-MIS',
+              providerId: 'RE-1',
+            }),
+          ],
+          agreements: [
+            makeAgreement({
+              source: 'MIS',
+              contractNumber: 'CON-MIS',
+              providerId: 'RE-2',
+              agreementStatus: 'Active',
+            }),
+          ],
+        }),
+        referenceDate,
+      )
+
+      expect(result.primaryAgreement).toBeNull()
+      expect(result.primaryOrder).toBeNull()
+    })
+
+    it('keeps agreement and product blank when OOC has no ICM and no MIS contracts', () => {
+      const result = selectPrimaryRecords(
+        makeProfile({
+          misLegalAuthCode: 'OPT',
+          placements: [makePlacement({ source: 'MIS', contractNumber: 'CON-MIS' })],
+          agreements: [],
+          orders: [makeOrder({ source: 'MIS', contractNumber: 'CON-MIS', orderStatus: 'Closed' })],
         }),
         referenceDate,
       )

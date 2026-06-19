@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { AppLogger } from 'src/common/logger/app-logger'
+import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
 import { pacificToday } from 'src/common/utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PROTECTED_STATUSES, PROTECTED_STATUSES_SQL } from './eligibility.config'
@@ -21,6 +22,11 @@ describe('PROTECTED_STATUSES_SQL', () => {
   it('should have same number of entries as PROTECTED_STATUSES', () => {
     const count = PROTECTED_STATUSES_SQL.split(',').length
     expect(count).toBe(PROTECTED_STATUSES.length)
+  })
+
+  it('should include CRA error statuses as protected', () => {
+    expect(PROTECTED_STATUSES).toContain(CSA_STATUS.CRA_ERROR_APPLICATION)
+    expect(PROTECTED_STATUSES).toContain(CSA_STATUS.CRA_ERROR_CANCELLATION)
   })
 })
 

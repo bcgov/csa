@@ -95,7 +95,10 @@ export function selectPrimaryRecords(
       null
     if (!primaryOrder && placementContractKey) {
       primaryOrder =
-        profile.orders.find((order) => normalize(order.contractNumber) === placementContractKey) ?? null
+        profile.orders.find(
+          (order) =>
+            order.source === 'MIS' && normalize(order.contractNumber) === placementContractKey,
+        ) ?? null
     }
   } else if (primaryPlacement?.source === 'MIS' && primaryPlacement.contractNumber) {
     primaryOrder =
@@ -114,7 +117,9 @@ export function selectPrimaryRecords(
     if (!primaryAgreement && placementContractKey) {
       primaryAgreement =
         profile.agreements.find(
-          (agreement) => normalize(agreement.contractNumber) === placementContractKey,
+          (agreement) =>
+            agreement.source === 'MIS' &&
+            normalize(agreement.contractNumber) === placementContractKey,
         ) ?? null
     }
   } else if (primaryPlacement?.source === 'MIS' && primaryPlacement.contractNumber) {

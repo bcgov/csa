@@ -236,6 +236,7 @@ const COLUMN_LABELS: Record<string, string> = {
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
 const HOLD_REASON_PREVIEW_LENGTH = 150
+const HOLD_REASON_COLUMN_WIDTH = 240
 
 const toYMD = (date: Date, timeZone: string): string => {
   const parts = new Intl.DateTimeFormat('en-US', { ...DATE_FORMAT, timeZone }).formatToParts(date)
@@ -4252,7 +4253,12 @@ function App() {
                             </IconButton>
                           </Box>
                         </TableCell>
-                        <TableCell>
+                        <TableCell
+                          sx={{
+                            width: HOLD_REASON_COLUMN_WIDTH,
+                            maxWidth: HOLD_REASON_COLUMN_WIDTH,
+                          }}
+                        >
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
                               onClick={(e) => handleSortClick(e, 'holdReason')}
@@ -4397,13 +4403,20 @@ function App() {
                           <TableCell>{row.legacyFile}</TableCell>
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
                           <TableCell
-                            sx={
-                              row.holdReason && holdReasonNeedsClamp(row.holdReason)
-                                ? { minWidth: 390, maxWidth: 450 }
-                                : undefined
-                            }
+                            sx={{
+                              width: HOLD_REASON_COLUMN_WIDTH,
+                              maxWidth: HOLD_REASON_COLUMN_WIDTH,
+                            }}
                           >
-                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: 0.5,
+                                width: '100%',
+                                minWidth: 0,
+                              }}
+                            >
                               {row.holdReason ? (
                                 holdReasonNeedsClamp(row.holdReason) ? (
                                   <Tooltip
@@ -4417,7 +4430,7 @@ function App() {
                                     <Typography
                                       component="span"
                                       sx={{
-                                        maxWidth: 430,
+                                        maxWidth: '100%',
                                         display: '-webkit-box',
                                         WebkitLineClamp: 3,
                                         WebkitBoxOrient: 'vertical',

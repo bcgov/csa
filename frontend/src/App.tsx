@@ -173,8 +173,9 @@ const BATCH_STATUS_FILTER_OPTIONS = [
 const BATCH_DETAILS_STATUS_FILTER_OPTIONS = [
   { value: 'Pending', label: 'Pending' },
   { value: 'In Progress', label: 'In Progress' },
+  { value: 'Approved', label: 'Approved' },
+  { value: 'Refused', label: 'Refused' },
   { value: 'Error', label: 'Error' },
-  { value: 'Processed', label: 'Processed' },
 ]
 
 // Initiated By options for filter dropdown (used in Batch Requests)

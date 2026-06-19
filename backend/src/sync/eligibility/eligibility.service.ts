@@ -86,6 +86,7 @@ export function selectPrimaryRecords(
 
   const primaryPlacement = selectPrimaryPlacement(profile.placements)
   const placementContractKey = normalize(primaryPlacement?.contractNumber)
+  const placementProviderKey = normalize(primaryPlacement?.providerId)
 
   // Primary Order: match via primary placement's link key
   let primaryOrder: OrderRecord | null = null
@@ -119,7 +120,8 @@ export function selectPrimaryRecords(
         profile.agreements.find(
           (agreement) =>
             agreement.source === 'MIS' &&
-            normalize(agreement.contractNumber) === placementContractKey,
+            normalize(agreement.contractNumber) === placementContractKey &&
+            normalize(agreement.providerId) === placementProviderKey,
         ) ?? null
     }
   } else if (primaryPlacement?.source === 'MIS' && primaryPlacement.contractNumber) {
@@ -127,7 +129,8 @@ export function selectPrimaryRecords(
       profile.agreements.find(
         (agreement) =>
           agreement.source === 'MIS' &&
-          normalize(agreement.contractNumber) === placementContractKey,
+          normalize(agreement.contractNumber) === placementContractKey &&
+          normalize(agreement.providerId) === placementProviderKey,
       ) ?? null
   }
 
@@ -193,19 +196,26 @@ function selectOocMisAgreement(
   agreements: AgreementRecord[],
   placements: PlacementRecord[],
 ): AgreementRecord | null {
-  const misPlacementContractKeys = new Set(
+  const misPlacementKeys = new Set(
     placements
       .filter((placement) => placement.source === 'MIS')
-      .map((placement) => normalize(placement.contractNumber))
+      .map((placement) => {
+        const contractNumber = normalize(placement.contractNumber)
+        const providerId = normalize(placement.providerId)
+        if (!contractNumber || !providerId) return null
+        return `${contractNumber}::${providerId}`
+      })
       .filter((key): key is string => key != null),
   )
-  if (misPlacementContractKeys.size === 0) return null
+  if (misPlacementKeys.size === 0) return null
 
   const misContracts = agreements.filter(
     (agreement) =>
       agreement.source === 'MIS' &&
       agreement.contractNumber != null &&
-      misPlacementContractKeys.has(normalize(agreement.contractNumber)),
+      misPlacementKeys.has(
+        `${normalize(agreement.contractNumber)}::${normalize(agreement.providerId)}`,
+      ),
   )
   if (misContracts.length === 0) return null
 

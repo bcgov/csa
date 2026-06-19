@@ -236,6 +236,7 @@ const COLUMN_LABELS: Record<string, string> = {
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
 const HOLD_REASON_PREVIEW_LENGTH = 150
+const HOLD_REASON_COLUMN_WIDTH = 240
 
 const toYMD = (date: Date, timeZone: string): string => {
   const parts = new Intl.DateTimeFormat('en-US', { ...DATE_FORMAT, timeZone }).formatToParts(date)
@@ -295,6 +296,18 @@ const parseFormattedDate = (dateStr: string): Date | null => {
     parseInt(hour),
     parseInt(minute),
     parseInt(second),
+  )
+}
+
+// System comments are prepended with newest first, one entry per line.
+// Batch Requests should display only the latest entry.
+const latestSystemComment = (comments: string | null | undefined): string => {
+  if (!comments) return ''
+  return (
+    comments
+      .split('\n')
+      .find((line) => line.trim())
+      ?.trim() || ''
   )
 }
 
@@ -2756,7 +2769,7 @@ function App() {
         case 'createdDate':
           return formatDateTimeYMD(batch.createdAt)
         case 'systemComments':
-          return batch.systemComments || ''
+          return latestSystemComment(batch.systemComments)
         default:
           return ''
       }
@@ -3256,7 +3269,7 @@ function App() {
       recordCount: batch.recordCount,
       initiatedBy: batch.initiatedBy || '',
       createdDate: formatDateTimeYMD(batch.createdAt),
-      systemComments: batch.systemComments || '',
+      systemComments: latestSystemComment(batch.systemComments),
     }))
 
     // Apply global search across all columns
@@ -4240,7 +4253,12 @@ function App() {
                             </IconButton>
                           </Box>
                         </TableCell>
-                        <TableCell>
+                        <TableCell
+                          sx={{
+                            width: HOLD_REASON_COLUMN_WIDTH,
+                            maxWidth: HOLD_REASON_COLUMN_WIDTH,
+                          }}
+                        >
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
                               onClick={(e) => handleSortClick(e, 'holdReason')}
@@ -4385,13 +4403,20 @@ function App() {
                           <TableCell>{row.legacyFile}</TableCell>
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
                           <TableCell
-                            sx={
-                              row.holdReason && holdReasonNeedsClamp(row.holdReason)
-                                ? { minWidth: 390, maxWidth: 450 }
-                                : undefined
-                            }
+                            sx={{
+                              width: HOLD_REASON_COLUMN_WIDTH,
+                              maxWidth: HOLD_REASON_COLUMN_WIDTH,
+                            }}
                           >
-                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: 0.5,
+                                width: '100%',
+                                minWidth: 0,
+                              }}
+                            >
                               {row.holdReason ? (
                                 holdReasonNeedsClamp(row.holdReason) ? (
                                   <Tooltip
@@ -4405,7 +4430,7 @@ function App() {
                                     <Typography
                                       component="span"
                                       sx={{
-                                        maxWidth: 430,
+                                        maxWidth: '100%',
                                         display: '-webkit-box',
                                         WebkitLineClamp: 3,
                                         WebkitBoxOrient: 'vertical',

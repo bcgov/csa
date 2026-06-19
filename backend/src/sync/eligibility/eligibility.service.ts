@@ -155,7 +155,11 @@ function selectOocPrimaryRecords(
   let primaryOrder: OrderRecord | null = null
 
   if (primaryAgreement?.source === 'ICM' && primaryAgreement.rowId != null) {
-    primaryOrder = findClosedIcmOrderPreviousMonth(profile.orders, primaryAgreement.rowId, referenceDate)
+    primaryOrder = findClosedIcmOrderPreviousMonth(
+      profile.orders,
+      primaryAgreement.rowId,
+      referenceDate,
+    )
   } else if (primaryAgreement?.source === 'MIS' && primaryAgreement.contractNumber != null) {
     primaryOrder = findClosedMisPaymentPreviousMonth(
       profile.orders,

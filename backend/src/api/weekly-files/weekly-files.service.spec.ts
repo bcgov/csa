@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import * as commonUtils from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 import { WeeklyFilesService } from './weekly-files.service'
 
@@ -353,6 +354,8 @@ describe('WeeklyFilesService', () => {
 
   describe('reprocess', () => {
     it('reprocesses associated records and returns processed ids', async () => {
+      const systemDate = new Date('2026-06-19')
+      vi.spyOn(commonUtils, 'pacificToday').mockReturnValue(systemDate)
       mockPrisma.transferFile.findFirst.mockResolvedValue({
         id: 1,
         deliveredAt: new Date('2025-04-21T10:00:00.000Z'),
@@ -395,7 +398,7 @@ describe('WeeklyFilesService', () => {
         '1-99',
         expect.objectContaining({
           preferExistingInProgressDetail: true,
-          batchDate: expect.any(Date),
+          batchDate: systemDate,
           origin: 'WeeklyFilesService.reprocess',
         }),
         expect.any(Object),
@@ -504,6 +507,8 @@ describe('WeeklyFilesService', () => {
 
   describe('reprocessRecord', () => {
     it('reprocesses a single associated record and returns updated dto', async () => {
+      const systemDate = new Date('2026-06-19')
+      vi.spyOn(commonUtils, 'pacificToday').mockReturnValue(systemDate)
       mockPrisma.transferFile.findFirst.mockResolvedValue({
         id: 1,
         deliveredAt: new Date('2025-04-21T10:00:00.000Z'),
@@ -547,7 +552,7 @@ describe('WeeklyFilesService', () => {
         '1-99',
         expect.objectContaining({
           preferExistingInProgressDetail: true,
-          batchDate: expect.any(Date),
+          batchDate: systemDate,
           origin: 'WeeklyFilesService.reprocessRecord',
         }),
         expect.any(Object),

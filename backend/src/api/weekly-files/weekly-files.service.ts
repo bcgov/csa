@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
-import { DateTime } from 'luxon'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { pacificToday } from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 import type { DetailRecord04, HeaderRecord } from 'src/cra/inbound/inbound-weekly.interface'
 import { RecordTypeCode, TranCode } from 'src/cra/inbound/inbound-weekly.interface'
@@ -249,7 +249,7 @@ export class WeeklyFilesService {
       processedBatchIds,
       'WeeklyFilesService.reprocessRecord',
       undefined,
-      csaProcessingBatchDate(file.deliveredAt),
+      pacificToday(),
     )
 
     if (!result) {
@@ -280,7 +280,7 @@ export class WeeklyFilesService {
 
   async reprocess(fileId: number, userId: string): Promise<ReprocessWeeklyFileResultDto> {
     const file = await this.getWeeklyFileForProcessing(fileId)
-    const batchDate = csaProcessingBatchDate(file.deliveredAt)
+    const batchDate = pacificToday()
 
     const associatedRecords = await this.prisma.wklFileRecord.findMany({
       where: {
@@ -462,11 +462,3 @@ function buildWklHeader(weeklyFileDate: Date | null): HeaderRecord {
   }
 }
 
-const PACIFIC_ZONE = 'America/Vancouver'
-
-function csaProcessingBatchDate(deliveredAt: Date | null): Date {
-  const isoDate = DateTime.fromJSDate(deliveredAt ?? new Date())
-    .setZone(PACIFIC_ZONE)
-    .toISODate()!
-  return new Date(isoDate)
-}

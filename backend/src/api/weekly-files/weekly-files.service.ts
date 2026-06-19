@@ -226,7 +226,7 @@ export class WeeklyFilesService {
     recordId: number,
     userId: string,
   ): Promise<WeeklyFileRecordDto> {
-    const file = await this.getWeeklyFileForProcessing(fileId)
+    await this.getWeeklyFileForProcessing(fileId)
     const record = await this.getWklRecordForFile(fileId, recordId)
     const detail = record.recordData as unknown as DetailRecord04
     assertCanReprocess(record, detail)
@@ -279,7 +279,7 @@ export class WeeklyFilesService {
   }
 
   async reprocess(fileId: number, userId: string): Promise<ReprocessWeeklyFileResultDto> {
-    const file = await this.getWeeklyFileForProcessing(fileId)
+    await this.getWeeklyFileForProcessing(fileId)
     const batchDate = pacificToday()
 
     const associatedRecords = await this.prisma.wklFileRecord.findMany({
@@ -461,4 +461,3 @@ function buildWklHeader(weeklyFileDate: Date | null): HeaderRecord {
     filler2: '',
   }
 }
-

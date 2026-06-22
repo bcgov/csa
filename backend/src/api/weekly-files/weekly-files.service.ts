@@ -468,5 +468,5 @@ function csaProcessingBatchDate(deliveredAt: Date | null): Date {
   const isoDate = DateTime.fromJSDate(deliveredAt ?? new Date())
     .setZone(PACIFIC_ZONE)
     .toISODate()!
-  return new Date(isoDate)
+  return DateTime.fromISO(isoDate, { zone: PACIFIC_ZONE }).toJSDate()
 }

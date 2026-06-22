@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { DateTime } from 'luxon'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
@@ -22,6 +23,18 @@ import {
 } from './wkl-record.validation'
 
 const { FILE_DIRECTION, FILE_TYPE, WKL_MATCH_STATUS } = CRA_DATA_HANDLING_CONSTANT
+
+export interface WeeklyFileRecordFilters {
+  csaMatchFound?: string[]
+  transactionType?: string[]
+  craStatus?: string[]
+}
+
+const TRANSACTION_TYPE_REVERSE: Record<string, string> = {
+  Application: 'A',
+  Cancellation: 'C',
+  'CRA Update': 'U',
+}
 
 const weeklyFileWhere = {
   fileType: FILE_TYPE.WKL,
@@ -141,16 +154,59 @@ export class WeeklyFilesService {
     id: number,
     page = 1,
     limit = 10,
+    filters?: WeeklyFileRecordFilters,
   ): Promise<PaginatedResponse<WeeklyFileRecordDto>> {
     await this.assertWeeklyFileExists(id)
 
     const safePage = page >= 1 ? page : 1
     const safeLimit = limit >= 1 ? Math.min(limit, 200) : 10
 
+    const andConditions: Prisma.WklFileRecordWhereInput[] = [{ transferFileId: id }]
+
+    if (filters?.csaMatchFound?.length) {
+      const matchStatuses: string[] = []
+      for (const val of filters.csaMatchFound) {
+        if (val === 'Yes') matchStatuses.push(WKL_MATCH_STATUS.MATCHED)
+        if (val === 'No') {
+          matchStatuses.push(WKL_MATCH_STATUS.UNMATCHED, WKL_MATCH_STATUS.ASSOCIATED)
+        }
+      }
+      const uniqueStatuses = [...new Set(matchStatuses)]
+      if (uniqueStatuses.length) {
+        andConditions.push({ matchStatus: { in: uniqueStatuses } })
+      }
+    }
+
+    if (filters?.transactionType?.length) {
+      const rawTypes = filters.transactionType
+        .map((v) => TRANSACTION_TYPE_REVERSE[v])
+        .filter((v): v is string => !!v)
+      if (rawTypes.length) {
+        andConditions.push({
+          OR: rawTypes.map((raw) => ({
+            recordData: { path: ['transactionType'], equals: raw },
+          })) as Prisma.WklFileRecordWhereInput[],
+        })
+      }
+    }
+
+    if (filters?.craStatus?.length) {
+      // Display format is uppercase with spaces (e.g. "IN PROGRESS"); raw CRA value is lowercase with hyphens (e.g. "in-progress")
+      const rawStatuses = filters.craStatus.map((v) => v.toLowerCase().replace(/ /g, '-'))
+      andConditions.push({
+        OR: rawStatuses.map((raw) => ({
+          recordData: { path: ['status'], equals: raw },
+        })) as Prisma.WklFileRecordWhereInput[],
+      })
+    }
+
+    const where: Prisma.WklFileRecordWhereInput =
+      andConditions.length === 1 ? andConditions[0] : { AND: andConditions }
+
     const [total, records] = await Promise.all([
-      this.prisma.wklFileRecord.count({ where: { transferFileId: id } }),
+      this.prisma.wklFileRecord.count({ where }),
       this.prisma.wklFileRecord.findMany({
-        where: { transferFileId: id },
+        where,
         orderBy: { recordIndex: 'asc' },
         skip: (safePage - 1) * safeLimit,
         take: safeLimit,

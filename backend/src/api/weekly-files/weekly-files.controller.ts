@@ -47,14 +47,62 @@ export class WeeklyFilesController {
   @Get(':id/records')
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({
+    name: 'csaMatchFound',
+    required: false,
+    type: String,
+    description: 'Comma-separated filter values for CSA Match Found: "Yes" and/or "No"',
+  })
+  @ApiQuery({
+    name: 'transactionType',
+    required: false,
+    type: String,
+    description:
+      'Comma-separated display labels for Transaction Type: "Application", "Cancellation", "CRA Update"',
+  })
+  @ApiQuery({
+    name: 'craStatus',
+    required: false,
+    type: String,
+    description:
+      'Comma-separated display values for CRA Status: "ABANDONED", "COMPLETED", "IN PROGRESS", "UPDATED"',
+  })
   @ApiResponse({ status: 200, description: 'Paginated detail records for a weekly file' })
   @ApiResponse({ status: 404, description: 'Weekly file not found' })
   findRecords(
     @Param('id', ParseIntPipe) id: number,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('csaMatchFound') csaMatchFound?: string,
+    @Query('transactionType') transactionType?: string,
+    @Query('craStatus') craStatus?: string,
   ): Promise<PaginatedResponse<WeeklyFileRecordDto>> {
-    return this.weeklyFilesService.findRecords(id, this.parsePage(page), this.parseLimit(limit))
+    const filters = {
+      csaMatchFound: csaMatchFound
+        ? csaMatchFound
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean)
+        : undefined,
+      transactionType: transactionType
+        ? transactionType
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean)
+        : undefined,
+      craStatus: craStatus
+        ? craStatus
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean)
+        : undefined,
+    }
+    return this.weeklyFilesService.findRecords(
+      id,
+      this.parsePage(page),
+      this.parseLimit(limit),
+      filters,
+    )
   }
 
   @Post(':id/records/:recordId/associate')

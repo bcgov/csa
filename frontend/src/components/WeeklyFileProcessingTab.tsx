@@ -4,37 +4,37 @@ import CloseIcon from '@mui/icons-material/Close'
 import FilterAltOffIcon from '@mui/icons-material/FilterAltOff'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import {
-  Alert,
-  Box,
-  Button,
-  Checkbox,
-  IconButton,
-  InputAdornment,
-  Menu,
-  MenuItem,
-  Pagination,
-  Paper,
-  Radio,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
-  Tooltip,
-  Typography,
+    Alert,
+    Box,
+    Button,
+    Checkbox,
+    IconButton,
+    InputAdornment,
+    Menu,
+    MenuItem,
+    Pagination,
+    Paper,
+    Radio,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    TextField,
+    Tooltip,
+    Typography,
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fullTextSearchContacts, type Contact } from '../service/contacts-service'
 import {
-  associateWeeklyFileRecord,
-  dissociateWeeklyFileRecord,
-  getWeeklyFileRecords,
-  getWeeklyFiles,
-  reprocessWeeklyFileRecord,
-  type WeeklyFileRecord,
-  type WeeklyFileSummary,
+    associateWeeklyFileRecord,
+    dissociateWeeklyFileRecord,
+    getWeeklyFileRecords,
+    getWeeklyFiles,
+    reprocessWeeklyFileRecord,
+    type WeeklyFileRecord,
+    type WeeklyFileSummary,
 } from '../service/weekly-files-service'
 
 const SUMMARY_PAGE_SIZE = 10
@@ -402,6 +402,11 @@ export default function WeeklyFileProcessingTab() {
           recordsPage,
           DETAILS_PAGE_SIZE,
           abortController.signal,
+          {
+            csaMatchFound: detailsColumnFilters.csaMatchFound,
+            transactionType: detailsColumnFilters.transactionType,
+            craStatus: detailsColumnFilters.craStatus,
+          },
         )
         setRecords(response.data)
         setRecordsTotalPages(Math.max(response.totalPages, 1))
@@ -425,7 +430,13 @@ export default function WeeklyFileProcessingTab() {
     return () => {
       abortController.abort()
     }
-  }, [selectedFileId, recordsPage])
+  }, [
+    selectedFileId,
+    recordsPage,
+    detailsColumnFilters.csaMatchFound,
+    detailsColumnFilters.transactionType,
+    detailsColumnFilters.craStatus,
+  ])
 
   useEffect(() => {
     childSearchRequestIdRef.current += 1
@@ -544,12 +555,20 @@ export default function WeeklyFileProcessingTab() {
   }, [weeklyFiles, weeklyReportSearchTerm, weeklyReportColumnFilters, weeklyReportSortConfig])
 
   const filteredRecords = useMemo(() => {
+    // csaMatchFound, transactionType, and craStatus are filtered server-side; omit them from
+    // the client-side pass so they don't double-filter the already-narrowed page of records.
+    const clientColumnFilters: Record<WeeklyDetailsColumn, string[]> = {
+      ...detailsColumnFilters,
+      csaMatchFound: [],
+      transactionType: [],
+      craStatus: [],
+    }
     const recordsAfterSearchFilterSort = filterAndSortRows(
       records,
       WEEKLY_DETAILS_COLUMNS,
       getDetailsFieldValue,
       detailsSearchTerm,
-      detailsColumnFilters,
+      clientColumnFilters,
       detailsSortConfig,
     )
 
@@ -659,16 +678,39 @@ export default function WeeklyFileProcessingTab() {
     setDetailsSelectionFilterAnchor(null)
   }
 
+  const SERVER_SIDE_FILTER_COLUMNS: ReadonlySet<WeeklyDetailsColumn> = new Set([
+    'csaMatchFound',
+    'transactionType',
+    'craStatus',
+  ])
+
   const handleDetailsFilterChange = (column: WeeklyDetailsColumn, value: string) => {
     setDetailsColumnFilters((prev) => toggleColumnFilterValue(prev, column, value))
+    if (SERVER_SIDE_FILTER_COLUMNS.has(column)) {
+      setRecordsPage(1)
+    }
   }
 
   const clearDetailsColumnFilter = (column: WeeklyDetailsColumn) => {
     setDetailsColumnFilters((prev) => ({ ...prev, [column]: [] }))
+    if (SERVER_SIDE_FILTER_COLUMNS.has(column)) {
+      setRecordsPage(1)
+    }
     setDetailsFilterSearchTerm('')
   }
 
+  // Hardcoded option sets for the three server-side filtered columns so the dropdown
+  // always shows all possible values regardless of which page of records is loaded.
+  const SERVER_SIDE_COLUMN_OPTIONS: Partial<Record<WeeklyDetailsColumn, string[]>> = {
+    csaMatchFound: ['Yes', 'No'],
+    transactionType: ['Application', 'Cancellation', 'CRA Update'],
+    craStatus: ['ABANDONED', 'COMPLETED', 'IN PROGRESS', 'UPDATED'],
+  }
+
   const getDetailsUniqueValues = (column: WeeklyDetailsColumn): string[] => {
+    if (SERVER_SIDE_COLUMN_OPTIONS[column]) {
+      return SERVER_SIDE_COLUMN_OPTIONS[column]!
+    }
     return Array.from(new Set(records.map((record) => getDetailsFieldValue(record, column))))
       .filter((value) => value !== '')
       .sort((a, b) => compareStrings(a, b))
@@ -790,7 +832,17 @@ export default function WeeklyFileProcessingTab() {
 
   const refreshSelectedFileRecords = async () => {
     if (!selectedFileId) return
-    const response = await getWeeklyFileRecords(selectedFileId, recordsPage, DETAILS_PAGE_SIZE)
+    const response = await getWeeklyFileRecords(
+      selectedFileId,
+      recordsPage,
+      DETAILS_PAGE_SIZE,
+      undefined,
+      {
+        csaMatchFound: detailsColumnFilters.csaMatchFound,
+        transactionType: detailsColumnFilters.transactionType,
+        craStatus: detailsColumnFilters.craStatus,
+      },
+    )
     setRecords(response.data)
     setRecordsTotalPages(Math.max(response.totalPages, 1))
   }
@@ -1109,6 +1161,7 @@ export default function WeeklyFileProcessingTab() {
                 })
                 setDetailsSortConfig(null)
                 setDetailsShowSelectedOnly(false)
+                setRecordsPage(1)
               }}
               sx={{
                 textTransform: 'none',

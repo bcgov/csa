@@ -66,14 +66,31 @@ export const getWeeklyFiles = async (
   return response.data
 }
 
+export interface WeeklyFileRecordFilters {
+  csaMatchFound?: string[]
+  transactionType?: string[]
+  craStatus?: string[]
+}
+
 export const getWeeklyFileRecords = async (
   fileId: number,
   page: number = 1,
   limit: number = 10,
   signal?: AbortSignal,
+  filters?: WeeklyFileRecordFilters,
 ): Promise<PaginatedResponse<WeeklyFileRecord>> => {
+  const params: Record<string, string | number> = { page, limit }
+  if (filters?.csaMatchFound?.length) {
+    params.csaMatchFound = filters.csaMatchFound.join(',')
+  }
+  if (filters?.transactionType?.length) {
+    params.transactionType = filters.transactionType.join(',')
+  }
+  if (filters?.craStatus?.length) {
+    params.craStatus = filters.craStatus.join(',')
+  }
   const response = await APIService.getAxiosInstance().get(`/weekly-files/${fileId}/records`, {
-    params: { page, limit },
+    params,
     signal,
   })
   return response.data

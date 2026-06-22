@@ -85,6 +85,8 @@ export function selectPrimaryRecords(
   }
 
   const primaryPlacement = selectPrimaryPlacement(profile.placements)
+  const placementContractKey = normalize(primaryPlacement?.contractNumber)
+  const placementProviderKey = normalize(primaryPlacement?.providerId)
 
   // Primary Order: match via primary placement's link key
   let primaryOrder: OrderRecord | null = null
@@ -92,11 +94,18 @@ export function selectPrimaryRecords(
     primaryOrder =
       profile.orders.find((order) => order.agreementRowId === primaryPlacement.agreementRowId) ??
       null
+    if (!primaryOrder && placementContractKey) {
+      primaryOrder =
+        profile.orders.find(
+          (order) =>
+            order.source === 'MIS' && normalize(order.contractNumber) === placementContractKey,
+        ) ?? null
+    }
   } else if (primaryPlacement?.source === 'MIS' && primaryPlacement.contractNumber) {
     primaryOrder =
       profile.orders.find(
         (order) =>
-          order.source === 'MIS' && order.contractNumber === primaryPlacement.contractNumber,
+          order.source === 'MIS' && normalize(order.contractNumber) === placementContractKey,
       ) ?? null
   }
 
@@ -106,12 +115,22 @@ export function selectPrimaryRecords(
     primaryAgreement =
       profile.agreements.find((agreement) => agreement.rowId === primaryPlacement.agreementRowId) ??
       null
+    if (!primaryAgreement && placementContractKey) {
+      primaryAgreement =
+        profile.agreements.find(
+          (agreement) =>
+            agreement.source === 'MIS' &&
+            normalize(agreement.contractNumber) === placementContractKey &&
+            normalize(agreement.providerId) === placementProviderKey,
+        ) ?? null
+    }
   } else if (primaryPlacement?.source === 'MIS' && primaryPlacement.contractNumber) {
     primaryAgreement =
       profile.agreements.find(
         (agreement) =>
           agreement.source === 'MIS' &&
-          agreement.contractNumber === primaryPlacement.contractNumber,
+          normalize(agreement.contractNumber) === placementContractKey &&
+          normalize(agreement.providerId) === placementProviderKey,
       ) ?? null
   }
 
@@ -132,16 +151,30 @@ function selectOocPrimaryRecords(
   primaryOrder: OrderRecord | null
   primaryAgreement: AgreementRecord | null
 } {
-  const primaryAgreement = selectOocPrimaryAgreement(profile.agreements)
-  const primaryOrder =
-    primaryAgreement?.rowId != null
-      ? findClosedIcmOrderPreviousMonth(profile.orders, primaryAgreement.rowId, referenceDate)
-      : null
+  const primaryAgreement = selectOocPrimaryAgreement(profile.agreements, profile.placements)
+  let primaryOrder: OrderRecord | null = null
+
+  if (primaryAgreement?.source === 'ICM' && primaryAgreement.rowId != null) {
+    primaryOrder = findClosedIcmOrderPreviousMonth(
+      profile.orders,
+      primaryAgreement.rowId,
+      referenceDate,
+    )
+  } else if (primaryAgreement?.source === 'MIS' && primaryAgreement.contractNumber != null) {
+    primaryOrder = findClosedMisPaymentPreviousMonth(
+      profile.orders,
+      primaryAgreement.contractNumber,
+      referenceDate,
+    )
+  }
 
   return { primaryPlacement: null, primaryOrder, primaryAgreement }
 }
 
-function selectOocPrimaryAgreement(agreements: AgreementRecord[]): AgreementRecord | null {
+function selectOocPrimaryAgreement(
+  agreements: AgreementRecord[],
+  placements: PlacementRecord[],
+): AgreementRecord | null {
   const oocAgreements = agreements.filter(
     (agreement) =>
       agreement.source === 'ICM' && normalize(agreement.agreementType) === 'OUT OF CARE',
@@ -154,6 +187,46 @@ function selectOocPrimaryAgreement(agreements: AgreementRecord[]): AgreementReco
   if (active) return active
 
   const withEndDate = oocAgreements.filter((agreement) => agreement.agreementEndDate != null)
+  if (withEndDate.length > 0) {
+    return withEndDate.reduce((latest, current) =>
+      current.agreementEndDate!.getTime() > latest.agreementEndDate!.getTime() ? current : latest,
+    )
+  }
+
+  return selectOocMisAgreement(agreements, placements)
+}
+
+function selectOocMisAgreement(
+  agreements: AgreementRecord[],
+  placements: PlacementRecord[],
+): AgreementRecord | null {
+  const misPlacementKeys = new Set(
+    placements
+      .filter((placement) => placement.source === 'MIS')
+      .map((placement) => {
+        const contractNumber = normalize(placement.contractNumber)
+        const providerId = normalize(placement.providerId)
+        if (!contractNumber || !providerId) return null
+        return `${contractNumber}::${providerId}`
+      })
+      .filter((key): key is string => key != null),
+  )
+  if (misPlacementKeys.size === 0) return null
+
+  const misContracts = agreements.filter(
+    (agreement) =>
+      agreement.source === 'MIS' &&
+      agreement.contractNumber != null &&
+      misPlacementKeys.has(
+        `${normalize(agreement.contractNumber)}::${normalize(agreement.providerId)}`,
+      ),
+  )
+  if (misContracts.length === 0) return null
+
+  const active = misContracts.find((agreement) => normalize(agreement.agreementStatus) === 'ACTIVE')
+  if (active) return active
+
+  const withEndDate = misContracts.filter((agreement) => agreement.agreementEndDate != null)
   if (withEndDate.length === 0) return null
 
   return withEndDate.reduce((latest, current) =>
@@ -171,6 +244,29 @@ function findClosedIcmOrderPreviousMonth(
     (order) =>
       order.source === 'ICM' &&
       order.agreementRowId === agreementRowId &&
+      normalize(order.orderStatus) === 'CLOSED' &&
+      isInMonth(order.effectiveStartDate, prevMonth),
+  )
+  if (matching.length === 0) return null
+
+  return matching.reduce((highest, current) =>
+    current.amount > highest.amount ? current : highest,
+  )
+}
+
+function findClosedMisPaymentPreviousMonth(
+  orders: OrderRecord[],
+  contractNumber: string,
+  referenceDate: Date,
+): OrderRecord | null {
+  const prevMonth = getPreviousMonth(referenceDate)
+  const normalizedContractNumber = normalize(contractNumber)
+  if (!normalizedContractNumber) return null
+
+  const matching = orders.filter(
+    (order) =>
+      order.source === 'MIS' &&
+      normalize(order.contractNumber) === normalizedContractNumber &&
       normalize(order.orderStatus) === 'CLOSED' &&
       isInMonth(order.effectiveStartDate, prevMonth),
   )

@@ -213,6 +213,7 @@ export class JobRunner {
     } catch (dbError) {
       this.logger.error(
         `Failed to mark job ${jobId} as FAILED in DB: ${dbError}. Original error: ${errorDetail}`,
+        error.stack,
       )
     }
   }

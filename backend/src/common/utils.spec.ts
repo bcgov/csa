@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { DateTime } from 'luxon'
+import { describe, expect, it, vi } from 'vitest'
 import {
   enrichLabels,
   firstDayOfPreviousMonthPacific,
@@ -11,6 +12,8 @@ import {
   parseCalendarDate,
   parseDateAsPacific,
   parseISODatePacific,
+  pacificToday,
+  parseWklDate,
 } from './utils'
 
 describe('firstDayOfPreviousMonthPacific', () => {
@@ -377,6 +380,39 @@ describe('parseISODatePacific', () => {
     const result = parseISODatePacific('2024-02-30 10:00:00')
     expect(isNaN(result.getTime())).toBe(false)
     expect(result.getUTCMonth()).toBe(2) // March (overflow from Feb 30)
+  })
+})
+
+describe('parseWklDate', () => {
+  it('parses YYYYMMDD as Pacific midnight without previous-day shift', () => {
+    const result = parseWklDate('20260617')
+    expect(result).toBeDefined()
+    expect(result!.toISOString()).toBe('2026-06-17T07:00:00.000Z')
+  })
+
+  it('returns undefined for non-8-digit values', () => {
+    expect(parseWklDate('2026-06-17')).toBeUndefined()
+    expect(parseWklDate('')).toBeUndefined()
+  })
+})
+
+describe('pacificToday', () => {
+  it('returns Pacific midnight in PDT', () => {
+    const nowSpy = vi
+      .spyOn(DateTime, 'now')
+      .mockReturnValue(DateTime.fromISO('2026-06-17T18:30:00.000Z'))
+    const result = pacificToday()
+    expect(result.toISOString()).toBe('2026-06-17T07:00:00.000Z')
+    nowSpy.mockRestore()
+  })
+
+  it('returns Pacific midnight in PST', () => {
+    const nowSpy = vi
+      .spyOn(DateTime, 'now')
+      .mockReturnValue(DateTime.fromISO('2026-01-10T20:30:00.000Z'))
+    const result = pacificToday()
+    expect(result.toISOString()).toBe('2026-01-10T08:00:00.000Z')
+    nowSpy.mockRestore()
   })
 })
 

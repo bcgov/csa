@@ -22,7 +22,7 @@ class PrismaService
     const pool = new Pool({
       connectionString: databaseConfig.url,
     })
-    this.wrapPoolConnectWithSearchPath(pool)
+    PrismaService.wrapPoolConnectWithSearchPath(pool)
     const adapter = new PrismaPg(pool)
     super({
       adapter,
@@ -61,7 +61,7 @@ class PrismaService
    * We wrap pool.connect instead of using pool "connect" event to avoid issuing
    * a concurrent query on a client that may already be executing work.
    */
-  private wrapPoolConnectWithSearchPath(pool: Pool): void {
+  private static wrapPoolConnectWithSearchPath(pool: Pool): void {
     const originalConnect = pool.connect.bind(pool)
 
     pool.connect = async (...args: unknown[]) => {

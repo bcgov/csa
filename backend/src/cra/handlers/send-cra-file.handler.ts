@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { readFile } from 'fs/promises'
-import { appendSystemComment, pacificToday } from 'src/common/utils'
 import type { Batch, Contact, ContactBatchDetail } from '@prisma/client'
 import { Prisma } from '@prisma/client'
+import { readFile } from 'fs/promises'
 import { BatchesService } from 'src/api/batches/batches.service'
 import { ContactsService } from 'src/api/contacts/contacts.service'
 import { PrismaService } from 'src/common/database/prisma.service'
@@ -13,6 +12,7 @@ import {
   BATCH_STATUS,
   CSA_EVENT,
 } from 'src/common/state-machine/constants'
+import { appendSystemComment, pacificToday } from 'src/common/utils'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
@@ -23,7 +23,7 @@ import { OutboundDataService } from '../outbound/outbound-data.service'
 import { OutboundFileService } from '../outbound/outbound-file.service'
 import { CraTransferService } from '../transfer/cra-transfer.service'
 
-const { DESTINATION_ID, FILE_DIRECTION, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
+const { DESTINATION_ID, FILE_DIRECTION, FILE_TYPE, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
 @Injectable()
 export class SendCraFileHandler extends BaseJob {
@@ -112,6 +112,7 @@ export class SendCraFileHandler extends BaseJob {
         batchId: this.batch.id,
         destinationId: DESTINATION_ID,
         direction: FILE_DIRECTION.OUTBOUND,
+        fileType: FILE_TYPE.REQUEST,
         fileName,
         deliveredAt: new Date(),
         referenceNumbers: this.batchDetails

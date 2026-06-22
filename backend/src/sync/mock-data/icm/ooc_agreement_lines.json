@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "Id": "mock-line-001",
+      "Updated": "05/26/2026 10:00:00",
+      "Agreement Id": "mock-agreement-001",
+      "ICM Person ID": "mock-person-001"
+    },
+    {
+      "Id": "mock-line-002",
+      "Updated": "05/26/2026 10:00:00",
+      "Agreement Id": "mock-agreement-001",
+      "ICM Person ID": "mock-person-001"
+    },
+    {
+      "Id": "mock-line-003",
+      "Updated": "05/20/2026 10:00:00",
+      "Agreement Id": "mock-agreement-002",
+      "ICM Person ID": "mock-person-002"
+    }
+  ]
+}

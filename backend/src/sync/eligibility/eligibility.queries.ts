@@ -7,86 +7,110 @@ const ICM_STATUS_CASE = `CASE UPPER(TRIM(cases.X_CSA_PAY_STATUS))\n${Object.entr
   .map(([code, label]) => `      WHEN '${label.toUpperCase()}' THEN '${code}'`)
   .join('\n')}\n      ELSE NULL\n    END`
 
-const CHANGED_CONTACTS_CTE = `
-    changed_contacts AS (
-      -- ICM: cases with recent ingested_at
-      SELECT DISTINCT cases.X_CONTACT_NUM
+/** Shared ICM/MIS arms for staging change detection ($1 = since timestamp). */
+function buildStagingDataChangedUnions(options: {
+  select: string
+  filterByPerson: boolean
+  unionAll?: boolean
+}): string {
+  const personFilter = options.filterByPerson ? 'AND cases.X_CONTACT_NUM = $2' : ''
+  const misSince = `($1 AT TIME ZONE 'America/Vancouver')::DATE`
+
+  const arms = [
+    `-- ICM: cases with recent data changes
+      SELECT ${options.select}
       FROM stg_icm_cases cases
-      WHERE cases.ingested_at >= $1
+      WHERE cases.data_changed_at >= $1 ${personFilter}`,
 
-      UNION
-
-      -- ICM: placements with recent ingested_at
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- ICM: placements with recent data changes
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
-      WHERE icm_plc.ingested_at >= $1
+      WHERE icm_plc.data_changed_at >= $1 ${personFilter}`,
 
-      UNION
-
-      -- ICM: legal authority with recent ingested_at (joins on CONTACT_ROW_ID)
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- ICM: legal authority with recent data changes (joins on CONTACT_ROW_ID)
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
-      WHERE legal_auth.ingested_at >= $1
+      WHERE legal_auth.data_changed_at >= $1 ${personFilter}`,
 
-      UNION
-
-      -- ICM: legal authority admin with recent ingested_at (via legal authority on CONTACT_ROW_ID)
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- ICM: legal authority admin with recent data changes (via legal authority on CONTACT_ROW_ID)
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_legal_authority legal_auth ON legal_auth.PAR_ROW_ID = cases.CONTACT_ROW_ID
       INNER JOIN stg_icm_legal_authority_admin legal_admin ON legal_admin.LGL_AUTH_CD = COALESCE(legal_auth.EFF_LGL_STATUS, legal_auth.LGL_AUTH_CD)
-      WHERE legal_admin.ingested_at >= $1
+      WHERE legal_admin.data_changed_at >= $1 ${personFilter}`,
 
-      UNION
-
-      -- ICM: orders with recent ingested_at
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- ICM: orders with recent data changes
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
       INNER JOIN stg_icm_orders icm_ord ON icm_ord.AGREEMENT_ROW_ID = icm_plc.AGREEMENT_ROW_ID
-      WHERE icm_ord.ingested_at >= $1
+      WHERE icm_ord.data_changed_at >= $1 ${personFilter}`,
 
-      UNION
-
-      -- ICM: agreements with recent ingested_at
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- ICM: agreements with recent data changes
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
       INNER JOIN stg_icm_agreement icm_agr ON icm_agr.ROW_ID = icm_plc.AGREEMENT_ROW_ID
-      WHERE icm_agr.ingested_at >= $1
+      WHERE icm_agr.data_changed_at >= $1 ${personFilter}`,
 
-      UNION
+    `-- ICM: agreement lines with recent data changes (OOC person id join)
+      SELECT ${options.select}
+      FROM stg_icm_cases cases
+      INNER JOIN stg_icm_agreement_line icm_line ON icm_line.X_CONTACT_NUM = cases.X_CONTACT_NUM
+      WHERE icm_line.data_changed_at >= $1 ${personFilter}`,
 
-      -- MIS: placements with recent last_updated_date (via person_id_mis on cases)
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- ICM: OOC agreement headers linked via agreement line
+      SELECT ${options.select}
+      FROM stg_icm_cases cases
+      INNER JOIN stg_icm_agreement_line icm_line ON icm_line.X_CONTACT_NUM = cases.X_CONTACT_NUM
+      INNER JOIN stg_icm_agreement icm_agr ON icm_agr.ROW_ID = icm_line.AGREEMENT_ROW_ID
+      WHERE icm_agr.data_changed_at >= $1 ${personFilter}`,
+
+    `-- ICM: orders with recent data changes (via agreement line, no placement)
+      SELECT ${options.select}
+      FROM stg_icm_cases cases
+      INNER JOIN stg_icm_agreement_line icm_line ON icm_line.X_CONTACT_NUM = cases.X_CONTACT_NUM
+      INNER JOIN stg_icm_orders icm_ord ON icm_ord.AGREEMENT_ROW_ID = icm_line.AGREEMENT_ROW_ID
+      WHERE icm_ord.data_changed_at >= $1 ${personFilter}`,
+
+    `-- MIS: placements with recent last_updated_date (via person_id_mis on cases)
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
-      WHERE mis_plc.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
+      WHERE mis_plc.last_updated_date::DATE >= ${misSince} ${personFilter}`,
 
-      UNION
-
-      -- MIS: contracts with recent last_updated_date (via contract_number on contracts, service_provider_id on placements)
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- MIS: contracts with recent last_updated_date (via contract_number on contracts, service_provider_id on placements)
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
       INNER JOIN stg_mis_contracts mis_con
         ON mis_con.service_provider_id = mis_plc.service_provider_id
         AND mis_con.contract_number = mis_plc.contract_number
-      WHERE mis_con.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
+      WHERE mis_con.last_updated_date::DATE >= ${misSince} ${personFilter}`,
 
-      UNION
-
-      -- MIS: payments with recent last_updated_date (via contract_number on contracts, service_provider_id on placements)
-      SELECT DISTINCT cases.X_CONTACT_NUM
+    `-- MIS: payments with recent last_updated_date (via contract_number on contracts, service_provider_id on placements)
+      SELECT ${options.select}
       FROM stg_icm_cases cases
       INNER JOIN stg_mis_placements mis_plc ON mis_plc.person_id_mis = cases.PERSON_ID_MIS
       INNER JOIN stg_mis_contracts mis_con
         ON mis_con.service_provider_id = mis_plc.service_provider_id
         AND mis_con.contract_number = mis_plc.contract_number
       INNER JOIN stg_mis_payments mis_pay ON mis_pay.contract_number = mis_con.contract_number
-      WHERE mis_pay.last_updated_date::DATE >= ($1 AT TIME ZONE 'America/Vancouver')::DATE
+      WHERE mis_pay.last_updated_date::DATE >= ${misSince} ${personFilter}`,
+  ]
+
+  const union = options.unionAll ? 'UNION ALL' : 'UNION'
+  return arms.join(`\n\n      ${union}\n\n      `)
+}
+
+const CHANGED_CONTACTS_CTE = `
+    changed_contacts AS (
+      ${buildStagingDataChangedUnions({
+        select: 'DISTINCT cases.X_CONTACT_NUM',
+        filterByPerson: false,
+      })}
     ),`
 
 /**
@@ -102,7 +126,8 @@ const CHANGED_CONTACTS_CTE = `
  * Deduplication: A person (X_CONTACT_NUM) may have multiple case rows in
  * stg_icm_cases (different CONTACT_ROW_IDs). Aggregation CTEs group by X_CONTACT_NUM
  * so arrays combine data across all cases. DISTINCT ON in the final SELECT
- * picks one case row per person for scalar fields.
+ * picks one case row per person for scalar fields (Open > Admin Re-open > else,
+ * then most recent CLOSED_DT).
  *
  * Join topology (matches ICM/MIS data model):
  *  ICM: Cases -[CaseId]-> N Placements -[AgreementID]-> 1 Agreement -[AgreementID]-> N Orders
@@ -112,10 +137,10 @@ const CHANGED_CONTACTS_CTE = `
  * CTEs:
  *  - changed_contacts (incremental only): contacts with recently changed data
  *  - eligible_cases: all case rows from staging (filtered by change detection in incremental mode)
- *  - latest_legal_auth: most recent legal authority per person (DISTINCT ON X_CONTACT_NUM)
+ *  - latest_legal_auth: one legal authority per person — latest START_DT, then blank EXPIRY_DT, then latest EXPIRY_DT
  *  - icm_placements_agg: active/interrupted/ended/closed ICM placements grouped by contact
- *  - icm_orders_agg: ICM orders grouped by contact (via placement -> agreement)
- *  - icm_agreements_agg: ICM agreements grouped by contact (via placement)
+ *  - icm_orders_agg: ICM orders grouped by contact (via placement or agreement line person id)
+ *  - icm_agreements_agg: ICM agreements grouped by contact (via placement or agreement line)
  *  - mis_payments_agg: MIS payments grouped by contact (via contract -> placement -> PERSON_ID_MIS)
  *  - mis_contracts_agg: MIS contracts grouped by contact (via placement -> PERSON_ID_MIS)
  *  - mis_placements_agg: active/interrupted/ended/closed MIS placements grouped by contact (via PERSON_ID_MIS)
@@ -169,7 +194,11 @@ export function buildLoadContactProfilesSql(
         legal_auth.START_DT
       FROM stg_icm_legal_authority legal_auth
       INNER JOIN eligible_cases ON eligible_cases.CONTACT_ROW_ID = legal_auth.PAR_ROW_ID
-      ORDER BY eligible_cases.X_CONTACT_NUM, legal_auth.START_DT DESC NULLS LAST
+      ORDER BY
+        eligible_cases.X_CONTACT_NUM,
+        legal_auth.START_DT DESC NULLS LAST,
+        CASE WHEN legal_auth.EXPIRY_DT IS NULL THEN 0 ELSE 1 END,
+        legal_auth.EXPIRY_DT DESC NULLS LAST
     ),
 
     unique_legal_admin AS (
@@ -233,6 +262,24 @@ export function buildLoadContactProfilesSql(
         INNER JOIN stg_icm_placements icm_plc
           ON icm_ord.AGREEMENT_ROW_ID = icm_plc.AGREEMENT_ROW_ID
         INNER JOIN eligible_cases ON eligible_cases.ROW_ID = icm_plc.CASE_ROW_ID
+
+        UNION
+
+        SELECT DISTINCT
+          eligible_cases.X_CONTACT_NUM,
+          icm_ord.NAME,
+          icm_ord.STATUS_CD,
+          icm_ord.X_EFF_START_DT,
+          icm_ord.X_EFF_END_DT,
+          icm_ord.TOTAL_AMT,
+          icm_ord.X_PCMS_CONTRACT_NUM,
+          icm_ord.ORDER_NUM,
+          icm_ord.PRODUCT_NAME,
+          icm_ord.AGREEMENT_ROW_ID
+        FROM stg_icm_orders icm_ord
+        INNER JOIN stg_icm_agreement_line icm_line
+          ON icm_ord.AGREEMENT_ROW_ID = icm_line.AGREEMENT_ROW_ID
+        INNER JOIN eligible_cases ON icm_line.X_CONTACT_NUM = eligible_cases.X_CONTACT_NUM
       ) unique_orders
       GROUP BY X_CONTACT_NUM
     ),
@@ -247,7 +294,9 @@ export function buildLoadContactProfilesSql(
           'agreementStartDate', EFF_START_DT,
           'agreementEndDate', EFF_END_DT,
           'terminationDate', X_TERMINATION_DT,
-          'mcfdContract', X_PCMS_CONTRACT_NUM
+          'mcfdContract', X_PCMS_CONTRACT_NUM,
+          'serviceProviderName', NAME,
+          'providerId', OU_NUM
         )) AS data
       FROM (
         SELECT DISTINCT
@@ -258,11 +307,30 @@ export function buildLoadContactProfilesSql(
           icm_agr.EFF_START_DT,
           icm_agr.EFF_END_DT,
           icm_agr.X_TERMINATION_DT,
-          icm_agr.X_PCMS_CONTRACT_NUM
+          icm_agr.X_PCMS_CONTRACT_NUM,
+          icm_agr.NAME,
+          icm_agr.OU_NUM
         FROM stg_icm_agreement icm_agr
         INNER JOIN stg_icm_placements icm_plc
           ON icm_agr.ROW_ID = icm_plc.AGREEMENT_ROW_ID
         INNER JOIN eligible_cases ON eligible_cases.ROW_ID = icm_plc.CASE_ROW_ID
+
+        UNION
+
+        SELECT DISTINCT
+          eligible_cases.X_CONTACT_NUM,
+          icm_agr.ROW_ID,
+          icm_agr.AGREE_CD,
+          icm_agr.STAT_CD,
+          icm_agr.EFF_START_DT,
+          icm_agr.EFF_END_DT,
+          icm_agr.X_TERMINATION_DT,
+          icm_agr.X_PCMS_CONTRACT_NUM,
+          icm_agr.NAME,
+          icm_agr.OU_NUM
+        FROM stg_icm_agreement icm_agr
+        INNER JOIN stg_icm_agreement_line icm_line ON icm_line.AGREEMENT_ROW_ID = icm_agr.ROW_ID
+        INNER JOIN eligible_cases ON icm_line.X_CONTACT_NUM = eligible_cases.X_CONTACT_NUM
       ) unique_agreements
       GROUP BY X_CONTACT_NUM
     ),
@@ -387,6 +455,7 @@ export function buildLoadContactProfilesSql(
     legal_auth.EXPIRY_DT         AS "legalExpiryDate",
     legal_auth.START_DT          AS "effectiveDate",
     master_contacts.id               AS "existingContactId",
+    master_contacts.last_updated_by   AS "lastUpdatedBy",
     COALESCE(master_contacts.csa_status, ${ICM_STATUS_CASE}) AS "csaStatus",
     COALESCE(master_contacts.csa_status_effective_date, (cases.X_CSA_EFF_DATE::timestamp AT TIME ZONE 'America/Vancouver')) AS "csaStatusEffectiveDate",
     cases.PERSON_ID_MIS              AS "personIdMis",
@@ -416,7 +485,13 @@ export function buildLoadContactProfilesSql(
   LEFT JOIN mis_payments_agg mis_pay ON mis_pay.X_CONTACT_NUM = cases.X_CONTACT_NUM
   LEFT JOIN mis_contracts_agg mis_con ON mis_con.X_CONTACT_NUM = cases.X_CONTACT_NUM
   LEFT JOIN mis_placements_agg mis_plc ON mis_plc.X_CONTACT_NUM = cases.X_CONTACT_NUM
-  ORDER BY cases.X_CONTACT_NUM
+  ORDER BY cases.X_CONTACT_NUM,
+    CASE UPPER(TRIM(cases.STATUS_CD))
+      WHEN 'OPEN' THEN 1
+      WHEN 'ADMIN RE-OPEN' THEN 2
+      ELSE 3
+    END,
+    cases.CLOSED_DT::TIMESTAMP DESC NULLS LAST
 `
 
   let params: unknown[]
@@ -431,6 +506,30 @@ export function buildLoadContactProfilesSql(
   }
 
   return { sql, params }
+}
+
+/**
+ * Returns whether eligibility source data in staging changed for a contact on or after `since`.
+ * Mirrors the change-detection arms in changed_contacts (BL-14B / BL-14C).
+ */
+export function buildContactHasStagingChangesSql(
+  personIdIcm: string,
+  since: Date,
+): {
+  sql: string
+  params: [Date, string]
+} {
+  const unions = buildStagingDataChangedUnions({
+    select: '1',
+    filterByPerson: true,
+    unionAll: true,
+  })
+  const sql = `
+    SELECT EXISTS (
+      ${unions}
+    ) AS "hasChanges"
+  `
+  return { sql, params: [since, personIdIcm] }
 }
 
 export function buildFindAgedOutContactIdsSql(cutoffDate: Date): {

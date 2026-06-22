@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { of } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { IcmApiConfig } from '../icm.config'
+import { OOC_AGREEMENT_LINES_FIELDS, OOC_AGREEMENT_LINES_SEARCH_SPEC } from '../agreement-lines'
 import { IcmApiDataSource } from './icm-api-data-source'
 import { IcmContactUpdatePayload } from './icm-data-source'
 
@@ -123,6 +124,70 @@ describe('IcmApiDataSource', () => {
       expect(callUrl).toContain('GetChildren=false')
       expect(callUrl).toContain('childlinks=None')
       expect(callUrl).toContain('ExecutionMode=ForwardOnly')
+    })
+
+    it('should send fields param for agreement lines endpoint', async () => {
+      const oocConfig: IcmApiConfig = {
+        ...mockConfig,
+        name: 'ooc_agreement_lines',
+        endpoint: '/AgreementLines/AgreementLine',
+        searchSpec: () => OOC_AGREEMENT_LINES_SEARCH_SPEC,
+        fields: OOC_AGREEMENT_LINES_FIELDS,
+      }
+
+      httpService.get.mockReturnValue(of({ status: 200, headers: {}, data: { items: [] } }))
+
+      await service.fetchAll(oocConfig)
+
+      const callUrl = decodeURIComponent(httpService.get.mock.calls[0][0]).replace(/\+/g, ' ')
+      expect(callUrl).toContain('/AgreementLines/AgreementLine')
+      expect(callUrl).toContain('ViewMode=Catalog')
+      expect(callUrl).toContain('GetChildren=false')
+      expect(callUrl).toContain('fields=Id,Updated,ICM Person ID,Agreement Id')
+      expect(callUrl).toContain("[Agreement Type] = 'Out of Care'")
+    })
+
+    it('should return flat agreement line items from paginated response', async () => {
+      const oocConfig: IcmApiConfig = {
+        ...mockConfig,
+        name: 'ooc_agreement_lines',
+        endpoint: '/AgreementLines/AgreementLine',
+        searchSpec: () => OOC_AGREEMENT_LINES_SEARCH_SPEC,
+        fields: OOC_AGREEMENT_LINES_FIELDS,
+      }
+
+      httpService.get.mockReturnValue(
+        of({
+          status: 200,
+          headers: {},
+          data: {
+            items: [
+              {
+                Id: 'mock-line-001',
+                'Agreement Id': 'mock-agreement-001',
+                'ICM Person ID': 'mock-person-001',
+                Updated: '05/26/2026 10:00:00',
+              },
+              {
+                Id: 'mock-line-002',
+                'Agreement Id': 'mock-agreement-001',
+                'ICM Person ID': 'mock-person-001',
+                Updated: '05/26/2026 10:00:00',
+              },
+            ],
+          },
+        }),
+      )
+
+      const results = await service.fetchAll(oocConfig)
+
+      expect(results).toHaveLength(2)
+      expect(results[1]).toMatchObject({
+        Id: 'mock-line-002',
+        'Agreement Id': 'mock-agreement-001',
+        'ICM Person ID': 'mock-person-001',
+        Updated: '05/26/2026 10:00:00',
+      })
     })
 
     it('should include workspace param when configured', async () => {

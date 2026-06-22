@@ -36,8 +36,10 @@ const PRODUCTS = [
 
 // Valid resume targets from the state machine (ON_HOLD->RESUME->one of these)
 const VALID_RESUME_TARGETS = [
+  CSA_STATUS.ELIGIBLE,
   CSA_STATUS.ELIGIBLE_TBD,
   CSA_STATUS.APPLICATION_REFUSED_CRA,
+  CSA_STATUS.NOT_ELIGIBLE_IN_PAY,
   CSA_STATUS.NOT_ELIGIBLE_IP_TBD,
   CSA_STATUS.CANCELLATION_REFUSED_CRA,
   CSA_STATUS.CRA_ERROR_APPLICATION,
@@ -267,6 +269,7 @@ async function seedBatches() {
   const batches = batchStatuses.map((status, i) => {
     const batchDate = addDays(now, -30 + i * 5)
     return {
+      batchNumber: i + 1,
       batchDate,
       status,
       recordCount: faker.number.int({ min: 5, max: 50 }),

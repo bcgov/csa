@@ -29,6 +29,7 @@ const makeBatchDetail = (overrides = {}) => ({
   systemComments: null,
   craMatchingSnapshot: makeSnapshot(),
   contact: { din: null },
+  batch: { initiatedBy: 'CRA' },
   ...overrides,
 })
 
@@ -85,6 +86,7 @@ describe('WeeklyContactMatcherService', () => {
         transactionType: 'application',
         systemComments: null,
         contact: { din: null },
+        initiatedBy: 'CRA',
       })
     })
 
@@ -102,6 +104,7 @@ describe('WeeklyContactMatcherService', () => {
         transactionType: 'application',
         systemComments: null,
         contact: { din: null },
+        initiatedBy: 'CRA',
       })
     })
 
@@ -117,6 +120,7 @@ describe('WeeklyContactMatcherService', () => {
         transactionType: 'application',
         systemComments: null,
         contact: { din: null },
+        initiatedBy: 'CRA',
       })
     })
 
@@ -275,6 +279,7 @@ describe('WeeklyContactMatcherService', () => {
         transactionType: 'application',
         systemComments: null,
         contact: { din: null },
+        initiatedBy: 'CRA',
       })
     })
 

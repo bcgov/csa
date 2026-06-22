@@ -4,6 +4,8 @@ import { JobStatus } from './enums/job-status.enum'
 import { JobTrigger } from './enums/job-trigger.enum'
 import { JobType } from './enums/job-type.enum'
 
+const RETRYABLE_END_USER_JOB_TYPES: JobType[] = [JobType.SEND_CRA_FILE]
+
 export interface CreateJobDto {
   jobType: JobType
   jobTrigger: JobTrigger
@@ -60,8 +62,8 @@ export class JobsService {
   }
 
   async markSuccess(id: number, metadata?: Record<string, unknown>) {
-    return this.prisma.jobRun.update({
-      where: { id },
+    return this.prisma.jobRun.updateMany({
+      where: { id, status: JobStatus.RUNNING },
       data: {
         status: JobStatus.SUCCESS,
         completedAt: new Date(),
@@ -71,8 +73,8 @@ export class JobsService {
   }
 
   async markFailed(id: number, error: string) {
-    return this.prisma.jobRun.update({
-      where: { id },
+    return this.prisma.jobRun.updateMany({
+      where: { id, status: JobStatus.RUNNING },
       data: {
         status: JobStatus.FAILED,
         error,
@@ -99,7 +101,13 @@ export class JobsService {
       where: {
         status: JobStatus.FAILED,
         parentJobId: null, // skip child jobs, parent will recreate them
-        jobTrigger: JobTrigger.CRON,
+        OR: [
+          { jobTrigger: JobTrigger.CRON },
+          {
+            jobTrigger: JobTrigger.END_USER,
+            jobType: { in: RETRYABLE_END_USER_JOB_TYPES },
+          },
+        ],
       },
       select: {
         id: true,
@@ -146,6 +154,17 @@ export class JobsService {
     })
   }
 
+  async markStuckJobAsFailed(id: number, error: string = 'Job timed out (stuck)') {
+    return this.prisma.jobRun.updateMany({
+      where: { id, status: JobStatus.RUNNING },
+      data: {
+        status: JobStatus.FAILED,
+        error,
+        completedAt: new Date(),
+      },
+    })
+  }
+
   async getChildJobs(parentJobId: number) {
     return this.prisma.jobRun.findMany({
       where: { parentJobId },
@@ -184,7 +203,13 @@ export class JobsService {
       where: {
         status: JobStatus.FAILED,
         parentJobId: null,
-        jobTrigger: JobTrigger.CRON,
+        OR: [
+          { jobTrigger: JobTrigger.CRON },
+          {
+            jobTrigger: JobTrigger.END_USER,
+            jobType: { in: RETRYABLE_END_USER_JOB_TYPES },
+          },
+        ],
       },
       select: { id: true },
     })

@@ -29,6 +29,8 @@ import { getJobRunWarning } from './job-openshift-advisory'
 const PAGE_DEFAULT = 1
 const LIMIT_DEFAULT = 20
 const LIMIT_MAX = 200
+const GENERIC_JOB_FAILURE_SUFFIX =
+  'failed unexpectedly. Please retry. If it persists, contact support.'
 
 interface JobRunResponse {
   id: number
@@ -42,6 +44,10 @@ interface JobRunResponse {
   startedAt: Date | null
   completedAt: Date | null
   warning?: string
+}
+
+function toUserFacingJobError(jobType: string, error: string | null): string | null {
+  return error ? `${jobType} ${GENERIC_JOB_FAILURE_SUFFIX}` : null
 }
 
 function toJobRunResponse(
@@ -65,7 +71,7 @@ function toJobRunResponse(
     status: job.status,
     jobTrigger: job.jobTrigger,
     retryCount: job.retryCount,
-    error: job.error,
+    error: toUserFacingJobError(job.jobType, job.error),
     metadata: (job.metadata as Record<string, unknown> | null) ?? null,
     createdAt: job.createdAt,
     startedAt: job.startedAt,

@@ -177,31 +177,45 @@ export class WeeklyFilesService {
       }
     }
 
+    const rawSqlConditions: Prisma.Sql[] = []
+
     if (filters?.transactionType?.length) {
       const rawTypes = filters.transactionType
         .map((v) => TRANSACTION_TYPE_REVERSE[v])
         .filter((v): v is string => !!v)
       if (rawTypes.length) {
-        andConditions.push({
-          OR: rawTypes.map((raw) => ({
-            recordData: { path: ['transactionType'], equals: raw },
-          })) as Prisma.WklFileRecordWhereInput[],
-        })
+        // Use PostgreSQL JSONB extraction: "recordData"->>'transactionType'
+        const typeList = rawTypes.map((t) => `'${t}'`).join(',')
+        rawSqlConditions.push(Prisma.raw(`"recordData"->>'transactionType' IN (${typeList})`))
       }
     }
 
     if (filters?.craStatus?.length) {
       // Display format is uppercase with spaces (e.g. "IN PROGRESS"); raw CRA value is lowercase with hyphens (e.g. "in-progress")
       const rawStatuses = filters.craStatus.map((v) => v.toLowerCase().replace(/ /g, '-'))
-      andConditions.push({
-        OR: rawStatuses.map((raw) => ({
-          recordData: { path: ['status'], equals: raw },
-        })) as Prisma.WklFileRecordWhereInput[],
-      })
+      if (rawStatuses.length) {
+        // Use PostgreSQL JSONB extraction: "recordData"->>'status'
+        const statusList = rawStatuses.map((s) => `'${s}'`).join(',')
+        rawSqlConditions.push(Prisma.raw(`"recordData"->>'status' IN (${statusList})`))
+      }
     }
 
-    const where: Prisma.WklFileRecordWhereInput =
-      andConditions.length === 1 ? andConditions[0] : { AND: andConditions }
+    // Combine Prisma conditions and raw SQL conditions
+    let where: any = andConditions.length === 1 ? andConditions[0] : { AND: andConditions }
+
+    if (rawSqlConditions.length > 0) {
+      if (Object.keys(where).length > 0) {
+        // Combine with existing conditions
+        where = {
+          AND: [where, ...rawSqlConditions],
+        }
+      } else {
+        // Only raw SQL conditions
+        where = {
+          AND: rawSqlConditions,
+        }
+      }
+    }
 
     const [total, records] = await Promise.all([
       this.prisma.wklFileRecord.count({ where }),

@@ -429,20 +429,6 @@ export class BatchesService {
               ? TRANSACTION_TYPES.CANCELLATION
               : TRANSACTION_TYPES.APPLICATION
 
-          // Per FDD BL-05: default cancellation fields when blank
-          if (transactionType === TRANSACTION_TYPES.CANCELLATION) {
-            const updates: Record<string, unknown> = {}
-            if (!contact.careEndDate) {
-              updates.careEndDate = pacificToday()
-            }
-            if (!contact.cancelReasonCode) {
-              updates.cancelReasonCode = CANCEL_REASON.CHILD_LEFT
-            }
-            if (Object.keys(updates).length > 0) {
-              await tx.contact.update({ where: { id: contactId }, data: updates })
-            }
-          }
-
           const caseNumber = contact.caseNumber ?? ''
 
           // Per FDD BL-05: default cancellation fields when blank

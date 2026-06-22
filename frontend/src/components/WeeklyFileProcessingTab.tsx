@@ -120,9 +120,9 @@ const formatDateDisplay = (value: string | null): string => {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
 
-  const month = parsed.toLocaleString('en-US', { month: 'short' })
-  const day = String(parsed.getDate()).padStart(2, '0')
-  return `${parsed.getFullYear()}-${month}-${day}`
+  const month = parsed.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })
+  const day = String(parsed.getUTCDate()).padStart(2, '0')
+  return `${parsed.getUTCFullYear()}-${month}-${day}`
 }
 
 const formatDateTimeDisplay = (value: string | null): string => {
@@ -130,12 +130,18 @@ const formatDateTimeDisplay = (value: string | null): string => {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
 
-  const month = parsed.toLocaleString('en-US', { month: 'short' })
-  const day = String(parsed.getDate()).padStart(2, '0')
-  const hours = String(parsed.getHours()).padStart(2, '0')
-  const minutes = String(parsed.getMinutes()).padStart(2, '0')
-  const seconds = String(parsed.getSeconds()).padStart(2, '0')
-  return `${parsed.getFullYear()}-${month}-${day} ${hours}:${minutes}:${seconds}`
+  const parts = new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    timeZone: 'America/Vancouver',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(parsed)
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
 }
 
 const valueOrBlank = (value: string | null | undefined): string => value ?? ''

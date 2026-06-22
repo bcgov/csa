@@ -207,6 +207,28 @@ describe('JobsController', () => {
   })
 
   describe('GET /jobs/:id', () => {
+    it('should sanitize stack trace errors for UI display', async () => {
+      const job = {
+        id: 5,
+        jobType: 'AUTO_BATCH',
+        status: 'FAILED',
+        jobTrigger: 'END_USER',
+        retryCount: 1,
+        error: 'DriverAdapterError: [TEST] Forced AUTO_BATCH failure via DB trigger\n    at x.y.z',
+        metadata: null,
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+        startedAt: new Date('2026-01-01T00:00:01Z'),
+        completedAt: new Date('2026-01-01T00:00:05Z'),
+      }
+      mockJobsService.getJob.mockResolvedValue(job)
+
+      const res = await request(app.getHttpServer()).get('/jobs/5').expect(200)
+
+      expect(res.body.error).toBe(
+        'AUTO_BATCH failed unexpectedly. Please retry. If it persists, contact support.',
+      )
+    })
+
     it('should return job status without warning when OpenShift is disabled', async () => {
       const job = {
         id: 5,

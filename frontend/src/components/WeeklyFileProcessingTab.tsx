@@ -1,6 +1,5 @@
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
-import CloseIcon from '@mui/icons-material/Close'
 import FilterAltOffIcon from '@mui/icons-material/FilterAltOff'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import {
@@ -228,7 +227,6 @@ export default function WeeklyFileProcessingTab() {
   const [savingAssociation, setSavingAssociation] = useState(false)
   const [reprocessing, setReprocessing] = useState(false)
 
-  const [weeklyReportSearchTerm, setWeeklyReportSearchTerm] = useState('')
   const [weeklyReportColumnFilters, setWeeklyReportColumnFilters] = useState<
     Record<WeeklyReportColumn, string[]>
   >({
@@ -253,7 +251,6 @@ export default function WeeklyFileProcessingTab() {
     column: 'weeklyFileDate',
   })
 
-  const [detailsSearchTerm, setDetailsSearchTerm] = useState('')
   const [detailsColumnFilters, setDetailsColumnFilters] = useState<
     Record<WeeklyDetailsColumn, string[]>
   >({
@@ -548,11 +545,11 @@ export default function WeeklyFileProcessingTab() {
       weeklyFiles,
       WEEKLY_REPORT_COLUMNS,
       getWeeklyReportFieldValue,
-      weeklyReportSearchTerm,
+      '',
       weeklyReportColumnFilters,
       weeklyReportSortConfig,
     )
-  }, [weeklyFiles, weeklyReportSearchTerm, weeklyReportColumnFilters, weeklyReportSortConfig])
+  }, [weeklyFiles, weeklyReportColumnFilters, weeklyReportSortConfig])
 
   const filteredRecords = useMemo(() => {
     // csaMatchFound, transactionType, and craStatus are filtered server-side; omit them from
@@ -567,7 +564,7 @@ export default function WeeklyFileProcessingTab() {
       records,
       WEEKLY_DETAILS_COLUMNS,
       getDetailsFieldValue,
-      detailsSearchTerm,
+      '',
       clientColumnFilters,
       detailsSortConfig,
     )
@@ -581,14 +578,7 @@ export default function WeeklyFileProcessingTab() {
     }
 
     return recordsAfterSearchFilterSort.filter((record) => record.id === selectedRecordId)
-  }, [
-    detailsSearchTerm,
-    records,
-    detailsColumnFilters,
-    detailsSortConfig,
-    detailsShowSelectedOnly,
-    selectedRecordId,
-  ])
+  }, [records, detailsColumnFilters, detailsSortConfig, detailsShowSelectedOnly, selectedRecordId])
 
   const filteredSearchedChildren = useMemo(() => {
     return filterAndSortRows(
@@ -936,29 +926,6 @@ export default function WeeklyFileProcessingTab() {
         Weekly Report
       </Typography>
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
-        <TextField
-          size="small"
-          placeholder="Search weekly report..."
-          value={weeklyReportSearchTerm}
-          onChange={(e) => setWeeklyReportSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Box component="span" sx={{ fontSize: '18px' }}>
-                  🔍
-                </Box>
-              </InputAdornment>
-            ),
-            endAdornment: weeklyReportSearchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setWeeklyReportSearchTerm('')} edge="end">
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-          sx={{ width: '300px' }}
-        />
         <Tooltip title="Clear all filters and sorting" arrow>
           <span>
             <Button
@@ -966,12 +933,10 @@ export default function WeeklyFileProcessingTab() {
               size="small"
               startIcon={<FilterAltOffIcon />}
               disabled={
-                !weeklyReportSearchTerm &&
                 !weeklyReportSortConfig &&
                 Object.values(weeklyReportColumnFilters).every((arr) => arr.length === 0)
               }
               onClick={() => {
-                setWeeklyReportSearchTerm('')
                 setWeeklyReportColumnFilters({
                   weeklyFileDate: [],
                   csaProcessingDate: [],
@@ -1055,9 +1020,7 @@ export default function WeeklyFileProcessingTab() {
               <TableRow>
                 <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
-                    {weeklyReportSearchTerm.trim()
-                      ? 'No weekly files match the current search'
-                      : 'No weekly files found'}
+                    No weekly files found
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -1114,29 +1077,6 @@ export default function WeeklyFileProcessingTab() {
         </Button>
       </Box>
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
-        <TextField
-          size="small"
-          placeholder="Search details..."
-          value={detailsSearchTerm}
-          onChange={(e) => setDetailsSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Box component="span" sx={{ fontSize: '18px' }}>
-                  🔍
-                </Box>
-              </InputAdornment>
-            ),
-            endAdornment: detailsSearchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setDetailsSearchTerm('')} edge="end">
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-          sx={{ width: '300px' }}
-        />
         <Tooltip title="Clear all filters and sorting" arrow>
           <span>
             <Button
@@ -1144,13 +1084,11 @@ export default function WeeklyFileProcessingTab() {
               size="small"
               startIcon={<FilterAltOffIcon />}
               disabled={
-                !detailsSearchTerm &&
                 !detailsSortConfig &&
                 !detailsShowSelectedOnly &&
                 Object.values(detailsColumnFilters).every((arr) => arr.length === 0)
               }
               onClick={() => {
-                setDetailsSearchTerm('')
                 setDetailsColumnFilters({
                   csaMatchFound: [],
                   batchNumber: [],
@@ -1353,9 +1291,7 @@ export default function WeeklyFileProcessingTab() {
               <TableRow>
                 <TableCell colSpan={22} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
-                    {detailsSearchTerm.trim()
-                      ? 'No records match the current search'
-                      : 'No records found for this weekly file'}
+                    No records found for this weekly file
                   </Typography>
                 </TableCell>
               </TableRow>

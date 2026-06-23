@@ -204,11 +204,12 @@ export class WeeklyFilesService {
     const whereClause = whereConditions.join(' AND ')
 
     // Execute count and findMany using raw SQL for accurate filtering
-    const countResult = await this.prisma.$queryRawUnsafe<Array<{ total: number }>>(
-      `SELECT COUNT(*) as total FROM csa.wkl_file_records WHERE ${whereClause}`,
-    )
+    const countResult = await this.prisma.$queryRawUnsafe<
+      Array<{ total: number | bigint | string }>
+    >(`SELECT COUNT(*) as total FROM csa.wkl_file_records WHERE ${whereClause}`)
 
-    const total = countResult[0]?.total ?? 0
+    const totalRaw = countResult[0]?.total ?? 0
+    const total = typeof totalRaw === 'bigint' ? Number(totalRaw) : Number(totalRaw)
 
     interface WklFileRecordRow {
       id: number

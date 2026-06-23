@@ -220,7 +220,7 @@ export class WeeklyFilesService {
     // Batch Req ID text filter (batch number via relation)
     if (filters?.batchNumber) {
       const term = filters.batchNumber.trim().toLowerCase()
-      if (term.length >= 3) {
+      if (term.length >= 1) {
         const escapedTerm = escapeSqlLiteral(term)
         whereConditions.push(`EXISTS (
           SELECT 1

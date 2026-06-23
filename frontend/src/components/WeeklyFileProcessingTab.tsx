@@ -275,20 +275,33 @@ export default function WeeklyFileProcessingTab() {
     batchNumber: '',
     transactionSource: '',
   })
-  const getBackendTextFilterValue = (value: string): string | undefined => {
-    const trimmed = value.trim()
-    if (trimmed.length >= DETAILS_TEXT_FILTER_MIN_LENGTH) {
-      return trimmed
-    }
-    return undefined
-  }
+  const getDetailsTextFilterMinLength = useCallback(
+    (column: DetailsTextFilterColumn): number =>
+      column === 'batchNumber' ? 1 : DETAILS_TEXT_FILTER_MIN_LENGTH,
+    [],
+  )
+
+  const getBackendTextFilterValue = useCallback(
+    (column: DetailsTextFilterColumn, value: string): string | undefined => {
+      const trimmed = value.trim()
+      if (trimmed.length >= getDetailsTextFilterMinLength(column)) {
+        return trimmed
+      }
+      return undefined
+    },
+    [getDetailsTextFilterMinLength],
+  )
   const detailsBackendTextFilters = useMemo(
     () => ({
-      matchedBy: getBackendTextFilterValue(detailsTextColumnFilters.matchedBy),
-      batchNumber: getBackendTextFilterValue(detailsTextColumnFilters.batchNumber),
-      transactionSource: getBackendTextFilterValue(detailsTextColumnFilters.transactionSource),
+      matchedBy: getBackendTextFilterValue('matchedBy', detailsTextColumnFilters.matchedBy),
+      batchNumber: getBackendTextFilterValue('batchNumber', detailsTextColumnFilters.batchNumber),
+      transactionSource: getBackendTextFilterValue(
+        'transactionSource',
+        detailsTextColumnFilters.transactionSource,
+      ),
     }),
     [
+      getBackendTextFilterValue,
       detailsTextColumnFilters.matchedBy,
       detailsTextColumnFilters.batchNumber,
       detailsTextColumnFilters.transactionSource,
@@ -728,7 +741,7 @@ export default function WeeklyFileProcessingTab() {
 
   const isDetailsFilterActive = (column: WeeklyDetailsColumn): boolean => {
     if (isDetailsTextFilterColumn(column)) {
-      return (getBackendTextFilterValue(detailsTextColumnFilters[column]) ?? '').length > 0
+      return (getBackendTextFilterValue(column, detailsTextColumnFilters[column]) ?? '').length > 0
     }
     return detailsColumnFilters[column].length > 0
   }
@@ -737,7 +750,7 @@ export default function WeeklyFileProcessingTab() {
     if (isDetailsTextFilterColumn(column)) {
       setDetailsTextColumnFilters((prev) => ({ ...prev, [column]: value }))
       const trimmed = value.trim()
-      if (trimmed.length === 0 || trimmed.length >= DETAILS_TEXT_FILTER_MIN_LENGTH) {
+      if (trimmed.length === 0 || trimmed.length >= getDetailsTextFilterMinLength(column)) {
         setRecordsPage(1)
       }
       return

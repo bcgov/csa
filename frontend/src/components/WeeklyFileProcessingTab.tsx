@@ -40,6 +40,7 @@ const SUMMARY_PAGE_SIZE = 10
 const DETAILS_PAGE_SIZE = 10
 const SEARCH_PAGE_SIZE = 10
 const CHILD_SEARCH_MIN_LENGTH = 3
+const DETAILS_TEXT_FILTER_MIN_LENGTH = 3
 const MANUAL_REVIEW_WARNING =
   'This weekly response record is not matched to a CSA master contact. Search and select a child record below to associate manually.'
 const ASSOCIATED_RECORD_INFO = 'Contact associated, click Confirm to reprocess this record.'
@@ -274,6 +275,25 @@ export default function WeeklyFileProcessingTab() {
     batchNumber: '',
     transactionSource: '',
   })
+  const getBackendTextFilterValue = (value: string): string | undefined => {
+    const trimmed = value.trim()
+    if (trimmed.length >= DETAILS_TEXT_FILTER_MIN_LENGTH) {
+      return trimmed
+    }
+    return undefined
+  }
+  const detailsBackendTextFilters = useMemo(
+    () => ({
+      matchedBy: getBackendTextFilterValue(detailsTextColumnFilters.matchedBy),
+      batchNumber: getBackendTextFilterValue(detailsTextColumnFilters.batchNumber),
+      transactionSource: getBackendTextFilterValue(detailsTextColumnFilters.transactionSource),
+    }),
+    [
+      detailsTextColumnFilters.matchedBy,
+      detailsTextColumnFilters.batchNumber,
+      detailsTextColumnFilters.transactionSource,
+    ],
+  )
   const [detailsFilterSearchTerm, setDetailsFilterSearchTerm] = useState('')
   const [detailsSortConfig, setDetailsSortConfig] = useState<SortConfig<WeeklyDetailsColumn>>(null)
   const [detailsSortAnchor, setDetailsSortAnchor] = useState<{
@@ -416,6 +436,9 @@ export default function WeeklyFileProcessingTab() {
             csaMatchFound: detailsColumnFilters.csaMatchFound,
             transactionType: detailsColumnFilters.transactionType,
             craStatus: detailsColumnFilters.craStatus,
+            matchedBy: detailsBackendTextFilters.matchedBy,
+            batchNumber: detailsBackendTextFilters.batchNumber,
+            transactionSource: detailsBackendTextFilters.transactionSource,
           },
         )
         setRecords(response.data)
@@ -446,6 +469,9 @@ export default function WeeklyFileProcessingTab() {
     detailsColumnFilters.csaMatchFound,
     detailsColumnFilters.transactionType,
     detailsColumnFilters.craStatus,
+    detailsBackendTextFilters.matchedBy,
+    detailsBackendTextFilters.batchNumber,
+    detailsBackendTextFilters.transactionSource,
   ])
 
   useEffect(() => {
@@ -585,33 +611,16 @@ export default function WeeklyFileProcessingTab() {
       detailsSortConfig,
     )
 
-    let recordsAfterTextFilter = recordsAfterSearchFilterSort
-    for (const column of DETAILS_TEXT_FILTER_COLUMNS) {
-      const term = detailsTextColumnFilters[column].trim().toLowerCase()
-      if (term) {
-        recordsAfterTextFilter = recordsAfterTextFilter.filter((record) =>
-          getDetailsFieldValue(record, column).toLowerCase().includes(term),
-        )
-      }
-    }
-
     if (!detailsShowSelectedOnly) {
-      return recordsAfterTextFilter
+      return recordsAfterSearchFilterSort
     }
 
     if (!selectedRecordId) {
       return []
     }
 
-    return recordsAfterTextFilter.filter((record) => record.id === selectedRecordId)
-  }, [
-    records,
-    detailsColumnFilters,
-    detailsSortConfig,
-    detailsShowSelectedOnly,
-    selectedRecordId,
-    detailsTextColumnFilters,
-  ])
+    return recordsAfterSearchFilterSort.filter((record) => record.id === selectedRecordId)
+  }, [records, detailsColumnFilters, detailsSortConfig, detailsShowSelectedOnly, selectedRecordId])
 
   const filteredSearchedChildren = useMemo(() => {
     return filterAndSortRows(
@@ -719,7 +728,7 @@ export default function WeeklyFileProcessingTab() {
 
   const isDetailsFilterActive = (column: WeeklyDetailsColumn): boolean => {
     if (isDetailsTextFilterColumn(column)) {
-      return detailsTextColumnFilters[column].trim().length > 0
+      return (getBackendTextFilterValue(detailsTextColumnFilters[column]) ?? '').length > 0
     }
     return detailsColumnFilters[column].length > 0
   }
@@ -727,6 +736,10 @@ export default function WeeklyFileProcessingTab() {
   const handleDetailsFilterChange = (column: WeeklyDetailsColumn, value: string) => {
     if (isDetailsTextFilterColumn(column)) {
       setDetailsTextColumnFilters((prev) => ({ ...prev, [column]: value }))
+      const trimmed = value.trim()
+      if (trimmed.length === 0 || trimmed.length >= DETAILS_TEXT_FILTER_MIN_LENGTH) {
+        setRecordsPage(1)
+      }
       return
     }
     setDetailsColumnFilters((prev) =>
@@ -891,6 +904,9 @@ export default function WeeklyFileProcessingTab() {
         csaMatchFound: detailsColumnFilters.csaMatchFound,
         transactionType: detailsColumnFilters.transactionType,
         craStatus: detailsColumnFilters.craStatus,
+        matchedBy: detailsBackendTextFilters.matchedBy,
+        batchNumber: detailsBackendTextFilters.batchNumber,
+        transactionSource: detailsBackendTextFilters.transactionSource,
       },
     )
     setRecords(response.data)

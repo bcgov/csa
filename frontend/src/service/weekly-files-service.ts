@@ -70,6 +70,9 @@ export interface WeeklyFileRecordFilters {
   csaMatchFound?: string[]
   transactionType?: string[]
   craStatus?: string[]
+  matchedBy?: string
+  batchNumber?: string
+  transactionSource?: string
 }
 
 export const getWeeklyFileRecords = async (
@@ -88,6 +91,15 @@ export const getWeeklyFileRecords = async (
   }
   if (filters?.craStatus?.length) {
     params.craStatus = filters.craStatus.join(',')
+  }
+  if (filters?.matchedBy?.trim()) {
+    params.matchedBy = filters.matchedBy.trim()
+  }
+  if (filters?.batchNumber?.trim()) {
+    params.batchNumber = filters.batchNumber.trim()
+  }
+  if (filters?.transactionSource?.trim()) {
+    params.transactionSource = filters.transactionSource.trim()
   }
   const response = await APIService.getAxiosInstance().get(`/weekly-files/${fileId}/records`, {
     params,

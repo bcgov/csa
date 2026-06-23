@@ -192,12 +192,14 @@ export class WeeklyFilesService {
     }
 
     // CRA Status filter (JSONB-based)
+    // Display format is uppercase with spaces (e.g. "IN PROGRESS").
+    // Raw CRA file values vary in casing, so compare case-insensitively.
+    // We normalise to lowercase-with-hyphens for the comparison.
     if (filters?.craStatus?.length) {
-      // Display format is uppercase with spaces (e.g. "IN PROGRESS"); raw CRA value is lowercase with hyphens (e.g. "in-progress")
       const rawStatuses = filters.craStatus.map((v) => v.toLowerCase().replace(/ /g, '-'))
       if (rawStatuses.length) {
         const statusList = rawStatuses.map((s) => `'${s}'`).join(',')
-        whereConditions.push(`record_data->>'status' IN (${statusList})`)
+        whereConditions.push(`LOWER(record_data->>'status') IN (${statusList})`)
       }
     }
 

@@ -77,6 +77,7 @@ export class WeeklyFilesController {
     @Query('transactionType') transactionType?: string,
     @Query('craStatus') craStatus?: string,
   ): Promise<PaginatedResponse<WeeklyFileRecordDto>> {
+    console.log('[DEBUG] Controller received query params:', { page, limit, csaMatchFound, transactionType, craStatus })
     const filters = {
       csaMatchFound: csaMatchFound
         ? csaMatchFound

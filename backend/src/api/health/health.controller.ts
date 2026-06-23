@@ -3,6 +3,8 @@ import { HealthCheck, HealthCheckService, PrismaHealthIndicator } from '@nestjs/
 import { PrismaClient } from '@prisma/client'
 import { PrismaService } from 'src/common/database/prisma.service.js'
 
+const HEALTH_DB_TIMEOUT_MS = 5000
+
 @Controller('health')
 export class HealthController {
   constructor(
@@ -15,7 +17,10 @@ export class HealthController {
   @HealthCheck()
   check() {
     return this.health.check([
-      () => this.prisma.pingCheck('database', this.prismaService as unknown as PrismaClient),
+      () =>
+        this.prisma.pingCheck('database', this.prismaService as unknown as PrismaClient, {
+          timeout: HEALTH_DB_TIMEOUT_MS,
+        }),
     ])
   }
 
@@ -29,7 +34,10 @@ export class HealthController {
   @HealthCheck()
   ready() {
     return this.health.check([
-      () => this.prisma.pingCheck('database', this.prismaService as unknown as PrismaClient),
+      () =>
+        this.prisma.pingCheck('database', this.prismaService as unknown as PrismaClient, {
+          timeout: HEALTH_DB_TIMEOUT_MS,
+        }),
     ])
   }
 }

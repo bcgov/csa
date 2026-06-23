@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
 import { DateTime } from 'luxon'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
@@ -160,9 +159,12 @@ export class WeeklyFilesService {
 
     const safePage = page >= 1 ? page : 1
     const safeLimit = limit >= 1 ? Math.min(limit, 200) : 10
+    const offset = (safePage - 1) * safeLimit
 
-    const andConditions: Prisma.WklFileRecordWhereInput[] = [{ transferFileId: id }]
+    // Build WHERE conditions
+    const whereConditions: string[] = [`transfer_file_id = ${id}`]
 
+    // CSA Match Found filter (simple column-based)
     if (filters?.csaMatchFound?.length) {
       const matchStatuses: string[] = []
       for (const val of filters.csaMatchFound) {
@@ -173,63 +175,77 @@ export class WeeklyFilesService {
       }
       const uniqueStatuses = [...new Set(matchStatuses)]
       if (uniqueStatuses.length) {
-        andConditions.push({ matchStatus: { in: uniqueStatuses } })
+        const statusList = uniqueStatuses.map((s) => `'${s}'`).join(',')
+        whereConditions.push(`match_status IN (${statusList})`)
       }
     }
 
-    const rawSqlConditions: Prisma.Sql[] = []
-
+    // Transaction Type filter (JSONB-based)
     if (filters?.transactionType?.length) {
       const rawTypes = filters.transactionType
         .map((v) => TRANSACTION_TYPE_REVERSE[v])
         .filter((v): v is string => !!v)
       if (rawTypes.length) {
-        // Use PostgreSQL JSONB extraction: "recordData"->>'transactionType'
         const typeList = rawTypes.map((t) => `'${t}'`).join(',')
-        rawSqlConditions.push(Prisma.raw(`"recordData"->>'transactionType' IN (${typeList})`))
+        whereConditions.push(`record_data->>'transactionType' IN (${typeList})`)
       }
     }
 
+    // CRA Status filter (JSONB-based)
     if (filters?.craStatus?.length) {
       // Display format is uppercase with spaces (e.g. "IN PROGRESS"); raw CRA value is lowercase with hyphens (e.g. "in-progress")
       const rawStatuses = filters.craStatus.map((v) => v.toLowerCase().replace(/ /g, '-'))
       if (rawStatuses.length) {
-        // Use PostgreSQL JSONB extraction: "recordData"->>'status'
         const statusList = rawStatuses.map((s) => `'${s}'`).join(',')
-        rawSqlConditions.push(Prisma.raw(`"recordData"->>'status' IN (${statusList})`))
+        whereConditions.push(`record_data->>'status' IN (${statusList})`)
       }
     }
 
-    // Combine Prisma conditions and raw SQL conditions
-    let where: any = andConditions.length === 1 ? andConditions[0] : { AND: andConditions }
+    const whereClause = whereConditions.join(' AND ')
 
-    if (rawSqlConditions.length > 0) {
-      if (Object.keys(where).length > 0) {
-        // Combine with existing conditions
-        where = {
-          AND: [where, ...rawSqlConditions],
-        }
-      } else {
-        // Only raw SQL conditions
-        where = {
-          AND: rawSqlConditions,
-        }
-      }
+    // Execute count and findMany using raw SQL for accurate filtering
+    const countResult = await this.prisma.$queryRawUnsafe<Array<{ total: number }>>(
+      `SELECT COUNT(*) as total FROM csa.wkl_file_records WHERE ${whereClause}`,
+    )
+
+    const total = countResult[0]?.total ?? 0
+
+    interface WklFileRecordRow {
+      id: number
+      transfer_file_id: number
+      record_index: number
+      weekly_file_date: string | null
+      record_data: unknown
+      match_status: string
+      contact_id: number | null
+      batch_detail_id: number | null
+      matched_by: string | null
+      processed_at: string | null
+      created_at: string
     }
 
-    const [total, records] = await Promise.all([
-      this.prisma.wklFileRecord.count({ where }),
-      this.prisma.wklFileRecord.findMany({
-        where,
-        orderBy: { recordIndex: 'asc' },
-        skip: (safePage - 1) * safeLimit,
-        take: safeLimit,
-        include: wklRecordDtoInclude,
-      }),
-    ])
+    const recordsResult = await this.prisma.$queryRawUnsafe<WklFileRecordRow[]>(
+      `SELECT id, transfer_file_id, record_index, weekly_file_date, record_data, match_status,
+        contact_id, batch_detail_id, matched_by, processed_at, created_at
+       FROM csa.wkl_file_records
+       WHERE ${whereClause}
+       ORDER BY record_index ASC
+       LIMIT ${safeLimit} OFFSET ${offset}`,
+    )
+
+    // Fetch related data for the records (contact, batch) using Prisma
+    const recordIds = recordsResult.map((r) => r.id)
+    const recordsWithRelations =
+      recordIds.length === 0
+        ? []
+        : await this.prisma.wklFileRecord.findMany({
+            where: { id: { in: recordIds } },
+            orderBy: { recordIndex: 'asc' },
+            include: wklRecordDtoInclude,
+          })
 
     return {
-      data: records.map(toWeeklyFileRecordDto),
+      data: recordsWithRelations.map(toWeeklyFileRecordDto),
       page: safePage,
       limit: safeLimit,
       total,

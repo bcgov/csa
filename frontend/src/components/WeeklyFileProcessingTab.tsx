@@ -4,37 +4,37 @@ import CloseIcon from '@mui/icons-material/Close'
 import FilterAltOffIcon from '@mui/icons-material/FilterAltOff'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import {
-    Alert,
-    Box,
-    Button,
-    Checkbox,
-    IconButton,
-    InputAdornment,
-    Menu,
-    MenuItem,
-    Pagination,
-    Paper,
-    Radio,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    TextField,
-    Tooltip,
-    Typography,
+  Alert,
+  Box,
+  Button,
+  Checkbox,
+  IconButton,
+  InputAdornment,
+  Menu,
+  MenuItem,
+  Pagination,
+  Paper,
+  Radio,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Tooltip,
+  Typography,
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fullTextSearchContacts, type Contact } from '../service/contacts-service'
 import {
-    associateWeeklyFileRecord,
-    dissociateWeeklyFileRecord,
-    getWeeklyFileRecords,
-    getWeeklyFiles,
-    reprocessWeeklyFileRecord,
-    type WeeklyFileRecord,
-    type WeeklyFileSummary,
+  associateWeeklyFileRecord,
+  dissociateWeeklyFileRecord,
+  getWeeklyFileRecords,
+  getWeeklyFiles,
+  reprocessWeeklyFileRecord,
+  type WeeklyFileRecord,
+  type WeeklyFileSummary,
 } from '../service/weekly-files-service'
 
 const SUMMARY_PAGE_SIZE = 10
@@ -704,7 +704,7 @@ export default function WeeklyFileProcessingTab() {
   const SERVER_SIDE_COLUMN_OPTIONS: Partial<Record<WeeklyDetailsColumn, string[]>> = {
     csaMatchFound: ['Yes', 'No'],
     transactionType: ['Application', 'Cancellation', 'CRA Update'],
-    craStatus: ['ABANDONED', 'COMPLETED', 'IN PROGRESS', 'UPDATED'],
+    craStatus: ['ABANDONED', 'ACTIVE', 'COMPLETED', 'IN PROGRESS', 'PENDING', 'UPDATED'],
   }
 
   const getDetailsUniqueValues = (column: WeeklyDetailsColumn): string[] => {

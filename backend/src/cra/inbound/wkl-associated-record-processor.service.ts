@@ -63,7 +63,10 @@ export class WklAssociatedRecordProcessorService {
     > | null = null
 
     if (ctx.preferExistingInProgressDetail) {
-      batchDetail = await this.batchesService.findInProgressBatchDetailForContact(contactId)
+      batchDetail = await this.batchesService.findInProgressBatchDetailForContact(
+        contactId,
+        ctx.batchDate,
+      )
       if (batchDetail) {
         if (batchDetail.transactionType !== wklType) {
           this.logger.warn(

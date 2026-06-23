@@ -234,23 +234,9 @@ export default function WeeklyFileProcessingTab() {
   const [savingAssociation, setSavingAssociation] = useState(false)
   const [reprocessing, setReprocessing] = useState(false)
 
-  const [weeklyReportColumnFilters, setWeeklyReportColumnFilters] = useState<
-    Record<WeeklyReportColumn, string[]>
-  >({
-    weeklyFileDate: [],
-    csaProcessingDate: [],
-  })
-  const [weeklyReportFilterSearchTerm, setWeeklyReportFilterSearchTerm] = useState('')
   const [weeklyReportSortConfig, setWeeklyReportSortConfig] =
     useState<SortConfig<WeeklyReportColumn>>(null)
   const [weeklyReportSortAnchor, setWeeklyReportSortAnchor] = useState<{
-    element: HTMLElement | null
-    column: WeeklyReportColumn
-  }>({
-    element: null,
-    column: 'weeklyFileDate',
-  })
-  const [weeklyReportFilterAnchor, setWeeklyReportFilterAnchor] = useState<{
     element: HTMLElement | null
     column: WeeklyReportColumn
   }>({
@@ -598,10 +584,10 @@ export default function WeeklyFileProcessingTab() {
       WEEKLY_REPORT_COLUMNS,
       getWeeklyReportFieldValue,
       '',
-      weeklyReportColumnFilters,
+      { weeklyFileDate: [], csaProcessingDate: [] },
       weeklyReportSortConfig,
     )
-  }, [weeklyFiles, weeklyReportColumnFilters, weeklyReportSortConfig])
+  }, [weeklyFiles, weeklyReportSortConfig])
 
   const filteredRecords = useMemo(() => {
     // csaMatchFound, transactionType, and craStatus are filtered server-side; omit them from
@@ -660,34 +646,6 @@ export default function WeeklyFileProcessingTab() {
   const handleWeeklyReportSort = (column: WeeklyReportColumn, direction: SortDirection) => {
     setWeeklyReportSortConfig({ column, direction })
     handleWeeklyReportSortClose()
-  }
-
-  const handleWeeklyReportFilterClick = (
-    event: React.MouseEvent<HTMLElement>,
-    column: WeeklyReportColumn,
-  ) => {
-    setWeeklyReportFilterAnchor({ element: event.currentTarget, column })
-    setWeeklyReportFilterSearchTerm('')
-  }
-
-  const handleWeeklyReportFilterClose = () => {
-    setWeeklyReportFilterAnchor({ ...weeklyReportFilterAnchor, element: null })
-    setWeeklyReportFilterSearchTerm('')
-  }
-
-  const handleWeeklyReportFilterChange = (column: WeeklyReportColumn, value: string) => {
-    setWeeklyReportColumnFilters((prev) => toggleColumnFilterValue(prev, column, value))
-  }
-
-  const clearWeeklyReportColumnFilter = (column: WeeklyReportColumn) => {
-    setWeeklyReportColumnFilters((prev) => ({ ...prev, [column]: [] }))
-    setWeeklyReportFilterSearchTerm('')
-  }
-
-  const getWeeklyReportUniqueValues = (column: WeeklyReportColumn): string[] => {
-    return Array.from(new Set(weeklyFiles.map((file) => getWeeklyReportFieldValue(file, column))))
-      .filter((value) => value !== '')
-      .sort((a, b) => compareStrings(a, b))
   }
 
   const handleDetailsSortClick = (
@@ -1015,21 +973,14 @@ export default function WeeklyFileProcessingTab() {
         Weekly Report
       </Typography>
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
-        <Tooltip title="Clear all filters and sorting" arrow>
+        <Tooltip title="Clear sorting" arrow>
           <span>
             <Button
               variant="outlined"
               size="small"
               startIcon={<FilterAltOffIcon />}
-              disabled={
-                !weeklyReportSortConfig &&
-                Object.values(weeklyReportColumnFilters).every((arr) => arr.length === 0)
-              }
+              disabled={!weeklyReportSortConfig}
               onClick={() => {
-                setWeeklyReportColumnFilters({
-                  weeklyFileDate: [],
-                  csaProcessingDate: [],
-                })
                 setWeeklyReportSortConfig(null)
               }}
               sx={{
@@ -1057,17 +1008,6 @@ export default function WeeklyFileProcessingTab() {
                   >
                     Weekly File Date
                   </span>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => handleWeeklyReportFilterClick(e, 'weeklyFileDate')}
-                    sx={{
-                      padding: 0.5,
-                      color:
-                        weeklyReportColumnFilters.weeklyFileDate.length > 0 ? '#1976d2' : '#666',
-                    }}
-                  >
-                    <FilterListIcon fontSize="small" />
-                  </IconButton>
                 </Box>
               </TableCell>
               <TableCell>
@@ -1078,17 +1018,6 @@ export default function WeeklyFileProcessingTab() {
                   >
                     CSA Processing Date
                   </span>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => handleWeeklyReportFilterClick(e, 'csaProcessingDate')}
-                    sx={{
-                      padding: 0.5,
-                      color:
-                        weeklyReportColumnFilters.csaProcessingDate.length > 0 ? '#1976d2' : '#666',
-                    }}
-                  >
-                    <FilterListIcon fontSize="small" />
-                  </IconButton>
                 </Box>
               </TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Total records count</TableCell>
@@ -1734,79 +1663,6 @@ export default function WeeklyFileProcessingTab() {
           <ArrowDownwardIcon fontSize="small" />
           <Typography variant="body2">Sort Descending</Typography>
         </MenuItem>
-      </Menu>
-
-      <Menu
-        anchorEl={weeklyReportFilterAnchor.element}
-        open={Boolean(weeklyReportFilterAnchor.element)}
-        onClose={handleWeeklyReportFilterClose}
-        PaperProps={{
-          sx: {
-            maxHeight: 400,
-            width: 250,
-          },
-        }}
-      >
-        <Box sx={{ p: 2 }}>
-          <Box
-            sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}
-          >
-            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-              Filter by{' '}
-              {weeklyReportFilterAnchor.column === 'weeklyFileDate'
-                ? 'Weekly File Date'
-                : 'CSA Processing Date'}
-            </Typography>
-            <Button
-              size="small"
-              onClick={() => {
-                clearWeeklyReportColumnFilter(weeklyReportFilterAnchor.column)
-                handleWeeklyReportFilterClose()
-              }}
-              sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-            >
-              Clear
-            </Button>
-          </Box>
-          <TextField
-            size="small"
-            fullWidth
-            placeholder="Search"
-            value={weeklyReportFilterSearchTerm}
-            onChange={(e) => setWeeklyReportFilterSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Box component="span" sx={{ fontSize: '18px' }}>
-                    🔍
-                  </Box>
-                </InputAdornment>
-              ),
-            }}
-            sx={{ mb: 1 }}
-          />
-          <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-            {getWeeklyReportUniqueValues(weeklyReportFilterAnchor.column)
-              .filter((value) =>
-                value.toLowerCase().includes(weeklyReportFilterSearchTerm.toLowerCase()),
-              )
-              .map((value) => (
-                <Box key={value} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
-                  <Checkbox
-                    size="small"
-                    checked={
-                      weeklyReportColumnFilters[weeklyReportFilterAnchor.column]?.includes(value) ||
-                      false
-                    }
-                    onChange={() =>
-                      handleWeeklyReportFilterChange(weeklyReportFilterAnchor.column, value)
-                    }
-                  />
-                  <Typography variant="body2">{value}</Typography>
-                </Box>
-              ))}
-          </Box>
-        </Box>
       </Menu>
 
       <Menu

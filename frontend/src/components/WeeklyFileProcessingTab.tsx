@@ -53,6 +53,7 @@ type WeeklyDetailsColumn =
   | 'transactionSource'
   | 'craStatus'
   | 'matchedBy'
+type DetailsTextFilterColumn = 'matchedBy' | 'batchNumber' | 'transactionSource'
 type ChildSearchColumn =
   | 'din'
   | 'firstName'
@@ -77,6 +78,11 @@ const WEEKLY_DETAILS_COLUMNS: WeeklyDetailsColumn[] = [
   'transactionSource',
   'craStatus',
 ]
+const DETAILS_TEXT_FILTER_COLUMNS: ReadonlySet<DetailsTextFilterColumn> = new Set([
+  'matchedBy',
+  'batchNumber',
+  'transactionSource',
+])
 const CHILD_SEARCH_COLUMNS: ChildSearchColumn[] = [
   'din',
   'firstName',
@@ -260,6 +266,13 @@ export default function WeeklyFileProcessingTab() {
     transactionSource: [],
     craStatus: [],
     matchedBy: [],
+  })
+  const [detailsTextColumnFilters, setDetailsTextColumnFilters] = useState<
+    Record<DetailsTextFilterColumn, string>
+  >({
+    matchedBy: '',
+    batchNumber: '',
+    transactionSource: '',
   })
   const [detailsFilterSearchTerm, setDetailsFilterSearchTerm] = useState('')
   const [detailsSortConfig, setDetailsSortConfig] = useState<SortConfig<WeeklyDetailsColumn>>(null)
@@ -557,8 +570,11 @@ export default function WeeklyFileProcessingTab() {
     const clientColumnFilters: Record<WeeklyDetailsColumn, string[]> = {
       ...detailsColumnFilters,
       csaMatchFound: [],
+      batchNumber: [],
       transactionType: [],
+      transactionSource: [],
       craStatus: [],
+      matchedBy: [],
     }
     const recordsAfterSearchFilterSort = filterAndSortRows(
       records,
@@ -569,16 +585,33 @@ export default function WeeklyFileProcessingTab() {
       detailsSortConfig,
     )
 
+    let recordsAfterTextFilter = recordsAfterSearchFilterSort
+    for (const column of DETAILS_TEXT_FILTER_COLUMNS) {
+      const term = detailsTextColumnFilters[column].trim().toLowerCase()
+      if (term) {
+        recordsAfterTextFilter = recordsAfterTextFilter.filter((record) =>
+          getDetailsFieldValue(record, column).toLowerCase().includes(term),
+        )
+      }
+    }
+
     if (!detailsShowSelectedOnly) {
-      return recordsAfterSearchFilterSort
+      return recordsAfterTextFilter
     }
 
     if (!selectedRecordId) {
       return []
     }
 
-    return recordsAfterSearchFilterSort.filter((record) => record.id === selectedRecordId)
-  }, [records, detailsColumnFilters, detailsSortConfig, detailsShowSelectedOnly, selectedRecordId])
+    return recordsAfterTextFilter.filter((record) => record.id === selectedRecordId)
+  }, [
+    records,
+    detailsColumnFilters,
+    detailsSortConfig,
+    detailsShowSelectedOnly,
+    selectedRecordId,
+    detailsTextColumnFilters,
+  ])
 
   const filteredSearchedChildren = useMemo(() => {
     return filterAndSortRows(
@@ -656,7 +689,11 @@ export default function WeeklyFileProcessingTab() {
     column: WeeklyDetailsColumn,
   ) => {
     setDetailsFilterAnchor({ element: event.currentTarget, column })
-    setDetailsFilterSearchTerm('')
+    if (DETAILS_TEXT_FILTER_COLUMNS.has(column as DetailsTextFilterColumn)) {
+      setDetailsFilterSearchTerm(detailsTextColumnFilters[column as DetailsTextFilterColumn])
+    } else {
+      setDetailsFilterSearchTerm('')
+    }
   }
 
   const handleDetailsFilterClose = () => {
@@ -674,17 +711,40 @@ export default function WeeklyFileProcessingTab() {
     'craStatus',
   ])
 
+  const isDetailsTextFilterColumn = (
+    column: WeeklyDetailsColumn,
+  ): column is DetailsTextFilterColumn => {
+    return DETAILS_TEXT_FILTER_COLUMNS.has(column as DetailsTextFilterColumn)
+  }
+
+  const isDetailsFilterActive = (column: WeeklyDetailsColumn): boolean => {
+    if (isDetailsTextFilterColumn(column)) {
+      return detailsTextColumnFilters[column].trim().length > 0
+    }
+    return detailsColumnFilters[column].length > 0
+  }
+
   const handleDetailsFilterChange = (column: WeeklyDetailsColumn, value: string) => {
-    setDetailsColumnFilters((prev) => toggleColumnFilterValue(prev, column, value))
+    if (isDetailsTextFilterColumn(column)) {
+      setDetailsTextColumnFilters((prev) => ({ ...prev, [column]: value }))
+      return
+    }
+    setDetailsColumnFilters((prev) =>
+      toggleColumnFilterValue<WeeklyDetailsColumn>(prev, column, value),
+    )
     if (SERVER_SIDE_FILTER_COLUMNS.has(column)) {
       setRecordsPage(1)
     }
   }
 
   const clearDetailsColumnFilter = (column: WeeklyDetailsColumn) => {
-    setDetailsColumnFilters((prev) => ({ ...prev, [column]: [] }))
-    if (SERVER_SIDE_FILTER_COLUMNS.has(column)) {
-      setRecordsPage(1)
+    if (isDetailsTextFilterColumn(column)) {
+      setDetailsTextColumnFilters((prev) => ({ ...prev, [column]: '' }))
+    } else {
+      setDetailsColumnFilters((prev) => ({ ...prev, [column]: [] }))
+      if (SERVER_SIDE_FILTER_COLUMNS.has(column)) {
+        setRecordsPage(1)
+      }
     }
     setDetailsFilterSearchTerm('')
   }
@@ -1086,7 +1146,8 @@ export default function WeeklyFileProcessingTab() {
               disabled={
                 !detailsSortConfig &&
                 !detailsShowSelectedOnly &&
-                Object.values(detailsColumnFilters).every((arr) => arr.length === 0)
+                Object.values(detailsColumnFilters).every((arr) => arr.length === 0) &&
+                Object.values(detailsTextColumnFilters).every((value) => value.trim() === '')
               }
               onClick={() => {
                 setDetailsColumnFilters({
@@ -1096,6 +1157,11 @@ export default function WeeklyFileProcessingTab() {
                   transactionSource: [],
                   craStatus: [],
                   matchedBy: [],
+                })
+                setDetailsTextColumnFilters({
+                  matchedBy: '',
+                  batchNumber: '',
+                  transactionSource: '',
                 })
                 setDetailsSortConfig(null)
                 setDetailsShowSelectedOnly(false)
@@ -1146,7 +1212,7 @@ export default function WeeklyFileProcessingTab() {
                     onClick={(e) => handleDetailsFilterClick(e, 'csaMatchFound')}
                     sx={{
                       padding: 0.5,
-                      color: detailsColumnFilters.csaMatchFound.length > 0 ? '#1976d2' : '#666',
+                      color: isDetailsFilterActive('csaMatchFound') ? '#1976d2' : '#666',
                     }}
                   >
                     <FilterListIcon fontSize="small" />
@@ -1166,7 +1232,7 @@ export default function WeeklyFileProcessingTab() {
                     onClick={(e) => handleDetailsFilterClick(e, 'matchedBy')}
                     sx={{
                       padding: 0.5,
-                      color: detailsColumnFilters.matchedBy.length > 0 ? '#1976d2' : '#666',
+                      color: isDetailsFilterActive('matchedBy') ? '#1976d2' : '#666',
                     }}
                   >
                     <FilterListIcon fontSize="small" />
@@ -1186,7 +1252,7 @@ export default function WeeklyFileProcessingTab() {
                     onClick={(e) => handleDetailsFilterClick(e, 'batchNumber')}
                     sx={{
                       padding: 0.5,
-                      color: detailsColumnFilters.batchNumber.length > 0 ? '#1976d2' : '#666',
+                      color: isDetailsFilterActive('batchNumber') ? '#1976d2' : '#666',
                     }}
                   >
                     <FilterListIcon fontSize="small" />
@@ -1206,7 +1272,7 @@ export default function WeeklyFileProcessingTab() {
                     onClick={(e) => handleDetailsFilterClick(e, 'transactionType')}
                     sx={{
                       padding: 0.5,
-                      color: detailsColumnFilters.transactionType.length > 0 ? '#1976d2' : '#666',
+                      color: isDetailsFilterActive('transactionType') ? '#1976d2' : '#666',
                     }}
                   >
                     <FilterListIcon fontSize="small" />
@@ -1226,7 +1292,7 @@ export default function WeeklyFileProcessingTab() {
                     onClick={(e) => handleDetailsFilterClick(e, 'transactionSource')}
                     sx={{
                       padding: 0.5,
-                      color: detailsColumnFilters.transactionSource.length > 0 ? '#1976d2' : '#666',
+                      color: isDetailsFilterActive('transactionSource') ? '#1976d2' : '#666',
                     }}
                   >
                     <FilterListIcon fontSize="small" />
@@ -1246,7 +1312,7 @@ export default function WeeklyFileProcessingTab() {
                     onClick={(e) => handleDetailsFilterClick(e, 'craStatus')}
                     sx={{
                       padding: 0.5,
-                      color: detailsColumnFilters.craStatus.length > 0 ? '#1976d2' : '#666',
+                      color: isDetailsFilterActive('craStatus') ? '#1976d2' : '#666',
                     }}
                   >
                     <FilterListIcon fontSize="small" />
@@ -1787,9 +1853,17 @@ export default function WeeklyFileProcessingTab() {
           <TextField
             size="small"
             fullWidth
-            placeholder="Search"
+            placeholder={
+              isDetailsTextFilterColumn(detailsFilterAnchor.column) ? 'Type to filter' : 'Search'
+            }
             value={detailsFilterSearchTerm}
-            onChange={(e) => setDetailsFilterSearchTerm(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value
+              setDetailsFilterSearchTerm(value)
+              if (isDetailsTextFilterColumn(detailsFilterAnchor.column)) {
+                handleDetailsFilterChange(detailsFilterAnchor.column, value)
+              }
+            }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -1801,24 +1875,26 @@ export default function WeeklyFileProcessingTab() {
             }}
             sx={{ mb: 1 }}
           />
-          <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-            {getDetailsUniqueValues(detailsFilterAnchor.column)
-              .filter((value) =>
-                value.toLowerCase().includes(detailsFilterSearchTerm.toLowerCase()),
-              )
-              .map((value) => (
-                <Box key={value} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
-                  <Checkbox
-                    size="small"
-                    checked={
-                      detailsColumnFilters[detailsFilterAnchor.column]?.includes(value) || false
-                    }
-                    onChange={() => handleDetailsFilterChange(detailsFilterAnchor.column, value)}
-                  />
-                  <Typography variant="body2">{value}</Typography>
-                </Box>
-              ))}
-          </Box>
+          {!isDetailsTextFilterColumn(detailsFilterAnchor.column) && (
+            <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+              {getDetailsUniqueValues(detailsFilterAnchor.column)
+                .filter((value) =>
+                  value.toLowerCase().includes(detailsFilterSearchTerm.toLowerCase()),
+                )
+                .map((value) => (
+                  <Box key={value} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
+                    <Checkbox
+                      size="small"
+                      checked={
+                        detailsColumnFilters[detailsFilterAnchor.column]?.includes(value) || false
+                      }
+                      onChange={() => handleDetailsFilterChange(detailsFilterAnchor.column, value)}
+                    />
+                    <Typography variant="body2">{value}</Typography>
+                  </Box>
+                ))}
+            </Box>
+          )}
         </Box>
       </Menu>
 

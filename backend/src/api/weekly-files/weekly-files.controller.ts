@@ -67,6 +67,24 @@ export class WeeklyFilesController {
     description:
       'Comma-separated display values for CRA Status: "ABANDONED", "COMPLETED", "IN PROGRESS", "UPDATED"',
   })
+  @ApiQuery({
+    name: 'matchedBy',
+    required: false,
+    type: String,
+    description: 'Text filter for Matched By (minimum 3 characters)',
+  })
+  @ApiQuery({
+    name: 'batchNumber',
+    required: false,
+    type: String,
+    description: 'Text filter for Batch Req ID / batch number (minimum 3 characters)',
+  })
+  @ApiQuery({
+    name: 'transactionSource',
+    required: false,
+    type: String,
+    description: 'Text filter for Transaction Source (minimum 3 characters)',
+  })
   @ApiResponse({ status: 200, description: 'Paginated detail records for a weekly file' })
   @ApiResponse({ status: 404, description: 'Weekly file not found' })
   findRecords(
@@ -76,8 +94,10 @@ export class WeeklyFilesController {
     @Query('csaMatchFound') csaMatchFound?: string,
     @Query('transactionType') transactionType?: string,
     @Query('craStatus') craStatus?: string,
+    @Query('matchedBy') matchedBy?: string,
+    @Query('batchNumber') batchNumber?: string,
+    @Query('transactionSource') transactionSource?: string,
   ): Promise<PaginatedResponse<WeeklyFileRecordDto>> {
-    console.log('[DEBUG] Controller received query params:', { page, limit, csaMatchFound, transactionType, craStatus })
     const filters = {
       csaMatchFound: csaMatchFound
         ? csaMatchFound
@@ -97,6 +117,9 @@ export class WeeklyFilesController {
             .map((v) => v.trim())
             .filter(Boolean)
         : undefined,
+      matchedBy: matchedBy?.trim() || undefined,
+      batchNumber: batchNumber?.trim() || undefined,
+      transactionSource: transactionSource?.trim() || undefined,
     }
     return this.weeklyFilesService.findRecords(
       id,

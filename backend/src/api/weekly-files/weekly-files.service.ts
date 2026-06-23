@@ -27,6 +27,9 @@ export interface WeeklyFileRecordFilters {
   csaMatchFound?: string[]
   transactionType?: string[]
   craStatus?: string[]
+  matchedBy?: string
+  batchNumber?: string
+  transactionSource?: string
 }
 
 const TRANSACTION_TYPE_REVERSE: Record<string, string> = {
@@ -200,6 +203,47 @@ export class WeeklyFilesService {
       if (rawStatuses.length) {
         const statusList = rawStatuses.map((s) => `'${s}'`).join(',')
         whereConditions.push(`LOWER(record_data->>'status') IN (${statusList})`)
+      }
+    }
+
+    const escapeSqlLiteral = (value: string): string => value.replace(/'/g, "''")
+
+    // Matched By text filter (column-based)
+    if (filters?.matchedBy) {
+      const term = filters.matchedBy.trim().toLowerCase()
+      if (term.length >= 3) {
+        const escapedTerm = escapeSqlLiteral(term)
+        whereConditions.push(`LOWER(COALESCE(matched_by, '')) LIKE '%${escapedTerm}%'`)
+      }
+    }
+
+    // Batch Req ID text filter (batch number via relation)
+    if (filters?.batchNumber) {
+      const term = filters.batchNumber.trim().toLowerCase()
+      if (term.length >= 3) {
+        const escapedTerm = escapeSqlLiteral(term)
+        whereConditions.push(`EXISTS (
+          SELECT 1
+          FROM csa.contact_batch_details cbd
+          INNER JOIN csa.batches b ON b.id = cbd.batch_id
+          WHERE cbd.id = csa.wkl_file_records.batch_detail_id
+            AND LOWER(CAST(b.batch_number AS TEXT)) LIKE '%${escapedTerm}%'
+        )`)
+      }
+    }
+
+    // Transaction Source text filter (display-value equivalent)
+    if (filters?.transactionSource) {
+      const term = filters.transactionSource.trim().toLowerCase()
+      if (term.length >= 3) {
+        const escapedTerm = escapeSqlLiteral(term)
+        whereConditions.push(`(
+          CASE
+            WHEN UPPER(COALESCE(record_data->>'receiveMode', '')) = 'E' THEN 'electronic'
+            WHEN COALESCE(record_data->>'receiveMode', '') = '' THEN 'other'
+            ELSE LOWER(record_data->>'receiveMode')
+          END
+        ) LIKE '%${escapedTerm}%'`)
       }
     }
 

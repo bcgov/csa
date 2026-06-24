@@ -509,8 +509,7 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
   {
     dbColumn: 'source_agreement',
     pgType: 'text',
-    extract: (row) =>
-      row.primaryAgreement?.source ?? row.primaryPlacement?.source ?? null,
+    extract: (row) => row.primaryAgreement?.source ?? row.primaryPlacement?.source ?? null,
   },
   {
     dbColumn: 'order_number',

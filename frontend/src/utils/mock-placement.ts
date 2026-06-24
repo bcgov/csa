@@ -45,8 +45,7 @@ export const buildPlacementDisplayValues = (
   contact: PlacementDisplayInput,
   formatDateYMD: (dateString: string) => string,
 ): PlacementDisplayValues => {
-  const hidePlacementDetails =
-    isMockSection54Placement(contact) || !hasPlacementDetails(contact)
+  const hidePlacementDetails = isMockSection54Placement(contact) || !hasPlacementDetails(contact)
 
   return {
     placementLocation: hidePlacementDetails ? '' : contact.placementLocation || '',

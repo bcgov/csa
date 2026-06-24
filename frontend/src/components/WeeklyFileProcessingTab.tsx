@@ -507,6 +507,10 @@ export default function WeeklyFileProcessingTab() {
     !selectedRecord?.processedAt &&
     hasAssociatedPendingRecords
 
+  const toggleSelectedRecord = (recordId: number) => {
+    setSelectedRecordId((prev) => (prev === recordId ? null : recordId))
+  }
+
   const getWeeklyReportFieldValue = (
     file: WeeklyFileSummary,
     column: WeeklyReportColumn,
@@ -1324,7 +1328,7 @@ export default function WeeklyFileProcessingTab() {
                 <TableRow
                   key={record.id}
                   hover
-                  onClick={() => setSelectedRecordId(record.id)}
+                  onClick={() => toggleSelectedRecord(record.id)}
                   sx={{
                     '&:hover': { backgroundColor: '#f9f9f9' },
                     cursor: 'pointer',
@@ -1332,7 +1336,13 @@ export default function WeeklyFileProcessingTab() {
                   }}
                 >
                   <TableCell padding="checkbox">
-                    <Radio checked={selectedRecordId === record.id} />
+                    <Radio
+                      checked={selectedRecordId === record.id}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        toggleSelectedRecord(record.id)
+                      }}
+                    />
                   </TableCell>
                   <TableCell>{record.csaMatchFound}</TableCell>
                   <TableCell>{valueOrBlank(record.matchedBy)}</TableCell>

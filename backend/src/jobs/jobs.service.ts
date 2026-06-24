@@ -4,6 +4,8 @@ import { JobStatus } from './enums/job-status.enum'
 import { JobTrigger } from './enums/job-trigger.enum'
 import { JobType } from './enums/job-type.enum'
 
+const RETRYABLE_END_USER_JOB_TYPES: JobType[] = [JobType.SEND_CRA_FILE]
+
 export interface CreateJobDto {
   jobType: JobType
   jobTrigger: JobTrigger
@@ -99,7 +101,13 @@ export class JobsService {
       where: {
         status: JobStatus.FAILED,
         parentJobId: null, // skip child jobs, parent will recreate them
-        jobTrigger: JobTrigger.CRON,
+        OR: [
+          { jobTrigger: JobTrigger.CRON },
+          {
+            jobTrigger: JobTrigger.END_USER,
+            jobType: { in: RETRYABLE_END_USER_JOB_TYPES },
+          },
+        ],
       },
       select: {
         id: true,
@@ -195,7 +203,13 @@ export class JobsService {
       where: {
         status: JobStatus.FAILED,
         parentJobId: null,
-        jobTrigger: JobTrigger.CRON,
+        OR: [
+          { jobTrigger: JobTrigger.CRON },
+          {
+            jobTrigger: JobTrigger.END_USER,
+            jobType: { in: RETRYABLE_END_USER_JOB_TYPES },
+          },
+        ],
       },
       select: { id: true },
     })

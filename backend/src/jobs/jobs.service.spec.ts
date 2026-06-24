@@ -241,14 +241,20 @@ describe('JobsService', () => {
   })
 
   describe('getFailedJobs', () => {
-    it('should return only top-level failed jobs (no child jobs)', async () => {
+    it('should return retryable top-level failed jobs (cron + selected end-user jobs)', async () => {
       await service.getFailedJobs()
 
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: {
           status: JobStatus.FAILED,
           parentJobId: null,
-          jobTrigger: JobTrigger.CRON,
+          OR: [
+            { jobTrigger: JobTrigger.CRON },
+            {
+              jobTrigger: JobTrigger.END_USER,
+              jobType: { in: [JobType.SEND_CRA_FILE] },
+            },
+          ],
         },
         select: {
           id: true,
@@ -308,7 +314,7 @@ describe('JobsService', () => {
       })
     })
 
-    it('should return true when a FAILED top-level CRON job exists', async () => {
+    it('should return true when a retryable FAILED top-level job exists', async () => {
       vi.spyOn(prisma.jobRun, 'findFirst')
         .mockResolvedValueOnce(null) // no stuck jobs
         .mockResolvedValueOnce({ id: 50 } as any) // failed job found
@@ -320,7 +326,13 @@ describe('JobsService', () => {
         where: {
           status: JobStatus.FAILED,
           parentJobId: null,
-          jobTrigger: JobTrigger.CRON,
+          OR: [
+            { jobTrigger: JobTrigger.CRON },
+            {
+              jobTrigger: JobTrigger.END_USER,
+              jobType: { in: [JobType.SEND_CRA_FILE] },
+            },
+          ],
         },
         select: { id: true },
       })

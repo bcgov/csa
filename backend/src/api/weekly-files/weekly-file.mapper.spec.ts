@@ -2,6 +2,9 @@ import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 import { describe, expect, it } from 'vitest'
 import {
   aggregateWeeklyFileCounts,
+  CRA_STATUS_DISPLAY_LABELS,
+  resolveCraStatusFilterToStored,
+  toCraStatusDisplayLabel,
   toCsaMatchFound,
   toWeeklyFileRecordDto,
 } from './weekly-file.mapper'
@@ -129,5 +132,24 @@ describe('weekly-file.mapper', () => {
     expect(dto.transactionSource).toBe('Other')
     expect(dto.gender).toBe('Unknown')
     expect(dto.birthCountry).toBe('Outside Canada')
+  })
+
+  it('derives CRA status display labels from WEEKLY_FILE.STATUS', () => {
+    expect(CRA_STATUS_DISPLAY_LABELS).toEqual([
+      'COMPLETED',
+      'ABANDONED',
+      'IN PROGRESS',
+      'UPDATED',
+    ])
+    expect(toCraStatusDisplayLabel('in-progress')).toBe('IN PROGRESS')
+  })
+
+  it('maps CRA status filter labels to stored file values', () => {
+    expect(resolveCraStatusFilterToStored(['IN PROGRESS'])).toEqual(['in-progress'])
+    expect(resolveCraStatusFilterToStored(['IN_PROGRESS', 'COMPLETED'])).toEqual([
+      'in-progress',
+      'completed',
+    ])
+    expect(resolveCraStatusFilterToStored(['INVALID', 'COMPLETED'])).toEqual(['completed'])
   })
 })

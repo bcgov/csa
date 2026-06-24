@@ -4,7 +4,9 @@ import type { DetailRecord04 } from 'src/cra/inbound/inbound-weekly.interface'
 import type { WeeklyFileRecordDto, WeeklyFileSummaryDto } from './dto/weekly-file.dto'
 
 const { WKL_MATCH_STATUS, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
-const { RECEIVE_MODE } = WEEKLY_FILE
+const { RECEIVE_MODE, STATUS: WKL_STATUS } = WEEKLY_FILE
+
+const WKL_STATUS_STORED_VALUES = Object.values(WKL_STATUS)
 
 const TRANSACTION_TYPE_LABELS: Record<string, string> = {
   A: 'Application',
@@ -26,6 +28,30 @@ const GENDER_LABELS: Record<string, string> = {
 const BIRTH_COUNTRY_LABELS: Record<string, string> = {
   CA: 'Canada',
   EX: 'Outside Canada',
+}
+
+/** Display label for a stored CRA status (e.g. "in-progress" → "IN PROGRESS"). */
+export function toCraStatusDisplayLabel(stored: string): string {
+  return stored.trim().toUpperCase().replace(/-/g, ' ')
+}
+
+/** Maps filter dropdown labels to raw values stored in cra_status. */
+export const CRA_STATUS_FILTER_TO_STORED: Record<string, string> = Object.fromEntries(
+  WKL_STATUS_STORED_VALUES.map((stored) => [toCraStatusDisplayLabel(stored), stored]),
+)
+
+/** Display labels for CRA status filter options (derived from WEEKLY_FILE.STATUS). */
+export const CRA_STATUS_DISPLAY_LABELS: string[] =
+  WKL_STATUS_STORED_VALUES.map(toCraStatusDisplayLabel)
+
+export function resolveCraStatusFilterToStored(labels: string[]): string[] {
+  const stored = labels
+    .map((label) => {
+      const normalized = label.trim().toUpperCase().replace(/_/g, ' ')
+      return CRA_STATUS_FILTER_TO_STORED[normalized]
+    })
+    .filter((v): v is string => !!v)
+  return [...new Set(stored)]
 }
 
 export interface WeeklyFileCounts {
@@ -167,7 +193,7 @@ function formatWklDateString(value: string | undefined): string | null {
 
 function formatCraStatus(status: string | undefined): string {
   if (!status?.trim()) return ''
-  return status.trim().toUpperCase().replace(/-/g, ' ')
+  return toCraStatusDisplayLabel(status)
 }
 
 function formatTransactionType(value: string | undefined): string {

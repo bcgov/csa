@@ -12,6 +12,7 @@ import type { ReprocessWeeklyFileResultDto } from './dto/associate-wkl-record.dt
 import type { WeeklyFileRecordDto, WeeklyFileSummaryDto } from './dto/weekly-file.dto'
 import {
   aggregateWeeklyFileCounts,
+  resolveCraStatusFilterToStored,
   toWeeklyFileRecordDto,
   toWeeklyFileSummaryDto,
 } from './weekly-file.mapper'
@@ -196,17 +197,12 @@ export class WeeklyFilesService {
 
     const escapeSqlLiteral = (value: string): string => value.replace(/'/g, "''")
 
-    // CRA Status filter (column-based)
-    // Stored values are raw file values (e.g. "in-progress"); display uses "IN PROGRESS".
+    // CRA Status filter (column-based) — whitelist maps display labels to stored file values.
     if (filters?.craStatus?.length) {
-      const displayStatuses = filters.craStatus
-        .map((v) => v.trim().toUpperCase().replace(/_/g, ' '))
-        .filter((v) => v.length > 0)
-      if (displayStatuses.length) {
-        const statusList = displayStatuses.map((s) => `'${escapeSqlLiteral(s)}'`).join(',')
-        whereConditions.push(
-          `UPPER(REPLACE(COALESCE(cra_status, ''), '-', ' ')) IN (${statusList})`,
-        )
+      const storedStatuses = resolveCraStatusFilterToStored(filters.craStatus)
+      if (storedStatuses.length) {
+        const statusList = storedStatuses.map((s) => `'${escapeSqlLiteral(s)}'`).join(',')
+        whereConditions.push(`cra_status IN (${statusList})`)
       }
     }
 

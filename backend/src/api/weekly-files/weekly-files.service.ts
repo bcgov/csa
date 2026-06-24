@@ -249,6 +249,27 @@ export class WeeklyFilesService {
 
     const whereClause = whereConditions.join(' AND ')
 
+    if (whereConditions.length === 1) {
+      const [total, recordsWithRelations] = await Promise.all([
+        this.prisma.wklFileRecord.count({ where: { transferFileId: id } }),
+        this.prisma.wklFileRecord.findMany({
+          where: { transferFileId: id },
+          orderBy: { recordIndex: 'asc' },
+          skip: offset,
+          take: safeLimit,
+          include: wklRecordDtoInclude,
+        }),
+      ])
+
+      return {
+        data: recordsWithRelations.map(toWeeklyFileRecordDto),
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages: Math.ceil(total / safeLimit),
+      }
+    }
+
     // Execute count and findMany using raw SQL for accurate filtering
     const countResult = await this.prisma.$queryRawUnsafe<
       Array<{ total: number | bigint | string }>

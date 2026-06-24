@@ -60,32 +60,49 @@ describe('WklAssociatedRecordProcessorService', () => {
     const batchDate = new Date('2026-06-23T07:00:00.000Z')
     const counters = { approved: 0, refused: 0, skipped: 0 }
 
-    await service.processAssociatedRecord(detail as any, 99, '1-99', {
-      unmatchedWklBatchId: { value: null },
-      processedBatchIds: new Set(),
-      header: { processDate: '20260622' } as any,
-      origin: 'test',
-      preferExistingInProgressDetail: true,
-      batchDate,
-    }, counters)
+    await service.processAssociatedRecord(
+      detail as any,
+      99,
+      '1-99',
+      {
+        unmatchedWklBatchId: { value: null },
+        processedBatchIds: new Set(),
+        header: { processDate: '20260622' } as any,
+        origin: 'test',
+        preferExistingInProgressDetail: true,
+        batchDate,
+      },
+      counters,
+    )
 
-    expect(mockBatchesService.findInProgressBatchDetailForContact).toHaveBeenCalledWith(99, batchDate)
+    expect(mockBatchesService.findInProgressBatchDetailForContact).toHaveBeenCalledWith(
+      99,
+      batchDate,
+    )
   })
 
   it('creates batch for CSA processing date when no in-progress detail matches that date', async () => {
     const batchDate = new Date('2026-06-23T07:00:00.000Z')
     const counters = { approved: 0, refused: 0, skipped: 0 }
 
-    await service.processAssociatedRecord(detail as any, 99, '1-99', {
-      unmatchedWklBatchId: { value: null },
-      processedBatchIds: new Set(),
-      header: { processDate: '20260622' } as any,
-      origin: 'test',
-      preferExistingInProgressDetail: true,
-      batchDate,
-    }, counters)
+    await service.processAssociatedRecord(
+      detail as any,
+      99,
+      '1-99',
+      {
+        unmatchedWklBatchId: { value: null },
+        processedBatchIds: new Set(),
+        header: { processDate: '20260622' } as any,
+        origin: 'test',
+        preferExistingInProgressDetail: true,
+        batchDate,
+      },
+      counters,
+    )
 
-    expect(mockBatchesService.findOrCreateWklBatchForUnmatchedRecords).toHaveBeenCalledWith(batchDate)
+    expect(mockBatchesService.findOrCreateWklBatchForUnmatchedRecords).toHaveBeenCalledWith(
+      batchDate,
+    )
     expect(mockBatchesService.createBatchDetailsForWklUnmatchedRecords).toHaveBeenCalledWith(
       700,
       99,

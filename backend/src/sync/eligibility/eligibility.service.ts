@@ -47,7 +47,8 @@ const REQUIRED_STAGING_TABLES = [
   'stg_icm_legal_authority_admin',
   'stg_icm_legal_authority',
   'stg_icm_agreement',
-  'stg_icm_agreement_line',
+  // Temporary: agreement line ingest returns empty until ICM API is ready
+  // 'stg_icm_agreement_line',
   'stg_icm_orders',
   'stg_mis_payments',
   'stg_mis_contracts',

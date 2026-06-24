@@ -141,7 +141,7 @@ export class ContactDto {
   @ApiPropertyOptional({ description: 'Whether placement was interrupted' })
   interruptedPlacement?: string
 
-  @ApiPropertyOptional({ description: 'Source of placement' })
+  @ApiPropertyOptional({ description: 'Source of the primary placement (ICM or MIS)' })
   sourcePlacement?: string
 
   @ApiPropertyOptional({ description: 'Service provider name' })
@@ -170,6 +170,9 @@ export class ContactDto {
 
   @ApiPropertyOptional({ description: 'MCFD contract identifier' })
   mcfdContract?: string
+
+  @ApiPropertyOptional({ description: 'Source of the primary agreement or contract (ICM or MIS)' })
+  sourceAgreement?: string
 
   @ApiPropertyOptional({ description: 'Order number' })
   orderNumber?: string

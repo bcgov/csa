@@ -207,6 +207,7 @@ function generateContact(csaStatus: string) {
     agreementEndDate: agreementEnd ?? null,
     terminationDate: terminationDate ?? null,
     mcfdContract: faker.string.alphanumeric(10).toUpperCase(),
+    sourceAgreement: faker.helpers.arrayElement(SOURCES),
 
     orderNumber: faker.string.alphanumeric(8).toUpperCase(),
     orderType: faker.helpers.arrayElement(ORDER_TYPES),

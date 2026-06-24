@@ -2922,6 +2922,7 @@ function App() {
         agreementEndDate: contact.agreementEndDate ? formatDateYMD(contact.agreementEndDate) : '',
         terminationDate: contact.terminationDate ? formatDateYMD(contact.terminationDate) : '',
         mcfdContract: contact.mcfdContract || '',
+        sourceAgreement: contact.sourceAgreement || '',
         product: contact.product || '',
         isOver18: contact.isOver18 || false,
         cgwrks3: contact.holdBy || '',
@@ -6039,7 +6040,7 @@ function App() {
                                       wordBreak: 'break-word',
                                     }}
                                   >
-                                    {childData.sourcePlacement ? (
+                                    {childData.sourceAgreement ? (
                                       <Typography
                                         component="span"
                                         sx={{
@@ -6051,7 +6052,7 @@ function App() {
                                           fontSize: '0.75rem',
                                         }}
                                       >
-                                        {childData.sourcePlacement}
+                                        {childData.sourceAgreement}
                                       </Typography>
                                     ) : (
                                       '-'

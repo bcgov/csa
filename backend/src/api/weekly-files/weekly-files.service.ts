@@ -195,13 +195,13 @@ export class WeeklyFilesService {
     }
 
     // CRA Status filter (column-based)
-    // Display format is uppercase with spaces (e.g. "IN PROGRESS").
-    // Stored column value is normalized to lowercase-with-hyphens.
     if (filters?.craStatus?.length) {
-      const rawStatuses = filters.craStatus.map((v) => v.toLowerCase().replace(/[ _]/g, '-'))
+      const rawStatuses = filters.craStatus
+        .map((v) => v.trim().toUpperCase())
+        .filter((v) => v.length > 0)
       if (rawStatuses.length) {
         const statusList = rawStatuses.map((s) => `'${s}'`).join(',')
-        whereConditions.push(`cra_status IN (${statusList})`)
+        whereConditions.push(`UPPER(COALESCE(cra_status, '')) IN (${statusList})`)
       }
     }
 
@@ -236,7 +236,13 @@ export class WeeklyFilesService {
       const term = filters.transactionSource.trim().toLowerCase()
       if (term.length >= 3) {
         const escapedTerm = escapeSqlLiteral(term)
-        whereConditions.push(`COALESCE(transaction_source, '') LIKE '%${escapedTerm}%'`)
+        whereConditions.push(`LOWER(
+          CASE
+            WHEN UPPER(COALESCE(transaction_source, '')) = 'E' THEN 'electronic'
+            WHEN COALESCE(transaction_source, '') = '' THEN 'other'
+            ELSE COALESCE(transaction_source, '')
+          END
+        ) LIKE '%${escapedTerm}%'`)
       }
     }
 

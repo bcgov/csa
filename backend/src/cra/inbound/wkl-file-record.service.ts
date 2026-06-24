@@ -22,22 +22,24 @@ export class WklFileRecordService {
   constructor(private readonly prisma: PrismaService) {}
 
   private extractTransactionType(recordData: DetailRecord04): string | null {
-    const type = recordData.transactionType
-    return type?.trim() || null
+    if (recordData.transactionType === undefined || recordData.transactionType === null) {
+      return null
+    }
+    return recordData.transactionType.trim()
   }
 
   private extractCraStatus(recordData: DetailRecord04): string | null {
-    const status = recordData.status?.trim()
-    if (!status) return null
-    // Normalize: lowercase, replace spaces with hyphens
-    return status.toLowerCase().replace(/ +/g, '-')
+    if (recordData.status === undefined || recordData.status === null) {
+      return null
+    }
+    return recordData.status.trim()
   }
 
   private extractTransactionSource(recordData: DetailRecord04): string | null {
-    const source = recordData.receiveMode?.trim().toUpperCase()
-    if (!source) return 'other'
-    if (source === 'E') return 'electronic'
-    return source.toLowerCase()
+    if (recordData.receiveMode === undefined || recordData.receiveMode === null) {
+      return null
+    }
+    return recordData.receiveMode.trim()
   }
 
   async persistRecord(params: PersistWklRecordParams): Promise<void> {
@@ -53,7 +55,7 @@ export class WklFileRecordService {
       processedAt,
     } = params
 
-    // Extract and transform filter values from recordData
+    // Persist raw file values; display/query transformations happen in the API layer.
     const transactionType = this.extractTransactionType(recordData)
     const craStatus = this.extractCraStatus(recordData)
     const transactionSource = this.extractTransactionSource(recordData)

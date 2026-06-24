@@ -15,9 +15,9 @@ export interface WklUnmatchedProcessContext {
   processedBatchIds: Set<number>
   header: HeaderRecord
   origin: string
-  /** CSA processing date (Pacific calendar date) for manual confirm batch lookup */
+  /** CSA processing date (Pacific calendar date) for CRA batch find/create */
   batchDate?: Date
-  /** When true, reuse an existing in-progress batch detail or find/create batch by batchDate */
+  /** When true, reuse an existing in-progress batch detail for the contact (any batch) */
   preferExistingInProgressDetail?: boolean
 }
 
@@ -63,10 +63,7 @@ export class WklAssociatedRecordProcessorService {
     > | null = null
 
     if (ctx.preferExistingInProgressDetail) {
-      batchDetail = await this.batchesService.findInProgressBatchDetailForContact(
-        contactId,
-        ctx.batchDate,
-      )
+      batchDetail = await this.batchesService.findInProgressBatchDetailForContact(contactId)
       if (batchDetail) {
         if (batchDetail.transactionType !== wklType) {
           this.logger.warn(
@@ -87,10 +84,9 @@ export class WklAssociatedRecordProcessorService {
 
     if (!batchDetail) {
       if (!ctx.unmatchedWklBatchId.value) {
-        const batch =
-          ctx.preferExistingInProgressDetail && ctx.batchDate
-            ? await this.batchesService.findOrCreateWklBatchForUnmatchedRecords(ctx.batchDate)
-            : await this.batchesService.createWklBatchForUnmatchedRecords(ctx.header)
+        const batch = ctx.batchDate
+          ? await this.batchesService.findOrCreateWklBatchForUnmatchedRecords(ctx.batchDate)
+          : await this.batchesService.createWklBatchForUnmatchedRecords(ctx.header)
         ctx.unmatchedWklBatchId.value = batch.id
         ctx.processedBatchIds.add(batch.id)
       }

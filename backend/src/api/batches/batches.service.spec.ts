@@ -414,24 +414,6 @@ describe('BatchesService', () => {
 
       expect(detail).toBeNull()
     })
-
-    it('scopes lookup to batchDate when provided', async () => {
-      const batchDate = new Date('2026-06-23T07:00:00.000Z')
-      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([])
-
-      await service.findInProgressBatchDetailForContact(99, batchDate)
-
-      expect(mockPrisma.contactBatchDetail.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            contactId: 99,
-            batch: expect.objectContaining({
-              batchDate,
-            }),
-          }),
-        }),
-      )
-    })
   })
 
   describe('findOrCreateWklBatchForUnmatchedRecords', () => {

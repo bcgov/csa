@@ -194,18 +194,21 @@ export class WeeklyFilesService {
       }
     }
 
+    const escapeSqlLiteral = (value: string): string => value.replace(/'/g, "''")
+
     // CRA Status filter (column-based)
+    // Stored values are raw file values (e.g. "in-progress"); display uses "IN PROGRESS".
     if (filters?.craStatus?.length) {
-      const rawStatuses = filters.craStatus
-        .map((v) => v.trim().toUpperCase())
+      const displayStatuses = filters.craStatus
+        .map((v) => v.trim().toUpperCase().replace(/_/g, ' '))
         .filter((v) => v.length > 0)
-      if (rawStatuses.length) {
-        const statusList = rawStatuses.map((s) => `'${s}'`).join(',')
-        whereConditions.push(`UPPER(COALESCE(cra_status, '')) IN (${statusList})`)
+      if (displayStatuses.length) {
+        const statusList = displayStatuses.map((s) => `'${escapeSqlLiteral(s)}'`).join(',')
+        whereConditions.push(
+          `UPPER(REPLACE(COALESCE(cra_status, ''), '-', ' ')) IN (${statusList})`,
+        )
       }
     }
-
-    const escapeSqlLiteral = (value: string): string => value.replace(/'/g, "''")
 
     // Matched By text filter (column-based)
     if (filters?.matchedBy) {

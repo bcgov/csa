@@ -742,7 +742,7 @@ export default function WeeklyFileProcessingTab() {
   const SERVER_SIDE_COLUMN_OPTIONS: Partial<Record<WeeklyDetailsColumn, string[]>> = {
     csaMatchFound: ['Yes', 'No'],
     transactionType: ['Application', 'Cancellation', 'CRA Update'],
-    craStatus: ['COMPLETED', 'ABANDONED', 'IN_PROGRESS', 'UPDATED'],
+    craStatus: ['COMPLETED', 'ABANDONED', 'IN PROGRESS', 'UPDATED'],
   }
 
   const getDetailsUniqueValues = (column: WeeklyDetailsColumn): string[] => {

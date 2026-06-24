@@ -183,26 +183,25 @@ export class WeeklyFilesService {
       }
     }
 
-    // Transaction Type filter (JSONB-based)
+    // Transaction Type filter (column-based)
     if (filters?.transactionType?.length) {
       const rawTypes = filters.transactionType
         .map((v) => TRANSACTION_TYPE_REVERSE[v])
         .filter((v): v is string => !!v)
       if (rawTypes.length) {
         const typeList = rawTypes.map((t) => `'${t}'`).join(',')
-        whereConditions.push(`record_data->>'transactionType' IN (${typeList})`)
+        whereConditions.push(`transaction_type IN (${typeList})`)
       }
     }
 
-    // CRA Status filter (JSONB-based)
+    // CRA Status filter (column-based)
     // Display format is uppercase with spaces (e.g. "IN PROGRESS").
-    // Raw CRA file values vary in casing, so compare case-insensitively.
-    // We normalise to lowercase-with-hyphens for the comparison.
+    // Stored column value is normalized to lowercase-with-hyphens.
     if (filters?.craStatus?.length) {
-      const rawStatuses = filters.craStatus.map((v) => v.toLowerCase().replace(/ /g, '-'))
+      const rawStatuses = filters.craStatus.map((v) => v.toLowerCase().replace(/[ _]/g, '-'))
       if (rawStatuses.length) {
         const statusList = rawStatuses.map((s) => `'${s}'`).join(',')
-        whereConditions.push(`LOWER(record_data->>'status') IN (${statusList})`)
+        whereConditions.push(`cra_status IN (${statusList})`)
       }
     }
 
@@ -232,18 +231,12 @@ export class WeeklyFilesService {
       }
     }
 
-    // Transaction Source text filter (display-value equivalent)
+    // Transaction Source text filter (column-based)
     if (filters?.transactionSource) {
       const term = filters.transactionSource.trim().toLowerCase()
       if (term.length >= 3) {
         const escapedTerm = escapeSqlLiteral(term)
-        whereConditions.push(`(
-          CASE
-            WHEN UPPER(COALESCE(record_data->>'receiveMode', '')) = 'E' THEN 'electronic'
-            WHEN COALESCE(record_data->>'receiveMode', '') = '' THEN 'other'
-            ELSE LOWER(record_data->>'receiveMode')
-          END
-        ) LIKE '%${escapedTerm}%'`)
+        whereConditions.push(`COALESCE(transaction_source, '') LIKE '%${escapedTerm}%'`)
       }
     }
 

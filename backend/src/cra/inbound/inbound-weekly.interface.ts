@@ -81,7 +81,7 @@ export type ProvinceCode =
 
 export type CareEndReasonCode = '14' | '21' | '22' | '23' | '29'
 
-export type Status = 'abandoned' | 'completed' | 'in-progress' | 'updated' | 'pending' | 'active'
+export type Status = 'abandoned' | 'completed' | 'in-progress' | 'updated'
 
 // DETAIL 04 (MAIN)
 

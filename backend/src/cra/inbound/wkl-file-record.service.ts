@@ -21,6 +21,25 @@ export interface PersistWklRecordParams {
 export class WklFileRecordService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private extractTransactionType(recordData: DetailRecord04): string | null {
+    const type = recordData.transactionType
+    return type?.trim() || null
+  }
+
+  private extractCraStatus(recordData: DetailRecord04): string | null {
+    const status = recordData.status?.trim()
+    if (!status) return null
+    // Normalize: lowercase, replace spaces with hyphens
+    return status.toLowerCase().replace(/ +/g, '-')
+  }
+
+  private extractTransactionSource(recordData: DetailRecord04): string | null {
+    const source = recordData.receiveMode?.trim().toUpperCase()
+    if (!source) return 'other'
+    if (source === 'E') return 'electronic'
+    return source.toLowerCase()
+  }
+
   async persistRecord(params: PersistWklRecordParams): Promise<void> {
     const {
       transferFileId,
@@ -34,6 +53,11 @@ export class WklFileRecordService {
       processedAt,
     } = params
 
+    // Extract and transform filter values from recordData
+    const transactionType = this.extractTransactionType(recordData)
+    const craStatus = this.extractCraStatus(recordData)
+    const transactionSource = this.extractTransactionSource(recordData)
+
     await this.prisma.wklFileRecord.upsert({
       where: {
         wkl_file_record_unique: {
@@ -46,6 +70,9 @@ export class WklFileRecordService {
         recordIndex,
         weeklyFileDate,
         recordData: recordData as unknown as Prisma.InputJsonValue,
+        transactionType,
+        craStatus,
+        transactionSource,
         matchStatus,
         contactId,
         batchDetailId,
@@ -55,6 +82,9 @@ export class WklFileRecordService {
       update: {
         weeklyFileDate,
         recordData: recordData as unknown as Prisma.InputJsonValue,
+        transactionType,
+        craStatus,
+        transactionSource,
         matchStatus,
         contactId,
         batchDetailId,

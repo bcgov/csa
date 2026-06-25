@@ -584,6 +584,18 @@ function App() {
   const [batchDetails, setBatchDetails] = useState<BatchContactDetail[]>([])
   const [loadingBatchDetails, setLoadingBatchDetails] = useState(false)
 
+  const refreshBatchRequestsAfterSendCra = async (): Promise<Batch[]> => {
+    const updatedBatches = await getAllBatches()
+    setBatches(updatedBatches)
+
+    if (selectedBatch) {
+      const updatedDetails = await getBatchContacts(selectedBatch)
+      setBatchDetails(updatedDetails)
+    }
+
+    return updatedBatches
+  }
+
   useEffect(() => {
     if (!isAuthenticated) return
 
@@ -641,6 +653,7 @@ function App() {
             severity: 'success',
           })
         } else {
+          await refreshBatchRequestsAfterSendCra()
           setSendCraFileJobState('failed')
           setSnackbar({
             open: true,
@@ -717,6 +730,7 @@ function App() {
             severity: 'success',
           })
         } else {
+          await refreshBatchRequestsAfterSendCra()
           setSendCraFileJobState('failed')
           setSnackbar({
             open: true,
@@ -745,18 +759,6 @@ function App() {
 
   const handleSendToCraClick = () => {
     setConfirmSendCraDialogOpen(true)
-  }
-
-  const refreshBatchRequestsAfterSendCra = async (): Promise<Batch[]> => {
-    const updatedBatches = await getAllBatches()
-    setBatches(updatedBatches)
-
-    if (selectedBatch) {
-      const updatedDetails = await getBatchContacts(selectedBatch)
-      setBatchDetails(updatedDetails)
-    }
-
-    return updatedBatches
   }
 
   const handleConfirmSendCra = async () => {
@@ -837,6 +839,7 @@ function App() {
       }
     } catch (error: any) {
       console.error('Send CRA file error:', error)
+      await refreshBatchRequestsAfterSendCra()
       const errorMessage =
         error?.response?.data?.message || error?.message || 'Failed to send CRA file'
       setSendCraFileJobState('failed')

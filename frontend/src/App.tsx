@@ -87,6 +87,12 @@ import {
   type LastSuccessfulRuns,
 } from './service/contacts-service'
 import type { AppEnvironment } from './types/runtime-config'
+import {
+  formatDateTimeYMD,
+  formatDateTimeYMDHMS,
+  formatDateYMD,
+  parseFormattedDate,
+} from './utils/date-format'
 import { buildPlacementDisplayValues } from './utils/mock-placement'
 
 // Environment-based toolbar background colors
@@ -238,67 +244,6 @@ const COLUMN_LABELS: Record<string, string> = {
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
 const HOLD_REASON_PREVIEW_LENGTH = 150
 const HOLD_REASON_COLUMN_WIDTH = 240
-
-const toYMD = (date: Date, timeZone: string): string => {
-  const parts = new Intl.DateTimeFormat('en-US', { ...DATE_FORMAT, timeZone }).formatToParts(date)
-  const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
-  return `${get('year')}-${get('month')}-${get('day')}`
-}
-
-const formatDateYMD = (dateString: string): string => {
-  return toYMD(new Date(dateString + 'T00:00:00Z'), 'UTC')
-}
-
-const formatDateTimeYMD = (dateString: string): string => {
-  return toYMD(new Date(dateString), 'America/Vancouver')
-}
-
-const formatDateTimeYMDHMS = (dateString: string): string => {
-  const date = new Date(dateString)
-  const parts = new Intl.DateTimeFormat('en-US', {
-    ...DATE_FORMAT,
-    timeZone: 'America/Vancouver',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
-  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
-}
-
-// Parse formatted date string (YYYY-MMM-DD or YYYY-MMM-DD HH:MM:SS) back to Date for sorting
-const parseFormattedDate = (dateStr: string): Date | null => {
-  if (!dateStr) return null
-  const months: Record<string, number> = {
-    Jan: 0,
-    Feb: 1,
-    Mar: 2,
-    Apr: 3,
-    May: 4,
-    Jun: 5,
-    Jul: 6,
-    Aug: 7,
-    Sep: 8,
-    Oct: 9,
-    Nov: 10,
-    Dec: 11,
-  }
-  // Handle both "YYYY-MMM-DD" and "YYYY-MMM-DD HH:MM:SS" formats
-  const match = dateStr.match(/^(\d{4})-(\w{3})-(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/)
-  if (!match) return null
-  const [, year, month, day, hour = '0', minute = '0', second = '0'] = match
-  const monthNum = months[month]
-  if (monthNum === undefined) return null
-  return new Date(
-    parseInt(year),
-    monthNum,
-    parseInt(day),
-    parseInt(hour),
-    parseInt(minute),
-    parseInt(second),
-  )
-}
 
 // System comments are prepended with newest first, one entry per line.
 // Batch Requests should display only the latest entry.

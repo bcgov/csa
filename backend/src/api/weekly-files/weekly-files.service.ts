@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
-import { DateTime } from 'luxon'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { csaProcessingBatchDate } from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 import type { DetailRecord04, HeaderRecord } from 'src/cra/inbound/inbound-weekly.interface'
 import { RecordTypeCode, TranCode } from 'src/cra/inbound/inbound-weekly.interface'
@@ -15,6 +15,7 @@ import {
   toWeeklyFileRecordDto,
   toWeeklyFileSummaryDto,
 } from './weekly-file.mapper'
+import { buildWklRecordWhereInput } from './weekly-file-record-filters'
 import {
   assertCanAssociate,
   assertCanDissociate,
@@ -22,6 +23,18 @@ import {
 } from './wkl-record.validation'
 
 const { FILE_DIRECTION, FILE_TYPE, WKL_MATCH_STATUS } = CRA_DATA_HANDLING_CONSTANT
+
+export interface WeeklyFileRecordFilters {
+  /** Semantic filter: "Yes" or "No" (maps to match_status groups). */
+  csaMatchFound?: string[]
+  /** Stored transaction_type codes: A, C, U. */
+  transactionType?: string[]
+  /** Stored cra_status values: completed, in-progress, abandoned, updated. */
+  craStatus?: string[]
+  matchedBy?: string
+  batchNumber?: string
+  transactionSource?: string
+}
 
 const weeklyFileWhere = {
   fileType: FILE_TYPE.WKL,
@@ -141,25 +154,29 @@ export class WeeklyFilesService {
     id: number,
     page = 1,
     limit = 10,
+    filters?: WeeklyFileRecordFilters,
   ): Promise<PaginatedResponse<WeeklyFileRecordDto>> {
     await this.assertWeeklyFileExists(id)
 
     const safePage = page >= 1 ? page : 1
     const safeLimit = limit >= 1 ? Math.min(limit, 200) : 10
+    const offset = (safePage - 1) * safeLimit
 
-    const [total, records] = await Promise.all([
-      this.prisma.wklFileRecord.count({ where: { transferFileId: id } }),
+    const where = await buildWklRecordWhereInput(this.prisma, id, filters)
+
+    const [total, recordsWithRelations] = await Promise.all([
+      this.prisma.wklFileRecord.count({ where }),
       this.prisma.wklFileRecord.findMany({
-        where: { transferFileId: id },
+        where,
         orderBy: { recordIndex: 'asc' },
-        skip: (safePage - 1) * safeLimit,
+        skip: offset,
         take: safeLimit,
         include: wklRecordDtoInclude,
       }),
     ])
 
     return {
-      data: records.map(toWeeklyFileRecordDto),
+      data: recordsWithRelations.map(toWeeklyFileRecordDto),
       page: safePage,
       limit: safeLimit,
       total,
@@ -460,13 +477,4 @@ function buildWklHeader(weeklyFileDate: Date | null): HeaderRecord {
     processDate: `${year}${month}${day}`,
     filler2: '',
   }
-}
-
-const PACIFIC_ZONE = 'America/Vancouver'
-
-function csaProcessingBatchDate(deliveredAt: Date | null): Date {
-  const isoDate = DateTime.fromJSDate(deliveredAt ?? new Date())
-    .setZone(PACIFIC_ZONE)
-    .toISODate()!
-  return DateTime.fromISO(isoDate, { zone: PACIFIC_ZONE }).toJSDate()
 }

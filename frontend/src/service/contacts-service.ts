@@ -61,6 +61,7 @@ export interface Contact {
   agreementEndDate?: string
   terminationDate?: string
   mcfdContract?: string
+  sourceAgreement?: string
   // Order fields
   orderNumber?: string
   orderType?: string

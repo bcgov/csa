@@ -156,6 +156,7 @@ describe('JobRunner', () => {
       expect(result.success).toBe(false)
       expect(result.message).toContain('onStart failed')
       expect(jobsService.markFailed).toHaveBeenCalled()
+      expect(mockHandler.onFailure).toHaveBeenCalled()
       // execute should never be called if onStart fails
       expect(mockHandler.execute).not.toHaveBeenCalled()
     })

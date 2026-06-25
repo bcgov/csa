@@ -83,6 +83,12 @@ export class JobRunner {
       const err = error instanceof Error ? error : new Error(String(error))
       this.logger.error(`Job ${jobId} onStart hook failed: ${err.message}`, err.stack)
       await this.safeMarkFailed(jobId, err)
+      try {
+        await handler.onFailure?.(context, err)
+      } catch (hookError) {
+        const hookErr = hookError instanceof Error ? hookError : new Error(String(hookError))
+        this.logger.error(`Job ${jobId} onFailure hook threw: ${hookErr.message}`, hookErr.stack)
+      }
       return { success: false, message: `onStart failed: ${err.message}` }
     }
 

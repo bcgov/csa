@@ -45,9 +45,14 @@ describe('batchStatusMachine', () => {
       expect(nextState).toBe(BATCH_STATUS.IN_PROGRESS)
     })
 
-    it('should return current state for invalid transition', () => {
+    it('should transition from pending to system_error on SEND_FAILED', () => {
       const nextState = getNextBatchState(BATCH_STATUS.PENDING, BATCH_EVENT.SEND_FAILED)
-      expect(nextState).toBe(BATCH_STATUS.PENDING)
+      expect(nextState).toBe(BATCH_STATUS.SYSTEM_ERROR)
+    })
+
+    it('should return current state for invalid transition', () => {
+      const nextState = getNextBatchState(BATCH_STATUS.PROCESSED, BATCH_EVENT.SEND_FAILED)
+      expect(nextState).toBe(BATCH_STATUS.PROCESSED)
     })
 
     it('should not transition from processed (terminal)', () => {
@@ -66,8 +71,12 @@ describe('batchStatusMachine', () => {
       expect(canTransitionBatch(BATCH_STATUS.PENDING, BATCH_EVENT.SEND_TO_CRA)).toBe(true)
     })
 
-    it('should return false for invalid transition', () => {
-      expect(canTransitionBatch(BATCH_STATUS.PENDING, BATCH_EVENT.SEND_FAILED)).toBe(false)
+    it('should return false for invalid transition from processed', () => {
+      expect(canTransitionBatch(BATCH_STATUS.PROCESSED, BATCH_EVENT.SEND_FAILED)).toBe(false)
+    })
+
+    it('should return true for pending to SEND_FAILED', () => {
+      expect(canTransitionBatch(BATCH_STATUS.PENDING, BATCH_EVENT.SEND_FAILED)).toBe(true)
     })
 
     it('should return false for terminal processed state', () => {

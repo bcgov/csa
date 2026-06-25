@@ -571,9 +571,30 @@ function App() {
   const [batches, setBatches] = useState<Batch[]>([])
   const [loadingBatches, setLoadingBatches] = useState(false)
 
+  const getBatchNumberLabel = (
+    batchId: number | null | undefined,
+    batchList: Batch[] = batches,
+  ): string | null => {
+    if (batchId == null) return null
+    const batch = batchList.find((entry) => entry.id === batchId)
+    return batch != null ? String(batch.batchNumber) : null
+  }
+
   // Batch details state
   const [batchDetails, setBatchDetails] = useState<BatchContactDetail[]>([])
   const [loadingBatchDetails, setLoadingBatchDetails] = useState(false)
+
+  const refreshBatchRequestsAfterSendCra = async (): Promise<Batch[]> => {
+    const updatedBatches = await getAllBatches()
+    setBatches(updatedBatches)
+
+    if (selectedBatch) {
+      const updatedDetails = await getBatchContacts(selectedBatch)
+      setBatchDetails(updatedDetails)
+    }
+
+    return updatedBatches
+  }
 
   useEffect(() => {
     if (!isAuthenticated) return
@@ -618,20 +639,21 @@ function App() {
             contacts_count?: number
             contactsCount?: number
           } | null
+          const updatedBatches = await getAllBatches()
+          setBatches(updatedBatches)
           const batchId = metadata?.batch_id ?? metadata?.batchId
+          const batchNumber = getBatchNumberLabel(batchId, updatedBatches)
 
           setSendCraFileJobState('success')
           setSnackbar({
             open: true,
-            message: batchId
-              ? `Send CRA file job completed for batch ${batchId}.`
+            message: batchNumber
+              ? `Send CRA file job completed for batch ${batchNumber}.`
               : 'Send CRA file job completed successfully.',
             severity: 'success',
           })
-
-          const updatedBatches = await getAllBatches()
-          setBatches(updatedBatches)
         } else {
+          await refreshBatchRequestsAfterSendCra()
           setSendCraFileJobState('failed')
           setSnackbar({
             open: true,
@@ -644,6 +666,9 @@ function App() {
         setRunningSendCraBatchId(null)
       } catch (err) {
         console.error('Failed to check for running SEND_CRA_FILE job:', err)
+        setIsRunningSendCraFile(false)
+        setRunningSendCraBatchId(null)
+        setSendCraFileJobState('idle')
       }
     }
 
@@ -691,20 +716,21 @@ function App() {
             contacts_count?: number
             contactsCount?: number
           } | null
+          const updatedBatches = await getAllBatches()
+          setBatches(updatedBatches)
           const batchId = metadata?.batch_id ?? metadata?.batchId
+          const batchNumber = getBatchNumberLabel(batchId, updatedBatches)
 
           setSendCraFileJobState('success')
           setSnackbar({
             open: true,
-            message: batchId
-              ? `Send CRA file job completed for batch ${batchId}. Please try your action again.`
+            message: batchNumber
+              ? `Send CRA file job completed for batch ${batchNumber}. Please try your action again.`
               : 'Send CRA file job completed successfully. Please try your action again.',
             severity: 'success',
           })
-
-          const updatedBatches = await getAllBatches()
-          setBatches(updatedBatches)
         } else {
+          await refreshBatchRequestsAfterSendCra()
           setSendCraFileJobState('failed')
           setSnackbar({
             open: true,
@@ -720,6 +746,9 @@ function App() {
       return false // No job running, can proceed
     } catch (err) {
       console.error('Failed to check for running Send CRA file job:', err)
+      setIsRunningSendCraFile(false)
+      setRunningSendCraBatchId(null)
+      setSendCraFileJobState('idle')
       return false
     }
   }
@@ -730,16 +759,6 @@ function App() {
 
   const handleSendToCraClick = () => {
     setConfirmSendCraDialogOpen(true)
-  }
-
-  const refreshBatchRequestsAfterSendCra = async () => {
-    const updatedBatches = await getAllBatches()
-    setBatches(updatedBatches)
-
-    if (selectedBatch) {
-      const updatedDetails = await getBatchContacts(selectedBatch)
-      setBatchDetails(updatedDetails)
-    }
   }
 
   const handleConfirmSendCra = async () => {
@@ -798,23 +817,29 @@ function App() {
         const recordCount = metadata?.record_count ?? metadata?.recordCount ?? 0
         const contactsCount = metadata?.contacts_count ?? metadata?.contactsCount ?? 0
 
+        const updatedBatches = await refreshBatchRequestsAfterSendCra()
+        const batchNumber = getBatchNumberLabel(batchId, updatedBatches)
+
         setSendCraFileJobState('success')
         setSnackbar({
           open: true,
           message:
             recordCount > 0 || contactsCount > 0
-              ? `Send CRA file complete for batch ${batchId}: ${recordCount || contactsCount} record${(recordCount || contactsCount) === 1 ? '' : 's'} sent.`
-              : `Send CRA file complete for batch ${batchId}.`,
+              ? batchNumber
+                ? `Send CRA file complete for batch ${batchNumber}: ${recordCount || contactsCount} record${(recordCount || contactsCount) === 1 ? '' : 's'} sent.`
+                : `Send CRA file complete: ${recordCount || contactsCount} record${(recordCount || contactsCount) === 1 ? '' : 's'} sent.`
+              : batchNumber
+                ? `Send CRA file complete for batch ${batchNumber}.`
+                : 'Send CRA file complete.',
           severity: 'success',
         })
-
-        await refreshBatchRequestsAfterSendCra()
       } else {
         setSendCraFileJobState('failed')
         throw new Error(job.error || 'Send CRA file job failed')
       }
     } catch (error: any) {
       console.error('Send CRA file error:', error)
+      await refreshBatchRequestsAfterSendCra()
       const errorMessage =
         error?.response?.data?.message || error?.message || 'Failed to send CRA file'
       setSendCraFileJobState('failed')
@@ -2108,9 +2133,12 @@ function App() {
       pendingBatch?.id === runningSendCraBatchId
 
     if (isPendingBatchLocked) {
+      const runningBatchNumber = getBatchNumberLabel(runningSendCraBatchId)
       setSnackbar({
         open: true,
-        message: `Batch ${runningSendCraBatchId} is currently being sent to CRA. Please wait for it to complete before adding records.`,
+        message: runningBatchNumber
+          ? `Batch ${runningBatchNumber} is currently being sent to CRA. Please wait for it to complete before adding records.`
+          : 'The batch is currently being sent to CRA. Please wait for it to complete before adding records.',
         severity: 'info',
       })
       return
@@ -2372,9 +2400,12 @@ function App() {
       selectedBatchHistory?.batch.id === runningSendCraBatchId
 
     if (isSelectedHistoryBatchLocked) {
+      const runningBatchNumber = getBatchNumberLabel(runningSendCraBatchId)
       setSnackbar({
         open: true,
-        message: `Batch ${runningSendCraBatchId} is currently being sent to CRA. Please wait for it to complete before removing records.`,
+        message: runningBatchNumber
+          ? `Batch ${runningBatchNumber} is currently being sent to CRA. Please wait for it to complete before removing records.`
+          : 'The batch is currently being sent to CRA. Please wait for it to complete before removing records.',
         severity: 'info',
       })
       return
@@ -2476,9 +2507,12 @@ function App() {
       selectedBatchRecord?.id === runningSendCraBatchId
 
     if (isSelectedBatchLocked) {
+      const runningBatchNumber = getBatchNumberLabel(runningSendCraBatchId)
       setSnackbar({
         open: true,
-        message: `Batch ${runningSendCraBatchId} is currently being sent to CRA. Please wait for it to complete before removing records.`,
+        message: runningBatchNumber
+          ? `Batch ${runningBatchNumber} is currently being sent to CRA. Please wait for it to complete before removing records.`
+          : 'The batch is currently being sent to CRA. Please wait for it to complete before removing records.',
         severity: 'info',
       })
       return
@@ -2992,6 +3026,8 @@ function App() {
       selectedBatchHistoryData?.batch.id === runningSendCraBatchId,
     [isRunningSendCraFile, runningSendCraBatchId, selectedBatchHistoryData],
   )
+
+  const runningSendCraBatchNumber = getBatchNumberLabel(runningSendCraBatchId)
 
   const canRemoveFromBatchDetails = useMemo(() => {
     if (selectedBatchDetails.length === 0) return false
@@ -7070,12 +7106,12 @@ function App() {
                   </Box>
                 </Box>
 
-                {/* Send CRA file running banner */}
-                {isRunningSendCraFile && (
+                {/* Send CRA file running banner — hidden once the job fails or finishes */}
+                {isRunningSendCraFile && sendCraFileJobState === 'running' && (
                   <Box sx={{ mb: 2 }}>
                     <Alert severity="info" sx={{ mb: 1 }}>
-                      {runningSendCraBatchId
-                        ? `Send CRA file job is running for batch ${runningSendCraBatchId}. Changes to that batch are temporarily disabled until the job completes.`
+                      {runningSendCraBatchNumber
+                        ? `Send CRA file job is running for batch ${runningSendCraBatchNumber}. Changes to that batch are temporarily disabled until the job completes.`
                         : 'Send CRA file job is running. Changes to the batch being sent are temporarily disabled until the job completes.'}
                     </Alert>
                     <LinearProgress />

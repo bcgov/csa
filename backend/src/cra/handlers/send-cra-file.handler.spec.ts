@@ -1,3 +1,4 @@
+import { AppLogger } from 'src/common/logger/app-logger'
 import { BATCH_EVENT, CSA_EVENT } from 'src/common/state-machine/constants'
 import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
@@ -82,6 +83,7 @@ describe('SendCraFileHandler', () => {
     mockPrisma = {
       batch: {
         findFirst: vi.fn(),
+        findUnique: vi.fn(),
         update: vi.fn(),
       },
       contactBatchDetail: {
@@ -449,11 +451,12 @@ describe('SendCraFileHandler', () => {
   })
 
   describe('onFailure', () => {
-    it('should transition batch to system_error (SEND_FAILED)', async () => {
+    it('should transition batch to system_error (SEND_FAILED) with batch system comments', async () => {
       const batch = makeBatch({ id: 10 })
       const detail = makeBatchDetail({ id: 100, contactId: 1, batchId: 10 })
 
       mockPrisma.batch.findFirst.mockResolvedValue(batch)
+      mockPrisma.batch.findUnique.mockResolvedValue({ systemComments: null })
       mockPrisma.contactBatchDetail.findMany.mockResolvedValue([detail])
 
       await handler.onStart(mockContext)
@@ -464,14 +467,107 @@ describe('SendCraFileHandler', () => {
         BATCH_EVENT.SEND_FAILED,
         { additionalData: { systemComments: expect.stringContaining('Connection refused') } },
       )
-      expect(mockPrisma.contactBatchDetail.update).toHaveBeenCalledWith({
-        where: { id: 100 },
+      expect(mockPrisma.contactBatchDetail.update).not.toHaveBeenCalled()
+    })
+
+    it('should warn and persist batch failure state when status transition fails', async () => {
+      const batch = makeBatch({ id: 10 })
+      const detail = makeBatchDetail({ id: 100, contactId: 1, batchId: 10 })
+      const warnSpy = vi.spyOn(AppLogger.prototype, 'warn').mockImplementation(() => undefined)
+
+      mockPrisma.batch.findFirst.mockResolvedValue(batch)
+      mockPrisma.batch.findUnique.mockResolvedValue({
+        systemComments: 'existing comment',
+        status: 'pending',
+      })
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([detail])
+      mockBatchesService.updateBatchStatus
+        .mockResolvedValueOnce({ success: true, from: 'pending', to: 'in_progress' })
+        .mockResolvedValueOnce({
+          success: false,
+          reason: 'Invalid transition',
+        })
+
+      await handler.onStart(mockContext)
+      await handler.onFailure(mockContext, new Error('Connection refused'))
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Batch 10: SEND_FAILED transition failed (Invalid transition); persisted systemComments and status via direct update',
+      )
+      expect(mockPrisma.batch.update).toHaveBeenCalledWith({
+        where: { id: 10 },
         data: {
           systemComments: expect.stringContaining('Connection refused'),
-          lastUpdatedAt: expect.any(Date),
-          lastUpdatedBy: 'SYSTEM',
+          status: 'system_error',
         },
       })
+      expect(mockPrisma.contactBatchDetail.update).not.toHaveBeenCalled()
+
+      warnSpy.mockRestore()
+    })
+
+    it('should warn with Issue 1 message when only systemComments can be persisted', async () => {
+      const batch = makeBatch({ id: 10, status: 'processed' })
+      const warnSpy = vi.spyOn(AppLogger.prototype, 'warn').mockImplementation(() => undefined)
+
+      mockPrisma.batch.findUnique.mockResolvedValue({
+        systemComments: null,
+        status: 'processed',
+      })
+      mockBatchesService.updateBatchStatus.mockResolvedValue({
+        success: false,
+        reason: 'Invalid transition',
+      })
+      ;(handler as any).batch = batch
+
+      await handler.onFailure(mockContext, new Error('Connection refused'))
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Batch 10: SEND_FAILED transition failed (Invalid transition); persisted systemComments only',
+      )
+      expect(mockPrisma.batch.update).toHaveBeenCalledWith({
+        where: { id: 10 },
+        data: { systemComments: expect.stringContaining('Connection refused') },
+      })
+
+      warnSpy.mockRestore()
+    })
+
+    it('should mark pending batch as system_error when send transition never completed', async () => {
+      const batch = makeBatch({ id: 10, status: 'pending' })
+      const detail = makeBatchDetail({ id: 100, contactId: 1, batchId: 10 })
+
+      mockPrisma.batch.findFirst.mockResolvedValue(batch)
+      mockPrisma.batch.findUnique.mockResolvedValue({ systemComments: null, status: 'pending' })
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([detail])
+      mockBatchesService.updateBatchStatus
+        .mockResolvedValueOnce({ success: true, from: 'pending', to: 'in_progress' })
+        .mockResolvedValueOnce({ success: true, from: 'pending', to: 'system_error' })
+
+      await handler.onStart(mockContext)
+      await handler.onFailure(mockContext, new Error('Connection refused'))
+
+      expect(mockBatchesService.updateBatchStatus).toHaveBeenLastCalledWith(
+        10,
+        BATCH_EVENT.SEND_FAILED,
+        { additionalData: { systemComments: expect.stringContaining('Connection refused') } },
+      )
+    })
+
+    it('should throw when batch cannot transition to in_progress', async () => {
+      const batch = makeBatch({ id: 10 })
+      const detail = makeBatchDetail({ id: 100, contactId: 1, batchId: 10 })
+
+      mockPrisma.batch.findFirst.mockResolvedValue(batch)
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([detail])
+      mockBatchesService.updateBatchStatus.mockResolvedValue({
+        success: false,
+        reason: 'Invalid transition',
+      })
+
+      await expect(handler.onStart(mockContext)).rejects.toThrow(
+        'Failed to transition batch 10 to in_progress: Invalid transition',
+      )
     })
 
     it('should not transition if no batch was found', async () => {

@@ -30,6 +30,20 @@ const BIRTH_COUNTRY_LABELS: Record<string, string> = {
   EX: 'Outside Canada',
 }
 
+function normalizeCraStatusValue(value: string): string {
+  const cleaned = value
+    .trim()
+    .toLowerCase()
+    .replace(/^[^a-z]+/, '')
+    .replace(/[_\s]+/g, '-')
+
+  if (cleaned.startsWith('complete')) return 'completed'
+  if (cleaned.startsWith('abandon')) return 'abandoned'
+  if (cleaned.startsWith('in-progress') || cleaned.startsWith('inprogress')) return 'in-progress'
+  if (cleaned.startsWith('updated')) return 'updated'
+  return cleaned
+}
+
 /** Display label for a stored CRA status (e.g. "in-progress" → "IN PROGRESS"). */
 export function toCraStatusDisplayLabel(stored: string): string {
   return stored.trim().toUpperCase().replace(/-/g, ' ')
@@ -46,7 +60,7 @@ export function filterAllowedTransactionTypes(values: string[]): string[] {
 /** Whitelist filter params to values stored in cra_status. */
 export function filterAllowedCraStatuses(values: string[]): string[] {
   const allowed = new Set<string>(WKL_STATUS_STORED_VALUES)
-  return [...new Set(values.map((v) => v.trim().toLowerCase()).filter((v) => allowed.has(v)))]
+  return [...new Set(values.map(normalizeCraStatusValue).filter((v) => allowed.has(v)))]
 }
 
 export interface WeeklyFileCounts {
@@ -188,7 +202,7 @@ function formatWklDateString(value: string | undefined): string | null {
 
 function formatCraStatus(status: string | undefined): string {
   if (!status?.trim()) return ''
-  return toCraStatusDisplayLabel(status)
+  return toCraStatusDisplayLabel(normalizeCraStatusValue(status))
 }
 
 function formatTransactionType(value: string | undefined): string {

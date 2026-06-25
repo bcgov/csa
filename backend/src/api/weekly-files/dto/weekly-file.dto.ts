@@ -46,7 +46,7 @@ export class WeeklyFileRecordDto {
   matchStatus: string
 
   @ApiProperty({
-    description: 'Mapped display value: Application, Cancellation, CRA Update',
+    description: 'Mapped display value: Application, Cancellation, Update',
   })
   transactionType: string
 

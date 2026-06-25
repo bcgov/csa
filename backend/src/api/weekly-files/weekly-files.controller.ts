@@ -58,7 +58,7 @@ export class WeeklyFilesController {
     required: false,
     type: String,
     description:
-      'Comma-separated normalized transaction type labels: "Application", "Cancellation", "CRA Update"',
+      'Comma-separated normalized transaction type labels: "Application", "Cancellation", "Update"',
   })
   @ApiQuery({
     name: 'craStatus',

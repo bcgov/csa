@@ -87,7 +87,7 @@ export interface WeeklyFileRecordFilters {
 export const WEEKLY_FILE_TRANSACTION_TYPE_FILTER_OPTIONS = [
   { value: 'Application', label: 'Application' },
   { value: 'Cancellation', label: 'Cancellation' },
-  { value: 'CRA Update', label: 'CRA Update' },
+  { value: 'Update', label: 'Update' },
 ] as const
 
 export const WEEKLY_FILE_CRA_STATUS_FILTER_OPTIONS = [

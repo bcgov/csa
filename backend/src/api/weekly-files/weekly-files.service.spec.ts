@@ -221,7 +221,7 @@ describe('WeeklyFilesService', () => {
     ])
 
     const result = await service.findRecords(1, 1, 10, {
-      transactionType: ['CRA Update'],
+      transactionType: ['Update'],
       craStatus: ['COMPLETED'],
     })
 
@@ -229,7 +229,7 @@ describe('WeeklyFilesService', () => {
     expect(result.data).toHaveLength(1)
     expect(result.data[0]).toMatchObject({
       id: 5,
-      transactionType: 'CRA Update',
+      transactionType: 'Update',
       craStatus: 'COMPLETED',
     })
   })

@@ -11,7 +11,7 @@ const WKL_STATUS_STORED_VALUES = Object.values(WKL_STATUS)
 const TRANSACTION_TYPE_LABELS: Record<string, string> = {
   A: 'Application',
   C: 'Cancellation',
-  U: 'CRA Update',
+  U: 'Update',
 }
 
 const TRANSACTION_SOURCE_LABELS: Record<string, string> = {
@@ -31,17 +31,23 @@ const BIRTH_COUNTRY_LABELS: Record<string, string> = {
 }
 
 function normalizeCraStatusValue(value: string): string {
-  const cleaned = value
+  const tokens = value
     .trim()
     .toLowerCase()
-    .replace(/^[^a-z]+/, '')
-    .replace(/[_\s]+/g, '-')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
 
-  if (cleaned.startsWith('complete')) return 'completed'
-  if (cleaned.startsWith('abandon')) return 'abandoned'
-  if (cleaned.startsWith('in-progress') || cleaned.startsWith('inprogress')) return 'in-progress'
-  if (cleaned.startsWith('updated')) return 'updated'
-  return cleaned
+  if (!tokens.length) return ''
+
+  const compact = tokens.join('')
+  if (compact.startsWith('complete')) return 'completed'
+  if (compact.startsWith('abandon')) return 'abandoned'
+  if (compact.startsWith('inprogress')) return 'in-progress'
+  if (compact.startsWith('updated')) return 'updated'
+
+  return tokens.join('-')
 }
 
 export function normalizeCraStatusLabel(value: string): string {
@@ -50,7 +56,11 @@ export function normalizeCraStatusLabel(value: string): string {
 
 /** Display label for a stored CRA status (e.g. "in-progress" → "IN PROGRESS"). */
 export function toCraStatusDisplayLabel(stored: string): string {
-  return stored.trim().toUpperCase().replace(/-/g, ' ')
+  return stored
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+    .toUpperCase()
 }
 
 const TRANSACTION_TYPE_CODES = Object.keys(TRANSACTION_TYPE_LABELS)

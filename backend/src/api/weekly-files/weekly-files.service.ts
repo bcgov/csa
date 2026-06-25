@@ -27,7 +27,7 @@ const { FILE_DIRECTION, FILE_TYPE, WKL_MATCH_STATUS } = CRA_DATA_HANDLING_CONSTA
 export interface WeeklyFileRecordFilters {
   /** Semantic filter: "Yes" or "No" (maps to match_status groups). */
   csaMatchFound?: string[]
-  /** Normalized display labels: Application, Cancellation, CRA Update. */
+  /** Normalized display labels: Application, Cancellation, Update. */
   transactionType?: string[]
   /** Normalized display labels: COMPLETED, ABANDONED, IN PROGRESS, UPDATED. */
   craStatus?: string[]
@@ -54,8 +54,9 @@ const TRANSACTION_TYPE_FILTER_LABELS: Record<string, string> = {
   APPLICATION: 'Application',
   C: 'Cancellation',
   CANCELLATION: 'Cancellation',
-  U: 'CRA Update',
-  'CRA UPDATE': 'CRA Update',
+  U: 'Update',
+  UPDATE: 'Update',
+  'CRA UPDATE': 'Update',
 }
 
 const ALLOWED_WEEKLY_RECORD_SORT_COLUMNS: WeeklyFileRecordSortColumn[] = [

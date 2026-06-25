@@ -151,11 +151,14 @@ function applyWeeklyFileRecordFilters(
       return false
     }
 
-    if (transactionTypes.size > 0 && !transactionTypes.has(record.transactionType)) {
+    if (
+      transactionTypes.size > 0 &&
+      !transactionTypes.has(normalizeTransactionTypeLabel(record.transactionType))
+    ) {
       return false
     }
 
-    if (craStatuses.size > 0 && !craStatuses.has(record.craStatus)) {
+    if (craStatuses.size > 0 && !craStatuses.has(normalizeCraStatusLabel(record.craStatus))) {
       return false
     }
 

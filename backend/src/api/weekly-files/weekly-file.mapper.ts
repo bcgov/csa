@@ -45,7 +45,7 @@ export function filterAllowedTransactionTypes(values: string[]): string[] {
 
 /** Whitelist filter params to values stored in cra_status. */
 export function filterAllowedCraStatuses(values: string[]): string[] {
-  const allowed = new Set(WKL_STATUS_STORED_VALUES)
+  const allowed = new Set<string>(WKL_STATUS_STORED_VALUES)
   return [...new Set(values.map((v) => v.trim().toLowerCase()).filter((v) => allowed.has(v)))]
 }
 

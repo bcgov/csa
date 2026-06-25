@@ -120,6 +120,15 @@ const CHILD_SEARCH_COLUMN_LABELS: Record<ChildSearchColumn, string> = {
   birthPlace: 'Birth Place',
 }
 
+const WEEKLY_DETAILS_COLUMN_LABELS: Record<WeeklyDetailsColumn, string> = {
+  csaMatchFound: 'CSA Match Found?',
+  matchedBy: 'Matched By',
+  batchNumber: 'Batch Req ID',
+  transactionType: 'Transaction Type',
+  transactionSource: 'Transaction Source',
+  craStatus: 'CRA Status',
+}
+
 type SortConfig<T> = {
   column: T
   direction: SortDirection
@@ -1724,7 +1733,7 @@ export default function WeeklyFileProcessingTab() {
             sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}
           >
             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-              Filter by {detailsFilterAnchor.column}
+              Filter by {WEEKLY_DETAILS_COLUMN_LABELS[detailsFilterAnchor.column]}
             </Typography>
             <Button
               size="small"

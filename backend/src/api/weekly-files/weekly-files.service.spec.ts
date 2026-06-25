@@ -234,6 +234,49 @@ describe('WeeklyFilesService', () => {
     })
   })
 
+  it('filters N/A csa match found values', async () => {
+    mockPrisma.transferFile.findFirst.mockResolvedValue({ id: 1 })
+    mockPrisma.wklFileRecord.findMany.mockResolvedValue([
+      {
+        id: 5,
+        recordIndex: 0,
+        matchStatus: 'matched',
+        matchedBy: 'SYSTEM',
+        processedAt: null,
+        recordData: {
+          ...electronicRecordData,
+          status: 'completed',
+        },
+        contact: null,
+        batchDetail: { batch: { batchNumber: 1042 } },
+      },
+      {
+        id: 6,
+        recordIndex: 1,
+        matchStatus: 'skipped',
+        matchedBy: null,
+        processedAt: null,
+        recordData: {
+          ...electronicRecordData,
+          status: 'completed',
+        },
+        contact: null,
+        batchDetail: null,
+      },
+    ])
+
+    const result = await service.findRecords(1, 1, 10, {
+      csaMatchFound: ['N/A'],
+    })
+
+    expect(result.total).toBe(1)
+    expect(result.data).toHaveLength(1)
+    expect(result.data[0]).toMatchObject({
+      id: 6,
+      csaMatchFound: 'N/A',
+    })
+  })
+
   it('filters IN PROGRESS cra status using normalized display label', async () => {
     mockPrisma.transferFile.findFirst.mockResolvedValue({ id: 1 })
     mockPrisma.wklFileRecord.findMany.mockResolvedValue([

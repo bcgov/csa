@@ -25,7 +25,7 @@ import {
 const { FILE_DIRECTION, FILE_TYPE, WKL_MATCH_STATUS } = CRA_DATA_HANDLING_CONSTANT
 
 export interface WeeklyFileRecordFilters {
-  /** Semantic filter: "Yes" or "No" (maps to match_status groups). */
+  /** Semantic filter: "Yes", "No", or "N/A" (maps to match_status groups). */
   csaMatchFound?: string[]
   /** Normalized display labels: Application, Cancellation, Update. */
   transactionType?: string[]

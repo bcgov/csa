@@ -51,7 +51,7 @@ export class WeeklyFilesController {
     name: 'csaMatchFound',
     required: false,
     type: String,
-    description: 'Comma-separated filter values for CSA Match Found: "Yes" and/or "No"',
+    description: 'Comma-separated filter values for CSA Match Found: "Yes", "No", and/or "N/A"',
   })
   @ApiQuery({
     name: 'transactionType',

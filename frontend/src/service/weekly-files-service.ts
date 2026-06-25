@@ -67,7 +67,7 @@ export const getWeeklyFiles = async (
 }
 
 export interface WeeklyFileRecordFilters {
-  /** Semantic filter: "Yes" or "No" (maps to match_status groups). */
+  /** Semantic filter: "Yes", "No", or "N/A" (maps to match_status groups). */
   csaMatchFound?: string[]
   /** Backend-provided display values; sent back unchanged for filtering. */
   transactionType?: string[]
@@ -100,6 +100,7 @@ export const WEEKLY_FILE_CRA_STATUS_FILTER_OPTIONS = [
 export const WEEKLY_FILE_CSA_MATCH_FOUND_FILTER_OPTIONS = [
   { value: 'Yes', label: 'Yes' },
   { value: 'No', label: 'No' },
+  { value: 'N/A', label: 'N/A' },
 ] as const
 
 export const getWeeklyFileRecords = async (

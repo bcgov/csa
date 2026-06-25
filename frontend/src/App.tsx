@@ -244,6 +244,7 @@ const COLUMN_LABELS: Record<string, string> = {
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
 const HOLD_REASON_PREVIEW_LENGTH = 150
 const HOLD_REASON_COLUMN_WIDTH = 240
+const HOLD_REASON_EMPTY_COLUMN_WIDTH = 110
 
 // System comments are prepended with newest first, one entry per line.
 // Batch Requests should display only the latest entry.
@@ -266,6 +267,22 @@ const holdReasonNeedsClamp = (reason: string): boolean =>
 const capitalize = (str: string): string => {
   if (!str) return str
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
+}
+
+const splitDobIntoTwoLines = (value: string): [string, string] => {
+  const trimmed = value.trim()
+  if (!trimmed) return ['', '']
+  const lastDashIndex = trimmed.lastIndexOf('-')
+  if (lastDashIndex === -1) return [trimmed, '']
+  return [trimmed.slice(0, lastDashIndex), trimmed.slice(lastDashIndex + 1)]
+}
+
+const splitDateTimeIntoTwoLines = (value: string): [string, string] => {
+  const trimmed = value.trim()
+  if (!trimmed) return ['', '']
+  const firstSpaceIndex = trimmed.indexOf(' ')
+  if (firstSpaceIndex === -1) return [trimmed, '']
+  return [trimmed.slice(0, firstSpaceIndex), trimmed.slice(firstSpaceIndex + 1)]
 }
 
 function App() {
@@ -2915,6 +2932,11 @@ function App() {
     return data
   }, [contacts])
 
+  const holdReasonColumnWidth = useMemo(() => {
+    const hasHoldReasonContent = filteredData.some((row) => row.holdReason.trim().length > 0)
+    return hasHoldReasonContent ? HOLD_REASON_COLUMN_WIDTH : HOLD_REASON_EMPTY_COLUMN_WIDTH
+  }, [filteredData])
+
   useEffect(() => {
     if (selectedChild === null) return
 
@@ -4073,13 +4095,15 @@ function App() {
                             </IconButton>
                           </Box>
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ width: 116, minWidth: 116, maxWidth: 116 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
                               onClick={(e) => handleSortClick(e, 'dob')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              Date Of Birth
+                              Date Of
+                              <br />
+                              Birth
                             </span>
                           </Box>
                         </TableCell>
@@ -4130,13 +4154,15 @@ function App() {
                             </IconButton>
                           </Box>
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ minWidth: 128 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
                               onClick={(e) => handleSortClick(e, 'statusEffective')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              Status Effective Date
+                              Status Effective
+                              <br />
+                              Date
                             </span>
                           </Box>
                         </TableCell>
@@ -4238,8 +4264,8 @@ function App() {
                         </TableCell>
                         <TableCell
                           sx={{
-                            width: HOLD_REASON_COLUMN_WIDTH,
-                            maxWidth: HOLD_REASON_COLUMN_WIDTH,
+                            width: holdReasonColumnWidth,
+                            maxWidth: holdReasonColumnWidth,
                           }}
                         >
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -4377,18 +4403,69 @@ function App() {
                           <TableCell>{row.lastName}</TableCell>
                           <TableCell>{row.firstName}</TableCell>
                           <TableCell>{row.middleName}</TableCell>
-                          <TableCell>{row.dob}</TableCell>
+                          <TableCell
+                            sx={{
+                              width: 116,
+                              minWidth: 116,
+                              maxWidth: 116,
+                              whiteSpace: 'nowrap',
+                              overflowWrap: 'normal',
+                              wordBreak: 'keep-all',
+                            }}
+                          >
+                            {(() => {
+                              const [dobLine1, dobLine2] = splitDobIntoTwoLines(row.dob)
+                              return (
+                                <Box sx={{ lineHeight: 1.25 }}>
+                                  <Box
+                                    component="span"
+                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
+                                  >
+                                    {dobLine1}
+                                  </Box>
+                                  <Box
+                                    component="span"
+                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
+                                  >
+                                    {dobLine2}
+                                  </Box>
+                                </Box>
+                              )
+                            })()}
+                          </TableCell>
                           <TableCell>{row.din}</TableCell>
                           <TableCell>{row.csaStatus}</TableCell>
-                          <TableCell>{row.statusEffective}</TableCell>
+                          <TableCell sx={{ minWidth: 128 }}>
+                            {(() => {
+                              const [statusDateLine, statusTimeLine] = splitDateTimeIntoTwoLines(
+                                row.statusEffective,
+                              )
+                              return (
+                                <Box sx={{ lineHeight: 1.25 }}>
+                                  <Box
+                                    component="span"
+                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
+                                  >
+                                    {statusDateLine}
+                                  </Box>
+                                  <Box
+                                    component="span"
+                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
+                                  >
+                                    {statusTimeLine}
+                                  </Box>
+                                </Box>
+                              )
+                            })()}
+                          </TableCell>
                           <TableCell>{row.caseNumber}</TableCell>
                           <TableCell>{row.caseStatus}</TableCell>
                           <TableCell>{row.legacyFile}</TableCell>
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
                           <TableCell
                             sx={{
-                              width: HOLD_REASON_COLUMN_WIDTH,
-                              maxWidth: HOLD_REASON_COLUMN_WIDTH,
+                              width: holdReasonColumnWidth,
+                              maxWidth: holdReasonColumnWidth,
                             }}
                           >
                             <Box

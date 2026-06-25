@@ -128,7 +128,7 @@ describe('weekly-file.mapper', () => {
       batchDetail: null,
     })
 
-    expect(dto.transactionType).toBe('CRA Update')
+    expect(dto.transactionType).toBe('Update')
     expect(dto.transactionSource).toBe('Other')
     expect(dto.gender).toBe('Unknown')
     expect(dto.birthCountry).toBe('Outside Canada')
@@ -137,6 +137,7 @@ describe('weekly-file.mapper', () => {
   it('derives CRA status display labels from stored file values', () => {
     expect(toCraStatusDisplayLabel('in-progress')).toBe('IN PROGRESS')
     expect(toCraStatusDisplayLabel('completed')).toBe('COMPLETED')
+    expect(toCraStatusDisplayLabel(' ;in_progress*** ')).toBe('IN PROGRESS')
   })
 
   it('whitelists stored transaction type filter values', () => {
@@ -149,6 +150,11 @@ describe('weekly-file.mapper', () => {
     expect(filterAllowedCraStatuses(['completed', 'IN-PROGRESS'])).toEqual([
       'completed',
       'in-progress',
+    ])
+    expect(filterAllowedCraStatuses([';COMPLETED', '__in progress__', '@@updated!!'])).toEqual([
+      'completed',
+      'in-progress',
+      'updated',
     ])
     expect(filterAllowedCraStatuses(['INVALID', 'completed'])).toEqual(['completed'])
   })

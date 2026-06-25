@@ -120,6 +120,15 @@ const CHILD_SEARCH_COLUMN_LABELS: Record<ChildSearchColumn, string> = {
   birthPlace: 'Birth Place',
 }
 
+const WEEKLY_DETAILS_COLUMN_LABELS: Record<WeeklyDetailsColumn, string> = {
+  csaMatchFound: 'CSA Match Found?',
+  matchedBy: 'Matched By',
+  batchNumber: 'Batch Req ID',
+  transactionType: 'Transaction Type',
+  transactionSource: 'Transaction Source',
+  craStatus: 'CRA Status',
+}
+
 type SortConfig<T> = {
   column: T
   direction: SortDirection
@@ -426,6 +435,9 @@ export default function WeeklyFileProcessingTab() {
             matchedBy: detailsBackendTextFilters.matchedBy,
             batchNumber: detailsBackendTextFilters.batchNumber,
             transactionSource: detailsBackendTextFilters.transactionSource,
+            sort: detailsSortConfig
+              ? [{ [detailsSortConfig.column]: detailsSortConfig.direction }]
+              : undefined,
           },
         )
         setRecords(response.data)
@@ -459,6 +471,7 @@ export default function WeeklyFileProcessingTab() {
     detailsBackendTextFilters.matchedBy,
     detailsBackendTextFilters.batchNumber,
     detailsBackendTextFilters.transactionSource,
+    detailsSortConfig,
   ])
 
   useEffect(() => {
@@ -599,7 +612,7 @@ export default function WeeklyFileProcessingTab() {
       getDetailsFieldValue,
       '',
       clientColumnFilters,
-      detailsSortConfig,
+      null, // Server-side sorting is now applied - don't sort client-side
     )
 
     if (!detailsShowSelectedOnly) {
@@ -611,7 +624,7 @@ export default function WeeklyFileProcessingTab() {
     }
 
     return recordsAfterSearchFilterSort.filter((record) => record.id === selectedRecordId)
-  }, [records, detailsColumnFilters, detailsSortConfig, detailsShowSelectedOnly, selectedRecordId])
+  }, [records, detailsColumnFilters, detailsShowSelectedOnly, selectedRecordId])
 
   const filteredSearchedChildren = useMemo(() => {
     return filterAndSortRows(
@@ -1720,7 +1733,7 @@ export default function WeeklyFileProcessingTab() {
             sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}
           >
             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-              Filter by {detailsFilterAnchor.column}
+              Filter by {WEEKLY_DETAILS_COLUMN_LABELS[detailsFilterAnchor.column]}
             </Typography>
             <Button
               size="small"

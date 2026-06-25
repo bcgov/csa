@@ -51,20 +51,21 @@ export class WeeklyFilesController {
     name: 'csaMatchFound',
     required: false,
     type: String,
-    description: 'Comma-separated filter values for CSA Match Found: "Yes" and/or "No"',
+    description: 'Comma-separated filter values for CSA Match Found: "Yes", "No", and/or "N/A"',
   })
   @ApiQuery({
     name: 'transactionType',
     required: false,
     type: String,
-    description: 'Comma-separated stored transaction type codes: "A", "C", "U"',
+    description:
+      'Comma-separated normalized transaction type labels: "Application", "Cancellation", "Update"',
   })
   @ApiQuery({
     name: 'craStatus',
     required: false,
     type: String,
     description:
-      'Comma-separated stored CRA status values: "completed", "abandoned", "in-progress", "updated"',
+      'Comma-separated normalized CRA status labels: "COMPLETED", "ABANDONED", "IN PROGRESS", "UPDATED"',
   })
   @ApiQuery({
     name: 'matchedBy',
@@ -84,6 +85,13 @@ export class WeeklyFilesController {
     type: String,
     description: 'Text filter for Transaction Source (minimum 3 characters)',
   })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    type: String,
+    description:
+      'JSON array of sort objects: [{"field":"asc|desc"}]. Example: [{"craStatus":"asc"}]. Allowed fields: csaMatchFound, matchedBy, batchNumber, transactionType, transactionSource, craStatus',
+  })
   @ApiResponse({ status: 200, description: 'Paginated detail records for a weekly file' })
   @ApiResponse({ status: 404, description: 'Weekly file not found' })
   findRecords(
@@ -96,6 +104,7 @@ export class WeeklyFilesController {
     @Query('matchedBy') matchedBy?: string,
     @Query('batchNumber') batchNumber?: string,
     @Query('transactionSource') transactionSource?: string,
+    @Query('sort') sort?: string,
   ): Promise<PaginatedResponse<WeeklyFileRecordDto>> {
     const filters = {
       csaMatchFound: csaMatchFound
@@ -125,6 +134,7 @@ export class WeeklyFilesController {
       this.parsePage(page),
       this.parseLimit(limit),
       filters,
+      sort,
     )
   }
 

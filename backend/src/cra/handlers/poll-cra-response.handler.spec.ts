@@ -1477,7 +1477,7 @@ describe('PollCraResponseHandler', () => {
       }
 
       beforeEach(() => {
-        mockBatchesService.createWklBatchForUnmatchedRecords = vi
+        mockBatchesService.findOrCreateWklBatchForUnmatchedRecords = vi
           .fn()
           .mockResolvedValue(unmatchedBatch)
         mockBatchesService.createBatchDetailsForWklUnmatchedRecords = vi
@@ -1505,7 +1505,10 @@ describe('PollCraResponseHandler', () => {
 
         const result = await handler.execute(mockContext)
 
-        expect(mockBatchesService.createWklBatchForUnmatchedRecords).toHaveBeenCalledTimes(1)
+        expect(mockBatchesService.findOrCreateWklBatchForUnmatchedRecords).toHaveBeenCalledTimes(1)
+        expect(mockBatchesService.findOrCreateWklBatchForUnmatchedRecords).toHaveBeenCalledWith(
+          expect.any(Date),
+        )
         expect(mockBatchesService.createBatchDetailsForWklUnmatchedRecords).toHaveBeenCalledWith(
           500,
           99,
@@ -1564,6 +1567,32 @@ describe('PollCraResponseHandler', () => {
         expect(result.metadata.records_wkl_unmatched_approved).toBe(0)
       })
 
+      it('uses CSA processing date (not weekly file header date) for CRA batch lookup', async () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-06-17T07:30:00.000Z'))
+
+        setupWeeklyFile()
+        mockInboundWeeklyResponseService.parseWeeklyResponseFile.mockReturnValue({
+          header: { tranCode: '6136', recordTypeCode: '00', processDate: '20260616' },
+          details: [
+            makeWklDetail({
+              transactionType: 'C' as const,
+              careEndDate: '20250601',
+              status: WKL_STATUS.COMPLETED,
+            }),
+          ],
+          trailer: { tranCode: '6138', recordTypeCode: '00', recordCount: 3 },
+        })
+
+        await handler.execute(mockContext)
+
+        expect(mockBatchesService.findOrCreateWklBatchForUnmatchedRecords).toHaveBeenCalledWith(
+          new Date('2026-06-17T07:00:00.000Z'),
+        )
+
+        vi.useRealTimers()
+      })
+
       it('reuses the same unmatched batch across multiple unmatched records in one file', async () => {
         setupWeeklyFile()
         setupWeeklyParseFile([
@@ -1581,7 +1610,10 @@ describe('PollCraResponseHandler', () => {
 
         await handler.execute(mockContext)
 
-        expect(mockBatchesService.createWklBatchForUnmatchedRecords).toHaveBeenCalledTimes(1)
+        expect(mockBatchesService.findOrCreateWklBatchForUnmatchedRecords).toHaveBeenCalledTimes(1)
+        expect(mockBatchesService.findOrCreateWklBatchForUnmatchedRecords).toHaveBeenCalledWith(
+          expect.any(Date),
+        )
         expect(mockBatchesService.createBatchDetailsForWklUnmatchedRecords).toHaveBeenCalledTimes(2)
       })
 

@@ -3,7 +3,7 @@ import { IcmApiRecord } from './data-source/icm-data-source'
 
 /** OOC agreement line SearchSpec for flat /AgreementLines/AgreementLine reads. */
 export const OOC_AGREEMENT_LINES_SEARCH_SPEC =
-  "([Agreement Status] = 'Active' OR [Agreement Status] = 'Inactive') AND [Agreement Type] = 'Out of Care'"
+  "([Agreement Status] = 'Active' OR [Agreement Status] = 'Inactive' OR [Agreement Status] = 'Terminated') AND [Agreement Type] = 'Out of Care'"
 
 /** Fields required for stg_icm_agreement_line (join bridge). */
 export const OOC_AGREEMENT_LINES_FIELDS = 'Id,Updated,ICM Person ID,Agreement Id'

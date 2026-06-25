@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
-import { DateTime } from 'luxon'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { csaProcessingBatchDate } from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 import type { DetailRecord04, HeaderRecord } from 'src/cra/inbound/inbound-weekly.interface'
 import { RecordTypeCode, TranCode } from 'src/cra/inbound/inbound-weekly.interface'
@@ -477,13 +477,4 @@ function buildWklHeader(weeklyFileDate: Date | null): HeaderRecord {
     processDate: `${year}${month}${day}`,
     filler2: '',
   }
-}
-
-const PACIFIC_ZONE = 'America/Vancouver'
-
-function csaProcessingBatchDate(deliveredAt: Date | null): Date {
-  const isoDate = DateTime.fromJSDate(deliveredAt ?? new Date())
-    .setZone(PACIFIC_ZONE)
-    .toISODate()!
-  return DateTime.fromISO(isoDate, { zone: PACIFIC_ZONE }).toJSDate()
 }

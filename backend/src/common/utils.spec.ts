@@ -13,6 +13,7 @@ import {
   parseDateAsPacific,
   parseISODatePacific,
   pacificToday,
+  csaProcessingBatchDate,
   parseWklDate,
 } from './utils'
 
@@ -393,6 +394,25 @@ describe('parseWklDate', () => {
   it('returns undefined for non-8-digit values', () => {
     expect(parseWklDate('2026-06-17')).toBeUndefined()
     expect(parseWklDate('')).toBeUndefined()
+  })
+})
+
+describe('csaProcessingBatchDate', () => {
+  it('returns Pacific calendar date for a processing timestamp in PDT', () => {
+    const processedAt = new Date('2026-06-17T06:30:00.000Z') // Jun 16 11:30pm PT
+    expect(csaProcessingBatchDate(processedAt).toISOString()).toBe('2026-06-16T07:00:00.000Z')
+  })
+
+  it('returns Pacific calendar date when processing crosses into the next Pacific day', () => {
+    const processedAt = new Date('2026-06-17T07:30:00.000Z') // Jun 17 12:30am PT
+    expect(csaProcessingBatchDate(processedAt).toISOString()).toBe('2026-06-17T07:00:00.000Z')
+  })
+
+  it('falls back to now when processedAt is null', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-17T18:30:00.000Z'))
+    expect(csaProcessingBatchDate(null).toISOString()).toBe('2026-06-17T07:00:00.000Z')
+    vi.useRealTimers()
   })
 })
 

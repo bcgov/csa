@@ -159,6 +159,14 @@ export function pacificToday(): Date {
   return DateTime.fromISO(isoDate, { zone: PACIFIC_ZONE }).toJSDate()
 }
 
+/** Pacific calendar date for when CSA processed a WKL file (maps to transfer_file.delivered_at). */
+export function csaProcessingBatchDate(processedAt: Date | null | undefined): Date {
+  const isoDate = DateTime.fromJSDate(processedAt ?? new Date())
+    .setZone(PACIFIC_ZONE)
+    .toISODate()!
+  return DateTime.fromISO(isoDate, { zone: PACIFIC_ZONE }).toJSDate()
+}
+
 export function pacificTodayISO(): string {
   return DateTime.now().setZone(PACIFIC_ZONE).toISODate()!
 }

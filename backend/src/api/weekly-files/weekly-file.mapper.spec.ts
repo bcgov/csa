@@ -135,12 +135,7 @@ describe('weekly-file.mapper', () => {
   })
 
   it('derives CRA status display labels from WEEKLY_FILE.STATUS', () => {
-    expect(CRA_STATUS_DISPLAY_LABELS).toEqual([
-      'COMPLETED',
-      'ABANDONED',
-      'IN PROGRESS',
-      'UPDATED',
-    ])
+    expect(CRA_STATUS_DISPLAY_LABELS).toEqual(['COMPLETED', 'ABANDONED', 'IN PROGRESS', 'UPDATED'])
     expect(toCraStatusDisplayLabel('in-progress')).toBe('IN PROGRESS')
   })
 

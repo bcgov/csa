@@ -44,6 +44,10 @@ function normalizeCraStatusValue(value: string): string {
   return cleaned
 }
 
+export function normalizeCraStatusLabel(value: string): string {
+  return toCraStatusDisplayLabel(normalizeCraStatusValue(value))
+}
+
 /** Display label for a stored CRA status (e.g. "in-progress" → "IN PROGRESS"). */
 export function toCraStatusDisplayLabel(stored: string): string {
   return stored.trim().toUpperCase().replace(/-/g, ' ')
@@ -202,7 +206,7 @@ function formatWklDateString(value: string | undefined): string | null {
 
 function formatCraStatus(status: string | undefined): string {
   if (!status?.trim()) return ''
-  return toCraStatusDisplayLabel(normalizeCraStatusValue(status))
+  return normalizeCraStatusLabel(status)
 }
 
 function formatTransactionType(value: string | undefined): string {

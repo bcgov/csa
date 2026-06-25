@@ -1,6 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { WeeklyFilesService } from './weekly-files.service'
 
 const { WKL_MATCH_STATUS } = CRA_DATA_HANDLING_CONSTANT
@@ -175,8 +175,6 @@ describe('WeeklyFilesService', () => {
         contact: null,
       },
     ])
-    mockPrisma.wklFileRecord.count.mockResolvedValue(1)
-
     const result = await service.findRecords(1, 1, 10)
 
     expect(result.total).toBe(1)
@@ -187,6 +185,89 @@ describe('WeeklyFilesService', () => {
       firstName: 'JOHN',
       lastName: 'DOE',
     })
+  })
+
+  it('filters detail records using normalized display labels', async () => {
+    mockPrisma.transferFile.findFirst.mockResolvedValue({ id: 1 })
+    mockPrisma.wklFileRecord.findMany.mockResolvedValue([
+      {
+        id: 5,
+        recordIndex: 0,
+        matchStatus: 'matched',
+        matchedBy: 'SYSTEM',
+        processedAt: null,
+        recordData: {
+          ...electronicRecordData,
+          transactionType: 'U',
+          status: ';COMPLETED',
+        },
+        contact: null,
+        batchDetail: { batch: { batchNumber: 1042 } },
+      },
+      {
+        id: 6,
+        recordIndex: 1,
+        matchStatus: 'matched',
+        matchedBy: 'SYSTEM',
+        processedAt: null,
+        recordData: {
+          ...electronicRecordData,
+          transactionType: 'C',
+          status: 'abandoned',
+        },
+        contact: null,
+        batchDetail: { batch: { batchNumber: 1043 } },
+      },
+    ])
+
+    const result = await service.findRecords(1, 1, 10, {
+      transactionType: ['CRA Update'],
+      craStatus: ['COMPLETED'],
+    })
+
+    expect(result.total).toBe(1)
+    expect(result.data).toHaveLength(1)
+    expect(result.data[0]).toMatchObject({
+      id: 5,
+      transactionType: 'CRA Update',
+      craStatus: 'COMPLETED',
+    })
+  })
+
+  it('sorts detail records using normalized CRA status labels', async () => {
+    mockPrisma.transferFile.findFirst.mockResolvedValue({ id: 1 })
+    mockPrisma.wklFileRecord.findMany.mockResolvedValue([
+      {
+        id: 5,
+        recordIndex: 0,
+        matchStatus: 'matched',
+        matchedBy: 'SYSTEM',
+        processedAt: null,
+        recordData: {
+          ...electronicRecordData,
+          status: 'completed',
+        },
+        contact: null,
+        batchDetail: { batch: { batchNumber: 1042 } },
+      },
+      {
+        id: 6,
+        recordIndex: 1,
+        matchStatus: 'matched',
+        matchedBy: 'SYSTEM',
+        processedAt: null,
+        recordData: {
+          ...electronicRecordData,
+          status: ';ABANDONED',
+        },
+        contact: null,
+        batchDetail: { batch: { batchNumber: 1043 } },
+      },
+    ])
+
+    const result = await service.findRecords(1, 1, 10, undefined, '[{"craStatus":"asc"}]')
+
+    expect(result.data.map((record) => record.craStatus)).toEqual(['ABANDONED', 'COMPLETED'])
   })
 
   describe('associateRecord', () => {

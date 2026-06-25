@@ -1,12 +1,12 @@
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 import { describe, expect, it } from 'vitest'
 import {
-  aggregateWeeklyFileCounts,
-  filterAllowedCraStatuses,
-  filterAllowedTransactionTypes,
-  toCraStatusDisplayLabel,
-  toCsaMatchFound,
-  toWeeklyFileRecordDto,
+    aggregateWeeklyFileCounts,
+    filterAllowedCraStatuses,
+    filterAllowedTransactionTypes,
+    toCraStatusDisplayLabel,
+    toCsaMatchFound,
+    toWeeklyFileRecordDto,
 } from './weekly-file.mapper'
 
 const { WKL_MATCH_STATUS } = CRA_DATA_HANDLING_CONSTANT

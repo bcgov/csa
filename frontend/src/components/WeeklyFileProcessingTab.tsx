@@ -36,6 +36,7 @@ import {
   type WeeklyFileRecord,
   type WeeklyFileSummary,
 } from '../service/weekly-files-service'
+import { formatDateTimeYMDHMS, formatDateYMD } from '../utils/date-format'
 
 const SUMMARY_PAGE_SIZE = 10
 const DETAILS_PAGE_SIZE = 10
@@ -115,28 +116,10 @@ type SortConfig<T> = {
   direction: SortDirection
 } | null
 
-const formatDateDisplay = (value: string | null): string => {
-  if (!value) return ''
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value
+const formatDateDisplay = (value: string | null): string => (value ? formatDateYMD(value) : '')
 
-  const month = parsed.toLocaleString('en-US', { month: 'short' })
-  const day = String(parsed.getDate()).padStart(2, '0')
-  return `${parsed.getFullYear()}-${month}-${day}`
-}
-
-const formatDateTimeDisplay = (value: string | null): string => {
-  if (!value) return ''
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value
-
-  const month = parsed.toLocaleString('en-US', { month: 'short' })
-  const day = String(parsed.getDate()).padStart(2, '0')
-  const hours = String(parsed.getHours()).padStart(2, '0')
-  const minutes = String(parsed.getMinutes()).padStart(2, '0')
-  const seconds = String(parsed.getSeconds()).padStart(2, '0')
-  return `${parsed.getFullYear()}-${month}-${day} ${hours}:${minutes}:${seconds}`
-}
+const formatDateTimeDisplay = (value: string | null): string =>
+  value ? formatDateTimeYMDHMS(value) : ''
 
 const valueOrBlank = (value: string | null | undefined): string => value ?? ''
 

@@ -217,9 +217,13 @@ export class SendCraFileHandler extends BaseJob {
     })
     const systemComments = appendSystemComment(errorMessage, batchRecord?.systemComments ?? null)
 
-    const result = await this.batchesService.updateBatchStatus(this.batch.id, BATCH_EVENT.SEND_FAILED, {
-      additionalData: { systemComments },
-    })
+    const result = await this.batchesService.updateBatchStatus(
+      this.batch.id,
+      BATCH_EVENT.SEND_FAILED,
+      {
+        additionalData: { systemComments },
+      },
+    )
 
     if (!result.success) {
       const recoverableStatuses: string[] = [BATCH_STATUS.PENDING, BATCH_STATUS.IN_PROGRESS]

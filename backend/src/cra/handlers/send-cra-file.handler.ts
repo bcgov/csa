@@ -72,7 +72,15 @@ export class SendCraFileHandler extends BaseJob {
 
     await this.ensureBatchDetailsReady()
 
-    await this.batchesService.updateBatchStatus(this.batch.id, BATCH_EVENT.SEND_TO_CRA)
+    const sendTransition = await this.batchesService.updateBatchStatus(
+      this.batch.id,
+      BATCH_EVENT.SEND_TO_CRA,
+    )
+    if (!sendTransition.success) {
+      throw new Error(
+        `Failed to transition batch ${this.batch.id} to in_progress: ${sendTransition.reason}`,
+      )
+    }
 
     for (const detail of this.batchDetails) {
       if (detail.status !== BATCH_DETAIL_STATUS.IN_PROGRESS) {
@@ -199,25 +207,40 @@ export class SendCraFileHandler extends BaseJob {
   async onFailure(context: JobContext, error: Error): Promise<void> {
     await super.onFailure(context, error)
 
-    if (this.batch) {
-      this.logger.error(`File transfer failed for batch ${this.batch.id}`, error)
-      const errorMessage = error.message || 'File transfer failed'
-      await this.batchesService.updateBatchStatus(this.batch.id, BATCH_EVENT.SEND_FAILED, {
-        additionalData: {
-          systemComments: appendSystemComment(errorMessage, this.batch.systemComments),
-        },
-      })
+    if (!this.batch) return
 
-      for (const detail of this.batchDetails) {
-        await this.prisma.contactBatchDetail.update({
-          where: { id: detail.id },
-          data: {
-            systemComments: appendSystemComment(errorMessage, detail.systemComments),
-            lastUpdatedAt: new Date(),
-            lastUpdatedBy: 'SYSTEM',
-          },
-        })
+    this.logger.error(`File transfer failed for batch ${this.batch.id}`, error)
+    const errorMessage = error.message || 'File transfer failed'
+    const batchRecord = await this.prisma.batch.findUnique({
+      where: { id: this.batch.id },
+      select: { systemComments: true, status: true },
+    })
+    const systemComments = appendSystemComment(errorMessage, batchRecord?.systemComments ?? null)
+
+    const result = await this.batchesService.updateBatchStatus(this.batch.id, BATCH_EVENT.SEND_FAILED, {
+      additionalData: { systemComments },
+    })
+
+    if (!result.success) {
+      const recoverableStatuses: string[] = [BATCH_STATUS.PENDING, BATCH_STATUS.IN_PROGRESS]
+      const data: { systemComments: string | null; status?: string } = { systemComments }
+      if (batchRecord?.status && recoverableStatuses.includes(batchRecord.status)) {
+        data.status = BATCH_STATUS.SYSTEM_ERROR
       }
+
+      if (data.status) {
+        this.logger.warn(
+          `Batch ${this.batch.id}: SEND_FAILED transition failed (${result.reason}); persisted systemComments and status via direct update`,
+        )
+      } else {
+        this.logger.warn(
+          `Batch ${this.batch.id}: SEND_FAILED transition failed (${result.reason}); persisted systemComments only`,
+        )
+      }
+      await this.prisma.batch.update({
+        where: { id: this.batch.id },
+        data,
+      })
     }
   }
 }

@@ -21,6 +21,27 @@ export interface PersistWklRecordParams {
 export class WklFileRecordService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private extractTransactionType(recordData: DetailRecord04): string | null {
+    if (recordData.transactionType === undefined || recordData.transactionType === null) {
+      return null
+    }
+    return recordData.transactionType.trim()
+  }
+
+  private extractCraStatus(recordData: DetailRecord04): string | null {
+    if (recordData.status === undefined || recordData.status === null) {
+      return null
+    }
+    return recordData.status.trim()
+  }
+
+  private extractTransactionSource(recordData: DetailRecord04): string | null {
+    if (recordData.receiveMode === undefined || recordData.receiveMode === null) {
+      return null
+    }
+    return recordData.receiveMode.trim()
+  }
+
   async persistRecord(params: PersistWklRecordParams): Promise<void> {
     const {
       transferFileId,
@@ -34,6 +55,11 @@ export class WklFileRecordService {
       processedAt,
     } = params
 
+    // Persist raw file values; display/query transformations happen in the API layer.
+    const transactionType = this.extractTransactionType(recordData)
+    const craStatus = this.extractCraStatus(recordData)
+    const transactionSource = this.extractTransactionSource(recordData)
+
     await this.prisma.wklFileRecord.upsert({
       where: {
         wkl_file_record_unique: {
@@ -46,6 +72,9 @@ export class WklFileRecordService {
         recordIndex,
         weeklyFileDate,
         recordData: recordData as unknown as Prisma.InputJsonValue,
+        transactionType,
+        craStatus,
+        transactionSource,
         matchStatus,
         contactId,
         batchDetailId,
@@ -55,6 +84,9 @@ export class WklFileRecordService {
       update: {
         weeklyFileDate,
         recordData: recordData as unknown as Prisma.InputJsonValue,
+        transactionType,
+        craStatus,
+        transactionSource,
         matchStatus,
         contactId,
         batchDetailId,

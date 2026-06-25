@@ -186,6 +186,9 @@ model WklFileRecord {
   recordIndex    Int       @map("record_index")
   weeklyFileDate DateTime? @map("weekly_file_date") @db.Date
   recordData     Json      @map("record_data") @db.JsonB
+  transactionType String?  @map("transaction_type")
+  craStatus      String?   @map("cra_status")
+  transactionSource String? @map("transaction_source")
   matchStatus    String    @map("match_status")
   contactId      Int?      @map("contact_id")
   batchDetailId  Int?      @map("batch_detail_id")
@@ -201,6 +204,9 @@ model WklFileRecord {
   @@index([transferFileId])
   @@index([matchStatus])
   @@index([contactId])
+  @@index([transactionType])
+  @@index([craStatus])
+  @@index([transactionSource])
   @@map("wkl_file_records")
   @@schema("csa")
 }

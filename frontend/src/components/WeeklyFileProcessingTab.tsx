@@ -1,6 +1,5 @@
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
-import CloseIcon from '@mui/icons-material/Close'
 import FilterAltOffIcon from '@mui/icons-material/FilterAltOff'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import {
@@ -33,14 +32,19 @@ import {
   getWeeklyFileRecords,
   getWeeklyFiles,
   reprocessWeeklyFileRecord,
+  WEEKLY_FILE_CRA_STATUS_FILTER_OPTIONS,
+  WEEKLY_FILE_CSA_MATCH_FOUND_FILTER_OPTIONS,
+  WEEKLY_FILE_TRANSACTION_TYPE_FILTER_OPTIONS,
   type WeeklyFileRecord,
   type WeeklyFileSummary,
 } from '../service/weekly-files-service'
+import { formatDateTimeYMDHMS, formatDateYMD } from '../utils/date-format'
 
 const SUMMARY_PAGE_SIZE = 10
 const DETAILS_PAGE_SIZE = 10
 const SEARCH_PAGE_SIZE = 10
 const CHILD_SEARCH_MIN_LENGTH = 3
+const DETAILS_TEXT_FILTER_MIN_LENGTH = 3
 const MANUAL_REVIEW_WARNING =
   'This weekly response record is not matched to a CSA master contact. Search and select a child record below to associate manually.'
 const ASSOCIATED_RECORD_INFO = 'Contact associated, click Confirm to reprocess this record.'
@@ -54,6 +58,7 @@ type WeeklyDetailsColumn =
   | 'transactionSource'
   | 'craStatus'
   | 'matchedBy'
+type DetailsTextFilterColumn = 'matchedBy' | 'batchNumber' | 'transactionSource'
 type ChildSearchColumn =
   | 'din'
   | 'firstName'
@@ -78,6 +83,11 @@ const WEEKLY_DETAILS_COLUMNS: WeeklyDetailsColumn[] = [
   'transactionSource',
   'craStatus',
 ]
+const DETAILS_TEXT_FILTER_COLUMNS: ReadonlySet<DetailsTextFilterColumn> = new Set([
+  'matchedBy',
+  'batchNumber',
+  'transactionSource',
+])
 const CHILD_SEARCH_COLUMNS: ChildSearchColumn[] = [
   'din',
   'firstName',
@@ -115,30 +125,14 @@ type SortConfig<T> = {
   direction: SortDirection
 } | null
 
-const formatDateDisplay = (value: string | null): string => {
-  if (!value) return ''
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value
+const formatDateDisplay = (value: string | null): string => (value ? formatDateYMD(value) : '')
 
-  const month = parsed.toLocaleString('en-US', { month: 'short' })
-  const day = String(parsed.getDate()).padStart(2, '0')
-  return `${parsed.getFullYear()}-${month}-${day}`
-}
-
-const formatDateTimeDisplay = (value: string | null): string => {
-  if (!value) return ''
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value
-
-  const month = parsed.toLocaleString('en-US', { month: 'short' })
-  const day = String(parsed.getDate()).padStart(2, '0')
-  const hours = String(parsed.getHours()).padStart(2, '0')
-  const minutes = String(parsed.getMinutes()).padStart(2, '0')
-  const seconds = String(parsed.getSeconds()).padStart(2, '0')
-  return `${parsed.getFullYear()}-${month}-${day} ${hours}:${minutes}:${seconds}`
-}
+const formatDateTimeDisplay = (value: string | null): string =>
+  value ? formatDateTimeYMDHMS(value) : ''
 
 const valueOrBlank = (value: string | null | undefined): string => value ?? ''
+
+type DetailsFilterOption = { value: string; label: string }
 
 const compareStrings = (left: string, right: string): number =>
   left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' })
@@ -228,14 +222,6 @@ export default function WeeklyFileProcessingTab() {
   const [savingAssociation, setSavingAssociation] = useState(false)
   const [reprocessing, setReprocessing] = useState(false)
 
-  const [weeklyReportSearchTerm, setWeeklyReportSearchTerm] = useState('')
-  const [weeklyReportColumnFilters, setWeeklyReportColumnFilters] = useState<
-    Record<WeeklyReportColumn, string[]>
-  >({
-    weeklyFileDate: [],
-    csaProcessingDate: [],
-  })
-  const [weeklyReportFilterSearchTerm, setWeeklyReportFilterSearchTerm] = useState('')
   const [weeklyReportSortConfig, setWeeklyReportSortConfig] =
     useState<SortConfig<WeeklyReportColumn>>(null)
   const [weeklyReportSortAnchor, setWeeklyReportSortAnchor] = useState<{
@@ -245,15 +231,7 @@ export default function WeeklyFileProcessingTab() {
     element: null,
     column: 'weeklyFileDate',
   })
-  const [weeklyReportFilterAnchor, setWeeklyReportFilterAnchor] = useState<{
-    element: HTMLElement | null
-    column: WeeklyReportColumn
-  }>({
-    element: null,
-    column: 'weeklyFileDate',
-  })
 
-  const [detailsSearchTerm, setDetailsSearchTerm] = useState('')
   const [detailsColumnFilters, setDetailsColumnFilters] = useState<
     Record<WeeklyDetailsColumn, string[]>
   >({
@@ -264,6 +242,45 @@ export default function WeeklyFileProcessingTab() {
     craStatus: [],
     matchedBy: [],
   })
+  const [detailsTextColumnFilters, setDetailsTextColumnFilters] = useState<
+    Record<DetailsTextFilterColumn, string>
+  >({
+    matchedBy: '',
+    batchNumber: '',
+    transactionSource: '',
+  })
+  const getDetailsTextFilterMinLength = useCallback(
+    (column: DetailsTextFilterColumn): number =>
+      column === 'batchNumber' ? 1 : DETAILS_TEXT_FILTER_MIN_LENGTH,
+    [],
+  )
+
+  const getBackendTextFilterValue = useCallback(
+    (column: DetailsTextFilterColumn, value: string): string | undefined => {
+      const trimmed = value.trim()
+      if (trimmed.length >= getDetailsTextFilterMinLength(column)) {
+        return trimmed
+      }
+      return undefined
+    },
+    [getDetailsTextFilterMinLength],
+  )
+  const detailsBackendTextFilters = useMemo(
+    () => ({
+      matchedBy: getBackendTextFilterValue('matchedBy', detailsTextColumnFilters.matchedBy),
+      batchNumber: getBackendTextFilterValue('batchNumber', detailsTextColumnFilters.batchNumber),
+      transactionSource: getBackendTextFilterValue(
+        'transactionSource',
+        detailsTextColumnFilters.transactionSource,
+      ),
+    }),
+    [
+      getBackendTextFilterValue,
+      detailsTextColumnFilters.matchedBy,
+      detailsTextColumnFilters.batchNumber,
+      detailsTextColumnFilters.transactionSource,
+    ],
+  )
   const [detailsFilterSearchTerm, setDetailsFilterSearchTerm] = useState('')
   const [detailsSortConfig, setDetailsSortConfig] = useState<SortConfig<WeeklyDetailsColumn>>(null)
   const [detailsSortAnchor, setDetailsSortAnchor] = useState<{
@@ -402,6 +419,14 @@ export default function WeeklyFileProcessingTab() {
           recordsPage,
           DETAILS_PAGE_SIZE,
           abortController.signal,
+          {
+            csaMatchFound: detailsColumnFilters.csaMatchFound,
+            transactionType: detailsColumnFilters.transactionType,
+            craStatus: detailsColumnFilters.craStatus,
+            matchedBy: detailsBackendTextFilters.matchedBy,
+            batchNumber: detailsBackendTextFilters.batchNumber,
+            transactionSource: detailsBackendTextFilters.transactionSource,
+          },
         )
         setRecords(response.data)
         setRecordsTotalPages(Math.max(response.totalPages, 1))
@@ -425,7 +450,16 @@ export default function WeeklyFileProcessingTab() {
     return () => {
       abortController.abort()
     }
-  }, [selectedFileId, recordsPage])
+  }, [
+    selectedFileId,
+    recordsPage,
+    detailsColumnFilters.csaMatchFound,
+    detailsColumnFilters.transactionType,
+    detailsColumnFilters.craStatus,
+    detailsBackendTextFilters.matchedBy,
+    detailsBackendTextFilters.batchNumber,
+    detailsBackendTextFilters.transactionSource,
+  ])
 
   useEffect(() => {
     childSearchRequestIdRef.current += 1
@@ -460,6 +494,10 @@ export default function WeeklyFileProcessingTab() {
     isSelectedRecordAssociated &&
     !selectedRecord?.processedAt &&
     hasAssociatedPendingRecords
+
+  const toggleSelectedRecord = (recordId: number) => {
+    setSelectedRecordId((prev) => (prev === recordId ? null : recordId))
+  }
 
   const getWeeklyReportFieldValue = (
     file: WeeklyFileSummary,
@@ -537,19 +575,30 @@ export default function WeeklyFileProcessingTab() {
       weeklyFiles,
       WEEKLY_REPORT_COLUMNS,
       getWeeklyReportFieldValue,
-      weeklyReportSearchTerm,
-      weeklyReportColumnFilters,
+      '',
+      { weeklyFileDate: [], csaProcessingDate: [] },
       weeklyReportSortConfig,
     )
-  }, [weeklyFiles, weeklyReportSearchTerm, weeklyReportColumnFilters, weeklyReportSortConfig])
+  }, [weeklyFiles, weeklyReportSortConfig])
 
   const filteredRecords = useMemo(() => {
+    // csaMatchFound, transactionType, and craStatus are filtered server-side; omit them from
+    // the client-side pass so they don't double-filter the already-narrowed page of records.
+    const clientColumnFilters: Record<WeeklyDetailsColumn, string[]> = {
+      ...detailsColumnFilters,
+      csaMatchFound: [],
+      batchNumber: [],
+      transactionType: [],
+      transactionSource: [],
+      craStatus: [],
+      matchedBy: [],
+    }
     const recordsAfterSearchFilterSort = filterAndSortRows(
       records,
       WEEKLY_DETAILS_COLUMNS,
       getDetailsFieldValue,
-      detailsSearchTerm,
-      detailsColumnFilters,
+      '',
+      clientColumnFilters,
       detailsSortConfig,
     )
 
@@ -562,14 +611,7 @@ export default function WeeklyFileProcessingTab() {
     }
 
     return recordsAfterSearchFilterSort.filter((record) => record.id === selectedRecordId)
-  }, [
-    detailsSearchTerm,
-    records,
-    detailsColumnFilters,
-    detailsSortConfig,
-    detailsShowSelectedOnly,
-    selectedRecordId,
-  ])
+  }, [records, detailsColumnFilters, detailsSortConfig, detailsShowSelectedOnly, selectedRecordId])
 
   const filteredSearchedChildren = useMemo(() => {
     return filterAndSortRows(
@@ -598,34 +640,6 @@ export default function WeeklyFileProcessingTab() {
     handleWeeklyReportSortClose()
   }
 
-  const handleWeeklyReportFilterClick = (
-    event: React.MouseEvent<HTMLElement>,
-    column: WeeklyReportColumn,
-  ) => {
-    setWeeklyReportFilterAnchor({ element: event.currentTarget, column })
-    setWeeklyReportFilterSearchTerm('')
-  }
-
-  const handleWeeklyReportFilterClose = () => {
-    setWeeklyReportFilterAnchor({ ...weeklyReportFilterAnchor, element: null })
-    setWeeklyReportFilterSearchTerm('')
-  }
-
-  const handleWeeklyReportFilterChange = (column: WeeklyReportColumn, value: string) => {
-    setWeeklyReportColumnFilters((prev) => toggleColumnFilterValue(prev, column, value))
-  }
-
-  const clearWeeklyReportColumnFilter = (column: WeeklyReportColumn) => {
-    setWeeklyReportColumnFilters((prev) => ({ ...prev, [column]: [] }))
-    setWeeklyReportFilterSearchTerm('')
-  }
-
-  const getWeeklyReportUniqueValues = (column: WeeklyReportColumn): string[] => {
-    return Array.from(new Set(weeklyFiles.map((file) => getWeeklyReportFieldValue(file, column))))
-      .filter((value) => value !== '')
-      .sort((a, b) => compareStrings(a, b))
-  }
-
   const handleDetailsSortClick = (
     event: React.MouseEvent<HTMLElement>,
     column: WeeklyDetailsColumn,
@@ -647,7 +661,11 @@ export default function WeeklyFileProcessingTab() {
     column: WeeklyDetailsColumn,
   ) => {
     setDetailsFilterAnchor({ element: event.currentTarget, column })
-    setDetailsFilterSearchTerm('')
+    if (DETAILS_TEXT_FILTER_COLUMNS.has(column as DetailsTextFilterColumn)) {
+      setDetailsFilterSearchTerm(detailsTextColumnFilters[column as DetailsTextFilterColumn])
+    } else {
+      setDetailsFilterSearchTerm('')
+    }
   }
 
   const handleDetailsFilterClose = () => {
@@ -659,19 +677,69 @@ export default function WeeklyFileProcessingTab() {
     setDetailsSelectionFilterAnchor(null)
   }
 
+  const SERVER_SIDE_FILTER_COLUMNS: ReadonlySet<WeeklyDetailsColumn> = new Set([
+    'csaMatchFound',
+    'transactionType',
+    'craStatus',
+  ])
+
+  const isDetailsTextFilterColumn = (
+    column: WeeklyDetailsColumn,
+  ): column is DetailsTextFilterColumn => {
+    return DETAILS_TEXT_FILTER_COLUMNS.has(column as DetailsTextFilterColumn)
+  }
+
+  const isDetailsFilterActive = (column: WeeklyDetailsColumn): boolean => {
+    if (isDetailsTextFilterColumn(column)) {
+      return (getBackendTextFilterValue(column, detailsTextColumnFilters[column]) ?? '').length > 0
+    }
+    return detailsColumnFilters[column].length > 0
+  }
+
   const handleDetailsFilterChange = (column: WeeklyDetailsColumn, value: string) => {
-    setDetailsColumnFilters((prev) => toggleColumnFilterValue(prev, column, value))
+    if (isDetailsTextFilterColumn(column)) {
+      setDetailsTextColumnFilters((prev) => ({ ...prev, [column]: value }))
+      const trimmed = value.trim()
+      if (trimmed.length === 0 || trimmed.length >= getDetailsTextFilterMinLength(column)) {
+        setRecordsPage(1)
+      }
+      return
+    }
+    setDetailsColumnFilters((prev) =>
+      toggleColumnFilterValue<WeeklyDetailsColumn>(prev, column, value),
+    )
+    if (SERVER_SIDE_FILTER_COLUMNS.has(column)) {
+      setRecordsPage(1)
+    }
   }
 
   const clearDetailsColumnFilter = (column: WeeklyDetailsColumn) => {
-    setDetailsColumnFilters((prev) => ({ ...prev, [column]: [] }))
+    if (isDetailsTextFilterColumn(column)) {
+      setDetailsTextColumnFilters((prev) => ({ ...prev, [column]: '' }))
+    } else {
+      setDetailsColumnFilters((prev) => ({ ...prev, [column]: [] }))
+      if (SERVER_SIDE_FILTER_COLUMNS.has(column)) {
+        setRecordsPage(1)
+      }
+    }
     setDetailsFilterSearchTerm('')
   }
 
-  const getDetailsUniqueValues = (column: WeeklyDetailsColumn): string[] => {
+  // Hardcoded option sets for server-side filtered columns (value = API param, label = table display).
+  const SERVER_SIDE_COLUMN_OPTIONS: Partial<Record<WeeklyDetailsColumn, DetailsFilterOption[]>> = {
+    csaMatchFound: [...WEEKLY_FILE_CSA_MATCH_FOUND_FILTER_OPTIONS],
+    transactionType: [...WEEKLY_FILE_TRANSACTION_TYPE_FILTER_OPTIONS],
+    craStatus: [...WEEKLY_FILE_CRA_STATUS_FILTER_OPTIONS],
+  }
+
+  const getDetailsFilterOptions = (column: WeeklyDetailsColumn): DetailsFilterOption[] => {
+    if (SERVER_SIDE_COLUMN_OPTIONS[column]) {
+      return SERVER_SIDE_COLUMN_OPTIONS[column]!
+    }
     return Array.from(new Set(records.map((record) => getDetailsFieldValue(record, column))))
       .filter((value) => value !== '')
       .sort((a, b) => compareStrings(a, b))
+      .map((value) => ({ value, label: value }))
   }
 
   const handleChildSearchSortClick = (
@@ -790,7 +858,20 @@ export default function WeeklyFileProcessingTab() {
 
   const refreshSelectedFileRecords = async () => {
     if (!selectedFileId) return
-    const response = await getWeeklyFileRecords(selectedFileId, recordsPage, DETAILS_PAGE_SIZE)
+    const response = await getWeeklyFileRecords(
+      selectedFileId,
+      recordsPage,
+      DETAILS_PAGE_SIZE,
+      undefined,
+      {
+        csaMatchFound: detailsColumnFilters.csaMatchFound,
+        transactionType: detailsColumnFilters.transactionType,
+        craStatus: detailsColumnFilters.craStatus,
+        matchedBy: detailsBackendTextFilters.matchedBy,
+        batchNumber: detailsBackendTextFilters.batchNumber,
+        transactionSource: detailsBackendTextFilters.transactionSource,
+      },
+    )
     setRecords(response.data)
     setRecordsTotalPages(Math.max(response.totalPages, 1))
   }
@@ -884,46 +965,14 @@ export default function WeeklyFileProcessingTab() {
         Weekly Report
       </Typography>
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
-        <TextField
-          size="small"
-          placeholder="Search weekly report..."
-          value={weeklyReportSearchTerm}
-          onChange={(e) => setWeeklyReportSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Box component="span" sx={{ fontSize: '18px' }}>
-                  🔍
-                </Box>
-              </InputAdornment>
-            ),
-            endAdornment: weeklyReportSearchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setWeeklyReportSearchTerm('')} edge="end">
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-          sx={{ width: '300px' }}
-        />
-        <Tooltip title="Clear all filters and sorting" arrow>
+        <Tooltip title="Clear sorting" arrow>
           <span>
             <Button
               variant="outlined"
               size="small"
               startIcon={<FilterAltOffIcon />}
-              disabled={
-                !weeklyReportSearchTerm &&
-                !weeklyReportSortConfig &&
-                Object.values(weeklyReportColumnFilters).every((arr) => arr.length === 0)
-              }
+              disabled={!weeklyReportSortConfig}
               onClick={() => {
-                setWeeklyReportSearchTerm('')
-                setWeeklyReportColumnFilters({
-                  weeklyFileDate: [],
-                  csaProcessingDate: [],
-                })
                 setWeeklyReportSortConfig(null)
               }}
               sx={{
@@ -951,17 +1000,6 @@ export default function WeeklyFileProcessingTab() {
                   >
                     Weekly File Date
                   </span>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => handleWeeklyReportFilterClick(e, 'weeklyFileDate')}
-                    sx={{
-                      padding: 0.5,
-                      color:
-                        weeklyReportColumnFilters.weeklyFileDate.length > 0 ? '#1976d2' : '#666',
-                    }}
-                  >
-                    <FilterListIcon fontSize="small" />
-                  </IconButton>
                 </Box>
               </TableCell>
               <TableCell>
@@ -972,17 +1010,6 @@ export default function WeeklyFileProcessingTab() {
                   >
                     CSA Processing Date
                   </span>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => handleWeeklyReportFilterClick(e, 'csaProcessingDate')}
-                    sx={{
-                      padding: 0.5,
-                      color:
-                        weeklyReportColumnFilters.csaProcessingDate.length > 0 ? '#1976d2' : '#666',
-                    }}
-                  >
-                    <FilterListIcon fontSize="small" />
-                  </IconButton>
                 </Box>
               </TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Total records count</TableCell>
@@ -1003,9 +1030,7 @@ export default function WeeklyFileProcessingTab() {
               <TableRow>
                 <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
-                    {weeklyReportSearchTerm.trim()
-                      ? 'No weekly files match the current search'
-                      : 'No weekly files found'}
+                    No weekly files found
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -1062,29 +1087,6 @@ export default function WeeklyFileProcessingTab() {
         </Button>
       </Box>
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
-        <TextField
-          size="small"
-          placeholder="Search details..."
-          value={detailsSearchTerm}
-          onChange={(e) => setDetailsSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Box component="span" sx={{ fontSize: '18px' }}>
-                  🔍
-                </Box>
-              </InputAdornment>
-            ),
-            endAdornment: detailsSearchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setDetailsSearchTerm('')} edge="end">
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-          sx={{ width: '300px' }}
-        />
         <Tooltip title="Clear all filters and sorting" arrow>
           <span>
             <Button
@@ -1092,13 +1094,12 @@ export default function WeeklyFileProcessingTab() {
               size="small"
               startIcon={<FilterAltOffIcon />}
               disabled={
-                !detailsSearchTerm &&
                 !detailsSortConfig &&
                 !detailsShowSelectedOnly &&
-                Object.values(detailsColumnFilters).every((arr) => arr.length === 0)
+                Object.values(detailsColumnFilters).every((arr) => arr.length === 0) &&
+                Object.values(detailsTextColumnFilters).every((value) => value.trim() === '')
               }
               onClick={() => {
-                setDetailsSearchTerm('')
                 setDetailsColumnFilters({
                   csaMatchFound: [],
                   batchNumber: [],
@@ -1107,8 +1108,14 @@ export default function WeeklyFileProcessingTab() {
                   craStatus: [],
                   matchedBy: [],
                 })
+                setDetailsTextColumnFilters({
+                  matchedBy: '',
+                  batchNumber: '',
+                  transactionSource: '',
+                })
                 setDetailsSortConfig(null)
                 setDetailsShowSelectedOnly(false)
+                setRecordsPage(1)
               }}
               sx={{
                 textTransform: 'none',
@@ -1155,7 +1162,7 @@ export default function WeeklyFileProcessingTab() {
                     onClick={(e) => handleDetailsFilterClick(e, 'csaMatchFound')}
                     sx={{
                       padding: 0.5,
-                      color: detailsColumnFilters.csaMatchFound.length > 0 ? '#1976d2' : '#666',
+                      color: isDetailsFilterActive('csaMatchFound') ? '#1976d2' : '#666',
                     }}
                   >
                     <FilterListIcon fontSize="small" />
@@ -1175,7 +1182,7 @@ export default function WeeklyFileProcessingTab() {
                     onClick={(e) => handleDetailsFilterClick(e, 'matchedBy')}
                     sx={{
                       padding: 0.5,
-                      color: detailsColumnFilters.matchedBy.length > 0 ? '#1976d2' : '#666',
+                      color: isDetailsFilterActive('matchedBy') ? '#1976d2' : '#666',
                     }}
                   >
                     <FilterListIcon fontSize="small" />
@@ -1195,7 +1202,7 @@ export default function WeeklyFileProcessingTab() {
                     onClick={(e) => handleDetailsFilterClick(e, 'batchNumber')}
                     sx={{
                       padding: 0.5,
-                      color: detailsColumnFilters.batchNumber.length > 0 ? '#1976d2' : '#666',
+                      color: isDetailsFilterActive('batchNumber') ? '#1976d2' : '#666',
                     }}
                   >
                     <FilterListIcon fontSize="small" />
@@ -1215,7 +1222,7 @@ export default function WeeklyFileProcessingTab() {
                     onClick={(e) => handleDetailsFilterClick(e, 'transactionType')}
                     sx={{
                       padding: 0.5,
-                      color: detailsColumnFilters.transactionType.length > 0 ? '#1976d2' : '#666',
+                      color: isDetailsFilterActive('transactionType') ? '#1976d2' : '#666',
                     }}
                   >
                     <FilterListIcon fontSize="small" />
@@ -1235,7 +1242,7 @@ export default function WeeklyFileProcessingTab() {
                     onClick={(e) => handleDetailsFilterClick(e, 'transactionSource')}
                     sx={{
                       padding: 0.5,
-                      color: detailsColumnFilters.transactionSource.length > 0 ? '#1976d2' : '#666',
+                      color: isDetailsFilterActive('transactionSource') ? '#1976d2' : '#666',
                     }}
                   >
                     <FilterListIcon fontSize="small" />
@@ -1255,7 +1262,7 @@ export default function WeeklyFileProcessingTab() {
                     onClick={(e) => handleDetailsFilterClick(e, 'craStatus')}
                     sx={{
                       padding: 0.5,
-                      color: detailsColumnFilters.craStatus.length > 0 ? '#1976d2' : '#666',
+                      color: isDetailsFilterActive('craStatus') ? '#1976d2' : '#666',
                     }}
                   >
                     <FilterListIcon fontSize="small" />
@@ -1300,9 +1307,7 @@ export default function WeeklyFileProcessingTab() {
               <TableRow>
                 <TableCell colSpan={22} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
-                    {detailsSearchTerm.trim()
-                      ? 'No records match the current search'
-                      : 'No records found for this weekly file'}
+                    No records found for this weekly file
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -1311,7 +1316,7 @@ export default function WeeklyFileProcessingTab() {
                 <TableRow
                   key={record.id}
                   hover
-                  onClick={() => setSelectedRecordId(record.id)}
+                  onClick={() => toggleSelectedRecord(record.id)}
                   sx={{
                     '&:hover': { backgroundColor: '#f9f9f9' },
                     cursor: 'pointer',
@@ -1319,7 +1324,13 @@ export default function WeeklyFileProcessingTab() {
                   }}
                 >
                   <TableCell padding="checkbox">
-                    <Radio checked={selectedRecordId === record.id} />
+                    <Radio
+                      checked={selectedRecordId === record.id}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        toggleSelectedRecord(record.id)
+                      }}
+                    />
                   </TableCell>
                   <TableCell>{record.csaMatchFound}</TableCell>
                   <TableCell>{valueOrBlank(record.matchedBy)}</TableCell>
@@ -1653,79 +1664,6 @@ export default function WeeklyFileProcessingTab() {
       </Menu>
 
       <Menu
-        anchorEl={weeklyReportFilterAnchor.element}
-        open={Boolean(weeklyReportFilterAnchor.element)}
-        onClose={handleWeeklyReportFilterClose}
-        PaperProps={{
-          sx: {
-            maxHeight: 400,
-            width: 250,
-          },
-        }}
-      >
-        <Box sx={{ p: 2 }}>
-          <Box
-            sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}
-          >
-            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-              Filter by{' '}
-              {weeklyReportFilterAnchor.column === 'weeklyFileDate'
-                ? 'Weekly File Date'
-                : 'CSA Processing Date'}
-            </Typography>
-            <Button
-              size="small"
-              onClick={() => {
-                clearWeeklyReportColumnFilter(weeklyReportFilterAnchor.column)
-                handleWeeklyReportFilterClose()
-              }}
-              sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-            >
-              Clear
-            </Button>
-          </Box>
-          <TextField
-            size="small"
-            fullWidth
-            placeholder="Search"
-            value={weeklyReportFilterSearchTerm}
-            onChange={(e) => setWeeklyReportFilterSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Box component="span" sx={{ fontSize: '18px' }}>
-                    🔍
-                  </Box>
-                </InputAdornment>
-              ),
-            }}
-            sx={{ mb: 1 }}
-          />
-          <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-            {getWeeklyReportUniqueValues(weeklyReportFilterAnchor.column)
-              .filter((value) =>
-                value.toLowerCase().includes(weeklyReportFilterSearchTerm.toLowerCase()),
-              )
-              .map((value) => (
-                <Box key={value} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
-                  <Checkbox
-                    size="small"
-                    checked={
-                      weeklyReportColumnFilters[weeklyReportFilterAnchor.column]?.includes(value) ||
-                      false
-                    }
-                    onChange={() =>
-                      handleWeeklyReportFilterChange(weeklyReportFilterAnchor.column, value)
-                    }
-                  />
-                  <Typography variant="body2">{value}</Typography>
-                </Box>
-              ))}
-          </Box>
-        </Box>
-      </Menu>
-
-      <Menu
         anchorEl={detailsSelectionFilterAnchor}
         open={Boolean(detailsSelectionFilterAnchor)}
         onClose={handleDetailsSelectionFilterClose}
@@ -1798,9 +1736,17 @@ export default function WeeklyFileProcessingTab() {
           <TextField
             size="small"
             fullWidth
-            placeholder="Search"
+            placeholder={
+              isDetailsTextFilterColumn(detailsFilterAnchor.column) ? 'Type to filter' : 'Search'
+            }
             value={detailsFilterSearchTerm}
-            onChange={(e) => setDetailsFilterSearchTerm(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value
+              setDetailsFilterSearchTerm(value)
+              if (isDetailsTextFilterColumn(detailsFilterAnchor.column)) {
+                handleDetailsFilterChange(detailsFilterAnchor.column, value)
+              }
+            }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -1812,24 +1758,29 @@ export default function WeeklyFileProcessingTab() {
             }}
             sx={{ mb: 1 }}
           />
-          <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-            {getDetailsUniqueValues(detailsFilterAnchor.column)
-              .filter((value) =>
-                value.toLowerCase().includes(detailsFilterSearchTerm.toLowerCase()),
-              )
-              .map((value) => (
-                <Box key={value} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
-                  <Checkbox
-                    size="small"
-                    checked={
-                      detailsColumnFilters[detailsFilterAnchor.column]?.includes(value) || false
-                    }
-                    onChange={() => handleDetailsFilterChange(detailsFilterAnchor.column, value)}
-                  />
-                  <Typography variant="body2">{value}</Typography>
-                </Box>
-              ))}
-          </Box>
+          {!isDetailsTextFilterColumn(detailsFilterAnchor.column) && (
+            <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+              {getDetailsFilterOptions(detailsFilterAnchor.column)
+                .filter((option) =>
+                  option.label.toLowerCase().includes(detailsFilterSearchTerm.toLowerCase()),
+                )
+                .map((option) => (
+                  <Box key={option.value} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
+                    <Checkbox
+                      size="small"
+                      checked={
+                        detailsColumnFilters[detailsFilterAnchor.column]?.includes(option.value) ||
+                        false
+                      }
+                      onChange={() =>
+                        handleDetailsFilterChange(detailsFilterAnchor.column, option.value)
+                      }
+                    />
+                    <Typography variant="body2">{option.label}</Typography>
+                  </Box>
+                ))}
+            </Box>
+          )}
         </Box>
       </Menu>
 

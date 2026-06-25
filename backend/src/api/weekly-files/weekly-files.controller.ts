@@ -47,14 +47,85 @@ export class WeeklyFilesController {
   @Get(':id/records')
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({
+    name: 'csaMatchFound',
+    required: false,
+    type: String,
+    description: 'Comma-separated filter values for CSA Match Found: "Yes" and/or "No"',
+  })
+  @ApiQuery({
+    name: 'transactionType',
+    required: false,
+    type: String,
+    description: 'Comma-separated stored transaction type codes: "A", "C", "U"',
+  })
+  @ApiQuery({
+    name: 'craStatus',
+    required: false,
+    type: String,
+    description:
+      'Comma-separated stored CRA status values: "completed", "abandoned", "in-progress", "updated"',
+  })
+  @ApiQuery({
+    name: 'matchedBy',
+    required: false,
+    type: String,
+    description: 'Text filter for Matched By (minimum 3 characters)',
+  })
+  @ApiQuery({
+    name: 'batchNumber',
+    required: false,
+    type: String,
+    description: 'Text filter for Batch Req ID / batch number (minimum 3 characters)',
+  })
+  @ApiQuery({
+    name: 'transactionSource',
+    required: false,
+    type: String,
+    description: 'Text filter for Transaction Source (minimum 3 characters)',
+  })
   @ApiResponse({ status: 200, description: 'Paginated detail records for a weekly file' })
   @ApiResponse({ status: 404, description: 'Weekly file not found' })
   findRecords(
     @Param('id', ParseIntPipe) id: number,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('csaMatchFound') csaMatchFound?: string,
+    @Query('transactionType') transactionType?: string,
+    @Query('craStatus') craStatus?: string,
+    @Query('matchedBy') matchedBy?: string,
+    @Query('batchNumber') batchNumber?: string,
+    @Query('transactionSource') transactionSource?: string,
   ): Promise<PaginatedResponse<WeeklyFileRecordDto>> {
-    return this.weeklyFilesService.findRecords(id, this.parsePage(page), this.parseLimit(limit))
+    const filters = {
+      csaMatchFound: csaMatchFound
+        ? csaMatchFound
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean)
+        : undefined,
+      transactionType: transactionType
+        ? transactionType
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean)
+        : undefined,
+      craStatus: craStatus
+        ? craStatus
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean)
+        : undefined,
+      matchedBy: matchedBy?.trim() || undefined,
+      batchNumber: batchNumber?.trim() || undefined,
+      transactionSource: transactionSource?.trim() || undefined,
+    }
+    return this.weeklyFilesService.findRecords(
+      id,
+      this.parsePage(page),
+      this.parseLimit(limit),
+      filters,
+    )
   }
 
   @Post(':id/records/:recordId/associate')

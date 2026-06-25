@@ -38,11 +38,14 @@ export const isMockSection54Placement = (contact: MockPlacementMatchInput): bool
   normalizeMatchValue(contact.locationSubType) === '54' &&
   normalizeMatchValue(contact.placementStatus) === 'ACTIVE'
 
+const hasPlacementDetails = (contact: PlacementDisplayInput): boolean =>
+  Boolean(contact.placementLocation?.trim())
+
 export const buildPlacementDisplayValues = (
   contact: PlacementDisplayInput,
   formatDateYMD: (dateString: string) => string,
 ): PlacementDisplayValues => {
-  const hidePlacementDetails = isMockSection54Placement(contact)
+  const hidePlacementDetails = isMockSection54Placement(contact) || !hasPlacementDetails(contact)
 
   return {
     placementLocation: hidePlacementDetails ? '' : contact.placementLocation || '',

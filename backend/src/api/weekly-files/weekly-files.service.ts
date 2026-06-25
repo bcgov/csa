@@ -12,10 +12,10 @@ import type { ReprocessWeeklyFileResultDto } from './dto/associate-wkl-record.dt
 import type { WeeklyFileRecordDto, WeeklyFileSummaryDto } from './dto/weekly-file.dto'
 import {
   aggregateWeeklyFileCounts,
+  normalizeCraStatusLabel,
   toWeeklyFileRecordDto,
   toWeeklyFileSummaryDto,
 } from './weekly-file.mapper'
-import { buildWklRecordWhereInput } from './weekly-file-record-filters'
 import {
   assertCanAssociate,
   assertCanDissociate,
@@ -25,15 +25,211 @@ import {
 const { FILE_DIRECTION, FILE_TYPE, WKL_MATCH_STATUS } = CRA_DATA_HANDLING_CONSTANT
 
 export interface WeeklyFileRecordFilters {
-  /** Semantic filter: "Yes" or "No" (maps to match_status groups). */
+  /** Semantic filter: "Yes", "No", or "N/A" (maps to match_status groups). */
   csaMatchFound?: string[]
-  /** Stored transaction_type codes: A, C, U. */
+  /** Normalized display labels: Application, Cancellation, Update. */
   transactionType?: string[]
-  /** Stored cra_status values: completed, in-progress, abandoned, updated. */
+  /** Normalized display labels: COMPLETED, ABANDONED, IN PROGRESS, UPDATED. */
   craStatus?: string[]
   matchedBy?: string
   batchNumber?: string
   transactionSource?: string
+}
+
+type WeeklyFileRecordSortColumn =
+  | 'csaMatchFound'
+  | 'matchedBy'
+  | 'batchNumber'
+  | 'transactionType'
+  | 'transactionSource'
+  | 'craStatus'
+
+type WeeklyFileRecordSort = {
+  column: WeeklyFileRecordSortColumn
+  direction: 'asc' | 'desc'
+}
+
+const TRANSACTION_TYPE_FILTER_LABELS: Record<string, string> = {
+  A: 'Application',
+  APPLICATION: 'Application',
+  C: 'Cancellation',
+  CANCELLATION: 'Cancellation',
+  U: 'Update',
+  UPDATE: 'Update',
+  'CRA UPDATE': 'Update',
+}
+
+const ALLOWED_WEEKLY_RECORD_SORT_COLUMNS: WeeklyFileRecordSortColumn[] = [
+  'csaMatchFound',
+  'matchedBy',
+  'batchNumber',
+  'transactionType',
+  'transactionSource',
+  'craStatus',
+]
+
+function normalizeTransactionTypeLabel(value: string): string {
+  const normalized = value.trim().toUpperCase()
+  return TRANSACTION_TYPE_FILTER_LABELS[normalized] ?? value.trim()
+}
+
+function normalizeCsaMatchFoundLabel(value: string): string {
+  const normalized = value.trim().toLowerCase()
+  if (normalized === 'yes') return 'Yes'
+  if (normalized === 'no') return 'No'
+  if (normalized === 'n/a') return 'N/A'
+  return value.trim()
+}
+
+function parseWeeklyFileRecordSort(sort?: string): WeeklyFileRecordSort | null {
+  if (!sort) {
+    return null
+  }
+
+  let sortArray: unknown
+  try {
+    sortArray = JSON.parse(sort)
+  } catch {
+    throw new BadRequestException('Invalid JSON format for sort parameter')
+  }
+
+  if (!Array.isArray(sortArray) || sortArray.length === 0) {
+    return null
+  }
+
+  const sortItem = sortArray[0]
+  if (!sortItem || typeof sortItem !== 'object' || Array.isArray(sortItem)) {
+    throw new BadRequestException('Sort parameter must contain objects with field directions')
+  }
+
+  const field = Object.keys(sortItem)[0] as WeeklyFileRecordSortColumn | undefined
+  const direction =
+    field && field in sortItem
+      ? (sortItem[field as keyof typeof sortItem] as 'asc' | 'desc')
+      : undefined
+
+  if (!field || !ALLOWED_WEEKLY_RECORD_SORT_COLUMNS.includes(field)) {
+    throw new BadRequestException(
+      `Invalid sort field: ${field}. Allowed fields: ${ALLOWED_WEEKLY_RECORD_SORT_COLUMNS.join(', ')}`,
+    )
+  }
+
+  if (direction !== 'asc' && direction !== 'desc') {
+    throw new BadRequestException(`Invalid sort direction: ${direction}. Allowed values: asc, desc`)
+  }
+
+  return { column: field, direction }
+}
+
+function matchesTextFilter(
+  value: string | null | undefined,
+  term: string | undefined,
+  minLength: number,
+) {
+  const normalizedTerm = term?.trim().toLowerCase() ?? ''
+  if (!normalizedTerm || normalizedTerm.length < minLength) {
+    return true
+  }
+
+  return (value ?? '').toLowerCase().includes(normalizedTerm)
+}
+
+function applyWeeklyFileRecordFilters(
+  records: WeeklyFileRecordDto[],
+  filters?: WeeklyFileRecordFilters,
+): WeeklyFileRecordDto[] {
+  const csaMatchFound = new Set((filters?.csaMatchFound ?? []).map(normalizeCsaMatchFoundLabel))
+  const transactionTypes = new Set(
+    (filters?.transactionType ?? []).map(normalizeTransactionTypeLabel).filter(Boolean),
+  )
+  const craStatuses = new Set(
+    (filters?.craStatus ?? []).map(normalizeCraStatusLabel).filter(Boolean),
+  )
+  const batchNumberTerm = filters?.batchNumber?.trim().toLowerCase() ?? ''
+
+  return records.filter((record) => {
+    if (csaMatchFound.size > 0 && !csaMatchFound.has(record.csaMatchFound)) {
+      return false
+    }
+
+    if (
+      transactionTypes.size > 0 &&
+      !transactionTypes.has(normalizeTransactionTypeLabel(record.transactionType))
+    ) {
+      return false
+    }
+
+    if (craStatuses.size > 0 && !craStatuses.has(normalizeCraStatusLabel(record.craStatus))) {
+      return false
+    }
+
+    if (!matchesTextFilter(record.matchedBy, filters?.matchedBy, 3)) {
+      return false
+    }
+
+    if (!matchesTextFilter(record.transactionSource, filters?.transactionSource, 3)) {
+      return false
+    }
+
+    if (batchNumberTerm && batchNumberTerm.length >= 1) {
+      const batchNumber = record.batchNumber?.toString() ?? ''
+      if (!batchNumber.toLowerCase().includes(batchNumberTerm)) {
+        return false
+      }
+    }
+
+    return true
+  })
+}
+
+function getWeeklyFileRecordSortValue(
+  record: WeeklyFileRecordDto,
+  column: WeeklyFileRecordSortColumn,
+) {
+  switch (column) {
+    case 'batchNumber':
+      return record.batchNumber ?? Number.POSITIVE_INFINITY
+    case 'csaMatchFound':
+      return record.csaMatchFound
+    case 'matchedBy':
+      return record.matchedBy ?? ''
+    case 'transactionType':
+      return record.transactionType
+    case 'transactionSource':
+      return record.transactionSource
+    case 'craStatus':
+      return record.craStatus
+  }
+}
+
+function compareWeeklyFileRecordSortValues(left: string | number, right: string | number): number {
+  if (typeof left === 'number' && typeof right === 'number') {
+    return left - right
+  }
+
+  return String(left).localeCompare(String(right), undefined, { sensitivity: 'base' })
+}
+
+function sortWeeklyFileRecords(
+  records: WeeklyFileRecordDto[],
+  sort: WeeklyFileRecordSort | null,
+): WeeklyFileRecordDto[] {
+  if (!sort) {
+    return records
+  }
+
+  return [...records].sort((left, right) => {
+    const comparison = compareWeeklyFileRecordSortValues(
+      getWeeklyFileRecordSortValue(left, sort.column),
+      getWeeklyFileRecordSortValue(right, sort.column),
+    )
+
+    if (comparison !== 0) {
+      return sort.direction === 'asc' ? comparison : -comparison
+    }
+
+    return left.recordIndex - right.recordIndex
+  })
 }
 
 const weeklyFileWhere = {
@@ -155,6 +351,7 @@ export class WeeklyFilesService {
     page = 1,
     limit = 10,
     filters?: WeeklyFileRecordFilters,
+    sort?: string,
   ): Promise<PaginatedResponse<WeeklyFileRecordDto>> {
     await this.assertWeeklyFileExists(id)
 
@@ -162,21 +359,21 @@ export class WeeklyFilesService {
     const safeLimit = limit >= 1 ? Math.min(limit, 200) : 10
     const offset = (safePage - 1) * safeLimit
 
-    const where = await buildWklRecordWhereInput(this.prisma, id, filters)
+    const parsedSort = parseWeeklyFileRecordSort(sort)
+    const recordsWithRelations = await this.prisma.wklFileRecord.findMany({
+      where: { transferFileId: id },
+      orderBy: { recordIndex: 'asc' },
+      include: wklRecordDtoInclude,
+    })
 
-    const [total, recordsWithRelations] = await Promise.all([
-      this.prisma.wklFileRecord.count({ where }),
-      this.prisma.wklFileRecord.findMany({
-        where,
-        orderBy: { recordIndex: 'asc' },
-        skip: offset,
-        take: safeLimit,
-        include: wklRecordDtoInclude,
-      }),
-    ])
+    const normalizedRecords = recordsWithRelations.map(toWeeklyFileRecordDto)
+    const filteredRecords = applyWeeklyFileRecordFilters(normalizedRecords, filters)
+    const sortedRecords = sortWeeklyFileRecords(filteredRecords, parsedSort)
+    const paginatedRecords = sortedRecords.slice(offset, offset + safeLimit)
+    const total = sortedRecords.length
 
     return {
-      data: recordsWithRelations.map(toWeeklyFileRecordDto),
+      data: paginatedRecords,
       page: safePage,
       limit: safeLimit,
       total,

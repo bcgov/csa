@@ -548,6 +548,167 @@ describe('EligibilityService', () => {
     expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1) // batchUpsertRows only
   })
 
+  const SOURCE_PLACEMENT_COLUMN_INDEX = 39
+  const SOURCE_AGREEMENT_COLUMN_INDEX = 49
+
+  function upsertedColumnValues(index: number): unknown[] {
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalled()
+    return mockPrisma.$executeRawUnsafe.mock.calls[0][index + 1] as unknown[]
+  }
+
+  function makeOocIcmContact(overrides: Record<string, unknown> = {}) {
+    return makeEligibleContact({
+      misLegalAuthCode: 'OPC',
+      icmPlacements: [],
+      icmOrders: [],
+      icmAgreements: [
+        {
+          rowId: 'AGR-OOC',
+          agreementType: 'Out of Care',
+          agreementStatus: 'Active',
+          agreementStartDate: '2024-01-01',
+          agreementEndDate: null,
+          terminationDate: null,
+          mcfdContract: 'C-OOC',
+          serviceProviderName: 'OOC Provider',
+          providerId: 'PROV-OOC',
+        },
+      ],
+      csaStatus: null,
+      existingContactId: null,
+      ...overrides,
+    })
+  }
+
+  function makeOocMisFallbackContact(overrides: Record<string, unknown> = {}) {
+    return makeEligibleContact({
+      misLegalAuthCode: 'OPC',
+      icmPlacements: [],
+      icmOrders: [],
+      icmAgreements: [],
+      misPlacements: [
+        {
+          type: 'PL',
+          status: 'ACTIVE',
+          startDate: '2024-01-01',
+          endDate: null,
+          contractNumber: 'CON-MIS',
+          placementNumber: 'MIS-PL-1',
+          serviceType: '54',
+          serviceProviderName: 'MIS Provider',
+          providerId: 'RE-1',
+          placeOfServiceName: 'Home',
+        },
+      ],
+      misContracts: [
+        {
+          contractNumber: 'CON-MIS',
+          providerId: 'RE-1',
+          type: 'Out of Care',
+          status: 'Active',
+          startDate: '2024-01-01',
+          endDate: null,
+          terminationDate: null,
+          serviceProviderName: 'MIS Provider',
+        },
+      ],
+      misPayments: [],
+      csaStatus: null,
+      existingContactId: null,
+      ...overrides,
+    })
+  }
+
+  it('sets source_agreement from primaryAgreement when OOC has no placement', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeOocIcmContact()])
+
+    await service.run(null)
+
+    expect(upsertedColumnValues(SOURCE_PLACEMENT_COLUMN_INDEX)).toEqual([null])
+    expect(upsertedColumnValues(SOURCE_AGREEMENT_COLUMN_INDEX)).toEqual(['ICM'])
+  })
+
+  it('sets source_agreement from MIS contract when OOC falls back to MIS', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeOocMisFallbackContact()])
+
+    await service.run(null)
+
+    expect(upsertedColumnValues(SOURCE_PLACEMENT_COLUMN_INDEX)).toEqual([null])
+    expect(upsertedColumnValues(SOURCE_AGREEMENT_COLUMN_INDEX)).toEqual(['MIS'])
+  })
+
+  it('leaves placement and agreement source null when OOC has no agreement', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+      makeEligibleContact({
+        misLegalAuthCode: 'OPT',
+        icmPlacements: [],
+        icmOrders: [],
+        icmAgreements: [],
+        csaStatus: null,
+        existingContactId: null,
+      }),
+    ])
+
+    await service.run(null)
+
+    expect(upsertedColumnValues(SOURCE_PLACEMENT_COLUMN_INDEX)).toEqual([null])
+    expect(upsertedColumnValues(SOURCE_AGREEMENT_COLUMN_INDEX)).toEqual([null])
+  })
+
+  it('sets placement and agreement source from placement for non-OOC contacts', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeEligibleContact()])
+
+    await service.run(null)
+
+    expect(upsertedColumnValues(SOURCE_PLACEMENT_COLUMN_INDEX)).toEqual(['ICM'])
+    expect(upsertedColumnValues(SOURCE_AGREEMENT_COLUMN_INDEX)).toEqual(['ICM'])
+  })
+
+  it('sets source_agreement from MIS contract when ICM placement falls back to MIS agreement', async () => {
+    mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
+      makeEligibleContact({
+        icmPlacements: [
+          {
+            type: 'Placement',
+            status: 'Active',
+            startDate: '2024-01-01',
+            endDate: null,
+            contractNumber: 'CON-1',
+            agreementRowId: 'AGR-MISSING',
+            paidUnpaid: 'Paid',
+            placementNumber: 'PL-1',
+            serviceType: 'Foster Care',
+            serviceProviderName: 'Provider A',
+            providerId: 'RE-1',
+            placeOfServiceName: 'Home A',
+            interruptedPlacementId: null,
+          },
+        ],
+        icmAgreements: [],
+        icmOrders: [],
+        misContracts: [
+          {
+            contractNumber: 'con-1',
+            providerId: 're-1',
+            type: 'MIS-CONTRACT',
+            status: 'Active',
+            startDate: '2024-01-01',
+            endDate: null,
+            terminationDate: null,
+            serviceProviderName: 'MIS Provider',
+          },
+        ],
+        misPlacements: [],
+        misPayments: [],
+      }),
+    ])
+
+    await service.run(null)
+
+    expect(upsertedColumnValues(SOURCE_PLACEMENT_COLUMN_INDEX)).toEqual(['ICM'])
+    expect(upsertedColumnValues(SOURCE_AGREEMENT_COLUMN_INDEX)).toEqual(['MIS'])
+  })
+
   it('should skip new contacts who are already over 18', async () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([makeOver18Contact()])
 

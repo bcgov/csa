@@ -71,6 +71,7 @@ model Contact {
   agreementEndDate           DateTime? @map("agreement_end_date") @db.Date
   terminationDate            DateTime? @map("termination_date") @db.Date
   mcfdContract               String?   @map("mcfd_contract")
+  sourceAgreement            String?   @map("source_agreement")
   orderNumber                String?   @map("order_number")
   orderType                  String?   @map("order_type")
   orderStatus                String?   @map("order_status")

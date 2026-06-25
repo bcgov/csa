@@ -105,4 +105,20 @@ describe('mock placement helpers', () => {
     })
     expect(formatDateYMD).toHaveBeenCalledTimes(2)
   })
+
+  test('hides placement source when placement location is blank', () => {
+    const result = buildPlacementDisplayValues(
+      {
+        placementLocation: '',
+        locationType: '',
+        locationSubType: '',
+        placementStatus: '',
+        sourcePlacement: 'MIS',
+        placeOfServiceName: '',
+      },
+      vi.fn(),
+    )
+
+    expect(result.sourcePlacement).toBe('')
+  })
 })

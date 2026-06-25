@@ -76,6 +76,8 @@ export interface WeeklyFileRecordFilters {
   matchedBy?: string
   batchNumber?: string
   transactionSource?: string
+  /** Server-side sort: array of sort objects like [{ field: "asc|desc" }] */
+  sort?: Array<Record<string, 'asc' | 'desc'>>
 }
 
 /** Filter dropdown options: value is sent to the API; label matches table display. */
@@ -122,6 +124,9 @@ export const getWeeklyFileRecords = async (
   }
   if (filters?.transactionSource?.trim()) {
     params.transactionSource = filters.transactionSource.trim()
+  }
+  if (filters?.sort && filters.sort.length > 0) {
+    params.sort = JSON.stringify(filters.sort)
   }
   const response = await APIService.getAxiosInstance().get(`/weekly-files/${fileId}/records`, {
     params,

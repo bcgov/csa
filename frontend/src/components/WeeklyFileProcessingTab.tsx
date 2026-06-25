@@ -426,6 +426,9 @@ export default function WeeklyFileProcessingTab() {
             matchedBy: detailsBackendTextFilters.matchedBy,
             batchNumber: detailsBackendTextFilters.batchNumber,
             transactionSource: detailsBackendTextFilters.transactionSource,
+            sort: detailsSortConfig
+              ? [{ [detailsSortConfig.column]: detailsSortConfig.direction }]
+              : undefined,
           },
         )
         setRecords(response.data)
@@ -459,6 +462,7 @@ export default function WeeklyFileProcessingTab() {
     detailsBackendTextFilters.matchedBy,
     detailsBackendTextFilters.batchNumber,
     detailsBackendTextFilters.transactionSource,
+    detailsSortConfig,
   ])
 
   useEffect(() => {
@@ -599,7 +603,7 @@ export default function WeeklyFileProcessingTab() {
       getDetailsFieldValue,
       '',
       clientColumnFilters,
-      detailsSortConfig,
+      null, // Server-side sorting is now applied - don't sort client-side
     )
 
     if (!detailsShowSelectedOnly) {
@@ -611,7 +615,7 @@ export default function WeeklyFileProcessingTab() {
     }
 
     return recordsAfterSearchFilterSort.filter((record) => record.id === selectedRecordId)
-  }, [records, detailsColumnFilters, detailsSortConfig, detailsShowSelectedOnly, selectedRecordId])
+  }, [records, detailsColumnFilters, detailsShowSelectedOnly, selectedRecordId])
 
   const filteredSearchedChildren = useMemo(() => {
     return filterAndSortRows(

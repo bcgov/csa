@@ -12,10 +12,10 @@ import type { ReprocessWeeklyFileResultDto } from './dto/associate-wkl-record.dt
 import type { WeeklyFileRecordDto, WeeklyFileSummaryDto } from './dto/weekly-file.dto'
 import {
   aggregateWeeklyFileCounts,
-  resolveCraStatusFilterToStored,
   toWeeklyFileRecordDto,
   toWeeklyFileSummaryDto,
 } from './weekly-file.mapper'
+import { buildWklRecordWhereInput } from './weekly-file-record-filters'
 import {
   assertCanAssociate,
   assertCanDissociate,
@@ -25,18 +25,15 @@ import {
 const { FILE_DIRECTION, FILE_TYPE, WKL_MATCH_STATUS } = CRA_DATA_HANDLING_CONSTANT
 
 export interface WeeklyFileRecordFilters {
+  /** Semantic filter: "Yes" or "No" (maps to match_status groups). */
   csaMatchFound?: string[]
+  /** Stored transaction_type codes: A, C, U. */
   transactionType?: string[]
+  /** Stored cra_status values: completed, in-progress, abandoned, updated. */
   craStatus?: string[]
   matchedBy?: string
   batchNumber?: string
   transactionSource?: string
-}
-
-const TRANSACTION_TYPE_REVERSE: Record<string, string> = {
-  Application: 'A',
-  Cancellation: 'C',
-  'CRA Update': 'U',
 }
 
 const weeklyFileWhere = {
@@ -165,150 +162,18 @@ export class WeeklyFilesService {
     const safeLimit = limit >= 1 ? Math.min(limit, 200) : 10
     const offset = (safePage - 1) * safeLimit
 
-    // Build WHERE conditions
-    const whereConditions: string[] = [`transfer_file_id = ${id}`]
+    const where = await buildWklRecordWhereInput(this.prisma, id, filters)
 
-    // CSA Match Found filter (simple column-based)
-    if (filters?.csaMatchFound?.length) {
-      const matchStatuses: string[] = []
-      for (const val of filters.csaMatchFound) {
-        if (val === 'Yes') matchStatuses.push(WKL_MATCH_STATUS.MATCHED)
-        if (val === 'No') {
-          matchStatuses.push(WKL_MATCH_STATUS.UNMATCHED, WKL_MATCH_STATUS.ASSOCIATED)
-        }
-      }
-      const uniqueStatuses = [...new Set(matchStatuses)]
-      if (uniqueStatuses.length) {
-        const statusList = uniqueStatuses.map((s) => `'${s}'`).join(',')
-        whereConditions.push(`match_status IN (${statusList})`)
-      }
-    }
-
-    // Transaction Type filter (column-based)
-    if (filters?.transactionType?.length) {
-      const rawTypes = filters.transactionType
-        .map((v) => TRANSACTION_TYPE_REVERSE[v])
-        .filter((v): v is string => !!v)
-      if (rawTypes.length) {
-        const typeList = rawTypes.map((t) => `'${t}'`).join(',')
-        whereConditions.push(`transaction_type IN (${typeList})`)
-      }
-    }
-
-    const escapeSqlLiteral = (value: string): string => value.replace(/'/g, "''")
-
-    // CRA Status filter (column-based) — whitelist maps display labels to stored file values.
-    if (filters?.craStatus?.length) {
-      const storedStatuses = resolveCraStatusFilterToStored(filters.craStatus)
-      if (storedStatuses.length) {
-        const statusList = storedStatuses.map((s) => `'${escapeSqlLiteral(s)}'`).join(',')
-        whereConditions.push(`cra_status IN (${statusList})`)
-      }
-    }
-
-    // Matched By text filter (column-based)
-    if (filters?.matchedBy) {
-      const term = filters.matchedBy.trim().toLowerCase()
-      if (term.length >= 3) {
-        const escapedTerm = escapeSqlLiteral(term)
-        whereConditions.push(`LOWER(COALESCE(matched_by, '')) LIKE '%${escapedTerm}%'`)
-      }
-    }
-
-    // Batch Req ID text filter (batch number via relation)
-    if (filters?.batchNumber) {
-      const term = filters.batchNumber.trim().toLowerCase()
-      if (term.length >= 1) {
-        const escapedTerm = escapeSqlLiteral(term)
-        whereConditions.push(`EXISTS (
-          SELECT 1
-          FROM csa.contact_batch_details cbd
-          INNER JOIN csa.batches b ON b.id = cbd.batch_id
-          WHERE cbd.id = csa.wkl_file_records.batch_detail_id
-            AND LOWER(CAST(b.batch_number AS TEXT)) LIKE '%${escapedTerm}%'
-        )`)
-      }
-    }
-
-    // Transaction Source text filter (column-based)
-    if (filters?.transactionSource) {
-      const term = filters.transactionSource.trim().toLowerCase()
-      if (term.length >= 3) {
-        const escapedTerm = escapeSqlLiteral(term)
-        whereConditions.push(`LOWER(
-          CASE
-            WHEN UPPER(COALESCE(transaction_source, '')) = 'E' THEN 'electronic'
-            WHEN COALESCE(transaction_source, '') = '' THEN 'other'
-            ELSE COALESCE(transaction_source, '')
-          END
-        ) LIKE '%${escapedTerm}%'`)
-      }
-    }
-
-    const whereClause = whereConditions.join(' AND ')
-
-    if (whereConditions.length === 1) {
-      const [total, recordsWithRelations] = await Promise.all([
-        this.prisma.wklFileRecord.count({ where: { transferFileId: id } }),
-        this.prisma.wklFileRecord.findMany({
-          where: { transferFileId: id },
-          orderBy: { recordIndex: 'asc' },
-          skip: offset,
-          take: safeLimit,
-          include: wklRecordDtoInclude,
-        }),
-      ])
-
-      return {
-        data: recordsWithRelations.map(toWeeklyFileRecordDto),
-        page: safePage,
-        limit: safeLimit,
-        total,
-        totalPages: Math.ceil(total / safeLimit),
-      }
-    }
-
-    // Execute count and findMany using raw SQL for accurate filtering
-    const countResult = await this.prisma.$queryRawUnsafe<
-      Array<{ total: number | bigint | string }>
-    >(`SELECT COUNT(*) as total FROM csa.wkl_file_records WHERE ${whereClause}`)
-
-    const totalRaw = countResult[0]?.total ?? 0
-    const total = typeof totalRaw === 'bigint' ? Number(totalRaw) : Number(totalRaw)
-
-    interface WklFileRecordRow {
-      id: number
-      transfer_file_id: number
-      record_index: number
-      weekly_file_date: string | null
-      record_data: unknown
-      match_status: string
-      contact_id: number | null
-      batch_detail_id: number | null
-      matched_by: string | null
-      processed_at: string | null
-      created_at: string
-    }
-
-    const recordsResult = await this.prisma.$queryRawUnsafe<WklFileRecordRow[]>(
-      `SELECT id, transfer_file_id, record_index, weekly_file_date, record_data, match_status,
-        contact_id, batch_detail_id, matched_by, processed_at, created_at
-       FROM csa.wkl_file_records
-       WHERE ${whereClause}
-       ORDER BY record_index ASC
-       LIMIT ${safeLimit} OFFSET ${offset}`,
-    )
-
-    // Fetch related data for the records (contact, batch) using Prisma
-    const recordIds = recordsResult.map((r) => r.id)
-    const recordsWithRelations =
-      recordIds.length === 0
-        ? []
-        : await this.prisma.wklFileRecord.findMany({
-            where: { id: { in: recordIds } },
-            orderBy: { recordIndex: 'asc' },
-            include: wklRecordDtoInclude,
-          })
+    const [total, recordsWithRelations] = await Promise.all([
+      this.prisma.wklFileRecord.count({ where }),
+      this.prisma.wklFileRecord.findMany({
+        where,
+        orderBy: { recordIndex: 'asc' },
+        skip: offset,
+        take: safeLimit,
+        include: wklRecordDtoInclude,
+      }),
+    ])
 
     return {
       data: recordsWithRelations.map(toWeeklyFileRecordDto),

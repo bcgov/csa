@@ -57,15 +57,14 @@ export class WeeklyFilesController {
     name: 'transactionType',
     required: false,
     type: String,
-    description:
-      'Comma-separated display labels for Transaction Type: "Application", "Cancellation", "CRA Update"',
+    description: 'Comma-separated stored transaction type codes: "A", "C", "U"',
   })
   @ApiQuery({
     name: 'craStatus',
     required: false,
     type: String,
     description:
-      'Comma-separated display values for CRA Status: "ABANDONED", "COMPLETED", "IN PROGRESS", "UPDATED"',
+      'Comma-separated stored CRA status values: "completed", "abandoned", "in-progress", "updated"',
   })
   @ApiQuery({
     name: 'matchedBy',

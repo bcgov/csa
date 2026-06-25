@@ -35,23 +35,18 @@ export function toCraStatusDisplayLabel(stored: string): string {
   return stored.trim().toUpperCase().replace(/-/g, ' ')
 }
 
-/** Maps filter dropdown labels to raw values stored in cra_status. */
-export const CRA_STATUS_FILTER_TO_STORED: Record<string, string> = Object.fromEntries(
-  WKL_STATUS_STORED_VALUES.map((stored) => [toCraStatusDisplayLabel(stored), stored]),
-)
+const TRANSACTION_TYPE_CODES = Object.keys(TRANSACTION_TYPE_LABELS)
 
-/** Display labels for CRA status filter options (derived from WEEKLY_FILE.STATUS). */
-export const CRA_STATUS_DISPLAY_LABELS: string[] =
-  WKL_STATUS_STORED_VALUES.map(toCraStatusDisplayLabel)
+/** Whitelist filter params to values stored in transaction_type (A, C, U). */
+export function filterAllowedTransactionTypes(values: string[]): string[] {
+  const allowed = new Set(TRANSACTION_TYPE_CODES)
+  return [...new Set(values.map((v) => v.trim().toUpperCase()).filter((v) => allowed.has(v)))]
+}
 
-export function resolveCraStatusFilterToStored(labels: string[]): string[] {
-  const stored = labels
-    .map((label) => {
-      const normalized = label.trim().toUpperCase().replace(/_/g, ' ')
-      return CRA_STATUS_FILTER_TO_STORED[normalized]
-    })
-    .filter((v): v is string => !!v)
-  return [...new Set(stored)]
+/** Whitelist filter params to values stored in cra_status. */
+export function filterAllowedCraStatuses(values: string[]): string[] {
+  const allowed = new Set(WKL_STATUS_STORED_VALUES)
+  return [...new Set(values.map((v) => v.trim().toLowerCase()).filter((v) => allowed.has(v)))]
 }
 
 export interface WeeklyFileCounts {

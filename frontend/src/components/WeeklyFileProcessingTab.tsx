@@ -32,6 +32,9 @@ import {
   getWeeklyFileRecords,
   getWeeklyFiles,
   reprocessWeeklyFileRecord,
+  WEEKLY_FILE_CRA_STATUS_FILTER_OPTIONS,
+  WEEKLY_FILE_CSA_MATCH_FOUND_FILTER_OPTIONS,
+  WEEKLY_FILE_TRANSACTION_TYPE_FILTER_OPTIONS,
   type WeeklyFileRecord,
   type WeeklyFileSummary,
 } from '../service/weekly-files-service'
@@ -145,6 +148,8 @@ const formatDateTimeDisplay = (value: string | null): string => {
 }
 
 const valueOrBlank = (value: string | null | undefined): string => value ?? ''
+
+type DetailsFilterOption = { value: string; label: string }
 
 const compareStrings = (left: string, right: string): number =>
   left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' })
@@ -737,21 +742,21 @@ export default function WeeklyFileProcessingTab() {
     setDetailsFilterSearchTerm('')
   }
 
-  // Hardcoded option sets for the three server-side filtered columns so the dropdown
-  // always shows all possible values regardless of which page of records is loaded.
-  const SERVER_SIDE_COLUMN_OPTIONS: Partial<Record<WeeklyDetailsColumn, string[]>> = {
-    csaMatchFound: ['Yes', 'No'],
-    transactionType: ['Application', 'Cancellation', 'CRA Update'],
-    craStatus: ['COMPLETED', 'ABANDONED', 'IN PROGRESS', 'UPDATED'],
+  // Hardcoded option sets for server-side filtered columns (value = API param, label = table display).
+  const SERVER_SIDE_COLUMN_OPTIONS: Partial<Record<WeeklyDetailsColumn, DetailsFilterOption[]>> = {
+    csaMatchFound: [...WEEKLY_FILE_CSA_MATCH_FOUND_FILTER_OPTIONS],
+    transactionType: [...WEEKLY_FILE_TRANSACTION_TYPE_FILTER_OPTIONS],
+    craStatus: [...WEEKLY_FILE_CRA_STATUS_FILTER_OPTIONS],
   }
 
-  const getDetailsUniqueValues = (column: WeeklyDetailsColumn): string[] => {
+  const getDetailsFilterOptions = (column: WeeklyDetailsColumn): DetailsFilterOption[] => {
     if (SERVER_SIDE_COLUMN_OPTIONS[column]) {
       return SERVER_SIDE_COLUMN_OPTIONS[column]!
     }
     return Array.from(new Set(records.map((record) => getDetailsFieldValue(record, column))))
       .filter((value) => value !== '')
       .sort((a, b) => compareStrings(a, b))
+      .map((value) => ({ value, label: value }))
   }
 
   const handleChildSearchSortClick = (
@@ -1772,20 +1777,23 @@ export default function WeeklyFileProcessingTab() {
           />
           {!isDetailsTextFilterColumn(detailsFilterAnchor.column) && (
             <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-              {getDetailsUniqueValues(detailsFilterAnchor.column)
-                .filter((value) =>
-                  value.toLowerCase().includes(detailsFilterSearchTerm.toLowerCase()),
+              {getDetailsFilterOptions(detailsFilterAnchor.column)
+                .filter((option) =>
+                  option.label.toLowerCase().includes(detailsFilterSearchTerm.toLowerCase()),
                 )
-                .map((value) => (
-                  <Box key={value} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
+                .map((option) => (
+                  <Box key={option.value} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
                     <Checkbox
                       size="small"
                       checked={
-                        detailsColumnFilters[detailsFilterAnchor.column]?.includes(value) || false
+                        detailsColumnFilters[detailsFilterAnchor.column]?.includes(option.value) ||
+                        false
                       }
-                      onChange={() => handleDetailsFilterChange(detailsFilterAnchor.column, value)}
+                      onChange={() =>
+                        handleDetailsFilterChange(detailsFilterAnchor.column, option.value)
+                      }
                     />
-                    <Typography variant="body2">{value}</Typography>
+                    <Typography variant="body2">{option.label}</Typography>
                   </Box>
                 ))}
             </Box>

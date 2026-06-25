@@ -67,13 +67,35 @@ export const getWeeklyFiles = async (
 }
 
 export interface WeeklyFileRecordFilters {
+  /** Semantic filter: "Yes" or "No" (maps to match_status groups). */
   csaMatchFound?: string[]
+  /** Stored transaction_type codes: A, C, U. */
   transactionType?: string[]
+  /** Stored cra_status values: completed, in-progress, abandoned, updated. */
   craStatus?: string[]
   matchedBy?: string
   batchNumber?: string
   transactionSource?: string
 }
+
+/** Filter dropdown options: value is sent to the API; label matches table display. */
+export const WEEKLY_FILE_TRANSACTION_TYPE_FILTER_OPTIONS = [
+  { value: 'A', label: 'Application' },
+  { value: 'C', label: 'Cancellation' },
+  { value: 'U', label: 'CRA Update' },
+] as const
+
+export const WEEKLY_FILE_CRA_STATUS_FILTER_OPTIONS = [
+  { value: 'completed', label: 'COMPLETED' },
+  { value: 'abandoned', label: 'ABANDONED' },
+  { value: 'in-progress', label: 'IN PROGRESS' },
+  { value: 'updated', label: 'UPDATED' },
+] as const
+
+export const WEEKLY_FILE_CSA_MATCH_FOUND_FILTER_OPTIONS = [
+  { value: 'Yes', label: 'Yes' },
+  { value: 'No', label: 'No' },
+] as const
 
 export const getWeeklyFileRecords = async (
   fileId: number,

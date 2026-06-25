@@ -4095,7 +4095,7 @@ function App() {
                             </IconButton>
                           </Box>
                         </TableCell>
-                        <TableCell sx={{ minWidth: 108 }}>
+                        <TableCell sx={{ width: 116, minWidth: 116, maxWidth: 116 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
                               onClick={(e) => handleSortClick(e, 'dob')}
@@ -4403,7 +4403,16 @@ function App() {
                           <TableCell>{row.lastName}</TableCell>
                           <TableCell>{row.firstName}</TableCell>
                           <TableCell>{row.middleName}</TableCell>
-                          <TableCell sx={{ minWidth: 108 }}>
+                          <TableCell
+                            sx={{
+                              width: 116,
+                              minWidth: 116,
+                              maxWidth: 116,
+                              whiteSpace: 'nowrap',
+                              overflowWrap: 'normal',
+                              wordBreak: 'keep-all',
+                            }}
+                          >
                             {(() => {
                               const [dobLine1, dobLine2] = splitDobIntoTwoLines(row.dob)
                               return (

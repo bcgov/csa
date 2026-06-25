@@ -10,12 +10,12 @@ import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { BatchesService } from '../batches/batches.service'
 import type { ReprocessWeeklyFileResultDto } from './dto/associate-wkl-record.dto'
 import type { WeeklyFileRecordDto, WeeklyFileSummaryDto } from './dto/weekly-file.dto'
+import { buildWklRecordWhereInput } from './weekly-file-record-filters'
 import {
   aggregateWeeklyFileCounts,
   toWeeklyFileRecordDto,
   toWeeklyFileSummaryDto,
 } from './weekly-file.mapper'
-import { buildWklRecordWhereInput } from './weekly-file-record-filters'
 import {
   assertCanAssociate,
   assertCanDissociate,
@@ -155,6 +155,7 @@ export class WeeklyFilesService {
     page = 1,
     limit = 10,
     filters?: WeeklyFileRecordFilters,
+    sort?: string,
   ): Promise<PaginatedResponse<WeeklyFileRecordDto>> {
     await this.assertWeeklyFileExists(id)
 
@@ -164,11 +165,54 @@ export class WeeklyFilesService {
 
     const where = await buildWklRecordWhereInput(this.prisma, id, filters)
 
+    // Parse sort parameter (JSON array of sort objects)
+    let orderBy: Array<Record<string, 'asc' | 'desc'>> = [{ recordIndex: 'asc' }]
+    if (sort) {
+      try {
+        const sortArray = JSON.parse(sort)
+        if (Array.isArray(sortArray) && sortArray.length > 0) {
+          orderBy = []
+          const allowedFields = [
+            'weeklyFileDate',
+            'csaProcessingDate',
+            'matchedBy',
+            'batchNumber',
+            'transactionType',
+            'transactionSource',
+            'craStatus',
+          ]
+          for (const sortItem of sortArray) {
+            const field = Object.keys(sortItem)[0]
+            const direction = sortItem[field]
+
+            if (!allowedFields.includes(field)) {
+              throw new BadRequestException(
+                `Invalid sort field: ${field}. Allowed fields: ${allowedFields.join(', ')}`,
+              )
+            }
+
+            if (direction !== 'asc' && direction !== 'desc') {
+              throw new BadRequestException(
+                `Invalid sort direction: ${direction}. Allowed values: asc, desc`,
+              )
+            }
+
+            orderBy.push({ [field]: direction })
+          }
+        }
+      } catch (error) {
+        if (error instanceof BadRequestException) {
+          throw error
+        }
+        throw new BadRequestException('Invalid JSON format for sort parameter')
+      }
+    }
+
     const [total, recordsWithRelations] = await Promise.all([
       this.prisma.wklFileRecord.count({ where }),
       this.prisma.wklFileRecord.findMany({
         where,
-        orderBy: { recordIndex: 'asc' },
+        orderBy,
         skip: offset,
         take: safeLimit,
         include: wklRecordDtoInclude,

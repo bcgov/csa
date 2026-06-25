@@ -84,6 +84,13 @@ export class WeeklyFilesController {
     type: String,
     description: 'Text filter for Transaction Source (minimum 3 characters)',
   })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    type: String,
+    description:
+      'JSON array of sort objects: [{"field":"asc|desc"}]. Example: [{"craStatus":"asc"},{"weeklyFileDate":"desc"}]. Allowed fields: weeklyFileDate, csaProcessingDate, matchedBy, batchNumber, transactionType, transactionSource, craStatus',
+  })
   @ApiResponse({ status: 200, description: 'Paginated detail records for a weekly file' })
   @ApiResponse({ status: 404, description: 'Weekly file not found' })
   findRecords(
@@ -96,6 +103,7 @@ export class WeeklyFilesController {
     @Query('matchedBy') matchedBy?: string,
     @Query('batchNumber') batchNumber?: string,
     @Query('transactionSource') transactionSource?: string,
+    @Query('sort') sort?: string,
   ): Promise<PaginatedResponse<WeeklyFileRecordDto>> {
     const filters = {
       csaMatchFound: csaMatchFound
@@ -125,6 +133,7 @@ export class WeeklyFilesController {
       this.parsePage(page),
       this.parseLimit(limit),
       filters,
+      sort,
     )
   }
 

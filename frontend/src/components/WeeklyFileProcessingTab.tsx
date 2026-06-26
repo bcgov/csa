@@ -25,7 +25,11 @@ import {
   Typography,
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fullTextSearchContacts, getAllContacts, type Contact } from '../service/contacts-service'
+import {
+  getAllContacts,
+  searchWeeklyChildContacts,
+  type Contact,
+} from '../service/contacts-service'
 import {
   associateWeeklyFileRecord,
   dissociateWeeklyFileRecord,
@@ -840,22 +844,22 @@ export default function WeeklyFileProcessingTab() {
             })),
           },
         ]
-        const [filteredResponse, fullTextResponse] = await Promise.allSettled([
+        const [filteredResponse, weeklyChildResponse] = await Promise.allSettled([
           getAllContacts(page, SEARCH_PAGE_SIZE, filter),
-          fullTextSearchContacts(trimmedSearchTerm, page, SEARCH_PAGE_SIZE),
+          searchWeeklyChildContacts(trimmedSearchTerm, page, SEARCH_PAGE_SIZE),
         ])
 
         const filteredData =
           filteredResponse.status === 'fulfilled'
             ? filteredResponse.value
             : { data: [], totalPages: 1 }
-        const fullTextData =
-          fullTextResponse.status === 'fulfilled'
-            ? fullTextResponse.value
+        const weeklyChildData =
+          weeklyChildResponse.status === 'fulfilled'
+            ? weeklyChildResponse.value
             : { data: [], totalPages: 1 }
 
-        if (filteredResponse.status === 'rejected' && fullTextResponse.status === 'rejected') {
-          throw filteredResponse.reason ?? fullTextResponse.reason
+        if (filteredResponse.status === 'rejected' && weeklyChildResponse.status === 'rejected') {
+          throw filteredResponse.reason ?? weeklyChildResponse.reason
         }
 
         if (requestId !== childSearchRequestIdRef.current) {
@@ -866,13 +870,13 @@ export default function WeeklyFileProcessingTab() {
         for (const child of filteredData.data) {
           mergedChildrenMap.set(child.id, child)
         }
-        for (const child of fullTextData.data) {
+        for (const child of weeklyChildData.data) {
           mergedChildrenMap.set(child.id, child)
         }
 
         const mergedChildren = Array.from(mergedChildrenMap.values()).slice(0, SEARCH_PAGE_SIZE)
         setSearchedChildren(mergedChildren)
-        setChildSearchTotalPages(Math.max(filteredData.totalPages, fullTextData.totalPages, 1))
+        setChildSearchTotalPages(Math.max(filteredData.totalPages, weeklyChildData.totalPages, 1))
       } catch (err) {
         if (requestId !== childSearchRequestIdRef.current) {
           return

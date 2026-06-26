@@ -1,18 +1,18 @@
 import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-  UnprocessableEntityException,
+    BadRequestException,
+    Injectable,
+    Logger,
+    NotFoundException,
+    UnprocessableEntityException,
 } from '@nestjs/common'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
 import {
-  CRA_FILE_REJECTED_TARGET,
-  CSA_EVENT,
-  CSA_STATUS,
-  CSA_STATUS_LABELS,
-  REMOVE_FROM_BATCH_TARGET,
+    CRA_FILE_REJECTED_TARGET,
+    CSA_EVENT,
+    CSA_STATUS,
+    CSA_STATUS_LABELS,
+    REMOVE_FROM_BATCH_TARGET,
 } from 'src/common/state-machine/constants'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
@@ -22,16 +22,16 @@ import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
 import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import {
-  ALLOWED_FILTER_SORT_FIELDS,
-  BULK_OPERATION_SKIP_REASONS,
-  TRANSACTION_TYPES,
+    ALLOWED_FILTER_SORT_FIELDS,
+    BULK_OPERATION_SKIP_REASONS,
+    TRANSACTION_TYPES,
 } from './constants'
 import { ContactDto } from './dto/contact.dto'
 import type {
-  BulkOperationResponse,
-  FilterCondition,
-  FilterItem,
-  UpdateCsaStatusOptions,
+    BulkOperationResponse,
+    FilterCondition,
+    FilterItem,
+    UpdateCsaStatusOptions,
 } from './interfaces'
 
 @Injectable()
@@ -405,6 +405,49 @@ export class ContactsService {
 
     const where = {
       searchText: { contains: searchTerm, mode: 'insensitive' as const },
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.contact.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      }),
+      this.prisma.contact.count({ where }),
+    ])
+
+    return {
+      data: data.map(enrichLabels),
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    }
+  }
+
+  async weeklyChildSearch(
+    query: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<PaginatedResponse<ContactDto>> {
+    if (limit > 200) {
+      limit = 200
+    }
+
+    const searchTerm = this.escapeLikePattern(query.trim())
+    if (!searchTerm) {
+      return { data: [], page, limit, total: 0, totalPages: 0 }
+    }
+
+    const where = {
+      OR: [
+        { personIdIcm: { contains: searchTerm, mode: 'insensitive' as const } },
+        { personIdMis: { contains: searchTerm, mode: 'insensitive' as const } },
+        { birthCity: { contains: searchTerm, mode: 'insensitive' as const } },
+        { birthProvince: { contains: searchTerm, mode: 'insensitive' as const } },
+        { birthCountry: { contains: searchTerm, mode: 'insensitive' as const } },
+      ],
     }
 
     const [data, total] = await Promise.all([

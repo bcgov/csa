@@ -622,6 +622,53 @@ describe('ContactsService', () => {
     })
   })
 
+  describe('weeklyChildSearch', () => {
+    it('should search by person IDs and birth place fields', async () => {
+      const mockData = [
+        { id: 1, lastName: 'Smith', firstName: 'John' },
+        { id: 2, lastName: 'Smith', firstName: 'Jane' },
+      ]
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValueOnce(mockData as any)
+      vi.spyOn(prisma.contact, 'count').mockResolvedValueOnce(2)
+
+      const result = await service.weeklyChildSearch('victoria', 1, 10)
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { personIdIcm: { contains: 'victoria', mode: 'insensitive' } },
+            { personIdMis: { contains: 'victoria', mode: 'insensitive' } },
+            { birthCity: { contains: 'victoria', mode: 'insensitive' } },
+            { birthProvince: { contains: 'victoria', mode: 'insensitive' } },
+            { birthCountry: { contains: 'victoria', mode: 'insensitive' } },
+          ],
+        },
+        skip: 0,
+        take: 10,
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      })
+      expect(result).toEqual({
+        data: mockData,
+        page: 1,
+        limit: 10,
+        total: 2,
+        totalPages: 1,
+      })
+    })
+
+    it('should return empty result for empty query', async () => {
+      const result = await service.weeklyChildSearch('   ', 1, 10)
+
+      expect(result).toEqual({
+        data: [],
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0,
+      })
+    })
+  })
+
   describe('Validation errors (filter/sort)', () => {
     beforeEach(() => {
       vi.spyOn((prisma as any).contact, 'findMany').mockResolvedValue([])

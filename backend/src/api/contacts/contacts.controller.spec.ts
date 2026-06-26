@@ -3,8 +3,8 @@ import { NotFoundException, UnprocessableEntityException } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
-import { CSAGuard } from '../common/guards/csa.guard'
 import { AuditTrailService } from '../audit-trail/audit-trail.service'
+import { CSAGuard } from '../common/guards/csa.guard'
 import { ContactsController } from './contacts.controller'
 import { ContactsService } from './contacts.service'
 
@@ -39,6 +39,7 @@ describe('ContactsController', () => {
     findAll: vi.fn().mockResolvedValue(mockPaginatedResponse),
     findOne: vi.fn().mockResolvedValue(mockContacts[0]),
     fullTextSearch: vi.fn().mockResolvedValue(mockPaginatedResponse),
+    weeklyChildSearch: vi.fn().mockResolvedValue(mockPaginatedResponse),
     resumeContacts: vi.fn(),
     holdContacts: vi.fn(),
     findContactBatches: vi.fn(),
@@ -162,6 +163,36 @@ describe('ContactsController', () => {
     it('should return 400 when query is less than 2 characters', async () => {
       return request(app.getHttpServer())
         .get('/contacts/search?q=a')
+        .expect(400)
+        .expect({ statusCode: 400, message: 'Search query must be at least 2 characters' })
+    })
+  })
+
+  describe('GET /contacts/search/weekly-child', () => {
+    it('should return paginated weekly child search results', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/contacts/search/weekly-child?q=01094863')
+        .expect(200)
+
+      expect(response.body).toEqual(mockPaginatedResponse)
+      expect(service.weeklyChildSearch).toHaveBeenCalledWith('01094863', 1, 10)
+    })
+
+    it('should handle pagination parameters', async () => {
+      await request(app.getHttpServer())
+        .get('/contacts/search/weekly-child?q=victoria&page=2&limit=20')
+        .expect(200)
+
+      expect(service.weeklyChildSearch).toHaveBeenCalledWith('victoria', 2, 20)
+    })
+
+    it('should return 400 when query is missing', async () => {
+      await request(app.getHttpServer()).get('/contacts/search/weekly-child').expect(400)
+    })
+
+    it('should return 400 when query is less than 2 characters', async () => {
+      return request(app.getHttpServer())
+        .get('/contacts/search/weekly-child?q=a')
         .expect(400)
         .expect({ statusCode: 400, message: 'Search query must be at least 2 characters' })
     })

@@ -127,6 +127,8 @@ const CHILD_SEARCH_FILTER_FIELDS = [
   'din',
   'caseNumber',
   'legacyFileNumber',
+  'personIdIcm',
+  'personIdMis',
 ] as const
 
 const WEEKLY_DETAILS_COLUMN_LABELS: Record<WeeklyDetailsColumn, string> = {

@@ -123,14 +123,11 @@ const CHILD_SEARCH_COLUMN_LABELS: Record<ChildSearchColumn, string> = {
 const CHILD_SEARCH_FILTER_FIELDS = [
   'firstName',
   'lastName',
-  'birthCity',
-  'birthProvince',
-  'birthCountry',
+  'middleName',
+  'dateOfBirth',
   'din',
   'caseNumber',
   'legacyFileNumber',
-  'personIdIcm',
-  'personIdMis',
 ] as const
 
 const WEEKLY_DETAILS_COLUMN_LABELS: Record<WeeklyDetailsColumn, string> = {

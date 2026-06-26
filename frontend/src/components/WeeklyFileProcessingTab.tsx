@@ -124,7 +124,6 @@ const CHILD_SEARCH_FILTER_FIELDS = [
   'firstName',
   'lastName',
   'middleName',
-  'dateOfBirth',
   'din',
   'caseNumber',
   'legacyFileNumber',

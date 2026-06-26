@@ -25,7 +25,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fullTextSearchContacts, type Contact } from '../service/contacts-service'
+import { getAllContacts, type Contact } from '../service/contacts-service'
 import {
   associateWeeklyFileRecord,
   dissociateWeeklyFileRecord,
@@ -119,6 +119,19 @@ const CHILD_SEARCH_COLUMN_LABELS: Record<ChildSearchColumn, string> = {
   legacyFileNumber: 'Legacy File Num',
   birthPlace: 'Birth Place',
 }
+
+const CHILD_SEARCH_FILTER_FIELDS = [
+  'firstName',
+  'lastName',
+  'birthCity',
+  'birthProvince',
+  'birthCountry',
+  'din',
+  'caseNumber',
+  'legacyFileNumber',
+  'personIdIcm',
+  'personIdMis',
+] as const
 
 const WEEKLY_DETAILS_COLUMN_LABELS: Record<WeeklyDetailsColumn, string> = {
   csaMatchFound: 'CSA Match Found?',
@@ -822,7 +835,16 @@ export default function WeeklyFileProcessingTab() {
       setLoadingChildSearch(true)
       setActionError(null)
       try {
-        const response = await fullTextSearchContacts(trimmedSearchTerm, page, SEARCH_PAGE_SIZE)
+        const filter = [
+          {
+            OR: CHILD_SEARCH_FILTER_FIELDS.map((field) => ({
+              key: field,
+              op: 'like',
+              value: trimmedSearchTerm,
+            })),
+          },
+        ]
+        const response = await getAllContacts(page, SEARCH_PAGE_SIZE, filter)
         if (requestId !== childSearchRequestIdRef.current) {
           return
         }

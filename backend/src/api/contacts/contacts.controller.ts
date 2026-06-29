@@ -1,25 +1,25 @@
 import {
-    Body,
-    Controller,
-    Get,
-    HttpCode,
-    HttpException,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    Query,
-    UseGuards,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpException,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common'
 import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { AuditTrailService } from '../audit-trail/audit-trail.service'
 import { CurrentUser } from '../common/decorators'
 import {
-    ContactIdsWithActionDto,
-    HoldContactsDto,
-    ResumeContactsDto,
-    UpdateHoldReasonDto,
+  ContactIdsWithActionDto,
+  HoldContactsDto,
+  ResumeContactsDto,
+  UpdateHoldReasonDto,
 } from '../common/dto/contact-ids.dto'
 import { CSAGuard } from '../common/guards/csa.guard'
 import { ContactsService } from './contacts.service'

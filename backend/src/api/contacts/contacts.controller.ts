@@ -1,25 +1,25 @@
 import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpException,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpException,
+    Param,
+    ParseIntPipe,
+    Patch,
+    Post,
+    Query,
+    UseGuards,
 } from '@nestjs/common'
 import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { AuditTrailService } from '../audit-trail/audit-trail.service'
 import { CurrentUser } from '../common/decorators'
 import {
-  ContactIdsWithActionDto,
-  HoldContactsDto,
-  ResumeContactsDto,
-  UpdateHoldReasonDto,
+    ContactIdsWithActionDto,
+    HoldContactsDto,
+    ResumeContactsDto,
+    UpdateHoldReasonDto,
 } from '../common/dto/contact-ids.dto'
 import { CSAGuard } from '../common/guards/csa.guard'
 import { ContactsService } from './contacts.service'
@@ -115,41 +115,6 @@ export class ContactsController {
       throw new HttpException('Search query must be at least 2 characters', 400)
     }
     return this.contactsService.fullTextSearch(q, this.parsePage(page), this.parseLimit(limit))
-  }
-
-  @Get('search/weekly-child') // must be ahead of Get(":id") to avoid conflict
-  @ApiQuery({
-    name: 'q',
-    required: true,
-    type: String,
-    description: 'Search query for weekly child search by birth place and person IDs',
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    description: 'Page number (default: 1)',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Items per page (default: 10, max: 200)',
-  })
-  @ApiResponse({ status: 200, description: 'Paginated weekly child search results' })
-  @ApiResponse({ status: 400, description: 'Search query is required' })
-  async weeklyChildSearch(
-    @Query('q') q: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ): Promise<PaginatedResponse<ContactDto>> {
-    if (!q || q.trim() === '') {
-      throw new HttpException('Search query is required', 400)
-    }
-    if (q.trim().length < 2) {
-      throw new HttpException('Search query must be at least 2 characters', 400)
-    }
-    return this.contactsService.weeklyChildSearch(q, this.parsePage(page), this.parseLimit(limit))
   }
 
   @Get(':id')

@@ -187,27 +187,6 @@ export const fullTextSearchContacts = async (
   return response.data
 }
 
-/**
- * Weekly child search for fields not covered by contacts filter allowlist
- * (person IDs and birth place components).
- */
-export const searchWeeklyChildContacts = async (
-  searchQuery: string,
-  page: number = 1,
-  limit: number = 10,
-): Promise<PaginatedContactsResponse> => {
-  const params: any = {
-    q: searchQuery,
-    page,
-    limit,
-  }
-
-  const response = await APIService.getAxiosInstance().get('/contacts/search/weekly-child', {
-    params,
-  })
-  return response.data
-}
-
 export interface BulkOperationResponse {
   success: number[]
   skipped: Array<{ id: number; reason: string }>

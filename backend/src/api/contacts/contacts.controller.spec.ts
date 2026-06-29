@@ -3,8 +3,8 @@ import { NotFoundException, UnprocessableEntityException } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
-import { AuditTrailService } from '../audit-trail/audit-trail.service'
 import { CSAGuard } from '../common/guards/csa.guard'
+import { AuditTrailService } from '../audit-trail/audit-trail.service'
 import { ContactsController } from './contacts.controller'
 import { ContactsService } from './contacts.service'
 
@@ -125,7 +125,7 @@ describe('ContactsController', () => {
 
   describe('findOne', () => {
     it('should return a user object', async () => {
-      const result = await controller.findOne(1)
+      const result = await controller.findOne('1')
       expect(result).toEqual(mockContacts[0])
     })
 
@@ -133,7 +133,7 @@ describe('ContactsController', () => {
       mockContactsService.findOne.mockRejectedValueOnce(
         new NotFoundException('Contact 999 not found'),
       )
-      await expect(controller.findOne(999)).rejects.toThrow(NotFoundException)
+      await expect(controller.findOne('999')).rejects.toThrow(NotFoundException)
     })
   })
 

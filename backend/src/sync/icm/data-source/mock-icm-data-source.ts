@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import * as fs from 'fs'
 import * as path from 'path'
-import { IcmApiConfig, isOocAgreementLinesConfig } from '../icm.config'
+import { IcmApiConfig } from '../icm.config'
 import { IcmApiRecord, IcmContactUpdatePayload, IcmDataSource } from './icm-data-source'
 
 @Injectable()
@@ -9,11 +9,6 @@ export class MockIcmDataSource extends IcmDataSource {
   private readonly logger = new Logger(MockIcmDataSource.name)
 
   async fetchAll(config: IcmApiConfig, lastUpdated?: Date): Promise<IcmApiRecord[]> {
-    if (isOocAgreementLinesConfig(config)) {
-      this.logger.warn(`${config.name}: returning empty result (temporary)`)
-      return []
-    }
-
     const mockDir = path.join(__dirname, '..', '..', 'mock-data', 'icm')
     const mockFile = path.join(mockDir, `${config.name}.json`)
 

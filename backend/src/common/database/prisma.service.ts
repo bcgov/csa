@@ -21,11 +21,12 @@ class PrismaService
     }
     const pool = new Pool({
       connectionString: databaseConfig.url,
-    })
-    // Set search_path on each new connection (compatible with Openshift Crunchy DB that
-    // block startup parameters like `-c search_path=` in the options field)
-    pool.on('connect', (client) => {
-      client.query(`SET search_path TO ${databaseConfig.schema}`)
+      // pg-pool awaits onConnect before handing out new clients. pool.query()
+      // (used by Prisma $executeRawUnsafe) acquires clients via connect(callback),
+      // so wrapping only the promise form of connect leaves search_path unset.
+      onConnect: async (client) => {
+        await client.query(`SET search_path TO ${databaseConfig.schema}`)
+      },
     })
     const adapter = new PrismaPg(pool)
     super({

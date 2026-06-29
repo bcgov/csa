@@ -66,14 +66,74 @@ export const getWeeklyFiles = async (
   return response.data
 }
 
+export interface WeeklyFileRecordFilters {
+  /** Semantic filter: "Yes", "No", or "N/A" (maps to match_status groups). */
+  csaMatchFound?: string[]
+  /** Backend-provided display values; sent back unchanged for filtering. */
+  transactionType?: string[]
+  /** Backend-provided display values; sent back unchanged for filtering. */
+  craStatus?: string[]
+  matchedBy?: string
+  batchNumber?: string
+  transactionSource?: string
+  /** Server-side sort: array of sort objects like [{ field: "asc|desc" }] */
+  sort?: Array<Record<string, 'asc' | 'desc'>>
+}
+
+/**
+ * Predefined filter options stay hardcoded for the menu, but the selected value is the
+ * same backend display value shown in the table and sent back unchanged to the API.
+ */
+export const WEEKLY_FILE_TRANSACTION_TYPE_FILTER_OPTIONS = [
+  { value: 'Application', label: 'Application' },
+  { value: 'Cancellation', label: 'Cancellation' },
+  { value: 'Update', label: 'Update' },
+] as const
+
+export const WEEKLY_FILE_CRA_STATUS_FILTER_OPTIONS = [
+  { value: 'COMPLETED', label: 'COMPLETED' },
+  { value: 'ABANDONED', label: 'ABANDONED' },
+  { value: 'IN PROGRESS', label: 'IN PROGRESS' },
+  { value: 'UPDATED', label: 'UPDATED' },
+] as const
+
+export const WEEKLY_FILE_CSA_MATCH_FOUND_FILTER_OPTIONS = [
+  { value: 'Yes', label: 'Yes' },
+  { value: 'No', label: 'No' },
+  { value: 'N/A', label: 'N/A' },
+] as const
+
 export const getWeeklyFileRecords = async (
   fileId: number,
   page: number = 1,
   limit: number = 10,
   signal?: AbortSignal,
+  filters?: WeeklyFileRecordFilters,
 ): Promise<PaginatedResponse<WeeklyFileRecord>> => {
+  const params: Record<string, string | number> = { page, limit }
+  if (filters?.csaMatchFound?.length) {
+    params.csaMatchFound = filters.csaMatchFound.join(',')
+  }
+  if (filters?.transactionType?.length) {
+    params.transactionType = filters.transactionType.join(',')
+  }
+  if (filters?.craStatus?.length) {
+    params.craStatus = filters.craStatus.join(',')
+  }
+  if (filters?.matchedBy?.trim()) {
+    params.matchedBy = filters.matchedBy.trim()
+  }
+  if (filters?.batchNumber?.trim()) {
+    params.batchNumber = filters.batchNumber.trim()
+  }
+  if (filters?.transactionSource?.trim()) {
+    params.transactionSource = filters.transactionSource.trim()
+  }
+  if (filters?.sort && filters.sort.length > 0) {
+    params.sort = JSON.stringify(filters.sort)
+  }
   const response = await APIService.getAxiosInstance().get(`/weekly-files/${fileId}/records`, {
-    params: { page, limit },
+    params,
     signal,
   })
   return response.data

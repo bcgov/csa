@@ -4,12 +4,14 @@ import type { DetailRecord04 } from 'src/cra/inbound/inbound-weekly.interface'
 import type { WeeklyFileRecordDto, WeeklyFileSummaryDto } from './dto/weekly-file.dto'
 
 const { WKL_MATCH_STATUS, WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
-const { RECEIVE_MODE } = WEEKLY_FILE
+const { RECEIVE_MODE, STATUS: WKL_STATUS } = WEEKLY_FILE
+
+const WKL_STATUS_STORED_VALUES = Object.values(WKL_STATUS)
 
 const TRANSACTION_TYPE_LABELS: Record<string, string> = {
   A: 'Application',
   C: 'Cancellation',
-  U: 'CRA Update',
+  U: 'Update',
 }
 
 const TRANSACTION_SOURCE_LABELS: Record<string, string> = {
@@ -26,6 +28,53 @@ const GENDER_LABELS: Record<string, string> = {
 const BIRTH_COUNTRY_LABELS: Record<string, string> = {
   CA: 'Canada',
   EX: 'Outside Canada',
+}
+
+function normalizeCraStatusValue(value: string): string {
+  const tokens = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+
+  if (!tokens.length) return ''
+
+  const compact = tokens.join('')
+  if (compact.startsWith('complete')) return 'completed'
+  if (compact.startsWith('abandon')) return 'abandoned'
+  if (compact.startsWith('inprogress')) return 'in-progress'
+  if (compact.startsWith('updated')) return 'updated'
+
+  return tokens.join('-')
+}
+
+export function normalizeCraStatusLabel(value: string): string {
+  return toCraStatusDisplayLabel(normalizeCraStatusValue(value))
+}
+
+/** Display label for a stored CRA status (e.g. "in-progress" → "IN PROGRESS"). */
+export function toCraStatusDisplayLabel(stored: string): string {
+  return stored
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+    .toUpperCase()
+}
+
+const TRANSACTION_TYPE_CODES = Object.keys(TRANSACTION_TYPE_LABELS)
+
+/** Whitelist filter params to values stored in transaction_type (A, C, U). */
+export function filterAllowedTransactionTypes(values: string[]): string[] {
+  const allowed = new Set(TRANSACTION_TYPE_CODES)
+  return [...new Set(values.map((v) => v.trim().toUpperCase()).filter((v) => allowed.has(v)))]
+}
+
+/** Whitelist filter params to values stored in cra_status. */
+export function filterAllowedCraStatuses(values: string[]): string[] {
+  const allowed = new Set<string>(WKL_STATUS_STORED_VALUES)
+  return [...new Set(values.map(normalizeCraStatusValue).filter((v) => allowed.has(v)))]
 }
 
 export interface WeeklyFileCounts {
@@ -167,7 +216,7 @@ function formatWklDateString(value: string | undefined): string | null {
 
 function formatCraStatus(status: string | undefined): string {
   if (!status?.trim()) return ''
-  return status.trim().toUpperCase().replace(/-/g, ' ')
+  return normalizeCraStatusLabel(status)
 }
 
 function formatTransactionType(value: string | undefined): string {

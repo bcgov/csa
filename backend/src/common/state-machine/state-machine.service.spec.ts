@@ -290,8 +290,16 @@ describe('StateMachineService', () => {
       expect(result.to).toBe(BATCH_STATUS.IN_PROGRESS)
     })
 
-    it('should return error for invalid transition', () => {
+    it('should transition from pending to system_error on send failure', () => {
       const result = service.transitionBatch(BATCH_STATUS.PENDING, BATCH_EVENT.SEND_FAILED)
+
+      expect(result.success).toBe(true)
+      expect(result.from).toBe(BATCH_STATUS.PENDING)
+      expect(result.to).toBe(BATCH_STATUS.SYSTEM_ERROR)
+    })
+
+    it('should return error for invalid transition', () => {
+      const result = service.transitionBatch(BATCH_STATUS.PROCESSED, BATCH_EVENT.SEND_FAILED)
 
       expect(result.success).toBe(false)
       expect(result.reason).toBe('Invalid transition')

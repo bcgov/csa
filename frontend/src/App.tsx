@@ -87,6 +87,12 @@ import {
   type LastSuccessfulRuns,
 } from './service/contacts-service'
 import type { AppEnvironment } from './types/runtime-config'
+import {
+  formatDateTimeYMD,
+  formatDateTimeYMDHMS,
+  formatDateYMD,
+  parseFormattedDate,
+} from './utils/date-format'
 import { buildPlacementDisplayValues } from './utils/mock-placement'
 
 // Environment-based toolbar background colors
@@ -238,67 +244,7 @@ const COLUMN_LABELS: Record<string, string> = {
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
 const HOLD_REASON_PREVIEW_LENGTH = 150
 const HOLD_REASON_COLUMN_WIDTH = 240
-
-const toYMD = (date: Date, timeZone: string): string => {
-  const parts = new Intl.DateTimeFormat('en-US', { ...DATE_FORMAT, timeZone }).formatToParts(date)
-  const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
-  return `${get('year')}-${get('month')}-${get('day')}`
-}
-
-const formatDateYMD = (dateString: string): string => {
-  return toYMD(new Date(dateString + 'T00:00:00Z'), 'UTC')
-}
-
-const formatDateTimeYMD = (dateString: string): string => {
-  return toYMD(new Date(dateString), 'America/Vancouver')
-}
-
-const formatDateTimeYMDHMS = (dateString: string): string => {
-  const date = new Date(dateString)
-  const parts = new Intl.DateTimeFormat('en-US', {
-    ...DATE_FORMAT,
-    timeZone: 'America/Vancouver',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
-  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
-}
-
-// Parse formatted date string (YYYY-MMM-DD or YYYY-MMM-DD HH:MM:SS) back to Date for sorting
-const parseFormattedDate = (dateStr: string): Date | null => {
-  if (!dateStr) return null
-  const months: Record<string, number> = {
-    Jan: 0,
-    Feb: 1,
-    Mar: 2,
-    Apr: 3,
-    May: 4,
-    Jun: 5,
-    Jul: 6,
-    Aug: 7,
-    Sep: 8,
-    Oct: 9,
-    Nov: 10,
-    Dec: 11,
-  }
-  // Handle both "YYYY-MMM-DD" and "YYYY-MMM-DD HH:MM:SS" formats
-  const match = dateStr.match(/^(\d{4})-(\w{3})-(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/)
-  if (!match) return null
-  const [, year, month, day, hour = '0', minute = '0', second = '0'] = match
-  const monthNum = months[month]
-  if (monthNum === undefined) return null
-  return new Date(
-    parseInt(year),
-    monthNum,
-    parseInt(day),
-    parseInt(hour),
-    parseInt(minute),
-    parseInt(second),
-  )
-}
+const HOLD_REASON_EMPTY_COLUMN_WIDTH = 110
 
 // System comments are prepended with newest first, one entry per line.
 // Batch Requests should display only the latest entry.
@@ -321,6 +267,22 @@ const holdReasonNeedsClamp = (reason: string): boolean =>
 const capitalize = (str: string): string => {
   if (!str) return str
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
+}
+
+const splitDobIntoTwoLines = (value: string): [string, string] => {
+  const trimmed = value.trim()
+  if (!trimmed) return ['', '']
+  const lastDashIndex = trimmed.lastIndexOf('-')
+  if (lastDashIndex === -1) return [trimmed, '']
+  return [trimmed.slice(0, lastDashIndex), trimmed.slice(lastDashIndex + 1)]
+}
+
+const splitDateTimeIntoTwoLines = (value: string): [string, string] => {
+  const trimmed = value.trim()
+  if (!trimmed) return ['', '']
+  const firstSpaceIndex = trimmed.indexOf(' ')
+  if (firstSpaceIndex === -1) return [trimmed, '']
+  return [trimmed.slice(0, firstSpaceIndex), trimmed.slice(firstSpaceIndex + 1)]
 }
 
 function App() {
@@ -626,9 +588,30 @@ function App() {
   const [batches, setBatches] = useState<Batch[]>([])
   const [loadingBatches, setLoadingBatches] = useState(false)
 
+  const getBatchNumberLabel = (
+    batchId: number | null | undefined,
+    batchList: Batch[] = batches,
+  ): string | null => {
+    if (batchId == null) return null
+    const batch = batchList.find((entry) => entry.id === batchId)
+    return batch != null ? String(batch.batchNumber) : null
+  }
+
   // Batch details state
   const [batchDetails, setBatchDetails] = useState<BatchContactDetail[]>([])
   const [loadingBatchDetails, setLoadingBatchDetails] = useState(false)
+
+  const refreshBatchRequestsAfterSendCra = async (): Promise<Batch[]> => {
+    const updatedBatches = await getAllBatches()
+    setBatches(updatedBatches)
+
+    if (selectedBatch) {
+      const updatedDetails = await getBatchContacts(selectedBatch)
+      setBatchDetails(updatedDetails)
+    }
+
+    return updatedBatches
+  }
 
   useEffect(() => {
     if (!isAuthenticated) return
@@ -673,20 +656,21 @@ function App() {
             contacts_count?: number
             contactsCount?: number
           } | null
+          const updatedBatches = await getAllBatches()
+          setBatches(updatedBatches)
           const batchId = metadata?.batch_id ?? metadata?.batchId
+          const batchNumber = getBatchNumberLabel(batchId, updatedBatches)
 
           setSendCraFileJobState('success')
           setSnackbar({
             open: true,
-            message: batchId
-              ? `Send CRA file job completed for batch ${batchId}.`
+            message: batchNumber
+              ? `Send CRA file job completed for batch ${batchNumber}.`
               : 'Send CRA file job completed successfully.',
             severity: 'success',
           })
-
-          const updatedBatches = await getAllBatches()
-          setBatches(updatedBatches)
         } else {
+          await refreshBatchRequestsAfterSendCra()
           setSendCraFileJobState('failed')
           setSnackbar({
             open: true,
@@ -699,6 +683,9 @@ function App() {
         setRunningSendCraBatchId(null)
       } catch (err) {
         console.error('Failed to check for running SEND_CRA_FILE job:', err)
+        setIsRunningSendCraFile(false)
+        setRunningSendCraBatchId(null)
+        setSendCraFileJobState('idle')
       }
     }
 
@@ -746,20 +733,21 @@ function App() {
             contacts_count?: number
             contactsCount?: number
           } | null
+          const updatedBatches = await getAllBatches()
+          setBatches(updatedBatches)
           const batchId = metadata?.batch_id ?? metadata?.batchId
+          const batchNumber = getBatchNumberLabel(batchId, updatedBatches)
 
           setSendCraFileJobState('success')
           setSnackbar({
             open: true,
-            message: batchId
-              ? `Send CRA file job completed for batch ${batchId}. Please try your action again.`
+            message: batchNumber
+              ? `Send CRA file job completed for batch ${batchNumber}. Please try your action again.`
               : 'Send CRA file job completed successfully. Please try your action again.',
             severity: 'success',
           })
-
-          const updatedBatches = await getAllBatches()
-          setBatches(updatedBatches)
         } else {
+          await refreshBatchRequestsAfterSendCra()
           setSendCraFileJobState('failed')
           setSnackbar({
             open: true,
@@ -775,6 +763,9 @@ function App() {
       return false // No job running, can proceed
     } catch (err) {
       console.error('Failed to check for running Send CRA file job:', err)
+      setIsRunningSendCraFile(false)
+      setRunningSendCraBatchId(null)
+      setSendCraFileJobState('idle')
       return false
     }
   }
@@ -785,16 +776,6 @@ function App() {
 
   const handleSendToCraClick = () => {
     setConfirmSendCraDialogOpen(true)
-  }
-
-  const refreshBatchRequestsAfterSendCra = async () => {
-    const updatedBatches = await getAllBatches()
-    setBatches(updatedBatches)
-
-    if (selectedBatch) {
-      const updatedDetails = await getBatchContacts(selectedBatch)
-      setBatchDetails(updatedDetails)
-    }
   }
 
   const handleConfirmSendCra = async () => {
@@ -853,23 +834,29 @@ function App() {
         const recordCount = metadata?.record_count ?? metadata?.recordCount ?? 0
         const contactsCount = metadata?.contacts_count ?? metadata?.contactsCount ?? 0
 
+        const updatedBatches = await refreshBatchRequestsAfterSendCra()
+        const batchNumber = getBatchNumberLabel(batchId, updatedBatches)
+
         setSendCraFileJobState('success')
         setSnackbar({
           open: true,
           message:
             recordCount > 0 || contactsCount > 0
-              ? `Send CRA file complete for batch ${batchId}: ${recordCount || contactsCount} record${(recordCount || contactsCount) === 1 ? '' : 's'} sent.`
-              : `Send CRA file complete for batch ${batchId}.`,
+              ? batchNumber
+                ? `Send CRA file complete for batch ${batchNumber}: ${recordCount || contactsCount} record${(recordCount || contactsCount) === 1 ? '' : 's'} sent.`
+                : `Send CRA file complete: ${recordCount || contactsCount} record${(recordCount || contactsCount) === 1 ? '' : 's'} sent.`
+              : batchNumber
+                ? `Send CRA file complete for batch ${batchNumber}.`
+                : 'Send CRA file complete.',
           severity: 'success',
         })
-
-        await refreshBatchRequestsAfterSendCra()
       } else {
         setSendCraFileJobState('failed')
         throw new Error(job.error || 'Send CRA file job failed')
       }
     } catch (error: any) {
       console.error('Send CRA file error:', error)
+      await refreshBatchRequestsAfterSendCra()
       const errorMessage =
         error?.response?.data?.message || error?.message || 'Failed to send CRA file'
       setSendCraFileJobState('failed')
@@ -2163,9 +2150,12 @@ function App() {
       pendingBatch?.id === runningSendCraBatchId
 
     if (isPendingBatchLocked) {
+      const runningBatchNumber = getBatchNumberLabel(runningSendCraBatchId)
       setSnackbar({
         open: true,
-        message: `Batch ${runningSendCraBatchId} is currently being sent to CRA. Please wait for it to complete before adding records.`,
+        message: runningBatchNumber
+          ? `Batch ${runningBatchNumber} is currently being sent to CRA. Please wait for it to complete before adding records.`
+          : 'The batch is currently being sent to CRA. Please wait for it to complete before adding records.',
         severity: 'info',
       })
       return
@@ -2427,9 +2417,12 @@ function App() {
       selectedBatchHistory?.batch.id === runningSendCraBatchId
 
     if (isSelectedHistoryBatchLocked) {
+      const runningBatchNumber = getBatchNumberLabel(runningSendCraBatchId)
       setSnackbar({
         open: true,
-        message: `Batch ${runningSendCraBatchId} is currently being sent to CRA. Please wait for it to complete before removing records.`,
+        message: runningBatchNumber
+          ? `Batch ${runningBatchNumber} is currently being sent to CRA. Please wait for it to complete before removing records.`
+          : 'The batch is currently being sent to CRA. Please wait for it to complete before removing records.',
         severity: 'info',
       })
       return
@@ -2531,9 +2524,12 @@ function App() {
       selectedBatchRecord?.id === runningSendCraBatchId
 
     if (isSelectedBatchLocked) {
+      const runningBatchNumber = getBatchNumberLabel(runningSendCraBatchId)
       setSnackbar({
         open: true,
-        message: `Batch ${runningSendCraBatchId} is currently being sent to CRA. Please wait for it to complete before removing records.`,
+        message: runningBatchNumber
+          ? `Batch ${runningBatchNumber} is currently being sent to CRA. Please wait for it to complete before removing records.`
+          : 'The batch is currently being sent to CRA. Please wait for it to complete before removing records.',
         severity: 'info',
       })
       return
@@ -2922,6 +2918,7 @@ function App() {
         agreementEndDate: contact.agreementEndDate ? formatDateYMD(contact.agreementEndDate) : '',
         terminationDate: contact.terminationDate ? formatDateYMD(contact.terminationDate) : '',
         mcfdContract: contact.mcfdContract || '',
+        sourceAgreement: contact.sourceAgreement || '',
         product: contact.product || '',
         isOver18: contact.isOver18 || false,
         cgwrks3: contact.holdBy || '',
@@ -2934,6 +2931,11 @@ function App() {
 
     return data
   }, [contacts])
+
+  const holdReasonColumnWidth = useMemo(() => {
+    const hasHoldReasonContent = filteredData.some((row) => row.holdReason.trim().length > 0)
+    return hasHoldReasonContent ? HOLD_REASON_COLUMN_WIDTH : HOLD_REASON_EMPTY_COLUMN_WIDTH
+  }, [filteredData])
 
   useEffect(() => {
     if (selectedChild === null) return
@@ -3046,6 +3048,8 @@ function App() {
       selectedBatchHistoryData?.batch.id === runningSendCraBatchId,
     [isRunningSendCraFile, runningSendCraBatchId, selectedBatchHistoryData],
   )
+
+  const runningSendCraBatchNumber = getBatchNumberLabel(runningSendCraBatchId)
 
   const canRemoveFromBatchDetails = useMemo(() => {
     if (selectedBatchDetails.length === 0) return false
@@ -4091,13 +4095,15 @@ function App() {
                             </IconButton>
                           </Box>
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ width: 116, minWidth: 116, maxWidth: 116 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
                               onClick={(e) => handleSortClick(e, 'dob')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              Date Of Birth
+                              Date Of
+                              <br />
+                              Birth
                             </span>
                           </Box>
                         </TableCell>
@@ -4148,13 +4154,15 @@ function App() {
                             </IconButton>
                           </Box>
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ minWidth: 128 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
                               onClick={(e) => handleSortClick(e, 'statusEffective')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              Status Effective Date
+                              Status Effective
+                              <br />
+                              Date
                             </span>
                           </Box>
                         </TableCell>
@@ -4256,8 +4264,8 @@ function App() {
                         </TableCell>
                         <TableCell
                           sx={{
-                            width: HOLD_REASON_COLUMN_WIDTH,
-                            maxWidth: HOLD_REASON_COLUMN_WIDTH,
+                            width: holdReasonColumnWidth,
+                            maxWidth: holdReasonColumnWidth,
                           }}
                         >
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -4395,18 +4403,69 @@ function App() {
                           <TableCell>{row.lastName}</TableCell>
                           <TableCell>{row.firstName}</TableCell>
                           <TableCell>{row.middleName}</TableCell>
-                          <TableCell>{row.dob}</TableCell>
+                          <TableCell
+                            sx={{
+                              width: 116,
+                              minWidth: 116,
+                              maxWidth: 116,
+                              whiteSpace: 'nowrap',
+                              overflowWrap: 'normal',
+                              wordBreak: 'keep-all',
+                            }}
+                          >
+                            {(() => {
+                              const [dobLine1, dobLine2] = splitDobIntoTwoLines(row.dob)
+                              return (
+                                <Box sx={{ lineHeight: 1.25 }}>
+                                  <Box
+                                    component="span"
+                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
+                                  >
+                                    {dobLine1}
+                                  </Box>
+                                  <Box
+                                    component="span"
+                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
+                                  >
+                                    {dobLine2}
+                                  </Box>
+                                </Box>
+                              )
+                            })()}
+                          </TableCell>
                           <TableCell>{row.din}</TableCell>
                           <TableCell>{row.csaStatus}</TableCell>
-                          <TableCell>{row.statusEffective}</TableCell>
+                          <TableCell sx={{ minWidth: 128 }}>
+                            {(() => {
+                              const [statusDateLine, statusTimeLine] = splitDateTimeIntoTwoLines(
+                                row.statusEffective,
+                              )
+                              return (
+                                <Box sx={{ lineHeight: 1.25 }}>
+                                  <Box
+                                    component="span"
+                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
+                                  >
+                                    {statusDateLine}
+                                  </Box>
+                                  <Box
+                                    component="span"
+                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
+                                  >
+                                    {statusTimeLine}
+                                  </Box>
+                                </Box>
+                              )
+                            })()}
+                          </TableCell>
                           <TableCell>{row.caseNumber}</TableCell>
                           <TableCell>{row.caseStatus}</TableCell>
                           <TableCell>{row.legacyFile}</TableCell>
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
                           <TableCell
                             sx={{
-                              width: HOLD_REASON_COLUMN_WIDTH,
-                              maxWidth: HOLD_REASON_COLUMN_WIDTH,
+                              width: holdReasonColumnWidth,
+                              maxWidth: holdReasonColumnWidth,
                             }}
                           >
                             <Box
@@ -6039,7 +6098,7 @@ function App() {
                                       wordBreak: 'break-word',
                                     }}
                                   >
-                                    {childData.sourcePlacement ? (
+                                    {childData.sourceAgreement ? (
                                       <Typography
                                         component="span"
                                         sx={{
@@ -6051,7 +6110,7 @@ function App() {
                                           fontSize: '0.75rem',
                                         }}
                                       >
-                                        {childData.sourcePlacement}
+                                        {childData.sourceAgreement}
                                       </Typography>
                                     ) : (
                                       '-'
@@ -7124,12 +7183,12 @@ function App() {
                   </Box>
                 </Box>
 
-                {/* Send CRA file running banner */}
-                {isRunningSendCraFile && (
+                {/* Send CRA file running banner — hidden once the job fails or finishes */}
+                {isRunningSendCraFile && sendCraFileJobState === 'running' && (
                   <Box sx={{ mb: 2 }}>
                     <Alert severity="info" sx={{ mb: 1 }}>
-                      {runningSendCraBatchId
-                        ? `Send CRA file job is running for batch ${runningSendCraBatchId}. Changes to that batch are temporarily disabled until the job completes.`
+                      {runningSendCraBatchNumber
+                        ? `Send CRA file job is running for batch ${runningSendCraBatchNumber}. Changes to that batch are temporarily disabled until the job completes.`
                         : 'Send CRA file job is running. Changes to the batch being sent are temporarily disabled until the job completes.'}
                     </Alert>
                     <LinearProgress />

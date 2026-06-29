@@ -2,6 +2,9 @@ import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 import { describe, expect, it } from 'vitest'
 import {
   aggregateWeeklyFileCounts,
+  filterAllowedCraStatuses,
+  filterAllowedTransactionTypes,
+  toCraStatusDisplayLabel,
   toCsaMatchFound,
   toWeeklyFileRecordDto,
 } from './weekly-file.mapper'
@@ -125,9 +128,34 @@ describe('weekly-file.mapper', () => {
       batchDetail: null,
     })
 
-    expect(dto.transactionType).toBe('CRA Update')
+    expect(dto.transactionType).toBe('Update')
     expect(dto.transactionSource).toBe('Other')
     expect(dto.gender).toBe('Unknown')
     expect(dto.birthCountry).toBe('Outside Canada')
+  })
+
+  it('derives CRA status display labels from stored file values', () => {
+    expect(toCraStatusDisplayLabel('in-progress')).toBe('IN PROGRESS')
+    expect(toCraStatusDisplayLabel('completed')).toBe('COMPLETED')
+    expect(toCraStatusDisplayLabel(' ;in_progress*** ')).toBe('IN PROGRESS')
+  })
+
+  it('whitelists stored transaction type filter values', () => {
+    expect(filterAllowedTransactionTypes(['A', 'c'])).toEqual(['A', 'C'])
+    expect(filterAllowedTransactionTypes(['Application', 'INVALID'])).toEqual([])
+  })
+
+  it('whitelists stored CRA status filter values', () => {
+    expect(filterAllowedCraStatuses(['in-progress'])).toEqual(['in-progress'])
+    expect(filterAllowedCraStatuses(['completed', 'IN-PROGRESS'])).toEqual([
+      'completed',
+      'in-progress',
+    ])
+    expect(filterAllowedCraStatuses([';COMPLETED', '__in progress__', '@@updated!!'])).toEqual([
+      'completed',
+      'in-progress',
+      'updated',
+    ])
+    expect(filterAllowedCraStatuses(['INVALID', 'completed'])).toEqual(['completed'])
   })
 })

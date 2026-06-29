@@ -7,7 +7,7 @@ import { ContactsService } from 'src/api/contacts/contacts.service'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_DETAIL_EVENT, CSA_EVENT } from 'src/common/state-machine/constants'
 
-import { parseWklDate } from 'src/common/utils'
+import { csaProcessingBatchDate, parseWklDate } from 'src/common/utils'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
@@ -39,6 +39,8 @@ interface WklRecordContext {
   transferFileId: number
   recordIndex: number
   weeklyFileDate: Date | null
+  /** Pacific calendar date when this WKL file is being processed (CSA Processing Date). */
+  csaProcessingDate: Date
 }
 
 @Injectable()
@@ -267,17 +269,21 @@ export class PollCraResponseHandler extends BaseJob {
         (recordCount !== undefined ? `, Total Records in File = ${recordCount}` : ''),
     )
 
+    const processedAt = new Date()
+
     if (isWeekly) {
       this.unmatchedWklBatchId = null
       await this.weeklyContactMatcher.loadCandidates()
       const weeklyHeader = header as HeaderRecord
       const weeklyFileDate = parseWklDate(weeklyHeader.processDate) ?? null
+      const csaProcessingDate = csaProcessingBatchDate(processedAt)
       const weeklyDetails = details as DetailRecord04[]
       for (let i = 0; i < weeklyDetails.length; i++) {
         await this.processWeeklyDetail(weeklyDetails[i], weeklyHeader, {
           transferFileId: responseFile.id,
           recordIndex: i,
           weeklyFileDate,
+          csaProcessingDate,
         })
       }
     } else {
@@ -290,7 +296,7 @@ export class PollCraResponseHandler extends BaseJob {
       where: { id: responseFile.id },
       data: {
         isDetailsProcessed: true,
-        deliveredAt: new Date(),
+        deliveredAt: processedAt,
         referenceNumbers: isWeekly
           ? []
           : (details as CraResDetail[]).map((detail) => detail.referenceNum),
@@ -413,6 +419,7 @@ export class PollCraResponseHandler extends BaseJob {
         contacts.id,
         contacts.caseNumber,
         header,
+        ctx.csaProcessingDate,
       )
       if (contactMatch) {
         await this.persistWklRecord(ctx, detail, {
@@ -530,6 +537,7 @@ export class PollCraResponseHandler extends BaseJob {
     contactId: number,
     caseNumber: string,
     header: HeaderRecord,
+    batchDate: Date,
   ): Promise<{ contactId: number; batchDetailId: number } | null> {
     const unmatchedWklBatchId = { value: this.unmatchedWklBatchId }
     const counters = { approved: 0, refused: 0, skipped: 0 }
@@ -542,6 +550,7 @@ export class PollCraResponseHandler extends BaseJob {
         processedBatchIds: this.processedBatchIds,
         header,
         origin: 'PollCraResponseHandler.processUnmatchedWeeklyDetail',
+        batchDate,
       },
       counters,
     )

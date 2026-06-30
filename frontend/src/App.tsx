@@ -4578,7 +4578,28 @@ function App() {
                               </Tooltip>
                             )}
                           </TableCell>
-                          <TableCell>{row.lastUpdated}</TableCell>
+                          <TableCell sx={{ minWidth: 128 }}>
+                            {(() => {
+                              const [lastUpdatedDateLine, lastUpdatedTimeLine] =
+                                splitDateTimeIntoTwoLines(row.lastUpdated)
+                              return (
+                                <Box sx={{ lineHeight: 1.25 }}>
+                                  <Box
+                                    component="span"
+                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
+                                  >
+                                    {lastUpdatedDateLine}
+                                  </Box>
+                                  <Box
+                                    component="span"
+                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
+                                  >
+                                    {lastUpdatedTimeLine}
+                                  </Box>
+                                </Box>
+                              )
+                            })()}
+                          </TableCell>
                           <TableCell>{row.lastUpdatedBy}</TableCell>
                         </TableRow>
                       ))}

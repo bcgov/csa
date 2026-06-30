@@ -371,14 +371,11 @@ export class ContactsService {
 
     const currentState = contact.csaStatus ?? ''
     const statusChanged = currentState !== nextState
-    const hasAdditionalData =
-      additionalData != null && Object.keys(additionalData).length > 0
+    const hasAdditionalData = additionalData != null && Object.keys(additionalData).length > 0
 
     if (!statusChanged && !hasAdditionalData) {
       const originSuffix = origin ? ` [origin: ${origin}]` : ''
-      this.logger.log(
-        `Contact ${contactId}: skip FORCE/WKL — already ${nextState}${originSuffix}`,
-      )
+      this.logger.log(`Contact ${contactId}: skip FORCE/WKL — already ${nextState}${originSuffix}`)
       return { success: true, from: currentState, to: nextState }
     }
 

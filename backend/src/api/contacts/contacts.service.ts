@@ -370,25 +370,43 @@ export class ContactsService {
     }
 
     const currentState = contact.csaStatus ?? ''
+    const statusChanged = currentState !== nextState
+    const hasAdditionalData =
+      additionalData != null && Object.keys(additionalData).length > 0
+
+    if (!statusChanged && !hasAdditionalData) {
+      const originSuffix = origin ? ` [origin: ${origin}]` : ''
+      this.logger.log(
+        `Contact ${contactId}: skip FORCE/WKL — already ${nextState}${originSuffix}`,
+      )
+      return { success: true, from: currentState, to: nextState }
+    }
+
+    const updateData: Record<string, unknown> = {
+      icmIntegrationStatus: true,
+      lastUpdatedBy: 'SYSTEM',
+      lastUpdatedAt: new Date(),
+      preBatchStatus: null,
+      resumeStatus: null,
+      holdBy: null,
+      ...additionalData,
+    }
+
+    if (statusChanged) {
+      updateData.csaStatus = nextState
+      updateData.csaStatusEffectiveDate = new Date()
+    }
 
     await this.prisma.contact.update({
       where: { id: contactId },
-      data: {
-        csaStatus: nextState,
-        csaStatusEffectiveDate: new Date(),
-        icmIntegrationStatus: true,
-        lastUpdatedBy: 'SYSTEM',
-        lastUpdatedAt: new Date(),
-        preBatchStatus: null,
-        resumeStatus: null,
-        holdBy: null,
-        ...additionalData,
-      },
+      data: updateData,
     })
 
     const originSuffix = origin ? ` [origin: ${origin}]` : ''
     this.logger.log(
-      `Contact ${contactId}: ${currentState}->${nextState} [FORCE/WKL] by SYSTEM${originSuffix}`,
+      statusChanged
+        ? `Contact ${contactId}: ${currentState}->${nextState} [FORCE/WKL] by SYSTEM${originSuffix}`
+        : `Contact ${contactId}: FORCE/WKL additional data only (status remains ${nextState})${originSuffix}`,
     )
 
     return { success: true, from: currentState, to: nextState }

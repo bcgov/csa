@@ -371,9 +371,9 @@ export class ContactsService {
 
     const currentState = contact.csaStatus ?? ''
     const statusChanged = currentState !== nextState
-    const hasAdditionalData = additionalData != null && Object.keys(additionalData).length > 0
+    const changedAdditionalData = this.pickChangedForceUpdateFields(contact, additionalData)
 
-    if (!statusChanged && !hasAdditionalData) {
+    if (!statusChanged && Object.keys(changedAdditionalData).length === 0) {
       const originSuffix = origin ? ` [origin: ${origin}]` : ''
       this.logger.log(`Contact ${contactId}: skip FORCE/WKL — already ${nextState}${originSuffix}`)
       return { success: true, from: currentState, to: nextState }
@@ -386,7 +386,7 @@ export class ContactsService {
       preBatchStatus: null,
       resumeStatus: null,
       holdBy: null,
-      ...additionalData,
+      ...changedAdditionalData,
     }
 
     if (statusChanged) {
@@ -824,6 +824,26 @@ export class ContactsService {
 
   // Escape ILIKE special characters to prevent wildcard injection
   // '%' and '_' are wildcards, '\' is escape char
+  private pickChangedForceUpdateFields(
+    contact: Record<string, unknown>,
+    additionalData?: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (!additionalData) {
+      return {}
+    }
+
+    const changed: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(additionalData)) {
+      const current = contact[key]
+      const currentNormalized = current == null ? '' : String(current).trim()
+      const valueNormalized = value == null ? '' : String(value).trim()
+      if (currentNormalized !== valueNormalized) {
+        changed[key] = value
+      }
+    }
+    return changed
+  }
+
   private escapeLikePattern(input: string): string {
     return input.replace(/[%_\\]/g, '\\$&')
   }

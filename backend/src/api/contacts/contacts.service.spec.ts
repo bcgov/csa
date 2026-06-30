@@ -1445,7 +1445,7 @@ describe('ContactsService', () => {
     })
 
     it('should apply additional data without bumping status effective date when status is unchanged', async () => {
-      const contact = { id: 1, csaStatus: 'not_eligible_out_of_pay' }
+      const contact = { id: 1, csaStatus: 'not_eligible_out_of_pay', din: null }
       vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
       const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
@@ -1458,12 +1458,26 @@ describe('ContactsService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             din: '123',
+            icmIntegrationStatus: true,
           }),
         }),
       )
       const updateCall = updateSpy.mock.calls[0][0] as { data: Record<string, unknown> }
       expect(updateCall.data).not.toHaveProperty('csaStatus')
       expect(updateCall.data).not.toHaveProperty('csaStatusEffectiveDate')
+    })
+
+    it('should skip contact update when status and DIN are unchanged', async () => {
+      const contact = { id: 1, csaStatus: 'not_eligible_out_of_pay', din: '123' }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.forceUpdateCsaStatus(1, 'not_eligible_out_of_pay', {
+        din: '123',
+      })
+
+      expect(result.success).toBe(true)
+      expect(updateSpy).not.toHaveBeenCalled()
     })
 
     it('should return error for non-existent contact', async () => {

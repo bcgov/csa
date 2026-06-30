@@ -80,15 +80,7 @@ describe('step9_UpdateNotEligible', () => {
     const result = step9_UpdateNotEligible(CSA_STATUS.IN_PAY)
     expect(result.newStatus).toBe(CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
     expect(result.cancelReasonCode).toBe('21')
-    expect(result.careEndDate).toBeNull()
-  })
-
-  it('should use Step 1B care end date when transitioning from in_pay', () => {
-    const careEnd = new Date('2026-03-01')
-    const result = step9_UpdateNotEligible(CSA_STATUS.IN_PAY, null, careEnd)
-    expect(result.newStatus).toBe(CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
-    expect(result.cancelReasonCode).toBe('21')
-    expect(result.careEndDate).toEqual(careEnd)
+    expect(result.careEndDate).toBeInstanceOf(Date)
   })
 
   it('should use provided cancel reason code and care end date', () => {
@@ -107,7 +99,7 @@ describe('step9_UpdateNotEligible', () => {
     const result = step9_UpdateNotEligible(CSA_STATUS.NOT_ELIGIBLE_IP_TBD)
     expect(result.newStatus).toBe(CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
     expect(result.cancelReasonCode).toBe('21')
-    expect(result.careEndDate).toBeNull()
+    expect(result.careEndDate).toBeInstanceOf(Date)
   })
 
   it('should keep existing status when no transition applies', () => {

@@ -12,7 +12,7 @@ import type { OrderRecord, PlacementRecord } from '../eligibility.types'
  *
  * Care End Date = Earliest Order Date and Placement Date
  *   - If one is null, use the other
- *   - If both null, return null
+ *   - If both null, return null (Step 9 fail-safe uses system date)
  */
 export function determineCareEndDate(
   orders: OrderRecord[],

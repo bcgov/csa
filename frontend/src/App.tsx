@@ -259,9 +259,9 @@ const latestSystemComment = (comments: string | null | undefined): string => {
 }
 
 // Returns true when the reason text needs to be clamped:
-// either it exceeds the character limit OR it contains more than 3 lines (newlines).
+// either it exceeds the character limit OR it contains more than 2 lines (newlines).
 const holdReasonNeedsClamp = (reason: string): boolean =>
-  reason.length > HOLD_REASON_PREVIEW_LENGTH || reason.split('\n').length > 3
+  reason.length > HOLD_REASON_PREVIEW_LENGTH || reason.split('\n').length > 2
 
 // Capitalize first letter of a string
 const capitalize = (str: string): string => {
@@ -4466,7 +4466,7 @@ function App() {
                                       sx={{
                                         maxWidth: '100%',
                                         display: '-webkit-box',
-                                        WebkitLineClamp: 3,
+                                        WebkitLineClamp: 2,
                                         WebkitBoxOrient: 'vertical',
                                         overflow: 'hidden',
                                         whiteSpace: 'pre-wrap',

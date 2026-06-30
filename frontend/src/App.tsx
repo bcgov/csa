@@ -259,22 +259,14 @@ const latestSystemComment = (comments: string | null | undefined): string => {
 }
 
 // Returns true when the reason text needs to be clamped:
-// either it exceeds the character limit OR it contains more than 3 lines (newlines).
+// either it exceeds the character limit OR it contains more than 2 lines (newlines).
 const holdReasonNeedsClamp = (reason: string): boolean =>
-  reason.length > HOLD_REASON_PREVIEW_LENGTH || reason.split('\n').length > 3
+  reason.length > HOLD_REASON_PREVIEW_LENGTH || reason.split('\n').length > 2
 
 // Capitalize first letter of a string
 const capitalize = (str: string): string => {
   if (!str) return str
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
-}
-
-const splitDobIntoTwoLines = (value: string): [string, string] => {
-  const trimmed = value.trim()
-  if (!trimmed) return ['', '']
-  const lastDashIndex = trimmed.lastIndexOf('-')
-  if (lastDashIndex === -1) return [trimmed, '']
-  return [trimmed.slice(0, lastDashIndex), trimmed.slice(lastDashIndex + 1)]
 }
 
 const splitDateTimeIntoTwoLines = (value: string): [string, string] => {
@@ -588,20 +580,20 @@ function App() {
   const [batches, setBatches] = useState<Batch[]>([])
   const [loadingBatches, setLoadingBatches] = useState(false)
 
-  const getBatchNumberLabel = (
-    batchId: number | null | undefined,
-    batchList: Batch[] = batches,
-  ): string | null => {
-    if (batchId == null) return null
-    const batch = batchList.find((entry) => entry.id === batchId)
-    return batch != null ? String(batch.batchNumber) : null
-  }
+  const getBatchNumberLabel = useCallback(
+    (batchId: number | null | undefined, batchList: Batch[] = batches): string | null => {
+      if (batchId == null) return null
+      const batch = batchList.find((entry) => entry.id === batchId)
+      return batch != null ? String(batch.batchNumber) : null
+    },
+    [batches],
+  )
 
   // Batch details state
   const [batchDetails, setBatchDetails] = useState<BatchContactDetail[]>([])
   const [loadingBatchDetails, setLoadingBatchDetails] = useState(false)
 
-  const refreshBatchRequestsAfterSendCra = async (): Promise<Batch[]> => {
+  const refreshBatchRequestsAfterSendCra = useCallback(async (): Promise<Batch[]> => {
     const updatedBatches = await getAllBatches()
     setBatches(updatedBatches)
 
@@ -611,7 +603,7 @@ function App() {
     }
 
     return updatedBatches
-  }
+  }, [selectedBatch])
 
   useEffect(() => {
     if (!isAuthenticated) return
@@ -690,7 +682,7 @@ function App() {
     }
 
     checkAndResumeRunningSendCraFileJob()
-  }, [isAuthenticated])
+  }, [isAuthenticated, getBatchNumberLabel, refreshBatchRequestsAfterSendCra])
 
   // Helper function to check for running Send CRA file job before new operations
   // Prevents conflicting Send CRA operations and waits for completion
@@ -4095,7 +4087,7 @@ function App() {
                             </IconButton>
                           </Box>
                         </TableCell>
-                        <TableCell sx={{ width: 116, minWidth: 116, maxWidth: 116 }}>
+                        <TableCell sx={{ width: 132, minWidth: 132, maxWidth: 132 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
                               onClick={(e) => handleSortClick(e, 'dob')}
@@ -4405,33 +4397,15 @@ function App() {
                           <TableCell>{row.middleName}</TableCell>
                           <TableCell
                             sx={{
-                              width: 116,
-                              minWidth: 116,
-                              maxWidth: 116,
+                              width: 132,
+                              minWidth: 132,
+                              maxWidth: 132,
                               whiteSpace: 'nowrap',
                               overflowWrap: 'normal',
                               wordBreak: 'keep-all',
                             }}
                           >
-                            {(() => {
-                              const [dobLine1, dobLine2] = splitDobIntoTwoLines(row.dob)
-                              return (
-                                <Box sx={{ lineHeight: 1.25 }}>
-                                  <Box
-                                    component="span"
-                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
-                                  >
-                                    {dobLine1}
-                                  </Box>
-                                  <Box
-                                    component="span"
-                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
-                                  >
-                                    {dobLine2}
-                                  </Box>
-                                </Box>
-                              )
-                            })()}
+                            {row.dob}
                           </TableCell>
                           <TableCell>{row.din}</TableCell>
                           <TableCell>{row.csaStatus}</TableCell>
@@ -4492,7 +4466,7 @@ function App() {
                                       sx={{
                                         maxWidth: '100%',
                                         display: '-webkit-box',
-                                        WebkitLineClamp: 3,
+                                        WebkitLineClamp: 2,
                                         WebkitBoxOrient: 'vertical',
                                         overflow: 'hidden',
                                         whiteSpace: 'pre-wrap',
@@ -4578,7 +4552,28 @@ function App() {
                               </Tooltip>
                             )}
                           </TableCell>
-                          <TableCell>{row.lastUpdated}</TableCell>
+                          <TableCell sx={{ minWidth: 128 }}>
+                            {(() => {
+                              const [lastUpdatedDateLine, lastUpdatedTimeLine] =
+                                splitDateTimeIntoTwoLines(row.lastUpdated)
+                              return (
+                                <Box sx={{ lineHeight: 1.25 }}>
+                                  <Box
+                                    component="span"
+                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
+                                  >
+                                    {lastUpdatedDateLine}
+                                  </Box>
+                                  <Box
+                                    component="span"
+                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
+                                  >
+                                    {lastUpdatedTimeLine}
+                                  </Box>
+                                </Box>
+                              )
+                            })()}
+                          </TableCell>
                           <TableCell>{row.lastUpdatedBy}</TableCell>
                         </TableRow>
                       ))}

@@ -105,6 +105,27 @@ describe('step9_UpdateNotEligible', () => {
   it('should keep existing status when no transition applies', () => {
     const result = step9_UpdateNotEligible(CSA_STATUS.ON_HOLD)
     expect(result.newStatus).toBe(CSA_STATUS.ON_HOLD)
+    expect(result.cancelReasonCode).toBeNull()
+    expect(result.careEndDate).toBeNull()
+  })
+
+  it('should retain Step 1B cancellation fields when status is already not_eligible_in_pay', () => {
+    const careEnd = new Date('2026-02-15')
+    const result = step9_UpdateNotEligible(CSA_STATUS.NOT_ELIGIBLE_IN_PAY, '29', careEnd)
+    expect(result.newStatus).toBe(CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
+    expect(result.cancelReasonCode).toBe('29')
+    expect(result.careEndDate).toEqual(careEnd)
+  })
+
+  it('should not populate cancellation fields for other unchanged statuses', () => {
+    const result = step9_UpdateNotEligible(
+      CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY,
+      '14',
+      new Date('2026-02-15'),
+    )
+    expect(result.newStatus).toBe(CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY)
+    expect(result.cancelReasonCode).toBeNull()
+    expect(result.careEndDate).toBeNull()
   })
 })
 

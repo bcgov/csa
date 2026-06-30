@@ -269,14 +269,6 @@ const capitalize = (str: string): string => {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
 }
 
-const splitDobIntoTwoLines = (value: string): [string, string] => {
-  const trimmed = value.trim()
-  if (!trimmed) return ['', '']
-  const lastDashIndex = trimmed.lastIndexOf('-')
-  if (lastDashIndex === -1) return [trimmed, '']
-  return [trimmed.slice(0, lastDashIndex), trimmed.slice(lastDashIndex + 1)]
-}
-
 const splitDateTimeIntoTwoLines = (value: string): [string, string] => {
   const trimmed = value.trim()
   if (!trimmed) return ['', '']
@@ -4095,7 +4087,7 @@ function App() {
                             </IconButton>
                           </Box>
                         </TableCell>
-                        <TableCell sx={{ width: 116, minWidth: 116, maxWidth: 116 }}>
+                        <TableCell sx={{ width: 132, minWidth: 132, maxWidth: 132 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
                               onClick={(e) => handleSortClick(e, 'dob')}
@@ -4405,33 +4397,15 @@ function App() {
                           <TableCell>{row.middleName}</TableCell>
                           <TableCell
                             sx={{
-                              width: 116,
-                              minWidth: 116,
-                              maxWidth: 116,
+                              width: 132,
+                              minWidth: 132,
+                              maxWidth: 132,
                               whiteSpace: 'nowrap',
                               overflowWrap: 'normal',
                               wordBreak: 'keep-all',
                             }}
                           >
-                            {(() => {
-                              const [dobLine1, dobLine2] = splitDobIntoTwoLines(row.dob)
-                              return (
-                                <Box sx={{ lineHeight: 1.25 }}>
-                                  <Box
-                                    component="span"
-                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
-                                  >
-                                    {dobLine1}
-                                  </Box>
-                                  <Box
-                                    component="span"
-                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
-                                  >
-                                    {dobLine2}
-                                  </Box>
-                                </Box>
-                              )
-                            })()}
+                            {row.dob}
                           </TableCell>
                           <TableCell>{row.din}</TableCell>
                           <TableCell>{row.csaStatus}</TableCell>

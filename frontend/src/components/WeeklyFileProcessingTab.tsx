@@ -121,12 +121,7 @@ const CHILD_SEARCH_COLUMN_LABELS: Record<ChildSearchColumn, string> = {
 }
 
 const CHILD_SEARCH_FILTER_FIELDS = [
-  'firstName',
-  'lastName',
-  'middleName',
-  'din',
-  'caseNumber',
-  'legacyFileNumber',
+  'searchText',
   'personIdIcm',
   'personIdMis',
   'birthCity',

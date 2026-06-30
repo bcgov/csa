@@ -201,7 +201,12 @@ export class ContactsService {
       case 'neq':
         return { [key]: { not: { equals: value } } }
       case 'like':
-        return { [key]: { contains: value as string, mode: 'insensitive' } }
+        return {
+          [key]: {
+            contains: this.escapeLikePattern(String(value)),
+            mode: 'insensitive',
+          },
+        }
       case 'gt':
         return { [key]: { gt: value } }
       case 'gte':

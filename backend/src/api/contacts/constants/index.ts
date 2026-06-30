@@ -21,6 +21,7 @@ export const ALLOWED_FILTER_SORT_FIELDS = [
   'holdBy',
   'holdReason',
   'needsReview',
+  'searchText',
   'personIdIcm',
   'personIdMis',
   'birthCity',

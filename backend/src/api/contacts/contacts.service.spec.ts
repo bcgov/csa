@@ -197,6 +197,44 @@ describe('ContactsService', () => {
       })
     })
 
+    it('should escape ILIKE special characters in filter like', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(0)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([])
+
+      await service.findAll(1, 10, undefined, '[{"key":"din","op":"like","value":"100%"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: { din: { contains: '100\\%', mode: 'insensitive' } },
+      })
+    })
+
+    it('should allow filtering on searchText and extended person/birth fields', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(
+        1,
+        10,
+        undefined,
+        '[{"OR":[{"key":"searchText","op":"like","value":"smith"},{"key":"personIdIcm","op":"like","value":"ICM123"}]}]',
+      )
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: {
+          OR: [
+            { searchText: { contains: 'smith', mode: 'insensitive' } },
+            { personIdIcm: { contains: 'ICM123', mode: 'insensitive' } },
+          ],
+        },
+      })
+    })
+
     it('should throw error on invalid sort field', async () => {
       await expect(service.findAll(1, 10, '[{"invalidField":"asc"}]')).rejects.toThrow(
         'Invalid sort field: invalidField',

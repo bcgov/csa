@@ -25,7 +25,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fullTextSearchContacts, type Contact } from '../service/contacts-service'
+import { getAllContacts, type Contact } from '../service/contacts-service'
 import {
   associateWeeklyFileRecord,
   dissociateWeeklyFileRecord,
@@ -120,6 +120,15 @@ const CHILD_SEARCH_COLUMN_LABELS: Record<ChildSearchColumn, string> = {
   birthPlace: 'Birth Place',
 }
 
+const CHILD_SEARCH_FILTER_FIELDS = [
+  'searchText',
+  'personIdIcm',
+  'personIdMis',
+  'birthCity',
+  'birthProvince',
+  'birthCountry',
+] as const
+
 const WEEKLY_DETAILS_COLUMN_LABELS: Record<WeeklyDetailsColumn, string> = {
   csaMatchFound: 'CSA Match Found?',
   matchedBy: 'Matched By',
@@ -213,17 +222,20 @@ export default function WeeklyFileProcessingTab() {
   const [weeklyFiles, setWeeklyFiles] = useState<WeeklyFileSummary[]>([])
   const [weeklyFilesPage, setWeeklyFilesPage] = useState(1)
   const [weeklyFilesTotalPages, setWeeklyFilesTotalPages] = useState(1)
+  const [weeklyFilesTotalRecords, setWeeklyFilesTotalRecords] = useState(0)
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null)
 
   const [records, setRecords] = useState<WeeklyFileRecord[]>([])
   const [recordsPage, setRecordsPage] = useState(1)
   const [recordsTotalPages, setRecordsTotalPages] = useState(1)
+  const [recordsTotalRecords, setRecordsTotalRecords] = useState(0)
   const [selectedRecordId, setSelectedRecordId] = useState<number | null>(null)
 
   const [childSearchTerm, setChildSearchTerm] = useState('')
   const [searchedChildren, setSearchedChildren] = useState<Contact[]>([])
   const [childSearchPage, setChildSearchPage] = useState(1)
   const [childSearchTotalPages, setChildSearchTotalPages] = useState(1)
+  const [childSearchTotalRecords, setChildSearchTotalRecords] = useState(0)
   const [loadingChildSearch, setLoadingChildSearch] = useState(false)
   const [selectedSearchContactId, setSelectedSearchContactId] = useState<number | null>(null)
   const [actionMessage, setActionMessage] = useState<string | null>(null)
@@ -364,6 +376,7 @@ export default function WeeklyFileProcessingTab() {
         )
         setWeeklyFiles(response.data)
         setWeeklyFilesTotalPages(Math.max(response.totalPages, 1))
+        setWeeklyFilesTotalRecords(response.total)
       } catch (err) {
         if (isAbortError(err)) {
           return
@@ -371,6 +384,7 @@ export default function WeeklyFileProcessingTab() {
         console.error('Failed to fetch weekly files:', err)
         setError('Failed to load weekly files. Please try again.')
         setWeeklyFiles([])
+        setWeeklyFilesTotalRecords(0)
       } finally {
         setLoadingFiles(false)
       }
@@ -416,6 +430,7 @@ export default function WeeklyFileProcessingTab() {
       if (!selectedFileId) {
         setRecords([])
         setRecordsTotalPages(1)
+        setRecordsTotalRecords(0)
         setSelectedRecordId(null)
         return
       }
@@ -442,6 +457,7 @@ export default function WeeklyFileProcessingTab() {
         )
         setRecords(response.data)
         setRecordsTotalPages(Math.max(response.totalPages, 1))
+        setRecordsTotalRecords(response.total)
         setSelectedRecordId((prev) =>
           prev && !response.data.some((record) => record.id === prev) ? null : prev,
         )
@@ -452,6 +468,7 @@ export default function WeeklyFileProcessingTab() {
         console.error('Failed to fetch weekly file records:', err)
         setError('Failed to load weekly file details. Please try again.')
         setRecords([])
+        setRecordsTotalRecords(0)
       } finally {
         setLoadingRecords(false)
       }
@@ -483,6 +500,7 @@ export default function WeeklyFileProcessingTab() {
       setSearchedChildren([])
       setChildSearchPage(1)
       setChildSearchTotalPages(1)
+      setChildSearchTotalRecords(0)
       setActionError(null)
       setActionMessage(null)
     }, 0)
@@ -809,6 +827,7 @@ export default function WeeklyFileProcessingTab() {
       if (!trimmedSearchTerm) {
         setSearchedChildren([])
         setChildSearchTotalPages(1)
+        setChildSearchTotalRecords(0)
         return
       }
 
@@ -816,18 +835,31 @@ export default function WeeklyFileProcessingTab() {
         setActionError(`Please enter at least ${CHILD_SEARCH_MIN_LENGTH} characters to search.`)
         setSearchedChildren([])
         setChildSearchTotalPages(1)
+        setChildSearchTotalRecords(0)
         return
       }
 
       setLoadingChildSearch(true)
       setActionError(null)
       try {
-        const response = await fullTextSearchContacts(trimmedSearchTerm, page, SEARCH_PAGE_SIZE)
+        const filter = [
+          {
+            OR: CHILD_SEARCH_FILTER_FIELDS.map((field) => ({
+              key: field,
+              op: 'like',
+              value: trimmedSearchTerm,
+            })),
+          },
+        ]
+        const filteredData = await getAllContacts(page, SEARCH_PAGE_SIZE, filter)
+
         if (requestId !== childSearchRequestIdRef.current) {
           return
         }
-        setSearchedChildren(response.data)
-        setChildSearchTotalPages(Math.max(response.totalPages, 1))
+
+        setSearchedChildren(filteredData.data)
+        setChildSearchTotalPages(Math.max(filteredData.totalPages, 1))
+        setChildSearchTotalRecords(filteredData.total)
       } catch (err) {
         if (requestId !== childSearchRequestIdRef.current) {
           return
@@ -836,6 +868,7 @@ export default function WeeklyFileProcessingTab() {
         setActionError('Failed to search contacts. Please try again.')
         setSearchedChildren([])
         setChildSearchTotalPages(1)
+        setChildSearchTotalRecords(0)
       } finally {
         if (requestId === childSearchRequestIdRef.current) {
           setLoadingChildSearch(false)
@@ -856,6 +889,7 @@ export default function WeeklyFileProcessingTab() {
         setSearchedChildren([])
         setChildSearchPage(1)
         setChildSearchTotalPages(1)
+        setChildSearchTotalRecords(0)
       }, 0)
 
       return () => window.clearTimeout(timerId)
@@ -887,12 +921,14 @@ export default function WeeklyFileProcessingTab() {
     )
     setRecords(response.data)
     setRecordsTotalPages(Math.max(response.totalPages, 1))
+    setRecordsTotalRecords(response.total)
   }
 
   const refreshWeeklyFiles = async () => {
     const response = await getWeeklyFiles(weeklyFilesPage, SUMMARY_PAGE_SIZE)
     setWeeklyFiles(response.data)
     setWeeklyFilesTotalPages(Math.max(response.totalPages, 1))
+    setWeeklyFilesTotalRecords(response.total)
   }
 
   const handleConfirmReprocess = async () => {
@@ -1074,8 +1110,22 @@ export default function WeeklyFileProcessingTab() {
         </Table>
       </TableContainer>
 
-      {weeklyFiles.length > 0 && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 4 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          mt: 2,
+          mb: 4,
+          px: 2,
+        }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          {loadingFiles
+            ? 'Loading...'
+            : `Showing ${filteredWeeklyFiles.length} of ${weeklyFilesTotalRecords} records`}
+        </Typography>
+        {weeklyFiles.length > 0 ? (
           <Pagination
             count={weeklyFilesTotalPages}
             page={weeklyFilesPage}
@@ -1084,8 +1134,10 @@ export default function WeeklyFileProcessingTab() {
             showFirstButton
             showLastButton
           />
-        </Box>
-      )}
+        ) : (
+          <Box />
+        )}
+      </Box>
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 500, textAlign: 'left' }}>
@@ -1373,8 +1425,21 @@ export default function WeeklyFileProcessingTab() {
         </Table>
       </TableContainer>
 
-      {selectedFileId && records.length > 0 && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          mt: 2,
+          px: 2,
+        }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          {loadingRecords
+            ? 'Loading...'
+            : `Showing ${filteredRecords.length} of ${recordsTotalRecords} records`}
+        </Typography>
+        {selectedFileId && records.length > 0 ? (
           <Pagination
             count={recordsTotalPages}
             page={recordsPage}
@@ -1383,8 +1448,10 @@ export default function WeeklyFileProcessingTab() {
             showFirstButton
             showLastButton
           />
-        </Box>
-      )}
+        ) : (
+          <Box />
+        )}
+      </Box>
 
       {selectedRecord && (
         <Box sx={{ mt: 4 }}>
@@ -1416,6 +1483,7 @@ export default function WeeklyFileProcessingTab() {
                 setSearchedChildren([])
                 setChildSearchPage(1)
                 setChildSearchTotalPages(1)
+                setChildSearchTotalRecords(0)
               }}
               sx={{ width: 320 }}
             />
@@ -1580,8 +1648,21 @@ export default function WeeklyFileProcessingTab() {
             </Table>
           </TableContainer>
 
-          {searchedChildren.length > 0 && (
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              mt: 2,
+              px: 2,
+            }}
+          >
+            <Typography variant="body2" color="text.secondary">
+              {loadingChildSearch
+                ? 'Loading...'
+                : `Showing ${filteredSearchedChildren.length} of ${childSearchTotalRecords} records`}
+            </Typography>
+            {searchedChildren.length > 0 ? (
               <Pagination
                 count={childSearchTotalPages}
                 page={childSearchPage}
@@ -1593,8 +1674,10 @@ export default function WeeklyFileProcessingTab() {
                 showFirstButton
                 showLastButton
               />
-            </Box>
-          )}
+            ) : (
+              <Box />
+            )}
+          </Box>
         </Box>
       )}
 

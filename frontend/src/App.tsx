@@ -588,20 +588,20 @@ function App() {
   const [batches, setBatches] = useState<Batch[]>([])
   const [loadingBatches, setLoadingBatches] = useState(false)
 
-  const getBatchNumberLabel = (
-    batchId: number | null | undefined,
-    batchList: Batch[] = batches,
-  ): string | null => {
-    if (batchId == null) return null
-    const batch = batchList.find((entry) => entry.id === batchId)
-    return batch != null ? String(batch.batchNumber) : null
-  }
+  const getBatchNumberLabel = useCallback(
+    (batchId: number | null | undefined, batchList: Batch[] = batches): string | null => {
+      if (batchId == null) return null
+      const batch = batchList.find((entry) => entry.id === batchId)
+      return batch != null ? String(batch.batchNumber) : null
+    },
+    [batches],
+  )
 
   // Batch details state
   const [batchDetails, setBatchDetails] = useState<BatchContactDetail[]>([])
   const [loadingBatchDetails, setLoadingBatchDetails] = useState(false)
 
-  const refreshBatchRequestsAfterSendCra = async (): Promise<Batch[]> => {
+  const refreshBatchRequestsAfterSendCra = useCallback(async (): Promise<Batch[]> => {
     const updatedBatches = await getAllBatches()
     setBatches(updatedBatches)
 
@@ -611,7 +611,7 @@ function App() {
     }
 
     return updatedBatches
-  }
+  }, [selectedBatch])
 
   useEffect(() => {
     if (!isAuthenticated) return
@@ -690,7 +690,7 @@ function App() {
     }
 
     checkAndResumeRunningSendCraFileJob()
-  }, [isAuthenticated])
+  }, [isAuthenticated, getBatchNumberLabel, refreshBatchRequestsAfterSendCra])
 
   // Helper function to check for running Send CRA file job before new operations
   // Prevents conflicting Send CRA operations and waits for completion

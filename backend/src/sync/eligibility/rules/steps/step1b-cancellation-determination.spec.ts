@@ -228,8 +228,7 @@ describe('step1B_CancellationCheck', () => {
     it('should set careEndDate to null when no end dates exist', () => {
       const ctx = makeCtx({ deceased: 'Y', csaStatus: CSA_STATUS.IN_PAY })
       const result = step1B_CancellationCheck.evaluate(ctx)
-      // Step 9 fail-safe: when IN_PAY and careEndDate is null, uses new Date()
-      expect(result!.careEndDate).not.toBeNull() // Step 9 applies system date
+      expect(result!.careEndDate).toBeNull()
     })
 
     it('should return null (continue chain) when no cancellation triggered, but stash computed careEndDate on ctx for downstream rules', () => {

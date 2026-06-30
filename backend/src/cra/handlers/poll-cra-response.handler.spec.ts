@@ -1201,6 +1201,120 @@ describe('PollCraResponseHandler', () => {
       expect(result.metadata.records_wkl_approved).toBe(0)
     })
 
+    it('routes matched record to associated when contact transition fails, keeping it reprocessable', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([makeWklDetail({ status: WKL_STATUS.COMPLETED })])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: false,
+        reason: 'invalid transition',
+      })
+
+      const result = await handler.execute(mockContext)
+
+      expect(mockWklFileRecordService.persistRecord).toHaveBeenCalledTimes(1)
+      expect(mockWklFileRecordService.persistRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          matchStatus: 'associated',
+          contactId: 42,
+          matchedBy: 'SYSTEM',
+        }),
+      )
+      const persistedArg = mockWklFileRecordService.persistRecord.mock.calls[0][0]
+      expect(persistedArg.batchDetailId).toBeUndefined()
+      expect(persistedArg.processedAt).toBeUndefined()
+      expect(mockBatchesService.updateBatchDetailStatus).not.toHaveBeenCalled()
+      expect(result.metadata.records_wkl_approved).toBe(0)
+      expect(result.metadata.records_wkl_skipped).toBe(1)
+    })
+
+    it('routes refused record to associated when contact transition fails, without advancing the batch detail', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([makeWklDetail({ status: WKL_STATUS.ABANDONED })])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: false,
+        reason: 'invalid transition',
+      })
+
+      const result = await handler.execute(mockContext)
+
+      expect(mockWklFileRecordService.persistRecord).toHaveBeenCalledTimes(1)
+      expect(mockWklFileRecordService.persistRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          matchStatus: 'associated',
+          contactId: 42,
+          matchedBy: 'SYSTEM',
+        }),
+      )
+      const persistedArg = mockWklFileRecordService.persistRecord.mock.calls[0][0]
+      expect(persistedArg.batchDetailId).toBeUndefined()
+      expect(persistedArg.processedAt).toBeUndefined()
+      expect(mockBatchesService.updateBatchDetailStatus).not.toHaveBeenCalled()
+      expect(result.metadata.records_wkl_refused).toBe(0)
+      expect(result.metadata.records_wkl_skipped).toBe(1)
+    })
+
+    it('persists a completed record as matched with batchDetailId and processedAt on success', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([makeWklDetail({ status: WKL_STATUS.COMPLETED })])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
+
+      const result = await handler.execute(mockContext)
+
+      expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+        200,
+        BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
+        expect.objectContaining({ additionalData: expect.anything() }),
+      )
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        42,
+        CSA_EVENT.CRA_WKL_APPROVED,
+        'SYSTEM',
+        expect.objectContaining({ additionalData: expect.anything() }),
+      )
+      expect(mockWklFileRecordService.persistRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          matchStatus: 'matched',
+          contactId: 42,
+          batchDetailId: 200,
+          processedAt: expect.any(Date),
+        }),
+      )
+      expect(result.metadata.records_wkl_approved).toBe(1)
+      expect(result.metadata.records_wkl_skipped).toBe(0)
+    })
+
+    it('persists an abandoned record as matched with batchDetailId and processedAt on success', async () => {
+      setupWeeklyFile()
+      setupWeeklyParseFile([makeWklDetail({ status: WKL_STATUS.ABANDONED })])
+      mockWeeklyContactMatcher.findMatchingBatchDetail.mockResolvedValue(mockMatchedDetail)
+
+      const result = await handler.execute(mockContext)
+
+      expect(mockBatchesService.updateBatchDetailStatus).toHaveBeenCalledWith(
+        200,
+        BATCH_DETAIL_EVENT.CRA_WKL_REFUSED,
+        expect.objectContaining({ additionalData: expect.anything() }),
+      )
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        42,
+        CSA_EVENT.CRA_WKL_REFUSED,
+        'SYSTEM',
+        expect.objectContaining({ additionalData: expect.anything() }),
+      )
+      expect(mockWklFileRecordService.persistRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          matchStatus: 'matched',
+          contactId: 42,
+          batchDetailId: 200,
+          processedAt: expect.any(Date),
+        }),
+      )
+      expect(result.metadata.records_wkl_refused).toBe(1)
+      expect(result.metadata.records_wkl_skipped).toBe(0)
+    })
+
     it('skips in-progress records without making any service calls', async () => {
       setupWeeklyFile()
       setupWeeklyParseFile([makeWklDetail({ status: WKL_STATUS.IN_PROGRESS })])

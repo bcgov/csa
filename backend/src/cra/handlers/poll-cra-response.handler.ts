@@ -22,6 +22,7 @@ import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
 import { WklAssociatedRecordProcessorService } from '../inbound/wkl-associated-record-processor.service'
 import { buildWklUpdatePayloads } from '../inbound/wkl-snapshot-data'
 import { WeeklyContactMatcherService } from '../inbound/weekly-contact-matcher.service'
+import type { MatchedBatchDetail } from '../inbound/weekly-contact-matcher.service'
 import { WklFileRecordService } from '../inbound/wkl-file-record.service'
 import { CraTransferService } from '../transfer/cra-transfer.service'
 const {
@@ -463,45 +464,23 @@ export class PollCraResponseHandler extends BaseJob {
       batchDetail.initiatedBy === BATCH_INITIATED_BY.CRA ? batchDetailData : {}
 
     if (isApproved) {
-      await this.batchesService.updateBatchDetailStatus(
-        batchDetail.id,
-        BATCH_DETAIL_EVENT.CRA_WKL_APPROVED,
-        { additionalData: batchDetailAdditionalData },
+      await this.applyMatchedWeeklyDetail(
+        ctx,
+        detail,
+        batchDetail,
+        'approved',
+        additionalData,
+        batchDetailAdditionalData,
       )
-      await this.contactsService.updateCsaStatus(
-        batchDetail.contactId,
-        CSA_EVENT.CRA_WKL_APPROVED,
-        UPDATED_BY.SYSTEM,
-        { additionalData, origin: 'PollCraResponseHandler.processWeeklyDetail' },
-      )
-      this.recordsWklApproved++
-      await this.persistWklRecord(ctx, detail, {
-        matchStatus: WKL_MATCH_STATUS.MATCHED,
-        contactId: batchDetail.contactId,
-        batchDetailId: batchDetail.id,
-        matchedBy: UPDATED_BY.SYSTEM,
-        processedAt: new Date(),
-      })
     } else if (isRefused) {
-      await this.batchesService.updateBatchDetailStatus(
-        batchDetail.id,
-        BATCH_DETAIL_EVENT.CRA_WKL_REFUSED,
-        { additionalData: batchDetailAdditionalData },
+      await this.applyMatchedWeeklyDetail(
+        ctx,
+        detail,
+        batchDetail,
+        'refused',
+        additionalData,
+        batchDetailAdditionalData,
       )
-      await this.contactsService.updateCsaStatus(
-        batchDetail.contactId,
-        CSA_EVENT.CRA_WKL_REFUSED,
-        UPDATED_BY.SYSTEM,
-        { additionalData, origin: 'PollCraResponseHandler.processWeeklyDetail' },
-      )
-      this.recordsWklRefused++
-      await this.persistWklRecord(ctx, detail, {
-        matchStatus: WKL_MATCH_STATUS.MATCHED,
-        contactId: batchDetail.contactId,
-        batchDetailId: batchDetail.id,
-        matchedBy: UPDATED_BY.SYSTEM,
-        processedAt: new Date(),
-      })
     } else {
       this.logger.warn(
         `WKL: unexpected status '${detail.status}' for contact ${batchDetail.contactId}, skipping`,
@@ -510,6 +489,63 @@ export class PollCraResponseHandler extends BaseJob {
       this.recordsWklSkipped++
       return
     }
+  }
+
+  // Applies an auto-matched weekly detail. Drives the contact transition first; if it fails
+  // (contact in an unexpected status), the record is routed to ASSOCIATED — without a
+  // batchDetailId/processedAt — so the batch detail stays IN_PROGRESS and the record remains
+  // reprocessable via the flag→fix→reprocess loop instead of being stranded as MATCHED.
+  private async applyMatchedWeeklyDetail(
+    ctx: WklRecordContext,
+    detail: DetailRecord04,
+    batchDetail: MatchedBatchDetail,
+    kind: 'approved' | 'refused',
+    contactAdditionalData: Record<string, unknown>,
+    batchDetailAdditionalData: Record<string, unknown>,
+  ): Promise<void> {
+    const csaEvent = kind === 'approved' ? CSA_EVENT.CRA_WKL_APPROVED : CSA_EVENT.CRA_WKL_REFUSED
+    const batchDetailEvent =
+      kind === 'approved' ? BATCH_DETAIL_EVENT.CRA_WKL_APPROVED : BATCH_DETAIL_EVENT.CRA_WKL_REFUSED
+
+    const result = await this.contactsService.updateCsaStatus(
+      batchDetail.contactId,
+      csaEvent,
+      UPDATED_BY.SYSTEM,
+      {
+        additionalData: contactAdditionalData,
+        origin: 'PollCraResponseHandler.processWeeklyDetail',
+      },
+    )
+
+    if (!result.success) {
+      this.logger.warn(
+        `WKL: contact transition ${csaEvent} failed for contact ${batchDetail.contactId} ` +
+          `(${result.reason ?? 'unknown'}); routing record to associated for reprocessing`,
+      )
+      await this.persistWklRecord(ctx, detail, {
+        matchStatus: WKL_MATCH_STATUS.ASSOCIATED,
+        contactId: batchDetail.contactId,
+        matchedBy: UPDATED_BY.SYSTEM,
+      })
+      this.recordsWklSkipped++
+      return
+    }
+
+    await this.batchesService.updateBatchDetailStatus(batchDetail.id, batchDetailEvent, {
+      additionalData: batchDetailAdditionalData,
+    })
+    if (kind === 'approved') {
+      this.recordsWklApproved++
+    } else {
+      this.recordsWklRefused++
+    }
+    await this.persistWklRecord(ctx, detail, {
+      matchStatus: WKL_MATCH_STATUS.MATCHED,
+      contactId: batchDetail.contactId,
+      batchDetailId: batchDetail.id,
+      matchedBy: UPDATED_BY.SYSTEM,
+      processedAt: new Date(),
+    })
   }
 
   private async persistWklRecord(

@@ -12,6 +12,7 @@ import {
   BATCH_STATUS,
   CSA_EVENT,
 } from 'src/common/state-machine/constants'
+import { canTransitionCsa } from 'src/common/state-machine/machines/csa-status.machine'
 import { appendSystemComment, pacificToday } from 'src/common/utils'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
@@ -71,6 +72,8 @@ export class SendCraFileHandler extends BaseJob {
     }
 
     await this.ensureBatchDetailsReady()
+
+    this.assertContactsSendable()
 
     const sendTransition = await this.batchesService.updateBatchStatus(
       this.batch.id,
@@ -142,6 +145,26 @@ export class SendCraFileHandler extends BaseJob {
       })
     }
 
+    const now = new Date()
+    for (const detail of this.batchDetails) {
+      const transition = await this.contactsService.updateCsaStatus(
+        detail.contactId,
+        CSA_EVENT.SEND_TO_CRA,
+        UPDATED_BY.SYSTEM,
+        { additionalData: { csaSentDate: now }, origin: 'SendCraFileHandler' },
+      )
+      if (!transition.success) {
+        throw new Error(
+          `Batch ${this.batch.id}: contact ${detail.contactId} failed SEND_TO_CRA transition after file send (from ${transition.from ?? 'unknown'}): ${transition.reason ?? 'unknown'}`,
+        )
+      }
+    }
+
+    await this.prisma.batch.update({
+      where: { id: this.batch.id },
+      data: { batchDate: pacificToday() },
+    })
+
     this.logger.log(
       `Batch ${this.batch.id}: file ${fileName} sent, ${this.batchDetails.length} contacts updated`,
     )
@@ -163,26 +186,24 @@ export class SendCraFileHandler extends BaseJob {
 
     if (!this.batch) return
 
-    const now = new Date()
-
-    for (const detail of this.batchDetails) {
-      await this.contactsService.updateCsaStatus(
-        detail.contactId,
-        CSA_EVENT.SEND_TO_CRA,
-        UPDATED_BY.SYSTEM,
-        { additionalData: { csaSentDate: now }, origin: 'SendCraFileHandler' },
-      )
-    }
-
-    await this.prisma.batch.update({
-      where: { id: this.batch.id },
-      data: { batchDate: pacificToday() },
-    })
-
     try {
       await this.icmSyncBackService.syncFlaggedWithRetry()
     } catch (err) {
       this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`)
+    }
+  }
+
+  private assertContactsSendable(): void {
+    const blocked = this.batchDetails.filter(
+      (detail) => !canTransitionCsa(detail.contact.csaStatus ?? '', CSA_EVENT.SEND_TO_CRA),
+    )
+    if (blocked.length > 0) {
+      const summary = blocked
+        .map((detail) => `${detail.contactId} (${detail.contact.csaStatus ?? 'null'})`)
+        .join(', ')
+      throw new Error(
+        `Batch ${this.batch!.id}: ${blocked.length} contact(s) cannot transition SEND_TO_CRA: ${summary}`,
+      )
     }
   }
 

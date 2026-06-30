@@ -1,5 +1,5 @@
 import { AppLogger } from 'src/common/logger/app-logger'
-import { BATCH_EVENT, CSA_EVENT } from 'src/common/state-machine/constants'
+import { BATCH_EVENT, CSA_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
 import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
@@ -251,6 +251,47 @@ describe('SendCraFileHandler', () => {
         BATCH_EVENT.SEND_TO_CRA,
       )
     })
+
+    it('should throw and not send when any contact cannot transition SEND_TO_CRA', async () => {
+      const blocked = makeBatchDetail({
+        id: 100,
+        contactId: 1,
+        batchId: 10,
+        contact: makeContact({ id: 1, csaStatus: CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY }),
+      })
+      const sendable1 = makeBatchDetail({
+        id: 101,
+        contactId: 2,
+        batchId: 10,
+        contact: makeContact({ id: 2, csaStatus: CSA_STATUS.IN_BATCH_CANCELLATION }),
+      })
+      const sendable2 = makeBatchDetail({
+        id: 102,
+        contactId: 3,
+        batchId: 10,
+        contact: makeContact({ id: 3, csaStatus: CSA_STATUS.IN_BATCH_CANCELLATION }),
+      })
+
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([blocked, sendable1, sendable2])
+
+      await expect(handler.onStart(mockContext)).rejects.toThrow(/cannot transition SEND_TO_CRA/i)
+      expect(mockCraTransferService.sendFile).not.toHaveBeenCalled()
+      expect(mockBatchesService.updateBatchStatus).not.toHaveBeenCalled()
+    })
+
+    it('should throw and not send when a contact has null csaStatus', async () => {
+      const detail = makeBatchDetail({
+        id: 100,
+        contactId: 1,
+        batchId: 10,
+        contact: makeContact({ id: 1, csaStatus: null }),
+      })
+
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([detail])
+
+      await expect(handler.onStart(mockContext)).rejects.toThrow(/cannot transition SEND_TO_CRA/i)
+      expect(mockCraTransferService.sendFile).not.toHaveBeenCalled()
+    })
   })
 
   describe('execute (happy path)', () => {
@@ -377,6 +418,123 @@ describe('SendCraFileHandler', () => {
         1,
       )
     })
+
+    it('should update contact CSA statuses via SEND_TO_CRA with csaSentDate', async () => {
+      await handler.execute(mockContext)
+
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledTimes(2)
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        1,
+        CSA_EVENT.SEND_TO_CRA,
+        'SYSTEM',
+        { additionalData: { csaSentDate: expect.any(Date) }, origin: 'SendCraFileHandler' },
+      )
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        2,
+        CSA_EVENT.SEND_TO_CRA,
+        'SYSTEM',
+        { additionalData: { csaSentDate: expect.any(Date) }, origin: 'SendCraFileHandler' },
+      )
+    })
+
+    it('should set batchDate on the batch', async () => {
+      await handler.execute(mockContext)
+
+      expect(mockPrisma.batch.update).toHaveBeenCalledWith({
+        where: { id: 10 },
+        data: { batchDate: expect.any(Date) },
+      })
+    })
+
+    it('should throw from execute when a contact SEND_TO_CRA transition fails', async () => {
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: false,
+        reason: 'invalid transition',
+      })
+
+      await expect(handler.execute(mockContext)).rejects.toThrow(/SEND_TO_CRA/i)
+    })
+  })
+
+  // Failure-injection scenarios exercised end-to-end through the public hooks, asserting the
+  // resulting state (not just that an error is thrown) the way a live run would leave it.
+  // Pre-prod confidence check for the deferred per-detail atomicity trade-off.
+  describe('Failure injection (post-send partial failure)', () => {
+    let batch: any
+    let detail1: any
+    let detail2: any
+
+    beforeEach(async () => {
+      batch = makeBatch({ id: 10 })
+      detail1 = makeBatchDetail({
+        id: 100,
+        contactId: 1,
+        batchId: 10,
+        status: 'in_progress',
+        contact: makeContact({ id: 1 }),
+      })
+      detail2 = makeBatchDetail({
+        id: 101,
+        contactId: 2,
+        batchId: 10,
+        status: 'in_progress',
+        contact: makeContact({ id: 2 }),
+      })
+
+      mockPrisma.batch.findFirst.mockResolvedValue(batch)
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([detail1, detail2])
+      mockPrisma.batch.update.mockResolvedValue(batch)
+      mockPrisma.transferFile.create.mockResolvedValue({ id: 1 })
+
+      await handler.onStart(mockContext)
+    })
+
+    it('fails loudly when the second contact transition fails after the file is sent', async () => {
+      // First contact transitions fine; second fails (e.g. status drifted after pre-check).
+      mockContactsService.updateCsaStatus
+        .mockResolvedValueOnce({
+          success: true,
+          from: 'in_batch_application',
+          to: 'batch_sent_application',
+        })
+        .mockResolvedValueOnce({ success: false, reason: 'invalid transition' })
+
+      await expect(handler.execute(mockContext)).rejects.toThrow(/contact 2 failed SEND_TO_CRA/i)
+    })
+
+    it('leaves the already-transitioned contact advanced when a later one fails (documented non-atomic window)', async () => {
+      mockContactsService.updateCsaStatus
+        .mockResolvedValueOnce({
+          success: true,
+          from: 'in_batch_application',
+          to: 'batch_sent_application',
+        })
+        .mockResolvedValueOnce({ success: false, reason: 'invalid transition' })
+
+      await expect(handler.execute(mockContext)).rejects.toThrow()
+
+      // The file did go out, and contact 1 was already advanced before contact 2 failed.
+      expect(mockCraTransferService.sendFile).toHaveBeenCalledTimes(1)
+      expect(mockContactsService.updateCsaStatus).toHaveBeenNthCalledWith(
+        1,
+        1,
+        CSA_EVENT.SEND_TO_CRA,
+        expect.anything(),
+        expect.anything(),
+      )
+      // batchDate is set only after ALL transitions succeed, so a mid-loop failure skips it.
+      expect(mockPrisma.batch.update).not.toHaveBeenCalled()
+    })
+
+    it('does not set batchDate when a post-send transition fails', async () => {
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: false,
+        reason: 'invalid transition',
+      })
+
+      await expect(handler.execute(mockContext)).rejects.toThrow()
+      expect(mockPrisma.batch.update).not.toHaveBeenCalled()
+    })
   })
 
   describe('onSuccess', () => {
@@ -406,25 +564,6 @@ describe('SendCraFileHandler', () => {
       await handler.onStart(mockContext)
     })
 
-    it('should update contact CSA statuses via SEND_TO_CRA with csaSentDate', async () => {
-      const result = { success: true, message: 'Batch 10 sent to CRA' }
-      await handler.onSuccess(mockContext, result)
-
-      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledTimes(2)
-      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
-        1,
-        CSA_EVENT.SEND_TO_CRA,
-        'SYSTEM',
-        { additionalData: { csaSentDate: expect.any(Date) }, origin: 'SendCraFileHandler' },
-      )
-      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
-        2,
-        CSA_EVENT.SEND_TO_CRA,
-        'SYSTEM',
-        { additionalData: { csaSentDate: expect.any(Date) }, origin: 'SendCraFileHandler' },
-      )
-    })
-
     it('should call syncFlaggedWithRetry', async () => {
       const result = { success: true, message: 'Batch 10 sent to CRA' }
       await handler.onSuccess(mockContext, result)
@@ -438,15 +577,42 @@ describe('SendCraFileHandler', () => {
 
       await expect(handler.onSuccess(mockContext, result)).resolves.not.toThrow()
     })
+  })
 
-    it('should set batchDate on the batch', async () => {
-      const result = { success: true, message: 'Batch 10 sent to CRA' }
+  describe('full happy path', () => {
+    it('should send the file once and transition every contact exactly once', async () => {
+      const batch = makeBatch({ id: 10 })
+      const detail1 = makeBatchDetail({
+        id: 100,
+        contactId: 1,
+        batchId: 10,
+        contact: makeContact({ id: 1, csaStatus: CSA_STATUS.IN_BATCH_CANCELLATION }),
+      })
+      const detail2 = makeBatchDetail({
+        id: 101,
+        contactId: 2,
+        batchId: 10,
+        contact: makeContact({ id: 2, csaStatus: CSA_STATUS.IN_BATCH_CANCELLATION }),
+      })
+      const detail3 = makeBatchDetail({
+        id: 102,
+        contactId: 3,
+        batchId: 10,
+        contact: makeContact({ id: 3, csaStatus: CSA_STATUS.IN_BATCH_CANCELLATION }),
+      })
+
+      mockPrisma.batch.findFirst.mockResolvedValue(batch)
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([detail1, detail2, detail3])
+      mockPrisma.batch.update.mockResolvedValue({ ...batch, batchDate: new Date() })
+      mockPrisma.transferFile.create.mockResolvedValue({ id: 1 })
+
+      await handler.onStart(mockContext)
+      const result = await handler.execute(mockContext)
       await handler.onSuccess(mockContext, result)
 
-      expect(mockPrisma.batch.update).toHaveBeenCalledWith({
-        where: { id: 10 },
-        data: { batchDate: expect.any(Date) },
-      })
+      expect(mockCraTransferService.sendFile).toHaveBeenCalledTimes(1)
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledTimes(3)
+      expect(result.success).toBe(true)
     })
   })
 

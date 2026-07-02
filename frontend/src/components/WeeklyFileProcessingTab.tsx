@@ -1408,12 +1408,36 @@ export default function WeeklyFileProcessingTab() {
                   <TableCell>{record.lastName}</TableCell>
                   <TableCell>{record.initial}</TableCell>
                   <TableCell>{record.gender}</TableCell>
-                  <TableCell>{formatDateDisplay(record.dateOfBirth)}</TableCell>
+                  <TableCell
+                    sx={{
+                      whiteSpace: 'nowrap',
+                      overflowWrap: 'normal',
+                      wordBreak: 'keep-all',
+                    }}
+                  >
+                    {formatDateDisplay(record.dateOfBirth)}
+                  </TableCell>
                   <TableCell>{record.birthCity}</TableCell>
                   <TableCell>{record.birthProvince}</TableCell>
                   <TableCell>{record.birthCountry}</TableCell>
-                  <TableCell>{formatDateDisplay(record.careStartDate)}</TableCell>
-                  <TableCell>{formatDateDisplay(record.careEndDate)}</TableCell>
+                  <TableCell
+                    sx={{
+                      whiteSpace: 'nowrap',
+                      overflowWrap: 'normal',
+                      wordBreak: 'keep-all',
+                    }}
+                  >
+                    {formatDateDisplay(record.careStartDate)}
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      whiteSpace: 'nowrap',
+                      overflowWrap: 'normal',
+                      wordBreak: 'keep-all',
+                    }}
+                  >
+                    {formatDateDisplay(record.careEndDate)}
+                  </TableCell>
                   <TableCell>{record.cancelReasonCode}</TableCell>
                   <TableCell>{formatDateDisplay(record.completionDate)}</TableCell>
                   <TableCell>{valueOrBlank(record.associatedCaseNumber)}</TableCell>

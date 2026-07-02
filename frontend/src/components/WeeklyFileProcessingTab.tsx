@@ -25,7 +25,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { searchWeeklyChildContacts, type Contact } from '../service/contacts-service'
+import { fullTextSearchContacts, type Contact } from '../service/contacts-service'
 import {
   associateWeeklyFileRecord,
   dissociateWeeklyFileRecord,
@@ -832,11 +832,7 @@ export default function WeeklyFileProcessingTab() {
       setLoadingChildSearch(true)
       setActionError(null)
       try {
-        const filteredData = await searchWeeklyChildContacts(
-          trimmedSearchTerm,
-          page,
-          SEARCH_PAGE_SIZE,
-        )
+        const filteredData = await fullTextSearchContacts(trimmedSearchTerm, page, SEARCH_PAGE_SIZE)
 
         if (requestId !== childSearchRequestIdRef.current) {
           return

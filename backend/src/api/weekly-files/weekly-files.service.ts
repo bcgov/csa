@@ -155,7 +155,7 @@ function sortWeeklySummaryFilesByWeeklyFileDate(
       return direction === 'asc' ? comparison : -comparison
     }
 
-    return right.id - left.id
+    return direction === 'asc' ? left.id - right.id : right.id - left.id
   })
 }
 

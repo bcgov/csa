@@ -902,6 +902,9 @@ export default function WeeklyFileProcessingTab() {
         matchedBy: detailsBackendTextFilters.matchedBy,
         batchNumber: detailsBackendTextFilters.batchNumber,
         transactionSource: detailsBackendTextFilters.transactionSource,
+        sort: detailsSortConfig
+          ? [{ [detailsSortConfig.column]: detailsSortConfig.direction }]
+          : undefined,
       },
     )
     setRecords(response.data)

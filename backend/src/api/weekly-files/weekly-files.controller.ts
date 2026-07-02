@@ -36,12 +36,20 @@ export class WeeklyFilesController {
   @Get()
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    type: String,
+    description:
+      'JSON array of sort objects: [{"weeklyFileDate":"asc|desc"}] or [{"csaProcessingDate":"asc|desc"}]',
+  })
   @ApiResponse({ status: 200, description: 'Paginated weekly file report summaries' })
   findAll(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('sort') sort?: string,
   ): Promise<PaginatedResponse<WeeklyFileSummaryDto>> {
-    return this.weeklyFilesService.findAll(this.parsePage(page), this.parseLimit(limit))
+    return this.weeklyFilesService.findAll(this.parsePage(page), this.parseLimit(limit), sort)
   }
 
   @Get(':id/records')

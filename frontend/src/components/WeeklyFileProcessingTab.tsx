@@ -1440,8 +1440,24 @@ export default function WeeklyFileProcessingTab() {
                   </TableCell>
                   <TableCell>{record.cancelReasonCode}</TableCell>
                   <TableCell>{formatDateDisplay(record.completionDate)}</TableCell>
-                  <TableCell>{valueOrBlank(record.associatedCaseNumber)}</TableCell>
-                  <TableCell>{valueOrBlank(record.associatedPersonIdIcm)}</TableCell>
+                  <TableCell
+                    sx={{
+                      whiteSpace: 'nowrap',
+                      overflowWrap: 'normal',
+                      wordBreak: 'keep-all',
+                    }}
+                  >
+                    {valueOrBlank(record.associatedCaseNumber)}
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      whiteSpace: 'nowrap',
+                      overflowWrap: 'normal',
+                      wordBreak: 'keep-all',
+                    }}
+                  >
+                    {valueOrBlank(record.associatedPersonIdIcm)}
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -1660,9 +1676,25 @@ export default function WeeklyFileProcessingTab() {
                       <TableCell>{valueOrBlank(child.dateOfBirth)}</TableCell>
                       <TableCell>{valueOrBlank(child.akaLastName)}</TableCell>
                       <TableCell>{valueOrBlank(child.akaFirstName)}</TableCell>
-                      <TableCell>{valueOrBlank(child.personIdIcm)}</TableCell>
+                      <TableCell
+                        sx={{
+                          whiteSpace: 'nowrap',
+                          overflowWrap: 'normal',
+                          wordBreak: 'keep-all',
+                        }}
+                      >
+                        {valueOrBlank(child.personIdIcm)}
+                      </TableCell>
                       <TableCell>{valueOrBlank(child.personIdMis)}</TableCell>
-                      <TableCell>{valueOrBlank(child.caseNumber)}</TableCell>
+                      <TableCell
+                        sx={{
+                          whiteSpace: 'nowrap',
+                          overflowWrap: 'normal',
+                          wordBreak: 'keep-all',
+                        }}
+                      >
+                        {valueOrBlank(child.caseNumber)}
+                      </TableCell>
                       <TableCell>{valueOrBlank(child.legacyFileNumber)}</TableCell>
                       <TableCell>{getBirthPlace(child)}</TableCell>
                     </TableRow>

@@ -54,13 +54,25 @@ export interface ReprocessWeeklyFileResult {
   skippedRecords: Array<{ recordId: number; reason: string }>
 }
 
+export type WeeklyFileSummarySortColumn = 'weeklyFileDate' | 'csaProcessingDate'
+export type WeeklyFileSummarySortDirection = 'asc' | 'desc'
+export type WeeklyFileSummarySort = Array<
+  Record<WeeklyFileSummarySortColumn, WeeklyFileSummarySortDirection>
+>
+
 export const getWeeklyFiles = async (
   page: number = 1,
   limit: number = 10,
   signal?: AbortSignal,
+  sort?: WeeklyFileSummarySort,
 ): Promise<PaginatedResponse<WeeklyFileSummary>> => {
+  const params: Record<string, string | number> = { page, limit }
+  if (sort && sort.length > 0) {
+    params.sort = JSON.stringify(sort)
+  }
+
   const response = await APIService.getAxiosInstance().get('/weekly-files', {
-    params: { page, limit },
+    params,
     signal,
   })
   return response.data

@@ -187,6 +187,15 @@ export const fullTextSearchContacts = async (
   return response.data
 }
 
+// Compatibility wrapper for weekly file processing child search callers.
+export const searchWeeklyChildContacts = async (
+  searchQuery: string,
+  page: number = 1,
+  limit: number = 10,
+): Promise<PaginatedContactsResponse> => {
+  return fullTextSearchContacts(searchQuery, page, limit)
+}
+
 export interface BulkOperationResponse {
   success: number[]
   skipped: Array<{ id: number; reason: string }>

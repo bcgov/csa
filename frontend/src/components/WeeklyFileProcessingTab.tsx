@@ -1214,13 +1214,14 @@ export default function WeeklyFileProcessingTab() {
                   </IconButton>
                 </Box>
               </TableCell>
-              <TableCell>
+              <TableCell sx={{ minWidth: 104 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <span
                     onClick={(e) => handleDetailsSortClick(e, 'csaMatchFound')}
                     style={{ cursor: 'pointer', userSelect: 'none', fontWeight: 600 }}
                   >
-                    CSA Match Found?
+                    <span style={{ display: 'block', whiteSpace: 'nowrap' }}>CSA Match</span>
+                    <span style={{ display: 'block', whiteSpace: 'nowrap' }}>Found?</span>
                   </span>
                   <IconButton
                     size="small"
@@ -1348,7 +1349,16 @@ export default function WeeklyFileProcessingTab() {
               <TableCell sx={{ fontWeight: 600 }}>Cancel Reason Code</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Completion Date</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Associated Case #</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Associated Person ID ICM</TableCell>
+              <TableCell sx={{ fontWeight: 600, minWidth: 132 }}>
+                <Box sx={{ lineHeight: 1.15 }}>
+                  <Box component="span" sx={{ display: 'block', whiteSpace: 'nowrap' }}>
+                    Associated Person ID
+                  </Box>
+                  <Box component="span" sx={{ display: 'block', whiteSpace: 'nowrap' }}>
+                    ICM
+                  </Box>
+                </Box>
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>

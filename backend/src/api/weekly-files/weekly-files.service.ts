@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { csaProcessingBatchDate } from 'src/common/utils'
@@ -115,48 +116,6 @@ function parseWeeklySort<T extends string>(
   }
 
   return { column: field, direction }
-}
-
-type WeeklyFileSummaryBase = {
-  id: number
-  fileName: string
-  deliveredAt: Date | null
-  isDetailsProcessed: boolean
-}
-
-function compareNullableDates(
-  left: Date | null | undefined,
-  right: Date | null | undefined,
-): number {
-  if (left && right) {
-    return left.getTime() - right.getTime()
-  }
-  if (!left && right) {
-    return 1
-  }
-  if (left && !right) {
-    return -1
-  }
-  return 0
-}
-
-function sortWeeklySummaryFilesByWeeklyFileDate(
-  files: WeeklyFileSummaryBase[],
-  weeklyFileDateByTransferFileId: Map<number, Date | null>,
-  direction: 'asc' | 'desc',
-): WeeklyFileSummaryBase[] {
-  return [...files].sort((left, right) => {
-    const comparison = compareNullableDates(
-      weeklyFileDateByTransferFileId.get(left.id) ?? null,
-      weeklyFileDateByTransferFileId.get(right.id) ?? null,
-    )
-
-    if (comparison !== 0) {
-      return direction === 'asc' ? comparison : -comparison
-    }
-
-    return direction === 'asc' ? left.id - right.id : right.id - left.id
-  })
 }
 
 function normalizeTransactionTypeLabel(value: string): string {
@@ -330,7 +289,12 @@ export class WeeklyFilesService {
     const offset = (safePage - 1) * safeLimit
     const total = await this.prisma.transferFile.count({ where: weeklyFileWhere })
 
-    let files: WeeklyFileSummaryBase[]
+    let files: Array<{
+      id: number
+      fileName: string
+      deliveredAt: Date | null
+      isDetailsProcessed: boolean
+    }>
 
     if (!parsedSort) {
       files = await this.prisma.transferFile.findMany({
@@ -359,43 +323,29 @@ export class WeeklyFilesService {
         },
       })
     } else {
-      const allFiles = await this.prisma.transferFile.findMany({
-        where: weeklyFileWhere,
-        select: {
-          id: true,
-          fileName: true,
-          deliveredAt: true,
-          isDetailsProcessed: true,
-        },
-      })
-
-      const fileIds = allFiles.map((file) => file.id)
-      const weeklyDateGroups =
-        fileIds.length === 0
-          ? []
-          : await this.prisma.wklFileRecord.groupBy({
-              by: ['transferFileId'],
-              where: {
-                transferFileId: {
-                  in: fileIds,
-                },
-              },
-              _min: {
-                weeklyFileDate: true,
-              },
-            })
-
-      const weeklyFileDateByTransferFileId = new Map<number, Date | null>()
-      for (const group of weeklyDateGroups) {
-        weeklyFileDateByTransferFileId.set(group.transferFileId, group._min.weeklyFileDate ?? null)
-      }
-
-      const sortedFiles = sortWeeklySummaryFilesByWeeklyFileDate(
-        allFiles,
-        weeklyFileDateByTransferFileId,
-        parsedSort.direction,
-      )
-      files = sortedFiles.slice(offset, offset + safeLimit)
+      const orderDirection = parsedSort.direction === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`
+      files = await this.prisma.$queryRaw<
+        Array<{
+          id: number
+          fileName: string
+          deliveredAt: Date | null
+          isDetailsProcessed: boolean
+        }>
+      >(Prisma.sql`
+        SELECT
+          tf.id AS "id",
+          tf.file_name AS "fileName",
+          tf.delivered_at AS "deliveredAt",
+          tf.is_processed AS "isDetailsProcessed"
+        FROM csa.transfer_files tf
+        LEFT JOIN csa.wkl_file_records wfr ON wfr.transfer_file_id = tf.id
+        WHERE tf.file_type = ${FILE_TYPE.WKL}
+          AND tf.direction = ${FILE_DIRECTION.INBOUND}
+        GROUP BY tf.id, tf.file_name, tf.delivered_at, tf.is_processed
+        ORDER BY MIN(wfr.weekly_file_date) ${orderDirection} NULLS LAST, tf.id ${orderDirection}
+        LIMIT ${safeLimit}
+        OFFSET ${offset}
+      `)
     }
 
     const fileIds = files.map((file) => file.id)

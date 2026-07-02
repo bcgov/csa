@@ -6672,7 +6672,15 @@ function App() {
                                       <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
                                         {row.batchId}
                                       </TableCell>
-                                      <TableCell>{row.batchDate}</TableCell>
+                                      <TableCell
+                                        sx={{
+                                          whiteSpace: 'nowrap',
+                                          overflowWrap: 'normal',
+                                          wordBreak: 'keep-all',
+                                        }}
+                                      >
+                                        {row.batchDate}
+                                      </TableCell>
                                       <TableCell>
                                         {row.batchRequestStatus === 'Pending' && (
                                           <Box
@@ -6697,7 +6705,15 @@ function App() {
                                           row.batchRequestStatus}
                                       </TableCell>
                                       <TableCell>{row.transactionType}</TableCell>
-                                      <TableCell>{row.effectiveDate}</TableCell>
+                                      <TableCell
+                                        sx={{
+                                          whiteSpace: 'nowrap',
+                                          overflowWrap: 'normal',
+                                          wordBreak: 'keep-all',
+                                        }}
+                                      >
+                                        {row.effectiveDate}
+                                      </TableCell>
                                       <TableCell>{row.batchDetailStatus}</TableCell>
                                       <TableCell>{row.systemComments}</TableCell>
                                     </TableRow>

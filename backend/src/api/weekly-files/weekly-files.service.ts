@@ -44,10 +44,7 @@ type WeeklyFileRecordSortColumn =
   | 'transactionSource'
   | 'craStatus'
 
-type WeeklyFileRecordSort = {
-  column: WeeklyFileRecordSortColumn
-  direction: 'asc' | 'desc'
-}
+type WeeklyFileSummarySortColumn = 'weeklyFileDate' | 'csaProcessingDate'
 
 const TRANSACTION_TYPE_FILTER_LABELS: Record<string, string> = {
   A: 'Application',
@@ -59,29 +56,28 @@ const TRANSACTION_TYPE_FILTER_LABELS: Record<string, string> = {
   'CRA UPDATE': 'Update',
 }
 
-const ALLOWED_WEEKLY_RECORD_SORT_COLUMNS: WeeklyFileRecordSortColumn[] = [
+const ALLOWED_WEEKLY_RECORD_SORT_COLUMNS: readonly WeeklyFileRecordSortColumn[] = [
   'csaMatchFound',
   'matchedBy',
   'batchNumber',
   'transactionType',
   'transactionSource',
   'craStatus',
-]
+] as const
 
-function normalizeTransactionTypeLabel(value: string): string {
-  const normalized = value.trim().toUpperCase()
-  return TRANSACTION_TYPE_FILTER_LABELS[normalized] ?? value.trim()
-}
+const ALLOWED_WEEKLY_SUMMARY_SORT_COLUMNS: readonly WeeklyFileSummarySortColumn[] = [
+  'weeklyFileDate',
+  'csaProcessingDate',
+] as const
 
-function normalizeCsaMatchFoundLabel(value: string): string {
-  const normalized = value.trim().toLowerCase()
-  if (normalized === 'yes') return 'Yes'
-  if (normalized === 'no') return 'No'
-  if (normalized === 'n/a') return 'N/A'
-  return value.trim()
-}
-
-function parseWeeklyFileRecordSort(sort?: string): WeeklyFileRecordSort | null {
+/**
+ * Unified sort parameter parser for all weekly-file-processing-tab tables.
+ * Parses JSON sort input and validates against the provided allowlist.
+ */
+function parseWeeklySort<T extends string>(
+  sort: string | undefined,
+  allowedColumns: readonly T[],
+): { column: T; direction: 'asc' | 'desc' } | null {
   if (!sort) {
     return null
   }
@@ -102,15 +98,15 @@ function parseWeeklyFileRecordSort(sort?: string): WeeklyFileRecordSort | null {
     throw new BadRequestException('Sort parameter must contain objects with field directions')
   }
 
-  const field = Object.keys(sortItem)[0] as WeeklyFileRecordSortColumn | undefined
+  const field = Object.keys(sortItem)[0] as T | undefined
   const direction =
     field && field in sortItem
       ? (sortItem[field as keyof typeof sortItem] as 'asc' | 'desc')
       : undefined
 
-  if (!field || !ALLOWED_WEEKLY_RECORD_SORT_COLUMNS.includes(field)) {
+  if (!field || !allowedColumns.includes(field)) {
     throw new BadRequestException(
-      `Invalid sort field: ${field}. Allowed fields: ${ALLOWED_WEEKLY_RECORD_SORT_COLUMNS.join(', ')}`,
+      `Invalid sort field: ${field}. Allowed fields: ${allowedColumns.join(', ')}`,
     )
   }
 
@@ -119,6 +115,61 @@ function parseWeeklyFileRecordSort(sort?: string): WeeklyFileRecordSort | null {
   }
 
   return { column: field, direction }
+}
+
+type WeeklyFileSummaryBase = {
+  id: number
+  fileName: string
+  deliveredAt: Date | null
+  isDetailsProcessed: boolean
+}
+
+function compareNullableDates(
+  left: Date | null | undefined,
+  right: Date | null | undefined,
+): number {
+  if (left && right) {
+    return left.getTime() - right.getTime()
+  }
+  if (!left && right) {
+    return 1
+  }
+  if (left && !right) {
+    return -1
+  }
+  return 0
+}
+
+function sortWeeklySummaryFilesByWeeklyFileDate(
+  files: WeeklyFileSummaryBase[],
+  weeklyFileDateByTransferFileId: Map<number, Date | null>,
+  direction: 'asc' | 'desc',
+): WeeklyFileSummaryBase[] {
+  return [...files].sort((left, right) => {
+    const comparison = compareNullableDates(
+      weeklyFileDateByTransferFileId.get(left.id) ?? null,
+      weeklyFileDateByTransferFileId.get(right.id) ?? null,
+    )
+
+    if (comparison !== 0) {
+      return direction === 'asc' ? comparison : -comparison
+    }
+
+    return right.id - left.id
+  })
+}
+
+function normalizeTransactionTypeLabel(value: string): string {
+  const normalized = value.trim().toUpperCase()
+  return TRANSACTION_TYPE_FILTER_LABELS[normalized] ?? value.trim()
+}
+
+function normalizeCsaMatchFoundLabel(value: string): string {
+  const normalized = value.trim().toLowerCase()
+  if (normalized === 'yes') return 'Yes'
+  if (normalized === 'no') return 'No'
+  if (normalized === 'n/a') return 'N/A'
+  return value.trim()
 }
 
 function matchesTextFilter(
@@ -212,7 +263,7 @@ function compareWeeklyFileRecordSortValues(left: string | number, right: string 
 
 function sortWeeklyFileRecords(
   records: WeeklyFileRecordDto[],
-  sort: WeeklyFileRecordSort | null,
+  sort: { column: WeeklyFileRecordSortColumn; direction: 'asc' | 'desc' } | null,
 ): WeeklyFileRecordDto[] {
   if (!sort) {
     return records
@@ -267,16 +318,25 @@ export class WeeklyFilesService {
     private readonly icmSyncBackService: IcmSyncBackService,
   ) {}
 
-  async findAll(page = 1, limit = 10): Promise<PaginatedResponse<WeeklyFileSummaryDto>> {
+  async findAll(
+    page = 1,
+    limit = 10,
+    sort?: string,
+  ): Promise<PaginatedResponse<WeeklyFileSummaryDto>> {
     const safePage = page >= 1 ? page : 1
     const safeLimit = limit >= 1 ? Math.min(limit, 200) : 10
 
-    const [total, files] = await Promise.all([
-      this.prisma.transferFile.count({ where: weeklyFileWhere }),
-      this.prisma.transferFile.findMany({
+    const parsedSort = parseWeeklySort(sort, ALLOWED_WEEKLY_SUMMARY_SORT_COLUMNS)
+    const offset = (safePage - 1) * safeLimit
+    const total = await this.prisma.transferFile.count({ where: weeklyFileWhere })
+
+    let files: WeeklyFileSummaryBase[]
+
+    if (!parsedSort) {
+      files = await this.prisma.transferFile.findMany({
         where: weeklyFileWhere,
         orderBy: [{ deliveredAt: 'desc' }, { id: 'desc' }],
-        skip: (safePage - 1) * safeLimit,
+        skip: offset,
         take: safeLimit,
         select: {
           id: true,
@@ -284,8 +344,59 @@ export class WeeklyFilesService {
           deliveredAt: true,
           isDetailsProcessed: true,
         },
-      }),
-    ])
+      })
+    } else if (parsedSort.column === 'csaProcessingDate') {
+      files = await this.prisma.transferFile.findMany({
+        where: weeklyFileWhere,
+        orderBy: [{ deliveredAt: parsedSort.direction }, { id: parsedSort.direction }],
+        skip: offset,
+        take: safeLimit,
+        select: {
+          id: true,
+          fileName: true,
+          deliveredAt: true,
+          isDetailsProcessed: true,
+        },
+      })
+    } else {
+      const allFiles = await this.prisma.transferFile.findMany({
+        where: weeklyFileWhere,
+        select: {
+          id: true,
+          fileName: true,
+          deliveredAt: true,
+          isDetailsProcessed: true,
+        },
+      })
+
+      const fileIds = allFiles.map((file) => file.id)
+      const weeklyDateGroups =
+        fileIds.length === 0
+          ? []
+          : await this.prisma.wklFileRecord.groupBy({
+              by: ['transferFileId'],
+              where: {
+                transferFileId: {
+                  in: fileIds,
+                },
+              },
+              _min: {
+                weeklyFileDate: true,
+              },
+            })
+
+      const weeklyFileDateByTransferFileId = new Map<number, Date | null>()
+      for (const group of weeklyDateGroups) {
+        weeklyFileDateByTransferFileId.set(group.transferFileId, group._min.weeklyFileDate ?? null)
+      }
+
+      const sortedFiles = sortWeeklySummaryFilesByWeeklyFileDate(
+        allFiles,
+        weeklyFileDateByTransferFileId,
+        parsedSort.direction,
+      )
+      files = sortedFiles.slice(offset, offset + safeLimit)
+    }
 
     const fileIds = files.map((file) => file.id)
     const records =
@@ -359,7 +470,7 @@ export class WeeklyFilesService {
     const safeLimit = limit >= 1 ? Math.min(limit, 200) : 10
     const offset = (safePage - 1) * safeLimit
 
-    const parsedSort = parseWeeklyFileRecordSort(sort)
+    const parsedSort = parseWeeklySort(sort, ALLOWED_WEEKLY_RECORD_SORT_COLUMNS)
     const recordsWithRelations = await this.prisma.wklFileRecord.findMany({
       where: { transferFileId: id },
       orderBy: { recordIndex: 'asc' },

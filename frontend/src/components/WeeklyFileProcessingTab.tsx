@@ -25,7 +25,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getAllContacts, type Contact } from '../service/contacts-service'
+import { searchWeeklyChildContacts, type Contact } from '../service/contacts-service'
 import {
   associateWeeklyFileRecord,
   dissociateWeeklyFileRecord,
@@ -37,6 +37,7 @@ import {
   WEEKLY_FILE_TRANSACTION_TYPE_FILTER_OPTIONS,
   type WeeklyFileRecord,
   type WeeklyFileSummary,
+  type WeeklyFileSummarySort,
 } from '../service/weekly-files-service'
 import { formatDateTimeYMDHMS, formatDateYMD } from '../utils/date-format'
 
@@ -74,7 +75,6 @@ type ChildSearchColumn =
   | 'legacyFileNumber'
   | 'birthPlace'
 
-const WEEKLY_REPORT_COLUMNS: WeeklyReportColumn[] = ['weeklyFileDate', 'csaProcessingDate']
 const WEEKLY_DETAILS_COLUMNS: WeeklyDetailsColumn[] = [
   'csaMatchFound',
   'matchedBy',
@@ -120,15 +120,6 @@ const CHILD_SEARCH_COLUMN_LABELS: Record<ChildSearchColumn, string> = {
   birthPlace: 'Birth Place',
 }
 
-const CHILD_SEARCH_FILTER_FIELDS = [
-  'searchText',
-  'personIdIcm',
-  'personIdMis',
-  'birthCity',
-  'birthProvince',
-  'birthCountry',
-] as const
-
 const WEEKLY_DETAILS_COLUMN_LABELS: Record<WeeklyDetailsColumn, string> = {
   csaMatchFound: 'CSA Match Found?',
   matchedBy: 'Matched By',
@@ -142,6 +133,20 @@ type SortConfig<T> = {
   column: T
   direction: SortDirection
 } | null
+
+const toWeeklySummarySort = (
+  sortConfig: SortConfig<WeeklyReportColumn>,
+): WeeklyFileSummarySort | undefined => {
+  if (!sortConfig) {
+    return undefined
+  }
+
+  return [
+    {
+      [sortConfig.column]: sortConfig.direction,
+    } as Record<WeeklyReportColumn, SortDirection>,
+  ]
+}
 
 const formatDateDisplay = (value: string | null): string => (value ? formatDateYMD(value) : '')
 
@@ -373,6 +378,7 @@ export default function WeeklyFileProcessingTab() {
           weeklyFilesPage,
           SUMMARY_PAGE_SIZE,
           abortController.signal,
+          toWeeklySummarySort(weeklyReportSortConfig),
         )
         setWeeklyFiles(response.data)
         setWeeklyFilesTotalPages(Math.max(response.totalPages, 1))
@@ -395,7 +401,7 @@ export default function WeeklyFileProcessingTab() {
     return () => {
       abortController.abort()
     }
-  }, [weeklyFilesPage])
+  }, [weeklyFilesPage, weeklyReportSortConfig])
 
   useEffect(() => {
     const resetSelection = (nextSelectedFileId: number | null) => {
@@ -530,16 +536,6 @@ export default function WeeklyFileProcessingTab() {
     setSelectedRecordId((prev) => (prev === recordId ? null : recordId))
   }
 
-  const getWeeklyReportFieldValue = (
-    file: WeeklyFileSummary,
-    column: WeeklyReportColumn,
-  ): string => {
-    if (column === 'weeklyFileDate') {
-      return formatDateDisplay(file.weeklyFileDate)
-    }
-    return formatDateDisplay(file.csaProcessingDate)
-  }
-
   const getDetailsFieldValue = (record: WeeklyFileRecord, column: WeeklyDetailsColumn): string => {
     switch (column) {
       case 'csaMatchFound':
@@ -602,15 +598,8 @@ export default function WeeklyFileProcessingTab() {
   )
 
   const filteredWeeklyFiles = useMemo(() => {
-    return filterAndSortRows(
-      weeklyFiles,
-      WEEKLY_REPORT_COLUMNS,
-      getWeeklyReportFieldValue,
-      '',
-      { weeklyFileDate: [], csaProcessingDate: [] },
-      weeklyReportSortConfig,
-    )
-  }, [weeklyFiles, weeklyReportSortConfig])
+    return weeklyFiles
+  }, [weeklyFiles])
 
   const filteredRecords = useMemo(() => {
     // csaMatchFound, transactionType, and craStatus are filtered server-side; omit them from
@@ -668,6 +657,7 @@ export default function WeeklyFileProcessingTab() {
 
   const handleWeeklyReportSort = (column: WeeklyReportColumn, direction: SortDirection) => {
     setWeeklyReportSortConfig({ column, direction })
+    setWeeklyFilesPage(1)
     handleWeeklyReportSortClose()
   }
 
@@ -842,16 +832,11 @@ export default function WeeklyFileProcessingTab() {
       setLoadingChildSearch(true)
       setActionError(null)
       try {
-        const filter = [
-          {
-            OR: CHILD_SEARCH_FILTER_FIELDS.map((field) => ({
-              key: field,
-              op: 'like',
-              value: trimmedSearchTerm,
-            })),
-          },
-        ]
-        const filteredData = await getAllContacts(page, SEARCH_PAGE_SIZE, filter)
+        const filteredData = await searchWeeklyChildContacts(
+          trimmedSearchTerm,
+          page,
+          SEARCH_PAGE_SIZE,
+        )
 
         if (requestId !== childSearchRequestIdRef.current) {
           return
@@ -925,7 +910,12 @@ export default function WeeklyFileProcessingTab() {
   }
 
   const refreshWeeklyFiles = async () => {
-    const response = await getWeeklyFiles(weeklyFilesPage, SUMMARY_PAGE_SIZE)
+    const response = await getWeeklyFiles(
+      weeklyFilesPage,
+      SUMMARY_PAGE_SIZE,
+      undefined,
+      toWeeklySummarySort(weeklyReportSortConfig),
+    )
     setWeeklyFiles(response.data)
     setWeeklyFilesTotalPages(Math.max(response.totalPages, 1))
     setWeeklyFilesTotalRecords(response.total)
@@ -1023,6 +1013,7 @@ export default function WeeklyFileProcessingTab() {
               disabled={!weeklyReportSortConfig}
               onClick={() => {
                 setWeeklyReportSortConfig(null)
+                setWeeklyFilesPage(1)
               }}
               sx={{
                 textTransform: 'none',

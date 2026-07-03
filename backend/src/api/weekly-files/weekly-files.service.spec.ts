@@ -57,8 +57,10 @@ describe('WeeklyFilesService', () => {
         findMany: vi.fn(),
         findFirst: vi.fn(),
       },
+      $queryRaw: vi.fn(),
       wklFileRecord: {
         findMany: vi.fn(),
+        groupBy: vi.fn(),
         findFirst: vi.fn(),
         count: vi.fn(),
         update: vi.fn(),
@@ -137,6 +139,105 @@ describe('WeeklyFilesService', () => {
       unmatchedCount: 1,
       isProcessed: true,
     })
+  })
+
+  it('sorts weekly file summaries by csaProcessingDate using database order', async () => {
+    mockPrisma.transferFile.count.mockResolvedValue(2)
+    mockPrisma.transferFile.findMany.mockResolvedValue([
+      {
+        id: 2,
+        fileName: 'craUserId.AWKL0002.txt',
+        deliveredAt: new Date('2025-04-20T10:00:00.000Z'),
+        isDetailsProcessed: true,
+      },
+      {
+        id: 1,
+        fileName: 'craUserId.AWKL0001.txt',
+        deliveredAt: new Date('2025-04-21T10:00:00.000Z'),
+        isDetailsProcessed: true,
+      },
+    ])
+    mockPrisma.wklFileRecord.findMany.mockResolvedValue([])
+
+    const result = await service.findAll(1, 10, '[{"csaProcessingDate":"asc"}]')
+
+    expect(mockPrisma.transferFile.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ deliveredAt: 'asc' }, { id: 'asc' }],
+      }),
+    )
+    expect(result.data.map((file) => file.id)).toEqual([2, 1])
+  })
+
+  it('sorts weekly file summaries by weeklyFileDate using SQL order', async () => {
+    mockPrisma.transferFile.count.mockResolvedValue(3)
+    mockPrisma.$queryRaw.mockResolvedValue([
+      {
+        id: 2,
+        fileName: 'craUserId.AWKL0002.txt',
+        deliveredAt: new Date('2025-04-20T10:00:00.000Z'),
+        isDetailsProcessed: true,
+      },
+      {
+        id: 1,
+        fileName: 'craUserId.AWKL0001.txt',
+        deliveredAt: new Date('2025-04-21T10:00:00.000Z'),
+        isDetailsProcessed: true,
+      },
+    ])
+    mockPrisma.wklFileRecord.findMany.mockResolvedValue([])
+
+    const result = await service.findAll(1, 2, '[{"weeklyFileDate":"asc"}]')
+
+    expect(mockPrisma.$queryRaw).toHaveBeenCalled()
+    expect(mockPrisma.wklFileRecord.groupBy).not.toHaveBeenCalled()
+    expect(result.data.map((file) => file.id)).toEqual([2, 1])
+  })
+
+  it('uses sort-direction tie-break for weeklyFileDate summary sort', async () => {
+    mockPrisma.transferFile.count.mockResolvedValue(2)
+    mockPrisma.$queryRaw
+      .mockResolvedValueOnce([
+        {
+          id: 1,
+          fileName: 'craUserId.AWKL0001.txt',
+          deliveredAt: new Date('2025-04-20T10:00:00.000Z'),
+          isDetailsProcessed: true,
+        },
+        {
+          id: 2,
+          fileName: 'craUserId.AWKL0002.txt',
+          deliveredAt: new Date('2025-04-20T10:00:00.000Z'),
+          isDetailsProcessed: true,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 2,
+          fileName: 'craUserId.AWKL0002.txt',
+          deliveredAt: new Date('2025-04-20T10:00:00.000Z'),
+          isDetailsProcessed: true,
+        },
+        {
+          id: 1,
+          fileName: 'craUserId.AWKL0001.txt',
+          deliveredAt: new Date('2025-04-20T10:00:00.000Z'),
+          isDetailsProcessed: true,
+        },
+      ])
+    mockPrisma.wklFileRecord.findMany.mockResolvedValue([])
+
+    const ascResult = await service.findAll(1, 10, '[{"weeklyFileDate":"asc"}]')
+    const descResult = await service.findAll(1, 10, '[{"weeklyFileDate":"desc"}]')
+
+    expect(ascResult.data.map((file) => file.id)).toEqual([1, 2])
+    expect(descResult.data.map((file) => file.id)).toEqual([2, 1])
+  })
+
+  it('throws for invalid weekly summary sort field', async () => {
+    await expect(service.findAll(1, 10, '[{"invalidField":"asc"}]')).rejects.toBeInstanceOf(
+      BadRequestException,
+    )
   })
 
   it('throws when weekly file is not found', async () => {

@@ -4015,7 +4015,12 @@ function App() {
                             />
                           </Tooltip>
                         </TableCell>
-                        <TableCell>
+                        <TableCell
+                          sx={{
+                            minWidth: 152,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
                               onClick={(e) => handleSortClick(e, 'lastName')}
@@ -4230,13 +4235,16 @@ function App() {
                             </IconButton>
                           </Box>
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ minWidth: 122 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <span
                               onClick={(e) => handleSortClick(e, 'cgwrks3')}
                               style={{ cursor: 'pointer', userSelect: 'none' }}
                             >
-                              Set on Hold By
+                              <span style={{ display: 'block', whiteSpace: 'nowrap' }}>Set on</span>
+                              <span style={{ display: 'block', whiteSpace: 'nowrap' }}>
+                                Hold By
+                              </span>
                             </span>
                             <IconButton
                               size="small"
@@ -4432,7 +4440,16 @@ function App() {
                               )
                             })()}
                           </TableCell>
-                          <TableCell>{row.caseNumber}</TableCell>
+                          <TableCell
+                            sx={{
+                              minWidth: 152,
+                              whiteSpace: 'nowrap',
+                              overflowWrap: 'normal',
+                              wordBreak: 'keep-all',
+                            }}
+                          >
+                            {row.caseNumber}
+                          </TableCell>
                           <TableCell>{row.caseStatus}</TableCell>
                           <TableCell>{row.legacyFile}</TableCell>
                           <TableCell>{row.cgwrks3 || ''}</TableCell>
@@ -6655,7 +6672,15 @@ function App() {
                                       <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
                                         {row.batchId}
                                       </TableCell>
-                                      <TableCell>{row.batchDate}</TableCell>
+                                      <TableCell
+                                        sx={{
+                                          whiteSpace: 'nowrap',
+                                          overflowWrap: 'normal',
+                                          wordBreak: 'keep-all',
+                                        }}
+                                      >
+                                        {row.batchDate}
+                                      </TableCell>
                                       <TableCell>
                                         {row.batchRequestStatus === 'Pending' && (
                                           <Box
@@ -6680,7 +6705,15 @@ function App() {
                                           row.batchRequestStatus}
                                       </TableCell>
                                       <TableCell>{row.transactionType}</TableCell>
-                                      <TableCell>{row.effectiveDate}</TableCell>
+                                      <TableCell
+                                        sx={{
+                                          whiteSpace: 'nowrap',
+                                          overflowWrap: 'normal',
+                                          wordBreak: 'keep-all',
+                                        }}
+                                      >
+                                        {row.effectiveDate}
+                                      </TableCell>
                                       <TableCell>{row.batchDetailStatus}</TableCell>
                                       <TableCell>{row.systemComments}</TableCell>
                                     </TableRow>

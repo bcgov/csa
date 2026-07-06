@@ -3068,7 +3068,9 @@ function App() {
       return (
         cached &&
         (cached.csaStatusRaw === 'not_eligible_out_of_pay' ||
-          cached.csaStatusRaw === 'not_eligible_ip_tbd')
+          cached.csaStatusRaw === 'not_eligible_ip_tbd' ||
+          cached.csaStatusRaw === 'application_refused_cra' ||
+          cached.csaStatusRaw === 'cancellation_refused_cra')
       )
     })
   }, [selected, selectedRecordsCache])
@@ -3084,7 +3086,9 @@ function App() {
         cached &&
         (cached.csaStatusRaw === 'eligible_tbd' ||
           cached.csaStatusRaw === 'in_pay' ||
-          cached.csaStatusRaw === 'on_hold')
+          cached.csaStatusRaw === 'on_hold' ||
+          cached.csaStatusRaw === 'application_refused_cra' ||
+          cached.csaStatusRaw === 'cancellation_refused_cra')
       )
     })
   }, [selected, selectedRecordsCache])

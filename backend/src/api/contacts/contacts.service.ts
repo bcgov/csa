@@ -599,6 +599,13 @@ export class ContactsService {
         // not_eligible_ip_tbd -> in_pay using BECOME_ELIGIBLE
         event = CSA_EVENT.BECOME_ELIGIBLE
         actor = 'USER'
+      } else if (
+        contact.csaStatus === CSA_STATUS.APPLICATION_REFUSED_CRA ||
+        contact.csaStatus === CSA_STATUS.CANCELLATION_REFUSED_CRA
+      ) {
+        // refused states -> in_pay using BECOME_ELIGIBLE
+        event = CSA_EVENT.BECOME_ELIGIBLE
+        actor = 'USER'
       } else {
         // Current status is not eligible for this operation
         result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION })
@@ -651,7 +658,15 @@ export class ContactsService {
       // eligible_tbd -> not_eligible_out_of_pay
       // on_hold -> not_eligible_out_of_pay
       // in_pay -> not_eligible_ip_tbd
-      const validStatuses = [CSA_STATUS.ELIGIBLE_TBD, CSA_STATUS.ON_HOLD, CSA_STATUS.IN_PAY]
+      // application_refused_cra -> not_eligible_out_of_pay
+      // cancellation_refused_cra -> not_eligible_out_of_pay
+      const validStatuses = [
+        CSA_STATUS.ELIGIBLE_TBD,
+        CSA_STATUS.ON_HOLD,
+        CSA_STATUS.IN_PAY,
+        CSA_STATUS.APPLICATION_REFUSED_CRA,
+        CSA_STATUS.CANCELLATION_REFUSED_CRA,
+      ]
 
       if (!validStatuses.includes(contact.csaStatus as any)) {
         // Current status is not eligible for this operation

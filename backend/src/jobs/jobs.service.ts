@@ -17,6 +17,20 @@ import {
 
 const RETRYABLE_END_USER_JOB_TYPES: JobType[] = [JobType.SEND_CRA_FILE]
 
+/** Top-level failed jobs that retry-failed may re-run (excludes RETRY_FAILED to avoid recursion). */
+const RETRYABLE_FAILED_JOB_WHERE = {
+  status: JobStatus.FAILED,
+  parentJobId: null,
+  jobType: { not: JobType.RETRY_FAILED },
+  OR: [
+    { jobTrigger: JobTrigger.CRON },
+    {
+      jobTrigger: JobTrigger.END_USER,
+      jobType: { in: RETRYABLE_END_USER_JOB_TYPES },
+    },
+  ],
+} as const
+
 export interface MonitoringHistoryFilters {
   page?: number
   limit?: number
@@ -180,19 +194,21 @@ export class JobsService {
     })
   }
 
+  /** Cron failures superseded by a later success are not worth retrying. */
+  private async isCronFailureStillActionable(job: {
+    jobType: string
+    completedAt: Date | null
+  }): Promise<boolean> {
+    if (!job.completedAt) {
+      return true
+    }
+    const lastSuccess = await this.getLastSuccessTimestamp(job.jobType as JobType)
+    return lastSuccess === null || job.completedAt > lastSuccess
+  }
+
   async getFailedJobs() {
-    return this.prisma.jobRun.findMany({
-      where: {
-        status: JobStatus.FAILED,
-        parentJobId: null, // skip child jobs, parent will recreate them
-        OR: [
-          { jobTrigger: JobTrigger.CRON },
-          {
-            jobTrigger: JobTrigger.END_USER,
-            jobType: { in: RETRYABLE_END_USER_JOB_TYPES },
-          },
-        ],
-      },
+    const failed = await this.prisma.jobRun.findMany({
+      where: RETRYABLE_FAILED_JOB_WHERE,
       select: {
         id: true,
         jobType: true,
@@ -200,11 +216,29 @@ export class JobsService {
         retryCount: true,
         metadata: true,
         parentJobId: true,
+        completedAt: true,
       },
-      orderBy: {
-        completedAt: 'asc',
-      },
+      orderBy: { completedAt: 'desc' },
     })
+
+    // One retry per job type — latest failure only (avoids replaying historical backlog).
+    const latestByType = new Map<string, (typeof failed)[number]>()
+    for (const job of failed) {
+      if (!latestByType.has(job.jobType)) {
+        latestByType.set(job.jobType, job)
+      }
+    }
+
+    const actionable: (typeof failed)[number][] = []
+    for (const job of latestByType.values()) {
+      if (job.jobTrigger !== JobTrigger.CRON || (await this.isCronFailureStillActionable(job))) {
+        actionable.push(job)
+      }
+    }
+
+    return actionable.sort(
+      (a, b) => (a.completedAt?.getTime() ?? 0) - (b.completedAt?.getTime() ?? 0),
+    )
   }
 
   //TODO: define when a job is stuck
@@ -305,21 +339,7 @@ export class JobsService {
     })
     if (stuck) return true
 
-    const failed = await this.prisma.jobRun.findFirst({
-      where: {
-        status: JobStatus.FAILED,
-        parentJobId: null,
-        OR: [
-          { jobTrigger: JobTrigger.CRON },
-          {
-            jobTrigger: JobTrigger.END_USER,
-            jobType: { in: RETRYABLE_END_USER_JOB_TYPES },
-          },
-        ],
-      },
-      select: { id: true },
-    })
-    return failed !== null
+    return (await this.getFailedJobs()).length > 0
   }
 
   async getLatestJobsPerType() {

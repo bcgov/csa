@@ -9,13 +9,13 @@ import {
   parseISODatePacific,
 } from 'src/common/utils'
 import { CANCEL_REASON } from './cancellation/cancellation-reason.constants'
+import { getPreviousMonth, isInMonth } from './eligibility-month'
 import {
   ELIGIBILITY_CONFIG,
   PROTECTED_STATUSES,
   PROTECTED_STATUSES_SQL,
 } from './eligibility.config'
 import { EligibilityInputError } from './eligibility.errors'
-import { getPreviousMonth, isInMonth } from './eligibility-month'
 import {
   buildContactHasStagingChangesSql,
   buildFindAgedOutContactIdsSql,
@@ -37,7 +37,6 @@ import { step1B_CancellationCheck } from './rules/steps/step1b-cancellation-dete
 import { step2_LegalStatusCheck } from './rules/steps/step2-legal-status-check'
 import { step3_PlacementCheck } from './rules/steps/step3-placement-check'
 import { step4_FetchAgreementContract } from './rules/steps/step4-fetch-agreement-contract'
-import { step6_OrderPaymentCheck } from './rules/steps/step6-order-payment-check'
 
 const { STEP8_LEGAL_AUTH_CODES } = ELIGIBILITY_CONFIG
 
@@ -66,7 +65,6 @@ const RULES: EligibilityRule[] = [
   step2_LegalStatusCheck,
   step3_PlacementCheck,
   step4_FetchAgreementContract,
-  step6_OrderPaymentCheck,
 ]
 // Select one representative placement, order, and agreement to denormalize
 // into the master contacts table.

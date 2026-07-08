@@ -14,7 +14,7 @@ import { step9_UpdateNotEligible } from './step9-update-not-eligible'
  *
  * 2. Computes Care End Date from order/payment end dates and stashes both
  *    cancellation reason and care end date on ctx so downstream rules
- *    (step 2, step 6) can pass them through to Step 9 instead of falling
+ *    (step 2 onward) can pass them through to Step 9 instead of falling
  *    back to system date when they route a contact to Step 9.
  *
  * 3. If cancellation triggered, routes to Step 9.

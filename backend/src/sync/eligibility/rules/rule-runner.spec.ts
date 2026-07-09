@@ -1,7 +1,7 @@
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
 import { describe, expect, it } from 'vitest'
 import { EligibilityResult } from '../eligibility.types'
-import { makeContact, makeOrder, makePlacement } from '../test-helpers'
+import { makeContact, makePlacement } from '../test-helpers'
 import { runEligibility } from './rule-runner'
 import { EligibilityContext, EligibilityRule } from './rule.interface'
 import { step1B_CancellationCheck } from './steps/step1b-cancellation-determination'
@@ -114,11 +114,11 @@ describe('runEligibility integration: step1B → step2 → step9 (care end date 
   // Regression guard for the step-9 null-fallback fix:
   // When a contact lands in Step 9's In-Pay branch via step 2 (i.e. without a
   // staging-derived cancellation reason), the care end date must come from
-  // determineCareEndDate(orders, placements) — pre-computed by step 1B and stashed on
+  // determineCareEndDate(placements) — pre-computed by step 1B and stashed on
   // ctx — and NOT default to the system reference date.
   const RULES = [step1B_CancellationCheck, step2_LegalStatusCheck]
   const REF = new Date('2026-04-15')
-  const ORDER_END = new Date('2026-03-10')
+  const PLACEMENT_END = new Date('2026-03-10')
 
   it('step 2 routes IN_PAY contact to step 9 with care end date from step 1B compute', () => {
     const contact = makeContact({
@@ -126,7 +126,13 @@ describe('runEligibility integration: step1B → step2 → step9 (care end date 
       deceased: null,
       enrollForCsa: 'No',
       legalExpiryDate: null,
-      orders: [makeOrder({ orderStatus: 'Closed', effectiveEndDate: ORDER_END, source: 'ICM' })],
+      placements: [
+        makePlacement({
+          status: 'Ended',
+          type: 'Placement',
+          endDate: PLACEMENT_END,
+        }),
+      ],
     })
 
     const result = runEligibility(contact, RULES, REF)
@@ -135,7 +141,7 @@ describe('runEligibility integration: step1B → step2 → step9 (care end date 
       step: 9,
       newStatus: CSA_STATUS.NOT_ELIGIBLE_IN_PAY,
       cancelReasonCode: '21',
-      careEndDate: ORDER_END,
+      careEndDate: PLACEMENT_END,
     })
   })
 })

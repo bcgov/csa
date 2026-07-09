@@ -1223,8 +1223,18 @@ describe('ContactsService', () => {
 
     describe('cancellation fields on SET_NOT_ELIGIBLE', () => {
       it('should set cancelReasonCode and careEndDate from in_pay', async () => {
-        const contact = { id: 1, csaStatus: 'in_pay', cancelReasonCode: null, resumeStatus: null }
+        const contact = {
+          id: 1,
+          csaStatus: 'in_pay',
+          cancelReasonCode: null,
+          personIdIcm: 'ICM-1',
+          personIdMis: 'MIS-1',
+          resumeStatus: null,
+        }
         vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        vi.spyOn(prisma, '$queryRaw').mockResolvedValue([
+          { maxEndDate: new Date('2025-07-01') },
+        ] as any)
         const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
         const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
@@ -1235,7 +1245,7 @@ describe('ContactsService', () => {
         expect(result.to).toBe('not_eligible_ip_tbd')
         const updateCall = updateSpy.mock.calls[0][0] as any
         expect(updateCall.data.cancelReasonCode).toBe('21')
-        expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
+        expect(updateCall.data.careEndDate).toEqual(new Date('2025-07-01'))
       })
 
       it('should NOT set cancellation fields from eligible_tbd', async () => {
@@ -1281,8 +1291,16 @@ describe('ContactsService', () => {
       })
 
       it('should NOT overwrite cancelReasonCode when already set but still set careEndDate', async () => {
-        const contact = { id: 1, csaStatus: 'in_pay', cancelReasonCode: '14', resumeStatus: null }
+        const contact = {
+          id: 1,
+          csaStatus: 'in_pay',
+          cancelReasonCode: '14',
+          personIdIcm: 'ICM-1',
+          personIdMis: null,
+          resumeStatus: null,
+        }
         vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        vi.spyOn(prisma, '$queryRaw').mockResolvedValue([{ maxEndDate: null }] as any)
         const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
         const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {

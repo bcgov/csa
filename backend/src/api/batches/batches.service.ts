@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from 'src/common/database/prisma.service'
 import {
   BATCH_DETAIL_STATUS,
@@ -24,6 +25,24 @@ import { BulkOperationResponse } from '../contacts/interfaces'
 
 const { BATCH_INITIATED_BY, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
+/**
+ * Batch creation locking (pg_advisory_xact_lock class 2847).
+ *
+ * Two problems, one fix:
+ * 1. Internal id gaps — concurrent pending-batch creation raced on
+ *    batches_pending_unique; failed inserts still advanced the SERIAL.
+ * 2. Business batch numbers — batch_number is sequential (1, 2, 3…) and
+ *    shown in the UI instead of the internal id.
+ *
+ * Lock 0 serializes MAX(batch_number)+1 across all batch types.
+ * Lock 1 serializes find-or-create for the single pending batch.
+ * Lock 2 serializes find-or-create for the CRA WKL unmatched in_progress batch.
+ */
+const BATCH_ADVISORY_LOCK_CLASS = 2847
+const BATCH_NUMBER_ADVISORY_LOCK_OBJECT = 0
+const PENDING_BATCH_ADVISORY_LOCK_OBJECT = 1
+const WKL_UNMATCHED_BATCH_ADVISORY_LOCK_OBJECT = 2
+
 class TransitionSkipError extends Error {
   constructor(public readonly reason: string) {
     super(reason)
@@ -33,6 +52,7 @@ class TransitionSkipError extends Error {
 export interface BatchOperationResult extends BulkOperationResponse {
   batch: {
     id: number
+    batchNumber: number
     batchDate: Date | null
     status: string
     recordCount: number
@@ -62,6 +82,16 @@ export class BatchesService {
         `Immediate ICM sync failed for contact ${contactId}: ${(err as Error).message}`,
       )
     })
+  }
+
+  private async nextBatchNumber(tx: Prisma.TransactionClient): Promise<number> {
+    await tx.$executeRaw(
+      Prisma.sql`SELECT pg_advisory_xact_lock(${BATCH_ADVISORY_LOCK_CLASS}, ${BATCH_NUMBER_ADVISORY_LOCK_OBJECT})`,
+    )
+    const rows = await tx.$queryRaw<{ next: number }[]>(
+      Prisma.sql`SELECT COALESCE(MAX(batch_number), 0) + 1 AS next FROM csa.batches`,
+    )
+    return Number(rows[0].next)
   }
 
   async findAll() {
@@ -183,15 +213,8 @@ export class BatchesService {
     })
 
     return details.map((detail) => {
-      // Compute effectiveDate based on transaction type:
-      // - Application: Legal Authority's Effective Date (contact.effectiveDate)
-      // - Cancellation: Child's Care End Date (contact.careEndDate)
-      const effectiveDate =
-        detail.transactionType === TRANSACTION_TYPES.CANCELLATION
-          ? detail.contact.careEndDate
-          : detail.contact.effectiveDate
-
-      const cancelReasonCode = detail.contact.cancelReasonCode
+      const effectiveDate = detail.effectiveDate
+      const cancelReasonCode = detail.cancelReasonCode
       const cancelReasonLabel = getCancelReasonLabel(cancelReasonCode, detail.transactionType)
 
       return enrichLabels({
@@ -207,13 +230,22 @@ export class BatchesService {
   }
 
   async findOrCreatePendingBatch() {
-    let pendingBatch = await this.prisma.batch.findFirst({
-      where: { status: BATCH_STATUS.PENDING },
-    })
+    const pendingBatch = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(${BATCH_ADVISORY_LOCK_CLASS}, ${PENDING_BATCH_ADVISORY_LOCK_OBJECT})`,
+      )
 
-    if (!pendingBatch) {
-      pendingBatch = await this.prisma.batch.create({
+      const existing = await tx.batch.findFirst({
+        where: { status: BATCH_STATUS.PENDING },
+      })
+      if (existing) {
+        return existing
+      }
+
+      const batchNumber = await this.nextBatchNumber(tx)
+      return tx.batch.create({
         data: {
+          batchNumber,
           batchDate: null,
           status: BATCH_STATUS.PENDING,
           recordCount: 0,
@@ -221,37 +253,115 @@ export class BatchesService {
           createdAt: new Date(),
         },
       })
-    }
+    })
 
     return enrichLabels(pendingBatch)
   }
 
-  async createWklBatchForUnmatchedRecords(header: HeaderRecord) {
-    const existingBatch = await this.prisma.batch.findFirst({
+  async findInProgressBatchDetailForContact(contactId: number): Promise<MatchedBatchDetail | null> {
+    const details = await this.prisma.contactBatchDetail.findMany({
       where: {
-        initiatedBy: BATCH_INITIATED_BY.CRA,
-        status: BATCH_STATUS.IN_PROGRESS,
+        contactId,
+        status: BATCH_DETAIL_STATUS.IN_PROGRESS,
+        batch: {
+          status: { in: [BATCH_STATUS.IN_PROGRESS, BATCH_STATUS.PARTIALLY_PROCESSED] },
+        },
       },
+      select: {
+        id: true,
+        contactId: true,
+        batchId: true,
+        transactionType: true,
+        systemComments: true,
+        contact: { select: { din: true } },
+        batch: { select: { initiatedBy: true } },
+      },
+      orderBy: { id: 'desc' },
     })
 
-    if (existingBatch) {
-      this.logger.warn(
-        `Attempted to create WKL batch for unmatched records, but batch ${existingBatch.id} is already in progress. ` +
-          `This should not happen as we check for unmatched records before creating the batch, but it could occur in rare cases of high concurrency. ` +
-          `Please review batch ${existingBatch.id} for details.`,
-      )
-      return existingBatch
+    if (details.length === 0) {
+      return null
     }
-    const systemComments = appendSystemComment(`CRA initiated batch from WKL file`, null)
-    return this.prisma.batch.create({
-      data: {
-        batchDate: parseWklDate(header.processDate),
-        initiatedBy: BATCH_INITIATED_BY.CRA,
-        status: BATCH_STATUS.IN_PROGRESS,
-        recordCount: 0,
-        systemComments,
-        createdAt: new Date(),
-      },
+
+    if (details.length > 1) {
+      this.logger.error(
+        `Contact ${contactId} has ${details.length} in-progress batch details; using ${details[0].id}`,
+      )
+    }
+
+    const { batch, ...detail } = details[0]
+    return { ...detail, initiatedBy: batch.initiatedBy }
+  }
+
+  async findOrCreateWklBatchForUnmatchedRecords(batchDate: Date) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(${BATCH_ADVISORY_LOCK_CLASS}, ${WKL_UNMATCHED_BATCH_ADVISORY_LOCK_OBJECT})`,
+      )
+
+      const existingBatch = await tx.batch.findFirst({
+        where: {
+          initiatedBy: BATCH_INITIATED_BY.CRA,
+          batchDate,
+        },
+        orderBy: { id: 'desc' },
+      })
+
+      if (existingBatch) {
+        return existingBatch
+      }
+
+      const batchNumber = await this.nextBatchNumber(tx)
+      const systemComments = appendSystemComment(`CRA initiated batch from WKL file`, null)
+      return tx.batch.create({
+        data: {
+          batchNumber,
+          batchDate,
+          initiatedBy: BATCH_INITIATED_BY.CRA,
+          status: BATCH_STATUS.IN_PROGRESS,
+          recordCount: 0,
+          systemComments,
+          createdAt: new Date(),
+        },
+      })
+    })
+  }
+
+  async createWklBatchForUnmatchedRecords(header: HeaderRecord) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(${BATCH_ADVISORY_LOCK_CLASS}, ${WKL_UNMATCHED_BATCH_ADVISORY_LOCK_OBJECT})`,
+      )
+
+      const existingBatch = await tx.batch.findFirst({
+        where: {
+          initiatedBy: BATCH_INITIATED_BY.CRA,
+          status: BATCH_STATUS.IN_PROGRESS,
+        },
+      })
+
+      if (existingBatch) {
+        this.logger.warn(
+          `Attempted to create WKL batch for unmatched records, but batch ${existingBatch.id} is already in progress. ` +
+            `This should not happen as we check for unmatched records before creating the batch, but it could occur in rare cases of high concurrency. ` +
+            `Please review batch ${existingBatch.id} for details.`,
+        )
+        return existingBatch
+      }
+
+      const batchNumber = await this.nextBatchNumber(tx)
+      const systemComments = appendSystemComment(`CRA initiated batch from WKL file`, null)
+      return tx.batch.create({
+        data: {
+          batchNumber,
+          batchDate: parseWklDate(header.processDate),
+          initiatedBy: BATCH_INITIATED_BY.CRA,
+          status: BATCH_STATUS.IN_PROGRESS,
+          recordCount: 0,
+          systemComments,
+          createdAt: new Date(),
+        },
+      })
     })
   }
 
@@ -275,6 +385,7 @@ export class BatchesService {
         csaStatus: true,
         cancelReasonCode: true,
         careEndDate: true,
+        effectiveDate: true,
       },
     })
     const existingContactMap = new Map(existingContacts.map((c) => [c.id, c]))
@@ -318,27 +429,40 @@ export class BatchesService {
               ? TRANSACTION_TYPES.CANCELLATION
               : TRANSACTION_TYPES.APPLICATION
 
+          const caseNumber = contact.caseNumber ?? ''
+
           // Per FDD BL-05: default cancellation fields when blank
           if (transactionType === TRANSACTION_TYPES.CANCELLATION) {
             const updates: Record<string, unknown> = {}
             if (!contact.careEndDate) {
               updates.careEndDate = pacificToday()
+              contact.careEndDate = pacificToday()
             }
             if (!contact.cancelReasonCode) {
               updates.cancelReasonCode = CANCEL_REASON.CHILD_LEFT
+              contact.cancelReasonCode = CANCEL_REASON.CHILD_LEFT
             }
             if (Object.keys(updates).length > 0) {
               await tx.contact.update({ where: { id: contactId }, data: updates })
             }
           }
 
-          const caseNumber = contact.caseNumber ?? ''
+          // Capture snapshot of effective date and cancellation reason at time of batching
+          const effectiveDate =
+            transactionType === TRANSACTION_TYPES.CANCELLATION
+              ? contact.careEndDate
+              : contact.effectiveDate
+          const cancelReasonCode =
+            transactionType === TRANSACTION_TYPES.CANCELLATION ? contact.cancelReasonCode : null
+
           const batchDetail = await tx.contactBatchDetail.create({
             data: {
               contactId,
               batchId: pendingBatch.id,
               transactionType,
               status: BATCH_STATUS.PENDING,
+              effectiveDate,
+              cancelReasonCode,
               createdAt: now,
               createdBy: userId,
               lastUpdatedAt: now,
@@ -446,12 +570,22 @@ export class BatchesService {
       const batchMessage = this.getWklSystemComment(hasApproved, hasRefused, false)
       const batch = await this.prisma.batch.findUnique({
         where: { id: batchId },
-        select: { systemComments: true },
+        select: { status: true, systemComments: true },
       })
       const systemComments = appendSystemComment(batchMessage, batch?.systemComments ?? null)
-      await this.updateBatchStatus(batchId, BATCH_EVENT.CRA_ALL_PROCESSED, {
-        additionalData: { systemComments },
-      })
+
+      if (batch?.status === BATCH_STATUS.PROCESSED) {
+        // Manual WKL confirm can append more resolved details to an already processed CRA batch.
+        // In that case, keep status as-is and only append the recomputed aggregate comment.
+        await this.prisma.batch.update({
+          where: { id: batchId },
+          data: { systemComments },
+        })
+      } else {
+        await this.updateBatchStatus(batchId, BATCH_EVENT.CRA_ALL_PROCESSED, {
+          additionalData: { systemComments },
+        })
+      }
       return
     }
 
@@ -634,7 +768,8 @@ export class BatchesService {
         `Attempted to create WKL batch detail for contact ${contactId} in batch ${batchId}, but it already exists. ` +
           `Please review batch detail ${existingDetail.id} for details.`,
       )
-      return existingDetail
+      // This method only ever operates on the CRA-initiated unmatched batch.
+      return { ...existingDetail, initiatedBy: BATCH_INITIATED_BY.CRA }
     }
     this.logger.log(
       `Creating batch detail for contact ${contactId} in batch ${batchId} with CRA status ${craStatus}`,
@@ -665,7 +800,7 @@ export class BatchesService {
         where: { id: batchDetail.id },
         data: { referenceNumber: `${caseNumber}-${batchDetail.id}` },
       })
-      return await tx.contactBatchDetail.findUnique({
+      const created = await tx.contactBatchDetail.findUniqueOrThrow({
         where: { id: batchDetail.id },
         select: {
           id: true,
@@ -677,6 +812,8 @@ export class BatchesService {
           contact: { select: { din: true } },
         },
       })
+      // This method only ever operates on the CRA-initiated unmatched batch.
+      return { ...created, initiatedBy: BATCH_INITIATED_BY.CRA }
     })
   }
 }

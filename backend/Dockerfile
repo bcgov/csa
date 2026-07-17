@@ -28,7 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 
 HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:3000/health/live || exit 1
 
-# Nonroot user, limit heap size to 50 MB
+# Nonroot user
 RUN chown -R 1001:0 /app && chmod -R g=u /app
 USER 1001
-CMD ["node", "--max-old-space-size=50", "dist/api/main"]
+CMD ["node", "dist/api/main"]

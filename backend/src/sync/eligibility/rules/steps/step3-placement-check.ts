@@ -1,4 +1,5 @@
 import { normalize } from 'src/common/utils'
+import { getPreviousMonth, isInMonth } from '../../eligibility-month'
 import { ACTIVE_STATUSES, ENDED_STATUSES, EligibilityResult } from '../../eligibility.types'
 import { EligibilityContext, EligibilityRule } from '../rule.interface'
 import { step8_UpdateEligibleTbd } from './step8-update-eligible-tbd'
@@ -90,20 +91,7 @@ function getFirstDayOfMonth(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1))
 }
 
-function getPreviousMonth(date: Date): { year: number; month: number } {
-  const month = date.getUTCMonth() - 1
-  if (month < 0) {
-    return { year: date.getUTCFullYear() - 1, month: 11 }
-  }
-  return { year: date.getUTCFullYear(), month }
-}
-
 function isBeforeDate(date: Date | null, threshold: Date): boolean {
   if (!date) return false
   return date < threshold
-}
-
-function isInMonth(date: Date | null, month: { year: number; month: number }): boolean {
-  if (!date) return false
-  return date.getUTCFullYear() === month.year && date.getUTCMonth() === month.month
 }

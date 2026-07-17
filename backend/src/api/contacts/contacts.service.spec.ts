@@ -197,6 +197,44 @@ describe('ContactsService', () => {
       })
     })
 
+    it('should escape ILIKE special characters in filter like', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(0)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([])
+
+      await service.findAll(1, 10, undefined, '[{"key":"din","op":"like","value":"100%"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: { din: { contains: '100\\%', mode: 'insensitive' } },
+      })
+    })
+
+    it('should allow filtering on searchText and extended person/birth fields', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(
+        1,
+        10,
+        undefined,
+        '[{"OR":[{"key":"searchText","op":"like","value":"smith"},{"key":"personIdIcm","op":"like","value":"ICM123"}]}]',
+      )
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: undefined,
+        where: {
+          OR: [
+            { searchText: { contains: 'smith', mode: 'insensitive' } },
+            { personIdIcm: { contains: 'ICM123', mode: 'insensitive' } },
+          ],
+        },
+      })
+    })
+
     it('should throw error on invalid sort field', async () => {
       await expect(service.findAll(1, 10, '[{"invalidField":"asc"}]')).rejects.toThrow(
         'Invalid sort field: invalidField',
@@ -684,7 +722,7 @@ describe('ContactsService', () => {
       )
       const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
-      const result = await service.holdContacts([1, 2], 'user1')
+      const result = await service.holdContacts([1, 2], 'user1', 'Test reason')
 
       expect(result.success).toEqual([1, 2])
       expect(result.skipped).toEqual([])
@@ -700,7 +738,7 @@ describe('ContactsService', () => {
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
-      const result = await service.holdContacts([1, 999], 'user1')
+      const result = await service.holdContacts([1, 999], 'user1', 'Test reason')
 
       expect(result.success).toEqual([1])
       expect(result.skipped).toEqual([{ id: 999, reason: 'not_found' }])
@@ -719,7 +757,7 @@ describe('ContactsService', () => {
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
-      const result = await service.holdContacts([1, 2], 'user1')
+      const result = await service.holdContacts([1, 2], 'user1', 'Test reason')
 
       expect(result.success).toEqual([1])
       expect(result.skipped).toEqual([{ id: 2, reason: 'invalid_transition' }])
@@ -740,7 +778,7 @@ describe('ContactsService', () => {
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
-      const result = await service.holdContacts([1, 2, 3, 999], 'user1')
+      const result = await service.holdContacts([1, 2, 3, 999], 'user1', 'Test reason')
 
       expect(result.success).toEqual([1])
       expect(result.skipped).toEqual([
@@ -779,7 +817,8 @@ describe('ContactsService', () => {
 
       expect(result.success).toEqual([1, 2])
       expect(result.skipped).toEqual([])
-      expect(updateSpy).toHaveBeenCalledTimes(2)
+      // 2 calls per contact: 1 for status transition + 1 for clearing needsReview flag
+      expect(updateSpy).toHaveBeenCalledTimes(4)
     })
 
     it('should skip not found contacts', async () => {
@@ -1352,6 +1391,105 @@ describe('ContactsService', () => {
     })
   })
 
+  describe('forceUpdateCsaStatus', () => {
+    it('should update status and effective date when status changes', async () => {
+      const contact = { id: 1, csaStatus: 'in_pay' }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.forceUpdateCsaStatus(1, 'not_eligible_out_of_pay', {
+        din: '123',
+      })
+
+      expect(result.success).toBe(true)
+      expect(result.from).toBe('in_pay')
+      expect(result.to).toBe('not_eligible_out_of_pay')
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            csaStatus: 'not_eligible_out_of_pay',
+            csaStatusEffectiveDate: expect.any(Date),
+            din: '123',
+          }),
+        }),
+      )
+    })
+
+    it('should skip contact update when status is already at target', async () => {
+      const contact = { id: 1, csaStatus: 'not_eligible_out_of_pay' }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.forceUpdateCsaStatus(
+        1,
+        'not_eligible_out_of_pay',
+        undefined,
+        'test.origin',
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.from).toBe('not_eligible_out_of_pay')
+      expect(result.to).toBe('not_eligible_out_of_pay')
+      expect(updateSpy).not.toHaveBeenCalled()
+    })
+
+    it('should skip contact update when status is unchanged and additionalData is empty', async () => {
+      const contact = { id: 1, csaStatus: 'not_eligible_out_of_pay' }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.forceUpdateCsaStatus(1, 'not_eligible_out_of_pay', {})
+
+      expect(result.success).toBe(true)
+      expect(updateSpy).not.toHaveBeenCalled()
+    })
+
+    it('should apply additional data without bumping status effective date when status is unchanged', async () => {
+      const contact = { id: 1, csaStatus: 'not_eligible_out_of_pay', din: null }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.forceUpdateCsaStatus(1, 'not_eligible_out_of_pay', {
+        din: '123',
+      })
+
+      expect(result.success).toBe(true)
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            din: '123',
+            icmIntegrationStatus: true,
+          }),
+        }),
+      )
+      const updateCall = updateSpy.mock.calls[0][0] as { data: Record<string, unknown> }
+      expect(updateCall.data).not.toHaveProperty('csaStatus')
+      expect(updateCall.data).not.toHaveProperty('csaStatusEffectiveDate')
+    })
+
+    it('should skip contact update when status and DIN are unchanged', async () => {
+      const contact = { id: 1, csaStatus: 'not_eligible_out_of_pay', din: '123' }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.forceUpdateCsaStatus(1, 'not_eligible_out_of_pay', {
+        din: '123',
+      })
+
+      expect(result.success).toBe(true)
+      expect(updateSpy).not.toHaveBeenCalled()
+    })
+
+    it('should return error for non-existent contact', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(null)
+
+      const result = await service.forceUpdateCsaStatus(999, 'in_pay')
+
+      expect(result.success).toBe(false)
+      expect(result.reason).toBe('Contact not found')
+    })
+  })
+
   describe('findContactBatches', () => {
     it('should return batch details for a contact', async () => {
       const contact = { id: 1, firstName: 'John', lastName: 'Doe' }
@@ -1362,6 +1500,8 @@ describe('ContactsService', () => {
           batchId: 5,
           transactionType: 'application',
           status: 'approved',
+          effectiveDate: new Date('2025-06-01'),
+          cancelReasonCode: null,
           batch: { id: 5, batchDate: new Date('2026-01-15'), status: 'processed' },
           contact: {
             effectiveDate: new Date('2025-06-01'),
@@ -1390,7 +1530,13 @@ describe('ContactsService', () => {
         where: { contactId: 1 },
         include: {
           batch: {
-            select: { id: true, batchDate: true, status: true, systemComments: true },
+            select: {
+              id: true,
+              batchNumber: true,
+              batchDate: true,
+              status: true,
+              systemComments: true,
+            },
           },
           contact: {
             select: { effectiveDate: true, careEndDate: true, cancelReasonCode: true },
@@ -1400,7 +1546,7 @@ describe('ContactsService', () => {
       })
     })
 
-    it('should use careEndDate as effectiveDate for cancellation transactions', async () => {
+    it('should use batch detail snapshot for cancellation transactions', async () => {
       const contact = { id: 1, firstName: 'John', lastName: 'Doe' }
       const batchDetails = [
         {
@@ -1409,6 +1555,8 @@ describe('ContactsService', () => {
           batchId: 6,
           transactionType: 'cancellation',
           status: 'approved',
+          effectiveDate: new Date('2026-01-15'),
+          cancelReasonCode: '21',
           batch: { id: 6, batchDate: new Date('2026-02-20'), status: 'processed' },
           contact: {
             effectiveDate: new Date('2025-06-01'),
@@ -1423,7 +1571,6 @@ describe('ContactsService', () => {
 
       const result = await service.findContactBatches(1)
 
-      // For cancellation, effectiveDate should be careEndDate
       expect(result[0].effectiveDate).toEqual('2026-01-15')
       expect(result[0].cancelReasonCode).toEqual('21')
       expect(result[0].cancelReasonLabel).toEqual('Child Left')
@@ -1434,6 +1581,50 @@ describe('ContactsService', () => {
 
       await expect(service.findContactBatches(999)).rejects.toThrow(NotFoundException)
       await expect(service.findContactBatches(999)).rejects.toThrow('Contact 999 not found')
+    })
+  })
+
+  describe('updateHoldReason', () => {
+    it('should update hold reason and last_updated fields without changing hold_by', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'on_hold',
+      } as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({
+        id: 1,
+        holdReason: 'Reason text',
+      } as any)
+
+      await service.updateHoldReason(1, 'Reason text', 'fin.user')
+
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            holdReason: 'Reason text',
+            lastUpdatedBy: 'fin.user',
+            lastUpdatedAt: expect.any(Date),
+          }),
+        }),
+      )
+      const updateData = updateSpy.mock.calls[0][0].data as Record<string, unknown>
+      expect(updateData).not.toHaveProperty('holdBy')
+    })
+  })
+
+  describe('clearReviewFlag', () => {
+    it('should clear needsReview without updating last_updated audit fields', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        needsReview: true,
+      } as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      await service.clearReviewFlag(1, 'fin.user')
+
+      expect(updateSpy).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { needsReview: false },
+      })
     })
   })
 

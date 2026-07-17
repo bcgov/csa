@@ -46,6 +46,8 @@ const makeDetail = (overrides = {}) => ({
   transactionType: 'application',
   referenceNumber: 'LFN001-100',
   status: 'pending',
+  effectiveDate: new Date(2024, 5, 1),
+  cancelReasonCode: null,
   contact: makeContact(),
   ...overrides,
 })
@@ -263,17 +265,25 @@ describe('OutboundDataService', () => {
       expect(result.details[0].referenceNum).toBe('LFN001-200')
     })
 
-    it('should set cancelEndDate from contact.careEndDate', () => {
+    it('should set cancelEndDate from batch detail effectiveDate', () => {
       const contact = makeContact({ careEndDate: new Date(2025, 2, 15) })
-      const batchDetails = [makeDetail({ transactionType: 'cancellation', contact })]
+      const batchDetails = [
+        makeDetail({
+          transactionType: 'cancellation',
+          contact,
+          effectiveDate: new Date(2025, 2, 15),
+        }),
+      ]
       const result = service.buildCraFileData(batchDetails)
 
       expect(result.details[0].cancelEndDate).toBe('20250315')
     })
 
-    it('should set cancelReasonCode from contact.cancelReasonCode', () => {
+    it('should set cancelReasonCode from batch detail cancelReasonCode', () => {
       const contact = makeContact({ cancelReasonCode: '03' })
-      const batchDetails = [makeDetail({ transactionType: 'cancellation', contact })]
+      const batchDetails = [
+        makeDetail({ transactionType: 'cancellation', contact, cancelReasonCode: '03' }),
+      ]
       const result = service.buildCraFileData(batchDetails)
 
       expect(result.details[0].cancelReasonCode).toBe('03')
@@ -431,7 +441,11 @@ describe('OutboundDataService', () => {
     it('should handle effectiveDate at midnight UTC correctly', () => {
       const contact = makeContact({ effectiveDate: new Date('2024-06-01T00:00:00.000Z') })
       const result = service.buildCraFileData([
-        makeDetail({ transactionType: 'application', contact }),
+        makeDetail({
+          transactionType: 'application',
+          contact,
+          effectiveDate: new Date('2024-06-01T00:00:00.000Z'),
+        }),
       ])
 
       expect(result.details[0].appStartDate).toBe('20240601')
@@ -440,7 +454,11 @@ describe('OutboundDataService', () => {
     it('should handle careEndDate at midnight UTC correctly', () => {
       const contact = makeContact({ careEndDate: new Date('2025-12-31T00:00:00.000Z') })
       const result = service.buildCraFileData([
-        makeDetail({ transactionType: 'cancellation', contact }),
+        makeDetail({
+          transactionType: 'cancellation',
+          contact,
+          effectiveDate: new Date('2025-12-31T00:00:00.000Z'),
+        }),
       ])
 
       expect(result.details[0].cancelEndDate).toBe('20251231')
@@ -470,7 +488,11 @@ describe('OutboundDataService', () => {
     it('should handle year boundary (Dec 31 → Jan 1)', () => {
       const contact = makeContact({ effectiveDate: new Date('2025-01-01T00:00:00.000Z') })
       const result = service.buildCraFileData([
-        makeDetail({ transactionType: 'application', contact }),
+        makeDetail({
+          transactionType: 'application',
+          contact,
+          effectiveDate: new Date('2025-01-01T00:00:00.000Z'),
+        }),
       ])
 
       expect(result.details[0].appStartDate).toBe('20250101')
@@ -503,7 +525,14 @@ describe('OutboundDataService', () => {
         cancelReasonCode: null,
         careEndDate: null,
       })
-      const batchDetails = [makeDetail({ transactionType: 'application', contact })]
+      const batchDetails = [
+        makeDetail({
+          transactionType: 'application',
+          contact,
+          effectiveDate: null,
+          cancelReasonCode: null,
+        }),
+      ]
       const result = service.buildCraFileData(batchDetails)
       const detail = result.details[0]
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
-import { AppLogger } from 'src/common/logger/app-logger'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { AppLogger } from 'src/common/logger/app-logger'
 import {
   getAgeCutoffDate,
   isEligibleAge,
@@ -15,7 +15,12 @@ import {
   PROTECTED_STATUSES_SQL,
 } from './eligibility.config'
 import { EligibilityInputError } from './eligibility.errors'
-import { buildFindAgedOutContactIdsSql, buildLoadContactProfilesSql } from './eligibility.queries'
+import { getPreviousMonth, isInMonth } from './eligibility-month'
+import {
+  buildContactHasStagingChangesSql,
+  buildFindAgedOutContactIdsSql,
+  buildLoadContactProfilesSql,
+} from './eligibility.queries'
 import {
   AgreementRecord,
   ContactProfile,
@@ -34,12 +39,15 @@ import { step3_PlacementCheck } from './rules/steps/step3-placement-check'
 import { step4_FetchAgreementContract } from './rules/steps/step4-fetch-agreement-contract'
 import { step6_OrderPaymentCheck } from './rules/steps/step6-order-payment-check'
 
+const { STEP8_LEGAL_AUTH_CODES } = ELIGIBILITY_CONFIG
+
 const REQUIRED_STAGING_TABLES = [
   'stg_icm_cases',
   'stg_icm_placements',
   'stg_icm_legal_authority_admin',
   'stg_icm_legal_authority',
   'stg_icm_agreement',
+  'stg_icm_agreement_line',
   'stg_icm_orders',
   'stg_mis_payments',
   'stg_mis_contracts',
@@ -64,12 +72,21 @@ const RULES: EligibilityRule[] = [
 // into the master contacts table.
 // Status priority: Active > Interrupted > Ended/Closed (latest by endDate)
 // Within each status tier: ICM Placement > ICM Non-Placement > MIS Placement > MIS Non-Placement
-export function selectPrimaryRecords(profile: ContactProfile): {
+export function selectPrimaryRecords(
+  profile: ContactProfile,
+  referenceDate: Date = pacificToday(),
+): {
   primaryPlacement: PlacementRecord | null
   primaryOrder: OrderRecord | null
   primaryAgreement: AgreementRecord | null
 } {
+  if (isOocChild(profile)) {
+    return selectOocPrimaryRecords(profile, referenceDate)
+  }
+
   const primaryPlacement = selectPrimaryPlacement(profile.placements)
+  const placementContractKey = normalize(primaryPlacement?.contractNumber)
+  const placementProviderKey = normalize(primaryPlacement?.providerId)
 
   // Primary Order: match via primary placement's link key
   let primaryOrder: OrderRecord | null = null
@@ -77,11 +94,18 @@ export function selectPrimaryRecords(profile: ContactProfile): {
     primaryOrder =
       profile.orders.find((order) => order.agreementRowId === primaryPlacement.agreementRowId) ??
       null
+    if (!primaryOrder && placementContractKey) {
+      primaryOrder =
+        profile.orders.find(
+          (order) =>
+            order.source === 'MIS' && normalize(order.contractNumber) === placementContractKey,
+        ) ?? null
+    }
   } else if (primaryPlacement?.source === 'MIS' && primaryPlacement.contractNumber) {
     primaryOrder =
       profile.orders.find(
         (order) =>
-          order.source === 'MIS' && order.contractNumber === primaryPlacement.contractNumber,
+          order.source === 'MIS' && normalize(order.contractNumber) === placementContractKey,
       ) ?? null
   }
 
@@ -91,16 +115,166 @@ export function selectPrimaryRecords(profile: ContactProfile): {
     primaryAgreement =
       profile.agreements.find((agreement) => agreement.rowId === primaryPlacement.agreementRowId) ??
       null
+    if (!primaryAgreement && placementContractKey) {
+      primaryAgreement =
+        profile.agreements.find(
+          (agreement) =>
+            agreement.source === 'MIS' &&
+            normalize(agreement.contractNumber) === placementContractKey &&
+            normalize(agreement.providerId) === placementProviderKey,
+        ) ?? null
+    }
   } else if (primaryPlacement?.source === 'MIS' && primaryPlacement.contractNumber) {
     primaryAgreement =
       profile.agreements.find(
         (agreement) =>
           agreement.source === 'MIS' &&
-          agreement.contractNumber === primaryPlacement.contractNumber,
+          normalize(agreement.contractNumber) === placementContractKey &&
+          normalize(agreement.providerId) === placementProviderKey,
       ) ?? null
   }
 
   return { primaryPlacement, primaryOrder, primaryAgreement }
+}
+
+/** Section 54 / OOC: OPC, OPO, OPT — agreement by person id; placement blank on display. */
+function isOocChild(profile: ContactProfile): boolean {
+  const code = normalize(profile.misLegalAuthCode)
+  return code != null && STEP8_LEGAL_AUTH_CODES.includes(code)
+}
+
+function selectOocPrimaryRecords(
+  profile: ContactProfile,
+  referenceDate: Date,
+): {
+  primaryPlacement: PlacementRecord | null
+  primaryOrder: OrderRecord | null
+  primaryAgreement: AgreementRecord | null
+} {
+  const primaryAgreement = selectOocPrimaryAgreement(profile.agreements, profile.placements)
+  let primaryOrder: OrderRecord | null = null
+
+  if (primaryAgreement?.source === 'ICM' && primaryAgreement.rowId != null) {
+    primaryOrder = findClosedIcmOrderPreviousMonth(
+      profile.orders,
+      primaryAgreement.rowId,
+      referenceDate,
+    )
+  } else if (primaryAgreement?.source === 'MIS' && primaryAgreement.contractNumber != null) {
+    primaryOrder = findClosedMisPaymentPreviousMonth(
+      profile.orders,
+      primaryAgreement.contractNumber,
+      referenceDate,
+    )
+  }
+
+  return { primaryPlacement: null, primaryOrder, primaryAgreement }
+}
+
+function selectOocPrimaryAgreement(
+  agreements: AgreementRecord[],
+  placements: PlacementRecord[],
+): AgreementRecord | null {
+  const oocAgreements = agreements.filter(
+    (agreement) =>
+      agreement.source === 'ICM' && normalize(agreement.agreementType) === 'OUT OF CARE',
+  )
+
+  // Business expects at most one Active OOC agreement per person.
+  const active = oocAgreements.find(
+    (agreement) => normalize(agreement.agreementStatus) === 'ACTIVE',
+  )
+  if (active) return active
+
+  const withEndDate = oocAgreements.filter((agreement) => agreement.agreementEndDate != null)
+  if (withEndDate.length > 0) {
+    return withEndDate.reduce((latest, current) =>
+      current.agreementEndDate!.getTime() > latest.agreementEndDate!.getTime() ? current : latest,
+    )
+  }
+
+  return selectOocMisAgreement(agreements, placements)
+}
+
+function selectOocMisAgreement(
+  agreements: AgreementRecord[],
+  placements: PlacementRecord[],
+): AgreementRecord | null {
+  const misPlacementKeys = new Set(
+    placements
+      .filter((placement) => placement.source === 'MIS')
+      .map((placement) => {
+        const contractNumber = normalize(placement.contractNumber)
+        const providerId = normalize(placement.providerId)
+        if (!contractNumber || !providerId) return null
+        return `${contractNumber}::${providerId}`
+      })
+      .filter((key): key is string => key != null),
+  )
+  if (misPlacementKeys.size === 0) return null
+
+  const misContracts = agreements.filter(
+    (agreement) =>
+      agreement.source === 'MIS' &&
+      agreement.contractNumber != null &&
+      misPlacementKeys.has(
+        `${normalize(agreement.contractNumber)}::${normalize(agreement.providerId)}`,
+      ),
+  )
+  if (misContracts.length === 0) return null
+
+  const active = misContracts.find((agreement) => normalize(agreement.agreementStatus) === 'ACTIVE')
+  if (active) return active
+
+  const withEndDate = misContracts.filter((agreement) => agreement.agreementEndDate != null)
+  if (withEndDate.length === 0) return null
+
+  return withEndDate.reduce((latest, current) =>
+    current.agreementEndDate!.getTime() > latest.agreementEndDate!.getTime() ? current : latest,
+  )
+}
+
+function findClosedIcmOrderPreviousMonth(
+  orders: OrderRecord[],
+  agreementRowId: string,
+  referenceDate: Date,
+): OrderRecord | null {
+  const prevMonth = getPreviousMonth(referenceDate)
+  const matching = orders.filter(
+    (order) =>
+      order.source === 'ICM' &&
+      order.agreementRowId === agreementRowId &&
+      normalize(order.orderStatus) === 'CLOSED' &&
+      isInMonth(order.effectiveStartDate, prevMonth),
+  )
+  if (matching.length === 0) return null
+
+  return matching.reduce((highest, current) =>
+    current.amount > highest.amount ? current : highest,
+  )
+}
+
+function findClosedMisPaymentPreviousMonth(
+  orders: OrderRecord[],
+  contractNumber: string,
+  referenceDate: Date,
+): OrderRecord | null {
+  const prevMonth = getPreviousMonth(referenceDate)
+  const normalizedContractNumber = normalize(contractNumber)
+  if (!normalizedContractNumber) return null
+
+  const matching = orders.filter(
+    (order) =>
+      order.source === 'MIS' &&
+      normalize(order.contractNumber) === normalizedContractNumber &&
+      normalize(order.orderStatus) === 'CLOSED' &&
+      isInMonth(order.effectiveStartDate, prevMonth),
+  )
+  if (matching.length === 0) return null
+
+  return matching.reduce((highest, current) =>
+    current.amount > highest.amount ? current : highest,
+  )
 }
 
 const SOURCE_TYPE_PRIORITY: Array<{ source: 'ICM' | 'MIS'; type: string }> = [
@@ -333,6 +507,11 @@ const CONTACT_COLUMNS: ContactColumnDef[] = [
       row.primaryAgreement?.mcfdContract ?? row.primaryPlacement?.contractNumber ?? null,
   },
   {
+    dbColumn: 'source_agreement',
+    pgType: 'text',
+    extract: (row) => row.primaryAgreement?.source ?? row.primaryPlacement?.source ?? null,
+  },
+  {
     dbColumn: 'order_number',
     pgType: 'text',
     extract: (row) => row.primaryOrder?.orderNumber ?? null,
@@ -410,11 +589,11 @@ const UPSERT_SQL = `
   INSERT INTO contacts (
     ${COL_LIST},
     icm_integration_status,
-    created_at, created_by, last_updated_at, last_updated_by
+    created_at, created_by, last_updated_at, last_updated_by, needs_review
   )
   SELECT
     ${SELECT_LIST},
-    true, NOW(), 'SYSTEM', NOW(), 'SYSTEM'
+    true, NOW(), 'SYSTEM', NOW(), 'SYSTEM', false
   FROM unnest(${UNNEST_PARAMS})
   AS t(${COL_LIST})
   ON CONFLICT (person_id_icm) DO UPDATE SET
@@ -434,10 +613,18 @@ const UPSERT_SQL = `
     last_updated_by = CASE
       WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN 'SYSTEM'
       ELSE contacts.last_updated_by
+    END,
+    needs_review = CASE
+      WHEN contacts.csa_status = 'on_hold' THEN true
+      ELSE contacts.needs_review
     END
   WHERE contacts.csa_status NOT IN (${PROTECTED_STATUSES_SQL})
      OR EXCLUDED.csa_status = contacts.csa_status
 `
+
+function isUserSetCsaStatus(lastUpdatedBy: string | null): boolean {
+  return !!lastUpdatedBy && lastUpdatedBy !== 'SYSTEM'
+}
 
 @Injectable()
 export class EligibilityService {
@@ -491,6 +678,7 @@ export class EligibilityService {
       statusChanges: 0,
       newContacts: 0,
       skipped: 0,
+      userSetPreserved: 0,
       stepCounts: { step7: 0, step8: 0, step9: 0, step10: 0, noChange: 0 },
     }
 
@@ -509,11 +697,14 @@ export class EligibilityService {
         continue
       }
 
-      // Protected statuses: preserve existing csa_status, still upsert data
+      // Protected statuses: preserve csa_status; upsert only when staging eligibility data changed.
       if (
         profile.csaStatus &&
         (PROTECTED_STATUSES as readonly string[]).includes(profile.csaStatus)
       ) {
+        if (await this.shouldSkipUpsertForUnchangedStaging(profile)) {
+          continue
+        }
         updates.push({
           profile,
           result: {
@@ -525,8 +716,35 @@ export class EligibilityService {
         continue
       }
 
+      // User-set status (BL-14B): skip rules and upsert when staging eligibility data is unchanged.
+      if (isUserSetCsaStatus(profile.lastUpdatedBy)) {
+        if (!profile.csaStatusEffectiveDate) {
+          this.warnUserSetWithoutEffectiveDate(profile)
+        }
+        if (
+          await this.shouldSkipUpsertForUnchangedStaging(profile, {
+            referenceDate,
+            agedOutIds,
+          })
+        ) {
+          stats.userSetPreserved++
+          continue
+        }
+      }
+
       const result = runEligibility(profile, RULES, referenceDate)
       if (!result) continue
+
+      if (
+        result.newStatus === profile.csaStatus &&
+        (await this.shouldSkipUpsertForUnchangedStaging(profile, {
+          referenceDate,
+          agedOutIds,
+        }))
+      ) {
+        stats.stepCounts.noChange++
+        continue
+      }
 
       updates.push({ profile, result })
 
@@ -550,10 +768,52 @@ export class EligibilityService {
     }
 
     this.logger.log(
-      `Eligibility complete: ${stats.processed} processed, ${stats.statusChanges} updated, ${stats.newContacts} new, ${stats.skipped} skipped`,
+      `Eligibility complete: ${stats.processed} processed, ${stats.statusChanges} updated, ${stats.newContacts} new, ${stats.skipped} skipped, ${stats.userSetPreserved} user-set preserved`,
     )
 
     return stats
+  }
+
+  private warnUserSetWithoutEffectiveDate(profile: ContactProfile): void {
+    this.logger.warn(
+      `User-set CSA status for ${profile.personIdIcm} (last_updated_by=${profile.lastUpdatedBy}) but no csa_status_effective_date on master or ICM; running eligibility without BL-14B/14C skip`,
+    )
+  }
+
+  /**
+   * Skip upsert when staging eligibility data is unchanged since csa_status_effective_date.
+   * Age-out contacts are still processed when referenceDate/agedOutIds are provided.
+   */
+  private async shouldSkipUpsertForUnchangedStaging(
+    profile: ContactProfile,
+    options?: { referenceDate?: Date; agedOutIds?: string[] },
+  ): Promise<boolean> {
+    const since = profile.csaStatusEffectiveDate
+    if (!since) {
+      return false
+    }
+
+    if (options?.referenceDate && profile.dateOfBirth != null) {
+      const mustEvaluateAgeOut = !isEligibleAge(profile.dateOfBirth, options.referenceDate)
+      const includedForAgeOut = options.agedOutIds?.includes(profile.personIdIcm) ?? false
+      if (mustEvaluateAgeOut || includedForAgeOut) {
+        return false
+      }
+    }
+
+    const unchanged = !(await this.hasStagingDataChanged(profile.personIdIcm, since))
+    if (unchanged) {
+      this.logger.log(
+        `Skipping upsert for ${profile.personIdIcm}: no staging data changes since ${since.toISOString()}`,
+      )
+    }
+    return unchanged
+  }
+
+  private async hasStagingDataChanged(personIdIcm: string, since: Date): Promise<boolean> {
+    const { sql, params } = buildContactHasStagingChangesSql(personIdIcm, since)
+    const rows = await this.prisma.$queryRawUnsafe<{ hasChanges: boolean }[]>(sql, ...params)
+    return rows[0]?.hasChanges === true
   }
 
   private async findAgedOutContactIds(referenceDate: Date): Promise<string[]> {
@@ -580,6 +840,9 @@ export class EligibilityService {
       profile.csaStatus &&
       (PROTECTED_STATUSES as readonly string[]).includes(profile.csaStatus)
     ) {
+      if (await this.shouldSkipUpsertForUnchangedStaging(profile)) {
+        return { previousStatus, newStatus: profile.csaStatus }
+      }
       await this.upsertContacts([
         {
           profile,
@@ -593,6 +856,20 @@ export class EligibilityService {
       return { previousStatus, newStatus: profile.csaStatus }
     }
 
+    // BL-14C: user-set status is kept unless staging eligibility data changed.
+    if (isUserSetCsaStatus(profile.lastUpdatedBy)) {
+      if (!profile.csaStatusEffectiveDate) {
+        this.warnUserSetWithoutEffectiveDate(profile)
+      }
+      if (await this.shouldSkipUpsertForUnchangedStaging(profile, { referenceDate })) {
+        const status = previousStatus ?? profile.csaStatus
+        if (!status) {
+          throw new EligibilityInputError(`Contact ${personIdIcm} has no CSA status`)
+        }
+        return { previousStatus, newStatus: status }
+      }
+    }
+
     if (!profile.dateOfBirth) {
       throw new EligibilityInputError(`Contact ${personIdIcm} has no date of birth in staging`)
     }
@@ -600,6 +877,17 @@ export class EligibilityService {
     const result = runEligibility(profile, RULES, referenceDate)
     if (!result) {
       throw new EligibilityInputError(`No eligibility result for contact ${personIdIcm}`)
+    }
+
+    const resolvedStatus = result.newStatus ?? previousStatus ?? profile.csaStatus
+    if (
+      result.newStatus === profile.csaStatus &&
+      (await this.shouldSkipUpsertForUnchangedStaging(profile, { referenceDate }))
+    ) {
+      if (!resolvedStatus) {
+        throw new EligibilityInputError(`Contact ${personIdIcm} has no CSA status`)
+      }
+      return { previousStatus, newStatus: resolvedStatus }
     }
 
     await this.upsertContacts([{ profile, result }])
@@ -706,6 +994,8 @@ export class EligibilityService {
             ? parseISODatePacific(agreement.terminationDate)
             : null,
           mcfdContract: agreement.mcfdContract ?? null,
+          serviceProviderName: agreement.serviceProviderName ?? null,
+          providerId: agreement.providerId ?? null,
           source: 'ICM',
         }),
       )
@@ -754,6 +1044,7 @@ export class EligibilityService {
           ? new Date(raw.csaStatusEffectiveDate)
           : null,
         existingContactId: raw.existingContactId,
+        lastUpdatedBy: raw.lastUpdatedBy ?? null,
         din: raw.din ?? null,
         csaSentDate: raw.csaSentDate ? new Date(raw.csaSentDate) : null,
         misLegalAuthCode: raw.misLegalAuthCode,

@@ -3,9 +3,9 @@ name: Analysis
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
-    branches: [dev, test, main, release/cra-file-transfer-enabled]
+    branches: [dev, test, main]
   push:
-    branches: [dev, test, main, release/cra-file-transfer-enabled]
+    branches: [dev, test, main]
   schedule:
     - cron: "0 11 * * 0" # Sundays
   workflow_dispatch:
@@ -74,7 +74,7 @@ jobs:
             npm run lint
             npm run test:cov
           dir: backend
-          node_version: "22"
+          node_version: "24"
           supply_scan: true
           triggers: ('backend/')
 
@@ -98,7 +98,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 

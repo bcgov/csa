@@ -61,6 +61,7 @@ export interface Contact {
   agreementEndDate?: string
   terminationDate?: string
   mcfdContract?: string
+  sourceAgreement?: string
   // Order fields
   orderNumber?: string
   orderType?: string
@@ -73,6 +74,9 @@ export interface Contact {
   isOver18?: boolean
   // Hold fields
   holdBy?: string
+  holdReason?: string
+  // Review flag for On Hold records with staging data changes
+  needsReview?: boolean
 }
 
 export interface PaginatedContactsResponse {
@@ -190,6 +194,7 @@ export interface BulkOperationResponse {
 
 export interface Batch {
   id: number
+  batchNumber: number
   batchDate: string | null
   status: string
   statusLabel: string
@@ -214,11 +219,30 @@ export interface ContactBatchDetail {
   statusLabel: string | null
   batch: {
     id: number
+    batchNumber: number
     batchDate: string
     status: string
     statusLabel: string
-    systemComments: string | null
   }
+}
+
+export interface ContactAuditTrailEntry {
+  id: number
+  contactId: number
+  date: string
+  actionedBy: string
+  operation: string
+  field: string
+  oldValue: string
+  newValue: string
+}
+
+export interface PaginatedContactAuditTrailResponse {
+  data: ContactAuditTrailEntry[]
+  page: number
+  limit: number
+  total: number
+  totalPages: number
 }
 
 export interface BatchContactDetail {
@@ -250,10 +274,15 @@ export interface BatchContactDetail {
 /**
  * Put contacts on hold
  * @param contactIds - Array of contact IDs to put on hold
+ * @param reason - Required reason for putting contacts on hold
  */
-export const holdContacts = async (contactIds: number[]): Promise<BulkOperationResponse> => {
+export const holdContacts = async (
+  contactIds: number[],
+  reason: string,
+): Promise<BulkOperationResponse> => {
   const response = await APIService.getAxiosInstance().post('/contacts/hold', {
     contactIds,
+    reason,
   })
   return response.data
 }
@@ -261,10 +290,30 @@ export const holdContacts = async (contactIds: number[]): Promise<BulkOperationR
 /**
  * Resume contacts from hold
  * @param contactIds - Array of contact IDs to resume
+ * @param reason - Optional reason for resuming (overwrites previous reason)
  */
-export const resumeContacts = async (contactIds: number[]): Promise<BulkOperationResponse> => {
+export const resumeContacts = async (
+  contactIds: number[],
+  reason?: string,
+): Promise<BulkOperationResponse> => {
   const response = await APIService.getAxiosInstance().post('/contacts/resume', {
     contactIds,
+    reason,
+  })
+  return response.data
+}
+
+/**
+ * Update or clear hold reason for a contact
+ * @param contactId - Contact ID
+ * @param reason - New hold reason (required when ON_HOLD, optional/empty to clear when not ON_HOLD)
+ */
+export const updateHoldReason = async (
+  contactId: number,
+  reason?: string,
+): Promise<{ success: boolean; contact?: { id: number; holdReason: string } }> => {
+  const response = await APIService.getAxiosInstance().patch(`/contacts/${contactId}/hold-reason`, {
+    reason,
   })
   return response.data
 }
@@ -275,6 +324,23 @@ export const resumeContacts = async (contactIds: number[]): Promise<BulkOperatio
  */
 export const getContactBatches = async (contactId: number): Promise<ContactBatchDetail[]> => {
   const response = await APIService.getAxiosInstance().get(`/contacts/${contactId}/batches`)
+  return response.data
+}
+
+/**
+ * Get audit trail entries for a specific contact
+ * @param contactId - Contact ID
+ * @param page - Page number (default: 1)
+ * @param limit - Items per page (default: 200)
+ */
+export const getContactAuditTrail = async (
+  contactId: number,
+  page: number = 1,
+  limit: number = 200,
+): Promise<PaginatedContactAuditTrailResponse> => {
+  const response = await APIService.getAxiosInstance().get(`/contacts/${contactId}/audit-trail`, {
+    params: { page, limit },
+  })
   return response.data
 }
 
@@ -406,6 +472,15 @@ export const updateOver18Status = async (
 }
 
 /**
+ * Clear the review flag for a contact
+ * @param contactId - Contact ID to clear review flag for
+ */
+export const clearReviewFlag = async (contactId: number): Promise<{ success: boolean }> => {
+  const response = await APIService.getAxiosInstance().patch(`/contacts/${contactId}/review-flag`)
+  return response.data
+}
+
+/**
  * Eligibility run result
  */
 export interface EligibilityRunResult {
@@ -460,36 +535,51 @@ export const getJobStatus = async (jobId: number): Promise<JobRun> => {
   return response.data
 }
 
-/**
- * Run eligibility query for all contacts and poll until complete
- * @param onProgress - Optional callback for progress updates
- */
-export const runEligibilityForAllWithPolling = async (
-  onProgress?: (status: string) => void,
-): Promise<JobRun> => {
-  // Start the job
-  const { jobRunId } = await startEligibilityJob()
+type JobStatusResult = Awaited<ReturnType<typeof getJobStatus>>
 
-  // Poll for completion
-  const pollInterval = 10000 // 10 seconds
-  const maxAttempts = 60 // 10 minutes max
+type PollJobUntilCompleteOptions = {
+  jobId: number
+  pollIntervalMs: number
+  onProgress?: (job: JobStatusResult) => void
+}
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const job = await getJobStatus(jobRunId)
+const waitForNextPoll = (pollIntervalMs: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+
+const pollJobUntilComplete = async ({
+  jobId,
+  pollIntervalMs,
+  onProgress,
+}: PollJobUntilCompleteOptions): Promise<JobStatusResult> => {
+  while (true) {
+    const job = await getJobStatus(jobId)
 
     if (onProgress) {
-      onProgress(job.status)
+      onProgress(job)
     }
 
     if (job.status === 'SUCCESS' || job.status === 'FAILED') {
       return job
     }
 
-    // Wait before next poll
-    await new Promise((resolve) => setTimeout(resolve, pollInterval))
+    await waitForNextPoll(pollIntervalMs)
   }
+}
 
-  throw new Error('Eligibility job timed out')
+/**
+ * Run eligibility query for all contacts and poll until complete
+ * @param onProgress - Optional callback for progress updates
+ */
+export const runEligibilityForAllWithPolling = async (
+  onProgress?: (job: JobRun) => void,
+): Promise<JobRun> => {
+  const { jobRunId } = await startEligibilityJob()
+
+  return pollJobUntilComplete({
+    jobId: jobRunId,
+    pollIntervalMs: 10000,
+    onProgress,
+  })
 }
 
 /**
@@ -506,7 +596,22 @@ export interface JobRun {
   createdAt: string
   startedAt: string | null
   completedAt: string | null
+  /** Plain-language notice when a running job may be stuck (from GET /jobs). */
+  warning?: string
 }
+
+export type JobRunProgressUpdate = {
+  message: string
+  severity: 'info' | 'warning'
+}
+
+export const getJobRunProgressUpdate = (
+  job: JobRun,
+  runningMessage: string,
+): JobRunProgressUpdate => ({
+  message: job.warning ?? runningMessage,
+  severity: job.warning ? 'warning' : 'info',
+})
 
 export interface JobsResponse {
   data: JobRun[]
@@ -567,13 +672,64 @@ export const getRunningEligibilityJob = async (): Promise<JobRun | null> => {
 }
 
 /**
- * Get the most recent eligibility job run (regardless of status)
- * Returns the most recent job if found, null otherwise
+ * Wait for a running eligibility job to complete
+ * @param jobId - The job ID to monitor
+ * @param onProgress - Optional callback for progress updates
  */
-export const getLastEligibilityJob = async (): Promise<JobRun | null> => {
+export const waitForEligibilityJobCompletion = async (
+  jobId: number,
+  onProgress?: (job: JobRun) => void,
+): Promise<JobRun> => {
+  return pollJobUntilComplete({
+    jobId,
+    pollIntervalMs: 10000,
+    onProgress,
+  })
+}
+
+/**
+ * Wait for a running auto-batch job to complete
+ * @param jobId - The job ID to monitor
+ * @param onProgress - Optional callback for progress updates
+ */
+export const waitForAutoBatchJobCompletion = async (
+  jobId: number,
+  onProgress?: (job: JobRun) => void,
+): Promise<JobRun> => {
+  return pollJobUntilComplete({
+    jobId,
+    pollIntervalMs: 5000,
+    onProgress,
+  })
+}
+
+/**
+ * Start auto-batch job for all eligible contacts
+ * Returns the job run ID for tracking
+ */
+export const startAutoBatchJob = async (): Promise<{ jobRunId: number }> => {
+  const response = await APIService.getAxiosInstance().post('/jobs/auto-batch')
+  return response.data
+}
+
+/**
+ * Start SEND_CRA_FILE job for the selected pending batch
+ * Returns the job run ID for tracking
+ */
+export const startSendCraFileJob = async (): Promise<{ jobRunId: number }> => {
+  const response = await APIService.getAxiosInstance().post('/jobs/send-cra-file')
+  return response.data
+}
+
+/**
+ * Check if there's a running auto-batch job
+ * Returns the running job if found, null otherwise
+ */
+export const getRunningAutoBatchJob = async (): Promise<JobRun | null> => {
   const response = await APIService.getAxiosInstance().get<JobsResponse>('/jobs', {
     params: {
-      jobType: 'RUN_ELIGIBILITY',
+      jobType: 'AUTO_BATCH',
+      status: 'RUNNING',
       limit: 1,
     },
   })
@@ -581,31 +737,64 @@ export const getLastEligibilityJob = async (): Promise<JobRun | null> => {
 }
 
 /**
- * Wait for a running eligibility job to complete
+ * Check if there's a running SEND_CRA_FILE job
+ * Returns the running job if found, null otherwise
+ */
+export const getRunningSendCraFileJob = async (): Promise<JobRun | null> => {
+  const response = await APIService.getAxiosInstance().get<JobsResponse>('/jobs', {
+    params: {
+      jobType: 'SEND_CRA_FILE',
+      status: 'RUNNING',
+      limit: 1,
+    },
+  })
+  return response.data.data.length > 0 ? response.data.data[0] : null
+}
+
+/**
+ * Wait for a running SEND_CRA_FILE job to complete (polls indefinitely until SUCCESS or FAILED)
  * @param jobId - The job ID to monitor
  * @param onProgress - Optional callback for progress updates
  */
-export const waitForEligibilityJobCompletion = async (
+export const waitForSendCraFileJobCompletion = async (
   jobId: number,
-  onProgress?: (status: string) => void,
+  onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {
-  const pollInterval = 10000 // 10 seconds
-  const maxAttempts = 60 // 10 minutes max
+  return pollJobUntilComplete({
+    jobId,
+    pollIntervalMs: 10000,
+    onProgress,
+  })
+}
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const job = await getJobStatus(jobId)
+/**
+ * Run SEND_CRA_FILE job and poll until complete (polls indefinitely until SUCCESS or FAILED)
+ * @param onProgress - Optional callback for progress updates
+ */
+export const runSendCraFileWithPolling = async (
+  onProgress?: (job: JobRun) => void,
+): Promise<JobRun> => {
+  const { jobRunId } = await startSendCraFileJob()
 
-    if (onProgress) {
-      onProgress(job.status)
-    }
+  return pollJobUntilComplete({
+    jobId: jobRunId,
+    pollIntervalMs: 10000,
+    onProgress,
+  })
+}
 
-    if (job.status === 'SUCCESS' || job.status === 'FAILED') {
-      return job
-    }
+/**
+ * Run auto-batch job for all eligible contacts and poll until complete
+ * @param onProgress - Optional callback for progress updates
+ */
+export const runAutoBatchWithPolling = async (
+  onProgress?: (job: JobRun) => void,
+): Promise<JobRun> => {
+  const { jobRunId } = await startAutoBatchJob()
 
-    // Wait before next poll
-    await new Promise((resolve) => setTimeout(resolve, pollInterval))
-  }
-
-  throw new Error('Eligibility job timed out')
+  return pollJobUntilComplete({
+    jobId: jobRunId,
+    pollIntervalMs: 5000,
+    onProgress,
+  })
 }

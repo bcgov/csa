@@ -5,8 +5,15 @@ import {
   formatDateTimePacific,
   getAgeCutoffDate,
 } from 'src/common/utils'
+import { IcmApiRecord } from './data-source/icm-data-source'
+import {
+  filterValidOocAgreementLineItems,
+  OOC_AGREEMENT_LINES_FIELDS,
+  OOC_AGREEMENT_LINES_SEARCH_SPEC,
+} from './agreement-lines'
 import {
   FieldMapEntry,
+  STG_AGREEMENT_LINE_MAP,
   STG_AGREEMENT_MAP,
   STG_ICM_CASES_MAP,
   STG_ICM_CONTACTS_MAP,
@@ -24,6 +31,10 @@ export interface IcmApiConfig {
   cursorLabel: string | string[]
   searchSpec?: () => string
   fieldMap: FieldMapEntry[]
+  /** ICM `fields` query param for flat business-object reads. */
+  fields?: string
+  /** Drops invalid API rows before staging upsert. */
+  filterItems?: (items: IcmApiRecord[]) => IcmApiRecord[]
 }
 // TODO: date may not need DateTime as query params
 // Configs for ingesting ICM data into staging tables
@@ -75,6 +86,17 @@ export const ICM_INGESTION_CONFIGS: IcmApiConfig[] = [
     searchSpec: () =>
       '([Agreement Type] = "SHSS" OR [Agreement Type] = "FCH" OR [Agreement Type] = "Out of Care")',
     fieldMap: STG_AGREEMENT_MAP,
+  },
+  {
+    name: 'ooc_agreement_lines',
+    endpoint: '/AgreementLines/AgreementLine',
+    stagingTable: 'stg_icm_agreement_line',
+    primaryKey: 'ROW_ID',
+    cursorLabel: 'Updated',
+    searchSpec: () => OOC_AGREEMENT_LINES_SEARCH_SPEC,
+    fields: OOC_AGREEMENT_LINES_FIELDS,
+    filterItems: filterValidOocAgreementLineItems,
+    fieldMap: STG_AGREEMENT_LINE_MAP,
   },
   {
     name: 'orders',

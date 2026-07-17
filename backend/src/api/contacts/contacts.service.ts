@@ -201,7 +201,12 @@ export class ContactsService {
       case 'neq':
         return { [key]: { not: { equals: value } } }
       case 'like':
-        return { [key]: { contains: value as string, mode: 'insensitive' } }
+        return {
+          [key]: {
+            contains: this.escapeLikePattern(String(value)),
+            mode: 'insensitive',
+          },
+        }
       case 'gt':
         return { [key]: { gt: value } }
       case 'gte':
@@ -357,6 +362,7 @@ export class ContactsService {
     contactId: number,
     nextState: string,
     additionalData?: Record<string, unknown>,
+    origin?: string,
   ): Promise<TransitionResult> {
     const contact = await this.prisma.contact.findUnique({ where: { id: contactId } })
     if (!contact) {
@@ -364,23 +370,41 @@ export class ContactsService {
     }
 
     const currentState = contact.csaStatus ?? ''
+    const statusChanged = currentState !== nextState
+    const changedAdditionalData = this.pickChangedForceUpdateFields(contact, additionalData)
+
+    if (!statusChanged && Object.keys(changedAdditionalData).length === 0) {
+      const originSuffix = origin ? ` [origin: ${origin}]` : ''
+      this.logger.log(`Contact ${contactId}: skip FORCE/WKL — already ${nextState}${originSuffix}`)
+      return { success: true, from: currentState, to: nextState }
+    }
+
+    const updateData: Record<string, unknown> = {
+      icmIntegrationStatus: true,
+      lastUpdatedBy: 'SYSTEM',
+      lastUpdatedAt: new Date(),
+      preBatchStatus: null,
+      resumeStatus: null,
+      holdBy: null,
+      ...changedAdditionalData,
+    }
+
+    if (statusChanged) {
+      updateData.csaStatus = nextState
+      updateData.csaStatusEffectiveDate = new Date()
+    }
 
     await this.prisma.contact.update({
       where: { id: contactId },
-      data: {
-        csaStatus: nextState,
-        csaStatusEffectiveDate: new Date(),
-        icmIntegrationStatus: true,
-        lastUpdatedBy: 'SYSTEM',
-        lastUpdatedAt: new Date(),
-        preBatchStatus: null,
-        resumeStatus: null,
-        holdBy: null,
-        ...additionalData,
-      },
+      data: updateData,
     })
 
-    this.logger.log(`Contact ${contactId}: ${currentState}->${nextState} [FORCE/WKL] by SYSTEM`)
+    const originSuffix = origin ? ` [origin: ${origin}]` : ''
+    this.logger.log(
+      statusChanged
+        ? `Contact ${contactId}: ${currentState}->${nextState} [FORCE/WKL] by SYSTEM${originSuffix}`
+        : `Contact ${contactId}: FORCE/WKL additional data only (status remains ${nextState})${originSuffix}`,
+    )
 
     return { success: true, from: currentState, to: nextState }
   }
@@ -422,7 +446,11 @@ export class ContactsService {
     }
   }
 
-  async holdContacts(contactIds: number[], userId: string): Promise<BulkOperationResponse> {
+  async holdContacts(
+    contactIds: number[],
+    userId: string,
+    reason: string,
+  ): Promise<BulkOperationResponse> {
     const result: BulkOperationResponse = {
       success: [],
       skipped: [],
@@ -432,44 +460,105 @@ export class ContactsService {
       const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.HOLD, 'USER', {
         userId,
         origin: 'ContactsService.holdContacts',
+        additionalData: { holdReason: reason },
       })
       if (transitionResult.success) {
         result.success.push(id)
       } else {
-        const reason =
+        const skipReason =
           transitionResult.reason === 'Contact not found'
             ? BULK_OPERATION_SKIP_REASONS.NOT_FOUND
             : BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION
-        result.skipped.push({ id, reason })
+        result.skipped.push({ id, reason: skipReason })
       }
     }
 
     return result
   }
 
-  async resumeContacts(contactIds: number[], userId: string): Promise<BulkOperationResponse> {
+  async resumeContacts(
+    contactIds: number[],
+    userId: string,
+    reason?: string,
+  ): Promise<BulkOperationResponse> {
     const result: BulkOperationResponse = {
       success: [],
       skipped: [],
     }
 
     for (const id of contactIds) {
+      const additionalData: Record<string, unknown> = {}
+      // If reason is provided (can be empty string to clear), update holdReason
+      if (reason !== undefined) {
+        additionalData.holdReason = reason || null
+      }
+
       const transitionResult = await this.updateCsaStatus(id, CSA_EVENT.RESUME, 'USER', {
         userId,
         origin: 'ContactsService.resumeContacts',
+        additionalData: Object.keys(additionalData).length > 0 ? additionalData : undefined,
       })
       if (transitionResult.success) {
+        // Clear the review flag when resuming from hold
+        await this.prisma.contact.update({
+          where: { id },
+          data: { needsReview: false },
+        })
         result.success.push(id)
       } else {
-        const reason =
+        const skipReason =
           transitionResult.reason === 'Contact not found'
             ? BULK_OPERATION_SKIP_REASONS.NOT_FOUND
             : BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION
-        result.skipped.push({ id, reason })
+        result.skipped.push({ id, reason: skipReason })
       }
     }
 
     return result
+  }
+
+  async updateHoldReason(
+    contactId: number,
+    reason: string | undefined,
+    userId: string,
+  ): Promise<{ success: boolean; contact?: { id: number; holdReason: string } }> {
+    const contact = await this.prisma.contact.findUnique({
+      where: { id: contactId },
+      select: { id: true, csaStatus: true },
+    })
+
+    if (!contact) {
+      throw new NotFoundException(`Contact with ID ${contactId} not found`)
+    }
+
+    const isOnHold = contact.csaStatus === CSA_STATUS.ON_HOLD
+    const hasReason = reason !== undefined && reason.trim() !== ''
+
+    // If contact is ON_HOLD, reason is required
+    if (isOnHold && !hasReason) {
+      throw new BadRequestException("'Reason' cannot be blank when the CSA Status is 'On Hold'.")
+    }
+
+    // If contact is NOT on hold and no reason provided, clear the reason
+    const newReason = hasReason ? reason!.trim() : null
+
+    // Do not update hold_by here — that is set on HOLD only. last_updated_by is set so the
+    // audit trigger records the correct Actioned By on Reason changes without reassigning
+    // who put the contact on hold.
+    const updated = await this.prisma.contact.update({
+      where: { id: contactId },
+      data: {
+        holdReason: newReason,
+        lastUpdatedBy: userId,
+        lastUpdatedAt: new Date(),
+      },
+      select: { id: true, holdReason: true },
+    })
+
+    const action = newReason ? 'updated' : 'cleared'
+    this.logger.log(`Hold reason ${action} for contact ${contactId} by ${userId}`)
+
+    return { success: true, contact: { id: updated.id, holdReason: updated.holdReason || '' } }
   }
 
   async updateEligibilityStatus(
@@ -641,7 +730,6 @@ export class ContactsService {
   }
 
   async findContactBatches(contactId: number) {
-    this.logger.log(`Fetching batch history for contact with id ${contactId}`)
     const contact = await this.prisma.contact.findUnique({
       where: { id: contactId },
     })
@@ -655,6 +743,7 @@ export class ContactsService {
         batch: {
           select: {
             id: true,
+            batchNumber: true,
             batchDate: true,
             status: true,
             systemComments: true,
@@ -672,15 +761,8 @@ export class ContactsService {
     })
 
     return details.map((detail) => {
-      // Compute effectiveDate based on transaction type:
-      // - Application: Legal Authority's Effective Date (contact.effectiveDate)
-      // - Cancellation: Child's Care End Date (contact.careEndDate)
-      const effectiveDate =
-        detail.transactionType === TRANSACTION_TYPES.CANCELLATION
-          ? detail.contact.careEndDate
-          : detail.contact.effectiveDate
-
-      const cancelReasonCode = detail.contact.cancelReasonCode
+      const effectiveDate = detail.effectiveDate
+      const cancelReasonCode = detail.cancelReasonCode
       const cancelReasonLabel = getCancelReasonLabel(cancelReasonCode, detail.transactionType)
 
       return enrichLabels({
@@ -716,6 +798,16 @@ export class ContactsService {
       throw err
     }
 
+    // Clear the review flag after eligibility is run, unless the contact is ON_HOLD.
+    // For ON_HOLD contacts, the review flag is set by the eligibility upsert when
+    // staging data has changed, and we want to preserve that signal.
+    if (result.newStatus !== CSA_STATUS.ON_HOLD) {
+      await this.prisma.contact.update({
+        where: { id: contactId },
+        data: { needsReview: false },
+      })
+    }
+
     // If the eligibility run flipped csa_status, the upsert flagged
     // icm_integration_status=true. Try to push immediately; on failure
     // the flag stays set and the RETRY_FAILED cron will sweep it.
@@ -732,7 +824,52 @@ export class ContactsService {
 
   // Escape ILIKE special characters to prevent wildcard injection
   // '%' and '_' are wildcards, '\' is escape char
+  private pickChangedForceUpdateFields(
+    contact: Record<string, unknown>,
+    additionalData?: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (!additionalData) {
+      return {}
+    }
+
+    const changed: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(additionalData)) {
+      const current = contact[key]
+      const currentNormalized = current == null ? '' : String(current).trim()
+      const valueNormalized = value == null ? '' : String(value).trim()
+      if (currentNormalized !== valueNormalized) {
+        changed[key] = value
+      }
+    }
+    return changed
+  }
+
   private escapeLikePattern(input: string): string {
     return input.replace(/[%_\\]/g, '\\$&')
+  }
+
+  /**
+   * Clear the review flag for a contact
+   * @param contactId - Contact ID to clear review flag for
+   * @param userId - User performing the action
+   */
+  async clearReviewFlag(contactId: number, userId: string): Promise<{ success: boolean }> {
+    const contact = await this.prisma.contact.findUnique({
+      where: { id: contactId },
+      select: { id: true, needsReview: true },
+    })
+
+    if (!contact) {
+      throw new NotFoundException(`Contact ${contactId} not found`)
+    }
+
+    await this.prisma.contact.update({
+      where: { id: contactId },
+      data: { needsReview: false },
+    })
+
+    this.logger.log(`Review flag cleared for contact ${contactId} by ${userId}`)
+
+    return { success: true }
   }
 }

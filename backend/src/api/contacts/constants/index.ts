@@ -19,6 +19,14 @@ export const ALLOWED_FILTER_SORT_FIELDS = [
   'serviceOffice',
   'assignedTo',
   'holdBy',
+  'holdReason',
+  'needsReview',
+  'searchText',
+  'personIdIcm',
+  'personIdMis',
+  'birthCity',
+  'birthProvince',
+  'birthCountry',
 ] as const
 
 export const CSA_STATUSES = {

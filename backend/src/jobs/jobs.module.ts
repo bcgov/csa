@@ -5,6 +5,7 @@ import { RetryFailedHandler } from './handlers/retry-failed.handler'
 import { JobRegistry } from './job-registry.service'
 import { JobRunner } from './job-runner.service'
 import { JobsService } from './jobs.service'
+import { OpenshiftJobLauncher } from './openshift-job-launcher.service'
 
 /*
  * JobsModule provides the job framework infrastructure
@@ -13,12 +14,13 @@ import { JobsService } from './jobs.service'
  * - JobsService: Database operations for job_runs
  * - JobRunner: Execute jobs with retry logic
  * - JobRegistry: Register and retrieve job handlers
+ * - OpenshiftJobLauncher: Create OpenShift Jobs from CronJob templates
  * - Register their handlers (cross-cutting jobs) with JobRegistry in onModuleInit()
  */
 @Module({
   imports: [PrismaModule, IcmSyncBackModule],
-  providers: [JobsService, JobRunner, JobRegistry, RetryFailedHandler],
-  exports: [JobsService, JobRunner, JobRegistry, RetryFailedHandler],
+  providers: [JobsService, JobRunner, JobRegistry, RetryFailedHandler, OpenshiftJobLauncher],
+  exports: [JobsService, JobRunner, JobRegistry, RetryFailedHandler, OpenshiftJobLauncher],
 })
 export class JobsModule implements OnModuleInit {
   constructor(

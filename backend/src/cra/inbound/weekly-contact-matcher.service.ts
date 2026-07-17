@@ -5,6 +5,7 @@ import { BATCH_DETAIL_STATUS } from 'src/common/state-machine/constants/batch-de
 import { BATCH_STATUS } from 'src/common/state-machine/constants/batch-status.constants'
 import { AppLogger } from 'src/common/logger/app-logger'
 import { normalize, parseWklDate } from 'src/common/utils'
+import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { CraMatchingSnapshot } from './cra-matching-snapshot.interface'
 import { DetailRecord04 } from './inbound-weekly.interface'
 
@@ -67,6 +68,8 @@ export interface MatchedBatchDetail {
   transactionType: string
   systemComments: string | null
   contact: { din: string | null }
+  /** Who created the owning batch (MINISTRY or CRA). */
+  initiatedBy: string
 }
 
 export interface MatchedContact {
@@ -74,6 +77,17 @@ export interface MatchedContact {
   din: string | null
   csaStatus: string | null
   caseNumber: string | null
+}
+
+export type SnapshotBatchDetailCandidate = {
+  id: number
+  contactId: number
+  batchId: number
+  transactionType: string
+  systemComments: string | null
+  craMatchingSnapshot: unknown
+  contact: { din: string | null }
+  batch: { initiatedBy: string }
 }
 
 @Injectable()
@@ -103,24 +117,31 @@ export class WeeklyContactMatcherService {
         systemComments: true,
         craMatchingSnapshot: true,
         contact: { select: { din: true } },
+        batch: { select: { initiatedBy: true } },
       },
     })
   }
 
   async findMatchingBatchDetail(wklDetail: WklChildDetails): Promise<MatchedBatchDetail | null> {
+    return this.matchBatchDetailFromCandidates(this.candidates, wklDetail)
+  }
+
+  matchBatchDetailFromCandidates(
+    candidates: SnapshotBatchDetailCandidate[],
+    wklDetail: WklChildDetails,
+  ): MatchedBatchDetail | null {
     const din = wklDetail.childDin?.trim()
 
     // Step 1: DIN match
     if (din) {
-      const match = this.candidates.find(
+      const match = candidates.find(
         (d) => (d.craMatchingSnapshot as unknown as CraMatchingSnapshot).ccraDinNum === din,
       )
       if (match) return this.toResult(match)
-      this.logger.log(`DIN ${din} not matched in snapshots, falling back to child details`)
     }
 
     // Step 2: Child details match
-    const matches = this.candidates.filter((d) => {
+    const matches = candidates.filter((d) => {
       const snap = d.craMatchingSnapshot as unknown as CraMatchingSnapshot
       return (
         matchesGivenName(
@@ -151,14 +172,79 @@ export class WeeklyContactMatcherService {
     return null
   }
 
-  private toResult(detail: {
-    id: number
-    contactId: number
-    batchId: number
-    transactionType: string
-    systemComments: string | null
-    contact: { din: string | null }
-  }): MatchedBatchDetail {
+  async findAllSnapshotBatchDetails(): Promise<SnapshotBatchDetailCandidate[]> {
+    return this.prisma.contactBatchDetail.findMany({
+      where: { craMatchingSnapshot: { not: Prisma.DbNull } },
+      select: {
+        id: true,
+        contactId: true,
+        batchId: true,
+        transactionType: true,
+        systemComments: true,
+        craMatchingSnapshot: true,
+        contact: { select: { din: true } },
+        batch: { select: { initiatedBy: true } },
+      },
+    })
+  }
+
+  async findCraBatchDetailForContact(
+    contactId: number,
+    weeklyFileDate: Date,
+    detail: DetailRecord04,
+  ): Promise<MatchedBatchDetail | null> {
+    const batchDetails = await this.prisma.contactBatchDetail.findMany({
+      where: {
+        contactId,
+        craMatchingSnapshot: { not: Prisma.DbNull },
+        batch: {
+          initiatedBy: CRA_DATA_HANDLING_CONSTANT.BATCH_INITIATED_BY.CRA,
+          batchDate: weeklyFileDate,
+        },
+      },
+      select: {
+        id: true,
+        contactId: true,
+        batchId: true,
+        transactionType: true,
+        systemComments: true,
+        craMatchingSnapshot: true,
+        contact: { select: { din: true } },
+        batch: { select: { initiatedBy: true } },
+      },
+    })
+
+    const expected = this.buildWklMatchingSnapshot(detail)
+    const matches = batchDetails.filter((batchDetail) =>
+      this.snapshotMatchesWklDetail(
+        batchDetail.craMatchingSnapshot as unknown as CraMatchingSnapshot,
+        expected,
+      ),
+    )
+
+    if (matches.length === 1) return this.toResult(matches[0])
+    if (matches.length > 1) {
+      this.logger.warn(
+        `WKL backfill: multiple CRA batch details for contact ${contactId} on ${weeklyFileDate.toISOString().slice(0, 10)}`,
+      )
+    }
+    return null
+  }
+
+  snapshotMatchesWklDetail(snapshot: CraMatchingSnapshot, expected: CraMatchingSnapshot): boolean {
+    return (
+      equalsIgnoreCase(snapshot.childGivenName, expected.childGivenName) &&
+      equalsIgnoreCase(snapshot.childSurName, expected.childSurName) &&
+      equalsIgnoreCase(snapshot.childSex, expected.childSex) &&
+      snapshot.childBirthDate === expected.childBirthDate &&
+      equalsIgnoreCase(snapshot.childBirthCity, expected.childBirthCity) &&
+      equalsIgnoreCase(snapshot.childBirthProv, expected.childBirthProv) &&
+      equalsCountryCode(snapshot.childBirthCountry, expected.childBirthCountry) &&
+      (snapshot.ccraDinNum?.trim() ?? '') === (expected.ccraDinNum?.trim() ?? '')
+    )
+  }
+
+  private toResult(detail: SnapshotBatchDetailCandidate): MatchedBatchDetail {
     return {
       id: detail.id,
       contactId: detail.contactId,
@@ -166,6 +252,7 @@ export class WeeklyContactMatcherService {
       transactionType: detail.transactionType,
       systemComments: detail.systemComments,
       contact: detail.contact,
+      initiatedBy: detail.batch.initiatedBy,
     }
   }
 

@@ -6,6 +6,7 @@ import { JobResult } from './interfaces/job-result.interface'
 import { JobContext } from './interfaces/job.interface'
 import { JobRegistry } from './job-registry.service'
 import { JobsService } from './jobs.service'
+import { OpenshiftJobLauncher } from './openshift-job-launcher.service'
 
 @Injectable()
 export class JobRunner {
@@ -14,7 +15,43 @@ export class JobRunner {
   constructor(
     private readonly jobsService: JobsService,
     private readonly jobRegistry: JobRegistry,
+    private readonly openshiftJobLauncher: OpenshiftJobLauncher,
   ) {}
+
+  private async reconcileStuckRunningJobs(stuckThresholdMinutes: number): Promise<number> {
+    const stuckJobs = await this.jobsService.getStuckRunningJobs(stuckThresholdMinutes)
+    let markedFailed = 0
+
+    for (const job of stuckJobs) {
+      const jobType = job.jobType as JobType
+
+      // For non-OpenShift-managed jobs, keep the classic timeout behavior.
+      if (!this.openshiftJobLauncher.hasCronJobMapping(jobType)) {
+        await this.jobsService.markStuckJobAsFailed(job.id)
+        markedFailed += 1
+        continue
+      }
+
+      const openshiftStatus = await this.openshiftJobLauncher.getJobStatus(jobType, job.id)
+
+      if (openshiftStatus.state === 'ACTIVE') {
+        this.logger.log(
+          `Skipping stuck mark for job ${job.id} [${jobType}] because OpenShift still reports ACTIVE`,
+        )
+        continue
+      }
+
+      const reason =
+        openshiftStatus.state === 'FAILED'
+          ? `OpenShift job failed: ${openshiftStatus.message}`
+          : `Job timed out (stuck): OpenShift state=${openshiftStatus.state.toLowerCase()}`
+
+      await this.jobsService.markStuckJobAsFailed(job.id, reason)
+      markedFailed += 1
+    }
+
+    return markedFailed
+  }
 
   // Execute a job with inline retry
   async executeJob(jobId: number): Promise<JobResult> {
@@ -46,6 +83,12 @@ export class JobRunner {
       const err = error instanceof Error ? error : new Error(String(error))
       this.logger.error(`Job ${jobId} onStart hook failed: ${err.message}`, err.stack)
       await this.safeMarkFailed(jobId, err)
+      try {
+        await handler.onFailure?.(context, err)
+      } catch (hookError) {
+        const hookErr = hookError instanceof Error ? hookError : new Error(String(hookError))
+        this.logger.error(`Job ${jobId} onFailure hook threw: ${hookErr.message}`, hookErr.stack)
+      }
       return { success: false, message: `onStart failed: ${err.message}` }
     }
 
@@ -135,9 +178,16 @@ export class JobRunner {
 
   // Process failed jobs and stuck running jobs
   async processFailedJobs(): Promise<void> {
-    const stuckResult = await this.jobsService.markStuckJobsAsFailed(40)
-    if (stuckResult.count > 0) {
-      this.logger.log(`Marked ${stuckResult.count} stuck jobs as FAILED`)
+    let stuckCount = 0
+    if (this.openshiftJobLauncher.isEnabled()) {
+      stuckCount = await this.reconcileStuckRunningJobs(40)
+    } else {
+      const stuckResult = await this.jobsService.markStuckJobsAsFailed(40)
+      stuckCount = stuckResult.count
+    }
+
+    if (stuckCount > 0) {
+      this.logger.log(`Marked ${stuckCount} stuck jobs as FAILED`)
     }
 
     // Only returns top-level jobs under MAX_RETRY_COUNT (child jobs excluded)
@@ -169,6 +219,7 @@ export class JobRunner {
     } catch (dbError) {
       this.logger.error(
         `Failed to mark job ${jobId} as FAILED in DB: ${dbError}. Original error: ${errorDetail}`,
+        error.stack,
       )
     }
   }

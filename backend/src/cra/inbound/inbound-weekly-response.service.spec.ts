@@ -59,15 +59,16 @@ describe('InboundWeeklyResponseService', () => {
     expect(result.trailer.recordCount).toBe(3)
   })
 
-  it('should filter only electronic (E) records', () => {
+  it('should parse all detail records for report persistence', () => {
     const fileContent = [buildDetailLine('E'), buildDetailLine(' ')].join('\n')
 
     ;(fs.readFileSync as any).mockReturnValue(fileContent)
 
     const result = service.parseWeeklyResponseFile(mockFilePath)
 
-    expect(result.details.length).toBe(1)
+    expect(result.details.length).toBe(2)
     expect(result.details[0].receiveMode).toBe('E')
+    expect(result.details[1].receiveMode).toBe(' ')
   })
 
   it('should parse detail fields correctly', () => {
@@ -105,14 +106,15 @@ describe('InboundWeeklyResponseService', () => {
     expect(result.trailer.recordCount).toBe(123)
   })
 
-  it('should handle file with no electronic records', () => {
+  it('should parse non-electronic-only files for report persistence', () => {
     const fileContent = [buildDetailLine(' ')].join('\n')
 
     ;(fs.readFileSync as any).mockReturnValue(fileContent)
 
     const result = service.parseWeeklyResponseFile(mockFilePath)
 
-    expect(result.details.length).toBe(0)
+    expect(result.details.length).toBe(1)
+    expect(result.details[0].receiveMode).toBe(' ')
   })
 
   it('should log summary after parsing', () => {

@@ -26,6 +26,10 @@ export function step9_UpdateNotEligible(
     newStatus = CSA_STATUS.NOT_ELIGIBLE_IN_PAY
     reasonCode = cancelReasonCode ?? ELIGIBILITY_CONFIG.DEFAULT_CANCEL_REASON_CODE
     endDate = careEndDate ?? referenceDate ?? pacificToday()
+  } else if (currentStatus === CSA_STATUS.NOT_ELIGIBLE_IN_PAY) {
+    newStatus = currentStatus
+    reasonCode = cancelReasonCode ?? null
+    endDate = careEndDate ?? null
   } else {
     newStatus = currentStatus
   }

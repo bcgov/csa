@@ -893,6 +893,70 @@ describe('ContactsService', () => {
     })
   })
 
+  describe('button bulk status handlers', () => {
+    it('should treat application/cancellation refused as eligible targets for ELIGIBLE action', async () => {
+      const contactMap = new Map([
+        [1, { id: 1, csaStatus: 'application_refused_cra' }],
+        [2, { id: 2, csaStatus: 'cancellation_refused_cra' }],
+      ])
+
+      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+        Promise.resolve(contactMap.get(where.id) as any),
+      )
+      const updateSpy = vi
+        .spyOn(service, 'updateCsaStatus')
+        .mockResolvedValue({ success: true, from: 'x', to: 'y' } as any)
+
+      const result = await service.updateEligibilityStatus([1, 2], 'ELIGIBLE', 'user1')
+
+      expect(result.success).toEqual([1, 2])
+      expect(result.skipped).toEqual([])
+      expect(updateSpy).toHaveBeenCalledWith(
+        1,
+        'BECOME_ELIGIBLE',
+        'USER',
+        expect.objectContaining({ userId: 'user1' }),
+      )
+      expect(updateSpy).toHaveBeenCalledWith(
+        2,
+        'BECOME_ELIGIBLE',
+        'USER',
+        expect.objectContaining({ userId: 'user1' }),
+      )
+    })
+
+    it('should treat application/cancellation refused as valid sources for SET_NOT_ELIGIBLE action', async () => {
+      const contactMap = new Map([
+        [1, { id: 1, csaStatus: 'application_refused_cra' }],
+        [2, { id: 2, csaStatus: 'cancellation_refused_cra' }],
+      ])
+
+      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+        Promise.resolve(contactMap.get(where.id) as any),
+      )
+      const updateSpy = vi
+        .spyOn(service, 'updateCsaStatus')
+        .mockResolvedValue({ success: true, from: 'x', to: 'y' } as any)
+
+      const result = await service.updateNotEligibleStatus([1, 2], 'SET_NOT_ELIGIBLE', 'user1')
+
+      expect(result.success).toEqual([1, 2])
+      expect(result.skipped).toEqual([])
+      expect(updateSpy).toHaveBeenCalledWith(
+        1,
+        'SET_NOT_ELIGIBLE',
+        'USER',
+        expect.objectContaining({ userId: 'user1' }),
+      )
+      expect(updateSpy).toHaveBeenCalledWith(
+        2,
+        'SET_NOT_ELIGIBLE',
+        'USER',
+        expect.objectContaining({ userId: 'user1' }),
+      )
+    })
+  })
+
   describe('updateCsaStatus', () => {
     it('should transition contact with static target', async () => {
       const contact = { id: 1, csaStatus: 'eligible', resumeStatus: null }

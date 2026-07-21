@@ -329,7 +329,11 @@ export class ContactsService {
       if (!contact.cancelReasonCode) {
         updateData.cancelReasonCode = '21'
       }
-      updateData.careEndDate = pacificToday()
+      const placementCareEndDate = await this.findLatestPlacementEndDateFromStaging(
+        contact.personIdIcm,
+        contact.personIdMis,
+      )
+      updateData.careEndDate = placementCareEndDate ?? pacificToday()
     }
 
     if (event === CSA_EVENT.SET_ELIGIBLE_TBD || event === CSA_EVENT.BECOME_ELIGIBLE) {
@@ -356,6 +360,38 @@ export class ContactsService {
     }
 
     return { success: true, from: currentState, to: nextState }
+  }
+
+  private async findLatestPlacementEndDateFromStaging(
+    personIdIcm: string | null | undefined,
+    personIdMis: string | null | undefined,
+  ): Promise<Date | null> {
+    const personIcm = personIdIcm?.trim() || null
+    const personMis = personIdMis?.trim() || null
+
+    const rows = await this.prisma.$queryRaw<{ maxEndDate: Date | null }[]>`
+      WITH placement_end_dates AS (
+        SELECT icm_plc.X_END_DATE AS end_date
+        FROM stg_icm_cases cases
+        INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
+        WHERE ${personIcm} IS NOT NULL
+          AND cases.X_CONTACT_NUM = ${personIcm}
+          AND icm_plc.X_END_DATE IS NOT NULL
+
+        UNION ALL
+
+        SELECT mis_plc.END_DATE AS end_date
+        FROM stg_mis_placements mis_plc
+        WHERE ${personMis} IS NOT NULL
+          AND mis_plc.person_id_mis = ${personMis}
+          AND mis_plc.END_DATE IS NOT NULL
+      )
+      SELECT MAX(end_date) AS "maxEndDate"
+      FROM placement_end_dates
+    `
+
+    const maxEndDate = rows?.[0]?.maxEndDate
+    return maxEndDate ? new Date(maxEndDate) : null
   }
 
   async forceUpdateCsaStatus(

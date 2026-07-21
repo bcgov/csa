@@ -3,16 +3,22 @@ import { NotFoundException, UnprocessableEntityException } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
-import { CSAGuard } from '../common/guards/csa.guard'
+import { vi } from 'vitest'
 import { AuditTrailService } from '../audit-trail/audit-trail.service'
+import { CSAGuard } from '../common/guards/csa.guard'
 import { ContactsController } from './contacts.controller'
 import { ContactsService } from './contacts.service'
 
 const mockCSAGuard = {
   canActivate: (context: { switchToHttp: () => { getRequest: () => any } }) => {
     const req = context.switchToHttp().getRequest()
+    // Extract test username from header if present
     const testUsername = req.headers['x-test-username']
-    if (testUsername) req.username = testUsername
+    if (testUsername) {
+      req.username = typeof testUsername === 'string' ? testUsername : testUsername[0]
+    } else {
+      req.username = 'SYSTEM'
+    }
     return true
   },
 }
@@ -73,6 +79,18 @@ describe('ContactsController', () => {
     controller = module.get<ContactsController>(ContactsController)
     service = module.get<ContactsService>(ContactsService)
     app = module.createNestApplication()
+
+    // Add middleware to extract username from test header
+    app.use((req: any, res: any, next: any) => {
+      const testUsername = req.headers['x-test-username']
+      if (testUsername) {
+        req.username = typeof testUsername === 'string' ? testUsername : testUsername[0]
+      } else {
+        req.username = 'SYSTEM'
+      }
+      next()
+    })
+
     await app.init()
 
     vi.clearAllMocks()
@@ -125,7 +143,7 @@ describe('ContactsController', () => {
 
   describe('findOne', () => {
     it('should return a user object', async () => {
-      const result = await controller.findOne('1')
+      const result = await controller.findOne(1)
       expect(result).toEqual(mockContacts[0])
     })
 
@@ -133,7 +151,7 @@ describe('ContactsController', () => {
       mockContactsService.findOne.mockRejectedValueOnce(
         new NotFoundException('Contact 999 not found'),
       )
-      await expect(controller.findOne('999')).rejects.toThrow(NotFoundException)
+      await expect(controller.findOne(999)).rejects.toThrow(NotFoundException)
     })
   })
 

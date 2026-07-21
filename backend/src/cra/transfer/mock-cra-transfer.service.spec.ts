@@ -91,8 +91,6 @@ describe('MockCraTransferService', () => {
     })
 
     it('should throw when file does not exist', async () => {
-      vi.mocked(fsp.readFile).mockRejectedValue(new Error('ENOENT: no such file'))
-
       await expect(service.downloadInboundFile('missing.dat')).rejects.toThrow('ENOENT')
     })
   })

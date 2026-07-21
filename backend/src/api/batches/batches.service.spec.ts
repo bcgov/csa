@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BATCH_DETAIL_STATUS, BATCH_EVENT, BATCH_STATUS } from 'src/common/state-machine/constants'
+import { HeaderRecord, RecordTypeCode, TranCode } from 'src/cra/inbound/inbound-weekly.interface'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BatchesService } from './batches.service'
-import { RecordTypeCode, TranCode, HeaderRecord } from 'src/cra/inbound/inbound-weekly.interface'
 
 describe('BatchesService', () => {
   let service: BatchesService
@@ -626,6 +626,13 @@ describe('BatchesService', () => {
         id: 1,
         caseNumber: 'CASE-1',
         csaStatus: 'not_eligible_in_pay',
+        firstName: 'John',
+        lastName: 'Doe',
+        gender: 'M',
+        dateOfBirth: new Date('2000-01-01'),
+        birthCity: 'Vancouver',
+        birthCountry: 'Canada',
+        birthProvince: 'BC',
         effectiveDate: new Date('2024-01-01'),
         careEndDate: new Date('2025-02-20'),
         cancelReasonCode: '14',
@@ -658,6 +665,13 @@ describe('BatchesService', () => {
         id: 2,
         caseNumber: 'CASE-2',
         csaStatus: 'eligible',
+        firstName: 'Jane',
+        lastName: 'Smith',
+        gender: 'F',
+        dateOfBirth: new Date('2000-06-15'),
+        birthCity: 'Toronto',
+        birthCountry: 'Canada',
+        birthProvince: 'ON',
         effectiveDate: new Date('2025-01-15'),
         careEndDate: null,
         cancelReasonCode: null,
@@ -690,9 +704,16 @@ describe('BatchesService', () => {
         id: 3,
         caseNumber: 'CASE-3',
         csaStatus: 'not_eligible_in_pay',
+        firstName: 'Bob',
+        lastName: 'Brown',
+        gender: 'M',
+        dateOfBirth: new Date('2000-03-10'),
+        birthCity: 'Calgary',
+        birthCountry: 'Canada',
+        birthProvince: 'AB',
         effectiveDate: new Date('2024-01-01'),
-        careEndDate: null,
-        cancelReasonCode: null,
+        careEndDate: new Date('2025-02-20'),
+        cancelReasonCode: '21', // CHILD_LEFT
       }
 
       mockPrisma.batch.findFirst.mockResolvedValue({ id: 1, status: 'pending' })
@@ -702,28 +723,313 @@ describe('BatchesService', () => {
         success: true,
         to: 'in_batch_cancellation',
       })
-      mockPrisma.contact.update.mockResolvedValue({})
       mockPrisma.contactBatchDetail.create.mockResolvedValue({ id: 12 })
       mockPrisma.contactBatchDetail.update.mockResolvedValue({})
       mockPrisma.batch.update.mockResolvedValue({})
 
-      await service.addContactsToPendingBatch([3], 'user@test.com')
+      const result = await service.addContactsToPendingBatch([3], 'user@test.com')
 
-      // Verify defaults were applied to contact
-      expect(mockPrisma.contact.update).toHaveBeenCalledWith({
-        where: { id: 3 },
-        data: expect.objectContaining({
-          careEndDate: expect.any(Date),
-          cancelReasonCode: '21', // CHILD_LEFT default
-        }),
-      })
+      // Verify contact was successfully added (passes CRA validation)
+      expect(result.success).toContain(3)
 
-      // Verify defaults were captured in batch detail
+      // Verify batch detail captured the cancellation fields
       expect(mockPrisma.contactBatchDetail.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          effectiveDate: expect.any(Date),
+          effectiveDate: new Date('2025-02-20'),
           cancelReasonCode: '21',
+          transactionType: 'cancellation',
         }),
+      })
+    })
+  })
+
+  describe('User Story 40101 - S1: Manual add with CRA validation & incomplete records', () => {
+    it('should return incomplete records with missing CRA fields when actor=USER (default)', async () => {
+      const validContact = {
+        id: 100,
+        caseNumber: 'CASE-100',
+        csaStatus: 'eligible',
+        firstName: 'John',
+        lastName: 'Doe',
+        gender: 'M',
+        dateOfBirth: new Date('2000-01-01'),
+        birthCity: 'Vancouver',
+        birthCountry: 'Canada',
+        birthProvince: 'BC',
+        effectiveDate: new Date('2025-01-15'),
+        careEndDate: null,
+        cancelReasonCode: null,
+      }
+
+      const incompleteContact = {
+        id: 101,
+        caseNumber: 'CASE-101',
+        csaStatus: 'eligible',
+        firstName: null, // Missing required field
+        lastName: 'Smith',
+        gender: null, // Missing required field
+        dateOfBirth: new Date('2000-06-15'),
+        birthCity: 'Toronto',
+        birthCountry: 'Canada',
+        birthProvince: 'ON',
+        effectiveDate: new Date('2025-01-15'),
+        careEndDate: null,
+        cancelReasonCode: null,
+      }
+
+      mockPrisma.batch.findFirst.mockResolvedValue({ id: 1, status: 'pending' })
+      mockPrisma.contact.findMany.mockResolvedValue([validContact, incompleteContact])
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([])
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: true,
+        to: 'in_batch_application',
+      })
+      mockPrisma.contactBatchDetail.create.mockResolvedValue({ id: 100 })
+      mockPrisma.contactBatchDetail.update.mockResolvedValue({})
+      mockPrisma.batch.update.mockResolvedValue({})
+
+      const result = await service.addContactsToPendingBatch([100, 101], 'user@test.com')
+
+      // Valid contact should be in success
+      expect(result.success).toContain(100)
+
+      // Incomplete contact should be in incomplete array with missing fields
+      expect(result.incomplete).toContainEqual({
+        id: 101,
+        missingFields: expect.arrayContaining(['First Name', 'Gender']),
+      })
+
+      // Contacts service should NOT be called for incomplete record
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledTimes(1)
+    })
+
+    it('should include birthProvince in missing fields when not provided for Canada', async () => {
+      const contactMissingProvince = {
+        id: 102,
+        caseNumber: 'CASE-102',
+        csaStatus: 'eligible',
+        firstName: 'Alice',
+        lastName: 'Johnson',
+        gender: 'F',
+        dateOfBirth: new Date('2000-03-10'),
+        birthCity: 'Montreal',
+        birthCountry: 'Canada',
+        birthProvince: null, // Required for Canada but missing
+        effectiveDate: new Date('2025-01-15'),
+        careEndDate: null,
+        cancelReasonCode: null,
+      }
+
+      mockPrisma.batch.findFirst.mockResolvedValue({ id: 1, status: 'pending' })
+      mockPrisma.contact.findMany.mockResolvedValue([contactMissingProvince])
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([])
+      mockPrisma.batch.update.mockResolvedValue({})
+
+      const result = await service.addContactsToPendingBatch([102], 'user@test.com')
+
+      // Contact should be incomplete with birthProvince as missing
+      expect(result.incomplete).toContainEqual({
+        id: 102,
+        missingFields: expect.arrayContaining(['Province of Birth']),
+      })
+
+      // Contacts service should NOT be called
+      expect(mockContactsService.updateCsaStatus).not.toHaveBeenCalled()
+    })
+
+    it('should require effectiveDate for application transaction type', async () => {
+      const applicationNoEffectiveDate = {
+        id: 103,
+        caseNumber: 'CASE-103',
+        csaStatus: 'eligible',
+        firstName: 'Bob',
+        lastName: 'Brown',
+        gender: 'M',
+        dateOfBirth: new Date('2000-05-20'),
+        birthCity: 'Calgary',
+        birthCountry: 'Canada',
+        birthProvince: 'AB',
+        effectiveDate: null, // Missing for application
+        careEndDate: null,
+        cancelReasonCode: null,
+      }
+
+      mockPrisma.batch.findFirst.mockResolvedValue({ id: 1, status: 'pending' })
+      mockPrisma.contact.findMany.mockResolvedValue([applicationNoEffectiveDate])
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([])
+      mockPrisma.batch.update.mockResolvedValue({})
+
+      const result = await service.addContactsToPendingBatch([103], 'user@test.com')
+
+      expect(result.incomplete).toContainEqual({
+        id: 103,
+        missingFields: expect.arrayContaining(['Application Start Date']),
+      })
+    })
+
+    it('should require careEndDate and cancelReasonCode for cancellation transaction type', async () => {
+      const cancellationMissingFields = {
+        id: 104,
+        caseNumber: 'CASE-104',
+        csaStatus: 'not_eligible_in_pay', // Triggers cancellation transaction
+        firstName: 'Carol',
+        lastName: 'Davis',
+        gender: 'F',
+        dateOfBirth: new Date('2000-07-10'),
+        birthCity: 'Edmonton',
+        birthCountry: 'Canada',
+        birthProvince: 'AB',
+        effectiveDate: new Date('2024-01-01'),
+        careEndDate: null, // Missing for cancellation
+        cancelReasonCode: null, // Missing for cancellation
+      }
+
+      mockPrisma.batch.findFirst.mockResolvedValue({ id: 1, status: 'pending' })
+      mockPrisma.contact.findMany.mockResolvedValue([cancellationMissingFields])
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([])
+      mockPrisma.batch.update.mockResolvedValue({})
+
+      const result = await service.addContactsToPendingBatch([104], 'user@test.com')
+
+      expect(result.incomplete).toContainEqual({
+        id: 104,
+        missingFields: expect.arrayContaining([
+          'Cancellation End Date',
+          'Cancellation Reason Code',
+        ]),
+      })
+    })
+  })
+
+  describe('User Story 40101 - S2: Auto-batch with CRA validation & auto-hold', () => {
+    it('should auto-hold incomplete records with specific reason when actor=SYSTEM', async () => {
+      const incompleteContact = {
+        id: 200,
+        caseNumber: 'CASE-200',
+        csaStatus: 'eligible',
+        firstName: null, // Missing
+        lastName: 'Wilson',
+        gender: null, // Missing
+        dateOfBirth: new Date('2000-02-14'),
+        birthCity: 'Vancouver',
+        birthCountry: 'Canada',
+        birthProvince: 'BC',
+        effectiveDate: new Date('2025-01-15'),
+        careEndDate: null,
+        cancelReasonCode: null,
+      }
+
+      mockPrisma.batch.findFirst.mockResolvedValue({ id: 1, status: 'pending' })
+      mockPrisma.contact.findMany.mockResolvedValue([incompleteContact])
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([])
+      mockPrisma.batch.update.mockResolvedValue({})
+
+      await service.addContactsToPendingBatch([200], 'system@auto-batch', 'SYSTEM')
+
+      // Verify auto-hold was called with specific missing fields reason
+      expect(mockContactsService.updateCsaStatus).toHaveBeenCalledWith(
+        200,
+        'HOLD', // CSA_EVENT.HOLD
+        'SYSTEM',
+        expect.objectContaining({
+          userId: 'system@auto-batch',
+          additionalData: {
+            holdReason: expect.stringContaining('Missing'),
+          },
+        }),
+      )
+    })
+
+    it('should not auto-hold when actor=USER (manual add)', async () => {
+      const incompleteContact = {
+        id: 201,
+        caseNumber: 'CASE-201',
+        csaStatus: 'eligible',
+        firstName: null, // Missing
+        lastName: 'Garcia',
+        gender: 'F',
+        dateOfBirth: new Date('2000-03-20'),
+        birthCity: 'Toronto',
+        birthCountry: 'Canada',
+        birthProvince: 'ON',
+        effectiveDate: new Date('2025-01-15'),
+        careEndDate: null,
+        cancelReasonCode: null,
+      }
+
+      mockPrisma.batch.findFirst.mockResolvedValue({ id: 1, status: 'pending' })
+      mockPrisma.contact.findMany.mockResolvedValue([incompleteContact])
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([])
+      mockPrisma.batch.update.mockResolvedValue({})
+
+      const result = await service.addContactsToPendingBatch([201], 'user@test.com', 'USER')
+
+      // Contact should be incomplete (not auto-held)
+      expect(result.incomplete).toContainEqual({
+        id: 201,
+        missingFields: expect.arrayContaining(['First Name']),
+      })
+
+      // updateCsaStatus should NOT be called (no auto-hold for USER actor)
+      expect(mockContactsService.updateCsaStatus).not.toHaveBeenCalled()
+    })
+
+    it('should continue processing after auto-hold failure for S2', async () => {
+      const validContact = {
+        id: 202,
+        caseNumber: 'CASE-202',
+        csaStatus: 'eligible',
+        firstName: 'David',
+        lastName: 'Miller',
+        gender: 'M',
+        dateOfBirth: new Date('2000-04-10'),
+        birthCity: 'Vancouver',
+        birthCountry: 'Canada',
+        birthProvince: 'BC',
+        effectiveDate: new Date('2025-01-15'),
+        careEndDate: null,
+        cancelReasonCode: null,
+      }
+
+      const incompleteContact = {
+        id: 203,
+        caseNumber: 'CASE-203',
+        csaStatus: 'eligible',
+        firstName: null, // Missing
+        lastName: 'Taylor',
+        gender: 'M',
+        dateOfBirth: new Date('2000-05-15'),
+        birthCity: 'Calgary',
+        birthCountry: 'Canada',
+        birthProvince: 'AB',
+        effectiveDate: new Date('2025-01-15'),
+        careEndDate: null,
+        cancelReasonCode: null,
+      }
+
+      mockPrisma.batch.findFirst.mockResolvedValue({ id: 1, status: 'pending' })
+      mockPrisma.contact.findMany.mockResolvedValue([validContact, incompleteContact])
+      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([])
+      mockContactsService.updateCsaStatus
+        .mockResolvedValueOnce({ success: true, to: 'in_batch_application' })
+        .mockRejectedValueOnce(new Error('State transition error')) // auto-hold fails
+      mockPrisma.contactBatchDetail.create.mockResolvedValue({ id: 202 })
+      mockPrisma.contactBatchDetail.update.mockResolvedValue({})
+      mockPrisma.batch.update.mockResolvedValue({})
+
+      const result = await service.addContactsToPendingBatch(
+        [202, 203],
+        'system@auto-batch',
+        'SYSTEM',
+      )
+
+      // Valid contact should succeed
+      expect(result.success).toContain(202)
+
+      // Incomplete contact should still be in incomplete array even if auto-hold failed
+      expect(result.incomplete).toContainEqual({
+        id: 203,
+        missingFields: expect.arrayContaining(['First Name']),
       })
     })
   })

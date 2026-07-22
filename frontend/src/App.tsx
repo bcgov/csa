@@ -1770,31 +1770,34 @@ function App() {
     setIncompleteRecordsLoading(true)
 
     try {
-      // Build hold reason strings for each record
-      const contactsToHold: { contactId: number; reason: string }[] = incompleteRecords.map(
-        (record) => ({
-          contactId: record.id,
-          reason: `Missing: ${record.missingFields.join(', ')}`,
-        }),
-      )
-
-      // Put all incomplete records on hold with their specific missing fields reason
-      const contactIds = contactsToHold.map((c) => c.contactId)
-      // We'll need to hold each with their specific reason, or use the same reason for all
-      // Let's use a common reason that lists all unique missing fields
-      const allMissingFields = new Set<string>()
-      incompleteRecords.forEach((record) => {
-        record.missingFields.forEach((field) => allMissingFields.add(field))
+      // Put each incomplete record on hold in parallel for better performance
+      // Each record gets its own unique hold reason with its specific missing fields
+      const holdPromises = incompleteRecords.map((record) => {
+        const holdReason = `Missing: ${record.missingFields.join(', ')}`
+        return holdContacts([record.id], holdReason).catch((err) => {
+          console.error(`Failed to hold record ${record.id}:`, err)
+          return { success: [], skipped: [{ id: record.id, reason: 'HOLD_FAILED' }] }
+        })
       })
 
-      const holdReason = `Missing Required CRA Fields: ${Array.from(allMissingFields).join(', ')}`
+      const holdResults = await Promise.all(holdPromises)
 
-      const response = await holdContacts(contactIds, holdReason)
+      // Aggregate results from all parallel calls
+      let successCount = 0
+      let failureCount = 0
+
+      holdResults.forEach((response) => {
+        successCount += response.success.length
+        failureCount += response.skipped.length
+      })
 
       setSnackbar({
         open: true,
-        message: `${response.success.length} record(s) placed on hold. They can be updated and added to batch later.`,
-        severity: 'success',
+        message:
+          failureCount > 0
+            ? `${successCount} record(s) placed on hold. ${failureCount} failed. They can be updated and added to batch later.`
+            : `${successCount} record(s) placed on hold. They can be updated and added to batch later.`,
+        severity: failureCount > 0 ? 'warning' : 'success',
       })
 
       // Close dialog and reset state

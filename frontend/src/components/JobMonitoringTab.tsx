@@ -46,8 +46,6 @@ interface ActivityRow {
   type: string
   related: string
   jobId?: number
-  craFileName?: string
-  fileType?: string
 }
 
 const ITEMS_PER_PAGE = 10
@@ -191,8 +189,6 @@ const mockActivitiesData: ActivityRow[] = [
     type: 'CRA',
     related: 'Send CRA file run @ Jul 11 08:00',
     jobId: 5,
-    craFileName: 'CSA_Response_20250711_120045.xml',
-    fileType: 'Response',
   },
   {
     id: 2,
@@ -201,8 +197,6 @@ const mockActivitiesData: ActivityRow[] = [
     type: 'Data quality',
     related: 'Send CRA file run @ Jul 11 08:00',
     jobId: 3,
-    craFileName: 'CSA_Weekly_20250711_090030.xml',
-    fileType: 'Weekly file',
   },
   {
     id: 3,
@@ -210,8 +204,6 @@ const mockActivitiesData: ActivityRow[] = [
     severity: 'Error',
     type: 'Job',
     related: 'Send CRA file run @ Jul 11 08:00',
-    craFileName: 'CSA_Response_20250711_150000.xml',
-    fileType: 'Response',
   },
   {
     id: 4,
@@ -220,8 +212,6 @@ const mockActivitiesData: ActivityRow[] = [
     type: 'File Processing',
     related: 'Weekly response run @ Jul 10 09:00',
     jobId: 4,
-    craFileName: 'CSA_Weekly_20250710_085500.xml',
-    fileType: 'Weekly file',
   },
   {
     id: 5,
@@ -230,8 +220,6 @@ const mockActivitiesData: ActivityRow[] = [
     type: 'Data quality',
     related: 'Auto Batch run @ Jul 09 08:00',
     jobId: 7,
-    craFileName: 'CSA_Auto_Batch_20250709_080000.xml',
-    fileType: 'Batch',
   },
   {
     id: 6,
@@ -240,8 +228,6 @@ const mockActivitiesData: ActivityRow[] = [
     type: 'CRA',
     related: 'Data Fetch run @ Jul 08 08:00',
     jobId: 1,
-    craFileName: 'CSA_DataFetch_20250708_082000.xml',
-    fileType: 'Response',
   },
   {
     id: 7,
@@ -250,8 +236,6 @@ const mockActivitiesData: ActivityRow[] = [
     type: 'Job',
     related: 'Eligibility run @ Jul 13 12:00',
     jobId: 2,
-    craFileName: 'CSA_Eligibility_20250712_235900.xml',
-    fileType: 'Response',
   },
   {
     id: 8,
@@ -260,8 +244,6 @@ const mockActivitiesData: ActivityRow[] = [
     type: 'Data quality',
     related: 'Weekly response run @ Jul 11 09:00',
     jobId: 4,
-    craFileName: 'CSA_Weekly_20250711_091000.xml',
-    fileType: 'Weekly file',
   },
   {
     id: 9,
@@ -270,8 +252,6 @@ const mockActivitiesData: ActivityRow[] = [
     type: 'File Processing',
     related: 'Data Fetch run @ Jul 07 14:00',
     jobId: 1,
-    craFileName: 'CSA_DataFetch_20250707_145500.xml',
-    fileType: 'Response',
   },
   {
     id: 10,
@@ -280,8 +260,6 @@ const mockActivitiesData: ActivityRow[] = [
     type: 'CRA',
     related: 'Send CRA file run @ Jul 06 11:00',
     jobId: 3,
-    craFileName: 'CSA_Response_20250706_110230.xml',
-    fileType: 'Response',
   },
 ]
 
@@ -489,8 +467,6 @@ export default function JobMonitoringTab() {
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Type</TableCell>
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Related</TableCell>
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Job ID</TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>CRA File Name</TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>File Type</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -511,26 +487,6 @@ export default function JobMonitoringTab() {
                     </Tooltip>
                   </TableCell>
                   <TableCell sx={{ fontSize: '0.875rem' }}>{row.jobId || '—'}</TableCell>
-                  <TableCell sx={{ fontSize: '0.875rem' }}>
-                    {row.craFileName ? (
-                      <Tooltip title={row.craFileName}>
-                        <span
-                          style={{
-                            color: '#1976d2',
-                            cursor: 'pointer',
-                            textDecoration: 'underline',
-                          }}
-                        >
-                          {row.craFileName.length > 30
-                            ? `${row.craFileName.substring(0, 27)}...`
-                            : row.craFileName}
-                        </span>
-                      </Tooltip>
-                    ) : (
-                      '—'
-                    )}
-                  </TableCell>
-                  <TableCell sx={{ fontSize: '0.875rem' }}>{row.fileType || '—'}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

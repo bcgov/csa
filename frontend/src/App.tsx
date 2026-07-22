@@ -45,6 +45,7 @@ import {
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
+import { IncompleteRecordsDialog } from './components/IncompleteRecordsDialog'
 import { OnHoldDialog } from './components/OnHoldDialog'
 import WeeklyFileProcessingTab from './components/WeeklyFileProcessingTab'
 import { getRuntimeConfig } from './config/keycloak.config'
@@ -362,6 +363,13 @@ function App() {
   const [pendingHoldIds, setPendingHoldIds] = useState<number[]>([])
   const [pendingResumeIds, setPendingResumeIds] = useState<number[]>([])
   const [editingContactId, setEditingContactId] = useState<number | null>(null)
+
+  // Incomplete records (CRA fields validation) dialog state
+  const [incompleteRecordsDialogOpen, setIncompleteRecordsDialogOpen] = useState(false)
+  const [incompleteRecords, setIncompleteRecords] = useState<
+    Array<{ id: number; missingFields: string[] }>
+  >([])
+  const [incompleteRecordsLoading, setIncompleteRecordsLoading] = useState(false)
   const [editingContactReason, setEditingContactReason] = useState<string>('')
 
   // Last successful job runs state
@@ -1756,6 +1764,75 @@ function App() {
     }
   }
 
+  // Handle incomplete records dialog confirmation - put records on hold with missing fields reason
+  const handleIncompleteRecordsConfirm = async () => {
+    setIncompleteRecordsLoading(true)
+
+    try {
+      // Build hold reason strings for each record
+      const contactsToHold: { contactId: number; reason: string }[] = incompleteRecords.map(
+        (record) => ({
+          contactId: record.id,
+          reason: `Missing: ${record.missingFields.join(', ')}`,
+        }),
+      )
+
+      // Put all incomplete records on hold with their specific missing fields reason
+      const contactIds = contactsToHold.map((c) => c.contactId)
+      // We'll need to hold each with their specific reason, or use the same reason for all
+      // Let's use a common reason that lists all unique missing fields
+      const allMissingFields = new Set<string>()
+      incompleteRecords.forEach((record) => {
+        record.missingFields.forEach((field) => allMissingFields.add(field))
+      })
+
+      const holdReason = `Missing Required CRA Fields: ${Array.from(allMissingFields).join(', ')}`
+
+      const response = await holdContacts(contactIds, holdReason)
+
+      setSnackbar({
+        open: true,
+        message: `${response.success.length} record(s) placed on hold. They can be updated and added to batch later.`,
+        severity: 'success',
+      })
+
+      // Close dialog and reset state
+      setIncompleteRecordsDialogOpen(false)
+      setIncompleteRecords([])
+
+      // Reload contacts to reflect the changes
+      const apiFilters = [
+        'All Records',
+        'Pending User review/action',
+        'All children On Hold from CSA',
+        'Children In Pay',
+        'Children Out of Pay',
+        'CRA Refused CSA List',
+        'Children within a batch',
+        'Children over 18 years (never eligible)',
+      ]
+
+      if (apiFilters.includes(preDefinedFilter)) {
+        if (isSearchActive && searchTerm.trim().length >= 3) {
+          await performFullTextSearch(searchTerm.trim(), currentPage)
+        } else if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+          await performColumnFiltersSearch(activeColumnFilters, currentPage)
+        } else {
+          await fetchContacts(currentPage)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to put incomplete records on hold:', error)
+      setSnackbar({
+        open: true,
+        message: 'Failed to put records on hold. Please try again.',
+        severity: 'error',
+      })
+    } finally {
+      setIncompleteRecordsLoading(false)
+    }
+  }
+
   // CSA Eligible handler
   const handleCSAEligible = async () => {
     if (selected.length === 0) return
@@ -2159,23 +2236,37 @@ function App() {
       // Show success/warning message based on results
       const successCount = response.success.length
       const skippedCount = response.skipped.length
+      const incompleteCount = response.incomplete?.length ?? 0
 
-      if (successCount > 0 && skippedCount === 0) {
+      // If there are incomplete records, show the dialog
+      if (incompleteCount > 0) {
+        setIncompleteRecords(response.incomplete || [])
+        setIncompleteRecordsDialogOpen(true)
+      }
+
+      if (successCount > 0 && skippedCount === 0 && incompleteCount === 0) {
         setSnackbar({
           open: true,
           message: `Successfully added ${successCount} contact${successCount > 1 ? 's' : ''} to batch`,
           severity: 'success',
         })
-      } else if (successCount > 0 && skippedCount > 0) {
+      } else if (successCount > 0 && (skippedCount > 0 || incompleteCount > 0)) {
+        const messages = []
+        messages.push(`Added ${successCount} contact${successCount > 1 ? 's' : ''} to batch`)
+        if (skippedCount > 0) messages.push(`${skippedCount} skipped`)
+        if (incompleteCount > 0) messages.push(`${incompleteCount} with missing fields`)
         setSnackbar({
           open: true,
-          message: `Added ${successCount} contact${successCount > 1 ? 's' : ''} to batch. ${skippedCount} skipped (already in batch or not found)`,
+          message: messages.join('. '),
           severity: 'warning',
         })
-      } else {
+      } else if (successCount === 0 && (skippedCount > 0 || incompleteCount > 0)) {
+        const messages = []
+        if (skippedCount > 0) messages.push(`${skippedCount} skipped`)
+        if (incompleteCount > 0) messages.push(`${incompleteCount} with missing fields`)
         setSnackbar({
           open: true,
-          message: 'No contacts were added. All contacts were skipped.',
+          message: messages.join('. '),
           severity: 'warning',
         })
       }
@@ -8353,6 +8444,15 @@ function App() {
         onConfirm={handleOnHoldDialogConfirm}
         mode={onHoldDialogMode}
         initialReason={onHoldDialogMode === 'edit' ? editingContactReason : ''}
+      />
+
+      {/* Incomplete Records Dialog for CRA field validation */}
+      <IncompleteRecordsDialog
+        open={incompleteRecordsDialogOpen}
+        onClose={() => setIncompleteRecordsDialogOpen(false)}
+        onConfirm={handleIncompleteRecordsConfirm}
+        incompletRecords={incompleteRecords}
+        isLoading={incompleteRecordsLoading}
       />
 
       {/* Snackbar for hold/resume feedback */}

@@ -9,8 +9,6 @@ export interface AutoBatchResult {
   cancellation: number
 }
 
-const AUTO_BATCH_ACTOR = 'SYSTEM'
-
 type AutoBatchCandidate = {
   contactId: number
   kind: 'application' | 'cancellation'
@@ -59,7 +57,8 @@ export class AutoBatchService {
 
     const result = await this.batchesService.addContactsToPendingBatch(
       candidates.map((c) => c.contactId),
-      AUTO_BATCH_ACTOR,
+      'SYSTEM', // userId for audit trail
+      'SYSTEM', // actor: SYSTEM for auto-batch
     )
 
     const successIds = new Set(result.success)
@@ -74,6 +73,12 @@ export class AutoBatchService {
     if (result.skipped.length > 0) {
       this.logger.log(
         `Auto-batch skipped ${result.skipped.length} contacts (batch ${result.batch.id})`,
+      )
+    }
+
+    if (result.incomplete.length > 0) {
+      this.logger.log(
+        `Auto-batch Records Validation: ${result.incomplete.length} contacts auto-held due to missing CRA mandatory fields (batch ${result.batch.id})`,
       )
     }
 

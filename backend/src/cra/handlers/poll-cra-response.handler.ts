@@ -141,11 +141,13 @@ export class PollCraResponseHandler extends BaseJob {
       this.recordsWklUnmatchedApproved +
       this.recordsWklUnmatchedRefused
 
+    const fileNames = sortedFiles.map((f) => f.fileName).join(', ')
     return {
       success: true,
-      message: `Processed ${totalRecordsProcessed} CRA response records from ${sortedFiles.length} file(s)`,
+      message: `Processed ${totalRecordsProcessed} records from ${sortedFiles.length} file(s): ${fileNames}`,
       metadata: {
         files_processed: sortedFiles.length,
+        file_names: sortedFiles.map((f) => f.fileName),
         records_updated: totalUpdated,
         records_accepted: this.recordsAccepted,
         records_rejected: this.recordsRejected,

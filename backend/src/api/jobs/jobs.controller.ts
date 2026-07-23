@@ -39,6 +39,8 @@ const GENERIC_JOB_FAILURE_SUFFIX =
   'failed unexpectedly. Please retry. If it persists, contact support.'
 const JOB_DISPLAY_NAMES: Record<string, string> = {
   [JobType.INGEST_DATA]: 'Data Fetch',
+  [JobType.INGEST_MIS]: 'Data Fetch - MIS',
+  [JobType.INGEST_ICM]: 'Data Fetch - ICM',
   [JobType.RUN_ELIGIBILITY]: 'Eligibility',
   [JobType.AUTO_BATCH]: 'Auto Batch',
   [JobType.SEND_CRA_FILE]: 'Send CRA File',

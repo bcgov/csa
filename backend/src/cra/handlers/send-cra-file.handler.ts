@@ -158,10 +158,11 @@ export class SendCraFileHandler extends BaseJob {
 
     return {
       success: true,
-      message: `Batch ${this.batch.id} sent to CRA`,
+      message: `Batch ${this.batch.id} sent to CRA (file: ${fileName}, ${recordCount} records)`,
       metadata: {
         batch_id: this.batch.id,
         file_path: filePath,
+        file_name: fileName,
         record_count: recordCount,
         contacts_count: this.batchDetails.length,
       },

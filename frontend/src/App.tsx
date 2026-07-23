@@ -46,6 +46,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { IncompleteRecordsDialog } from './components/IncompleteRecordsDialog'
+import JobMonitoringTab from './components/JobMonitoringTab'
 import { OnHoldDialog } from './components/OnHoldDialog'
 import WeeklyFileProcessingTab from './components/WeeklyFileProcessingTab'
 import { getRuntimeConfig } from './config/keycloak.config'
@@ -3159,7 +3160,9 @@ function App() {
       return (
         cached &&
         (cached.csaStatusRaw === 'not_eligible_out_of_pay' ||
-          cached.csaStatusRaw === 'not_eligible_ip_tbd')
+          cached.csaStatusRaw === 'not_eligible_ip_tbd' ||
+          cached.csaStatusRaw === 'application_refused_cra' ||
+          cached.csaStatusRaw === 'cancellation_refused_cra')
       )
     })
   }, [selected, selectedRecordsCache])
@@ -3175,7 +3178,9 @@ function App() {
         cached &&
         (cached.csaStatusRaw === 'eligible_tbd' ||
           cached.csaStatusRaw === 'in_pay' ||
-          cached.csaStatusRaw === 'on_hold')
+          cached.csaStatusRaw === 'on_hold' ||
+          cached.csaStatusRaw === 'application_refused_cra' ||
+          cached.csaStatusRaw === 'cancellation_refused_cra')
       )
     })
   }, [selected, selectedRecordsCache])
@@ -3724,6 +3729,7 @@ function App() {
               <Tab label="Eligibility List" />
               <Tab label="Batch Requests" />
               <Tab label="Weekly File Processing" />
+              <Tab label="Job Monitoring" />
             </Tabs>
 
             {/* Last Successful Runs Info */}
@@ -7967,6 +7973,7 @@ function App() {
             )}
 
             {selectedTab === 2 && <WeeklyFileProcessingTab />}
+            {selectedTab === 3 && <JobMonitoringTab />}
           </Box>
 
           {/* Sort and Filter Menus - Outside tabs so they're always available */}

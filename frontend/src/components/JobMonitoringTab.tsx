@@ -7,41 +7,42 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import {
-    Alert,
-    Box,
-    Button,
-    CircularProgress,
-    MenuItem,
-    Pagination,
-    Paper,
-    Select,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    TextField,
-    Tooltip,
-    Typography,
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  MenuItem,
+  Pagination,
+  Paper,
+  Select,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Tooltip,
+  Typography,
 } from '@mui/material'
 import { useCallback, useEffect, useState } from 'react'
 import {
-    type ActivityParams,
-    type JobActivityRow,
-    type JobHistoryParams,
-    type MonitoringJobRow,
-    getJobActivities,
-    getJobHistory,
-    getLatestJobs,
-    getRecentActivities,
+  type ActivityParams,
+  type JobActivityRow,
+  type JobHistoryParams,
+  type MonitoringJobRow,
+  getJobActivities,
+  getJobHistory,
+  getLatestJobs,
+  getRecentActivities,
 } from '../service/jobs-service'
 
 const ITEMS_PER_PAGE = 10
 
 // Map display job names to backend JobType enum values for server-side filtering
 const JOB_NAME_TO_TYPE: Record<string, string> = {
-  'Data Fetch': 'INGEST_DATA',
+  'Data Fetch - MIS': 'INGEST_MIS',
+  'Data Fetch - ICM': 'INGEST_ICM',
   Eligibility: 'RUN_ELIGIBILITY',
   'Auto Batch': 'AUTO_BATCH',
   'Send CRA File': 'SEND_CRA_FILE',

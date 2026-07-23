@@ -1,6 +1,8 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { JobActivitySeverity } from './enums/job-activity-severity.enum'
+import { JobActivityType } from './enums/job-activity-type.enum'
 import { JobStatus } from './enums/job-status.enum'
 import { JobTrigger } from './enums/job-trigger.enum'
 import { JobType } from './enums/job-type.enum'
@@ -40,6 +42,11 @@ describe('JobsService', () => {
               update: vi.fn().mockResolvedValue(mockJobRun),
               updateMany: vi.fn().mockResolvedValue({ count: 1 }),
             },
+            jobActivity: {
+              create: vi.fn().mockResolvedValue({ id: 1 }),
+              findMany: vi.fn().mockResolvedValue([{ id: 1 }]),
+              count: vi.fn().mockResolvedValue(1),
+            },
           },
         },
       ],
@@ -66,6 +73,13 @@ describe('JobsService', () => {
           jobTrigger: JobTrigger.CRON,
           status: JobStatus.RUNNING,
           retryCount: 0,
+        }),
+      })
+      expect(prisma.jobActivity.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          jobRunId: mockJobRun.id,
+          severity: JobActivitySeverity.INFO,
+          type: JobActivityType.STARTED,
         }),
       })
       expect(result).toEqual(mockJobRun)
@@ -193,15 +207,23 @@ describe('JobsService', () => {
           completedAt: expect.any(Date),
         }),
       })
+      expect(prisma.jobActivity.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          jobRunId: 1,
+          severity: JobActivitySeverity.INFO,
+          type: JobActivityType.COMPLETED,
+        }),
+      })
     })
 
-    it('should update metadata if provided', async () => {
-      await service.markSuccess(1, { recordsProcessed: 100 })
+    it('should update summary and metadata if provided', async () => {
+      await service.markSuccess(1, 'Processed 100 records', { recordsProcessed: 100 })
 
       expect(prisma.jobRun.updateMany).toHaveBeenCalledWith({
         where: { id: 1, status: JobStatus.RUNNING },
         data: expect.objectContaining({
           status: JobStatus.SUCCESS,
+          summary: 'Processed 100 records',
           metadata: { recordsProcessed: 100 },
         }),
       })
@@ -217,10 +239,85 @@ describe('JobsService', () => {
         data: expect.objectContaining({
           status: JobStatus.FAILED,
           error: 'Connection timeout',
+          summary: 'Job failed',
           retryCount: { increment: 1 },
           completedAt: expect.any(Date),
         }),
       })
+      expect(prisma.jobActivity.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          jobRunId: 1,
+          severity: JobActivitySeverity.ERROR,
+          type: JobActivityType.FAILED,
+          related: 'Connection timeout',
+        }),
+      })
+    })
+  })
+
+  describe('monitoring', () => {
+    it('should return latest run per monitored job type', async () => {
+      const latestIngest = {
+        ...mockJobRun,
+        id: 3,
+        jobType: JobType.INGEST_DATA,
+        createdAt: new Date('2026-01-02T00:00:00Z'),
+      }
+      const other = {
+        ...mockJobRun,
+        id: 4,
+        jobType: JobType.RUN_ELIGIBILITY,
+      }
+      vi.spyOn(prisma.jobRun, 'findMany').mockResolvedValueOnce([latestIngest, other] as any)
+
+      const result = await service.getLatestJobsPerType()
+
+      expect(result).toHaveLength(2)
+      expect(result.find((x) => x.jobType === JobType.INGEST_DATA)?.id).toBe(3)
+      expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
+        where: {
+          parentJobId: null,
+          jobType: { in: expect.any(Array) },
+        },
+        distinct: ['jobType'],
+        orderBy: [{ jobType: 'asc' }, { createdAt: 'desc' }],
+      })
+    })
+
+    it('should filter monitoring history by SYSTEM using jobTrigger', async () => {
+      await service.getJobHistory({ triggeredBy: 'SYSTEM' })
+
+      expect(prisma.jobRun.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            jobTrigger: { in: [JobTrigger.CRON, JobTrigger.SYSTEM] },
+          }),
+        }),
+      )
+    })
+
+    it('should filter monitoring history by USER using jobTrigger', async () => {
+      await service.getJobHistory({ triggeredBy: 'USER' })
+
+      expect(prisma.jobRun.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            jobTrigger: JobTrigger.END_USER,
+          }),
+        }),
+      )
+    })
+
+    it('should apply recent activity time window', async () => {
+      await service.getRecentActivities(1, 10)
+
+      expect(prisma.jobActivity.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            when: { gte: expect.any(Date) },
+          }),
+        }),
+      )
     })
   })
 

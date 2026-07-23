@@ -14,9 +14,12 @@ import {
 } from 'src/common/state-machine/constants'
 import { appendSystemComment, pacificToday } from 'src/common/utils'
 import { BaseJob } from 'src/jobs/base-job'
+import { JobActivitySeverity } from 'src/jobs/enums/job-activity-severity.enum'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
+import { JobsService } from 'src/jobs/jobs.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { OutboundDataService } from '../outbound/outbound-data.service'
@@ -41,6 +44,7 @@ export class SendCraFileHandler extends BaseJob {
     private readonly outboundDataService: OutboundDataService,
     private readonly outboundFileService: OutboundFileService,
     private readonly craTransferService: CraTransferService,
+    private readonly jobsService: JobsService,
     private readonly icmSyncBackService: IcmSyncBackService,
   ) {
     super()
@@ -128,6 +132,12 @@ export class SendCraFileHandler extends BaseJob {
           .filter(Boolean) as string[],
         sequenceNumber: nextSequence,
       },
+    })
+
+    await this.jobsService.addActivity(_context.jobRunId, {
+      severity: JobActivitySeverity.INFO,
+      type: JobActivityType.FILE_SENT,
+      related: `${fileName} (${recordCount} records)`,
     })
 
     for (let i = 0; i < this.batchDetails.length; i++) {

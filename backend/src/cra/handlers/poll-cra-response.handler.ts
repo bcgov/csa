@@ -9,9 +9,12 @@ import { BATCH_DETAIL_EVENT, CSA_EVENT } from 'src/common/state-machine/constant
 
 import { csaProcessingBatchDate, parseWklDate } from 'src/common/utils'
 import { BaseJob } from 'src/jobs/base-job'
+import { JobActivitySeverity } from 'src/jobs/enums/job-activity-severity.enum'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
+import { JobsService } from 'src/jobs/jobs.service'
 import { IcmSyncBackService, SyncBackResult } from 'src/sync/icm/icm-sync-back.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { InboundFileService } from '../inbound/inbound-file.service'
@@ -19,10 +22,10 @@ import { InboundResponseService } from '../inbound/inbound-response.service'
 import { InboundWeeklyResponseService } from '../inbound/inbound-weekly-response.service'
 import type { DetailRecord04, HeaderRecord } from '../inbound/inbound-weekly.interface'
 import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
-import { WklAssociatedRecordProcessorService } from '../inbound/wkl-associated-record-processor.service'
-import { buildWklUpdatePayloads } from '../inbound/wkl-snapshot-data'
 import { WeeklyContactMatcherService } from '../inbound/weekly-contact-matcher.service'
+import { WklAssociatedRecordProcessorService } from '../inbound/wkl-associated-record-processor.service'
 import { WklFileRecordService } from '../inbound/wkl-file-record.service'
+import { buildWklUpdatePayloads } from '../inbound/wkl-snapshot-data'
 import { CraTransferService } from '../transfer/cra-transfer.service'
 const {
   DESTINATION_ID,
@@ -68,6 +71,7 @@ export class PollCraResponseHandler extends BaseJob {
     private readonly prisma: PrismaService,
     private readonly batchesService: BatchesService,
     private readonly contactsService: ContactsService,
+    private readonly jobsService: JobsService,
     private readonly icmSyncBackService: IcmSyncBackService,
     private readonly weeklyContactMatcher: WeeklyContactMatcherService,
     private readonly wklFileRecordService: WklFileRecordService,
@@ -106,6 +110,12 @@ export class PollCraResponseHandler extends BaseJob {
         metadata: { files_processed: 0, records_updated: 0 },
       }
     }
+
+    await this.jobsService.addActivity(_context.jobRunId, {
+      severity: JobActivitySeverity.INFO,
+      type: JobActivityType.FILE_RECEIVED,
+      related: `${sortedFiles.length} inbound file(s) queued`,
+    })
 
     let totalRecordsProcessed = 0
     for (const responseFile of sortedFiles) {

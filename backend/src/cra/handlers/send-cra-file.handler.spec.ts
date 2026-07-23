@@ -74,6 +74,7 @@ describe('SendCraFileHandler', () => {
   let mockPrisma: any
   let mockBatchesService: any
   let mockContactsService: any
+  let mockJobsService: any
   let mockOutboundDataService: any
   let mockOutboundFileService: any
   let mockCraTransferService: any
@@ -103,6 +104,10 @@ describe('SendCraFileHandler', () => {
 
     mockContactsService = {
       updateCsaStatus: vi.fn().mockResolvedValue({ success: true }),
+    }
+
+    mockJobsService = {
+      addActivity: vi.fn().mockResolvedValue(undefined),
     }
 
     mockOutboundDataService = {
@@ -158,6 +163,7 @@ describe('SendCraFileHandler', () => {
       mockOutboundDataService,
       mockOutboundFileService,
       mockCraTransferService,
+      mockJobsService,
       mockIcmSyncBackService,
     )
   })

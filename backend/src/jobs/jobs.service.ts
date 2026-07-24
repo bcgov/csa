@@ -8,19 +8,12 @@ import { JobTrigger } from './enums/job-trigger.enum'
 import { JobType } from './enums/job-type.enum'
 import {
   isMonitoredChildJobType,
+  MONITORED_CHILD_JOB_TYPES,
+  MONITORED_JOB_HISTORY_TYPES,
   MONITORED_JOB_LIST_TYPES,
 } from './job-monitoring.utils'
 
 const RETRYABLE_END_USER_JOB_TYPES: JobType[] = [JobType.SEND_CRA_FILE]
-
-/** @deprecated Use MONITORED_JOB_LIST_TYPES — history query updated in step 2. */
-export const MONITORED_JOB_TYPES: JobType[] = [
-  JobType.INGEST_DATA,
-  JobType.RUN_ELIGIBILITY,
-  JobType.AUTO_BATCH,
-  JobType.SEND_CRA_FILE,
-  JobType.POLL_CRA_RESPONSE,
-]
 
 export interface MonitoringHistoryFilters {
   page?: number
@@ -304,11 +297,12 @@ export class JobsService {
     const oneMonthAgo = new Date()
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
 
+    const monitoredTypes = filters.jobType ? [filters.jobType] : MONITORED_JOB_HISTORY_TYPES
+
     const where: Prisma.JobRunWhereInput = {
-      parentJobId: null,
-      createdAt: { gte: oneMonthAgo },
-      jobType: { in: MONITORED_JOB_TYPES },
-      ...(filters.jobType && { jobType: filters.jobType }),
+      startedAt: { gte: oneMonthAgo },
+      jobType: { in: monitoredTypes },
+      OR: [{ jobType: { in: MONITORED_CHILD_JOB_TYPES } }, { parentJobId: null }],
       ...(filters.status && { status: filters.status }),
       ...(filters.jobId && { id: filters.jobId }),
     }
@@ -324,11 +318,12 @@ export class JobsService {
       ) {
         where.jobTrigger = filters.triggeredBy
       } else {
-        where.jobTrigger = filters.triggeredBy as JobTrigger
+        where.jobTrigger = JobTrigger.END_USER
+        where.triggeredByUser = { equals: filters.triggeredBy, mode: 'insensitive' }
       }
     }
 
-    const sortBy = filters.sortBy ?? 'createdAt'
+    const sortBy = filters.sortBy ?? 'startedAt'
     const sortOrder = filters.sortOrder ?? 'desc'
 
     const [data, total] = await Promise.all([

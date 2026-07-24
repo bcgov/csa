@@ -51,6 +51,11 @@ const JOB_NAME_TO_TYPE: Record<string, string> = {
 
 const MONITORED_JOB_NAMES = Object.keys(JOB_NAME_TO_TYPE)
 const STATUSES = ['Success', 'Running', 'Failed']
+const STATUS_TO_API: Record<string, string> = {
+  Success: 'SUCCESS',
+  Running: 'RUNNING',
+  Failed: 'FAILED',
+}
 const TRIGGER_OPTIONS = ['SYSTEM', 'USER']
 const ACTIVITY_SEVERITIES = ['ERROR', 'WARNING', 'INFO']
 const ACTIVITY_TYPES = [
@@ -217,7 +222,7 @@ export default function JobMonitoringTab() {
   const [jhFilterJobName, setJhFilterJobName] = useState('')
   const [jhFilterStatus, setJhFilterStatus] = useState('')
   const [jhFilterTrigger, setJhFilterTrigger] = useState('')
-  const [jhSortField, setJhSortField] = useState('createdAt')
+  const [jhSortField, setJhSortField] = useState('startedAt')
   const [jhSortOrder, setJhSortOrder] = useState<'asc' | 'desc'>('desc')
   const [selectedJobHistoryId, setSelectedJobHistoryId] = useState<number | null>(null)
 
@@ -261,7 +266,7 @@ export default function JobMonitoringTab() {
       }
       if (jhAppliedFilterId) params.jobId = Number(jhAppliedFilterId)
       if (jhFilterJobName) params.jobType = JOB_NAME_TO_TYPE[jhFilterJobName]
-      if (jhFilterStatus) params.status = jhFilterStatus
+      if (jhFilterStatus) params.status = STATUS_TO_API[jhFilterStatus] ?? jhFilterStatus
       if (jhFilterTrigger) params.triggeredBy = jhFilterTrigger
       const result = await getJobHistory(params)
       setJobHistoryData(result.data)

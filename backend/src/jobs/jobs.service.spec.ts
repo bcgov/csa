@@ -328,6 +328,33 @@ describe('JobsService', () => {
       )
     })
 
+    it('should query history for monitored types including ICM/MIS child runs', async () => {
+      await service.getJobHistory()
+
+      expect(prisma.jobRun.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            startedAt: { gte: expect.any(Date) },
+            OR: [{ jobType: { in: [JobType.INGEST_ICM, JobType.INGEST_MIS] } }, { parentJobId: null }],
+          }),
+          orderBy: { startedAt: 'desc' },
+        }),
+      )
+    })
+
+    it('should filter monitoring history by user IDIR', async () => {
+      await service.getJobHistory({ triggeredBy: 'jsmith' })
+
+      expect(prisma.jobRun.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            jobTrigger: JobTrigger.END_USER,
+            triggeredByUser: { equals: 'jsmith', mode: 'insensitive' },
+          }),
+        }),
+      )
+    })
+
     it('should apply recent activity time window', async () => {
       await service.getRecentActivities(1, 10)
 

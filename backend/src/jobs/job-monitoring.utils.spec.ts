@@ -6,11 +6,13 @@ import {
   formatJobSummary,
   formatMonitoringStatus,
   formatTriggeredBy,
+  MONITORED_JOB_HISTORY_TYPES,
   MONITORED_JOB_LIST_TYPES,
 } from './job-monitoring.utils'
 
 describe('job-monitoring.utils', () => {
   it('lists six FDD job types for the job list', () => {
+    expect(MONITORED_JOB_HISTORY_TYPES).toHaveLength(13)
     expect(MONITORED_JOB_LIST_TYPES).toEqual([
       JobType.INGEST_ICM,
       JobType.INGEST_MIS,

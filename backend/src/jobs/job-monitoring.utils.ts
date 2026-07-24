@@ -15,6 +15,18 @@ export const MONITORED_JOB_LIST_TYPES: JobType[] = [
 /** Ingestion child jobs — latest run is not filtered by parentJobId. */
 export const MONITORED_CHILD_JOB_TYPES: JobType[] = [JobType.INGEST_ICM, JobType.INGEST_MIS]
 
+/** FDD Job History (APL-11) — list types plus orchestrator, sync, retry, and backfills. */
+export const MONITORED_JOB_HISTORY_TYPES: JobType[] = [
+  ...MONITORED_JOB_LIST_TYPES,
+  JobType.INGEST_DATA,
+  JobType.SYNC_ICM,
+  JobType.RETRY_FAILED,
+  JobType.BACKFILL_OOC_AGREEMENT_LINES,
+  JobType.BACKFILL_ICM_CASE_CLOSE_DATES,
+  JobType.BACKFILL_WKL_FILE_RECORDS,
+  JobType.BACKFILL_BATCH_EFFECTIVE_DATE_REASON,
+]
+
 export const JOB_DISPLAY_NAMES: Record<string, string> = {
   [JobType.INGEST_DATA]: 'Data Fetch',
   [JobType.INGEST_MIS]: 'Data Fetch - MIS',

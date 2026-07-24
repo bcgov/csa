@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { AppLogger } from 'src/common/logger/app-logger'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import {
   getAgeCutoffDate,
   isEligibleAge,
@@ -684,7 +685,12 @@ export class EligibilityService {
 
     for (const profile of profiles) {
       if (!profile.dateOfBirth) {
-        this.logger.warn(`Skipping contact ${profile.personIdIcm}: missing date of birth`)
+        this.logger.activityWarn(`Skipping contact ${profile.personIdIcm}: missing date of birth`, {
+          activityType: JobActivityType.DATA_QUALITY,
+          aggregate: true,
+          aggregateKey: 'missing-dob',
+          related: 'Contact skipped: missing date of birth',
+        })
         stats.skipped++
         continue
       }
@@ -773,8 +779,14 @@ export class EligibilityService {
   }
 
   private warnUserSetWithoutEffectiveDate(profile: ContactProfile): void {
-    this.logger.warn(
+    this.logger.activityWarn(
       `User-set CSA status for ${profile.personIdIcm} (last_updated_by=${profile.lastUpdatedBy}) but no csa_status_effective_date on master or ICM; running eligibility without BL-14B/14C skip`,
+      {
+        activityType: JobActivityType.DATA_QUALITY,
+        aggregate: true,
+        aggregateKey: 'user-set-missing-effective-date',
+        related: 'User-set CSA status without effective date',
+      },
     )
   }
 

@@ -823,7 +823,9 @@ describe('EligibilityService', () => {
   })
 
   it('should warn when user-set but csa_status_effective_date is missing', async () => {
-    const warnSpy = vi.spyOn(AppLogger.prototype, 'warn').mockImplementation(() => undefined)
+    const activityWarnSpy = vi
+      .spyOn(AppLogger.prototype, 'activityWarn')
+      .mockImplementation(() => undefined)
     mockPrisma.$queryRawUnsafe.mockReset().mockResolvedValueOnce([
       makeEligibleContact({
         csaStatus: 'not_eligible_out_of_pay',
@@ -835,9 +837,18 @@ describe('EligibilityService', () => {
 
     await service.runForContact('ICM-ELIG')
 
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('ICM-ELIG'))
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('BL-14B/14C skip'))
-    warnSpy.mockRestore()
+    expect(activityWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('ICM-ELIG'),
+      expect.objectContaining({
+        activityType: 'DATA_QUALITY',
+        aggregateKey: 'user-set-missing-effective-date',
+      }),
+    )
+    expect(activityWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('BL-14B/14C skip'),
+      expect.any(Object),
+    )
+    activityWarnSpy.mockRestore()
   })
 
   it('should skip runForContact upsert when status unchanged and staging data unchanged', async () => {

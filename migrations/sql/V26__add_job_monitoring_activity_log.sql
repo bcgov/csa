@@ -1,7 +1,10 @@
--- Job monitoring columns for latest summary, warnings, and triggering identity.
+-- VW-02 Job Monitoring: user IDIR and activity log.
+
 ALTER TABLE csa.job_runs
-  ADD COLUMN IF NOT EXISTS summary TEXT,
-  ADD COLUMN IF NOT EXISTS warning TEXT;
+  ADD COLUMN IF NOT EXISTS triggered_by_user TEXT;
+
+COMMENT ON COLUMN csa.job_runs.triggered_by_user IS
+  'IDIR username when job_trigger is END_USER; NULL for CRON/SYSTEM jobs';
 
 -- Activity log table for job-level monitoring details.
 CREATE TABLE IF NOT EXISTS csa.job_activities (

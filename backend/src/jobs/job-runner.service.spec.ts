@@ -104,7 +104,7 @@ describe('JobRunner', () => {
       expect(jobsService.getJob).toHaveBeenCalledWith(1)
       expect(mockHandler.onStart).toHaveBeenCalled()
       expect(mockHandler.execute).toHaveBeenCalled()
-      expect(jobsService.markSuccess).toHaveBeenCalledWith(1, 'Done', undefined)
+      expect(jobsService.markSuccess).toHaveBeenCalledWith(1, undefined)
       expect(mockHandler.onSuccess).toHaveBeenCalled()
       expect(result.success).toBe(true)
     })
@@ -169,7 +169,7 @@ describe('JobRunner', () => {
       const result = await runner.executeJob(1)
 
       expect(result.success).toBe(true)
-      expect(jobsService.markSuccess).toHaveBeenCalledWith(1, 'Done', undefined)
+      expect(jobsService.markSuccess).toHaveBeenCalledWith(1, undefined)
       // Should not retry or mark as failed
       expect(mockHandler.execute).toHaveBeenCalledTimes(1)
       expect(jobsService.markFailed).not.toHaveBeenCalled()

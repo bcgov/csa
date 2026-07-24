@@ -50,7 +50,7 @@ const JOB_NAME_TO_TYPE: Record<string, string> = {
 }
 
 const MONITORED_JOB_NAMES = Object.keys(JOB_NAME_TO_TYPE)
-const STATUSES = ['SUCCESS', 'RUNNING', 'FAILED']
+const STATUSES = ['Success', 'Running', 'Failed']
 const TRIGGER_OPTIONS = ['SYSTEM', 'USER']
 const ACTIVITY_SEVERITIES = ['ERROR', 'WARNING', 'INFO']
 const ACTIVITY_TYPES = [
@@ -88,8 +88,21 @@ const formatDatePT = (dateStr: string | null | undefined): string => {
 }
 
 const normalizeStatus = (status: string): string => {
-  const map: Record<string, string> = { SUCCESS: 'Success', FAILED: 'Failed', RUNNING: 'Running' }
+  const map: Record<string, string> = {
+    SUCCESS: 'Success',
+    FAILED: 'Failed',
+    RUNNING: 'Running',
+    Success: 'Success',
+    Failed: 'Failed',
+    Running: 'Running',
+  }
   return map[status] ?? status
+}
+
+const matchesTriggerFilter = (triggeredBy: string, filter: string): boolean => {
+  if (!filter) return true
+  if (filter === 'USER') return triggeredBy !== 'SYSTEM'
+  return triggeredBy === filter
 }
 
 const normalizeSeverity = (severity: string): string => {
@@ -398,7 +411,7 @@ export default function JobMonitoringTab() {
       if (jlFilterName && !row.jobName.toLowerCase().includes(jlFilterName.toLowerCase()))
         return false
       if (jlFilterStatus && row.status !== jlFilterStatus) return false
-      if (jlFilterTrigger && row.triggeredBy !== jlFilterTrigger) return false
+      if (!matchesTriggerFilter(row.triggeredBy, jlFilterTrigger)) return false
       return true
     })
     .sort((a, b) => {

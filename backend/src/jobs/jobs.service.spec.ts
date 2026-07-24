@@ -216,14 +216,13 @@ describe('JobsService', () => {
       })
     })
 
-    it('should update summary and metadata if provided', async () => {
-      await service.markSuccess(1, 'Processed 100 records', { recordsProcessed: 100 })
+    it('should update metadata if provided', async () => {
+      await service.markSuccess(1, { recordsProcessed: 100 })
 
       expect(prisma.jobRun.updateMany).toHaveBeenCalledWith({
         where: { id: 1, status: JobStatus.RUNNING },
         data: expect.objectContaining({
           status: JobStatus.SUCCESS,
-          summary: 'Processed 100 records',
           metadata: { recordsProcessed: 100 },
         }),
       })
@@ -239,7 +238,6 @@ describe('JobsService', () => {
         data: expect.objectContaining({
           status: JobStatus.FAILED,
           error: 'Connection timeout',
-          summary: 'Job failed',
           retryCount: { increment: 1 },
           completedAt: expect.any(Date),
         }),
@@ -257,30 +255,52 @@ describe('JobsService', () => {
 
   describe('monitoring', () => {
     it('should return latest run per monitored job type', async () => {
-      const latestIngest = {
+      const latestIcm = {
         ...mockJobRun,
         id: 3,
-        jobType: JobType.INGEST_DATA,
-        createdAt: new Date('2026-01-02T00:00:00Z'),
+        jobType: JobType.INGEST_ICM,
+        parentJobId: 99,
+        startedAt: new Date('2026-01-02T00:00:00Z'),
       }
-      const other = {
+      const latestEligibility = {
         ...mockJobRun,
         id: 4,
         jobType: JobType.RUN_ELIGIBILITY,
+        parentJobId: null,
       }
-      vi.spyOn(prisma.jobRun, 'findMany').mockResolvedValueOnce([latestIngest, other] as any)
+      vi.spyOn(prisma.jobRun, 'findFirst')
+        .mockResolvedValueOnce(latestIcm as any)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(latestEligibility as any)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
 
       const result = await service.getLatestJobsPerType()
 
       expect(result).toHaveLength(2)
-      expect(result.find((x) => x.jobType === JobType.INGEST_DATA)?.id).toBe(3)
-      expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
-        where: {
-          parentJobId: null,
-          jobType: { in: expect.any(Array) },
-        },
-        distinct: ['jobType'],
-        orderBy: [{ jobType: 'asc' }, { createdAt: 'desc' }],
+      expect(result.find((x) => x.jobType === JobType.INGEST_ICM)?.id).toBe(3)
+      expect(prisma.jobRun.findFirst).toHaveBeenCalledWith({
+        where: { jobType: JobType.INGEST_ICM },
+        orderBy: { startedAt: 'desc' },
+      })
+      expect(prisma.jobRun.findFirst).toHaveBeenCalledWith({
+        where: { jobType: JobType.RUN_ELIGIBILITY, parentJobId: null },
+        orderBy: { startedAt: 'desc' },
+      })
+    })
+
+    it('should store triggeredByUser when provided', async () => {
+      await service.createJob({
+        jobType: JobType.RUN_ELIGIBILITY,
+        jobTrigger: JobTrigger.END_USER,
+        triggeredByUser: 'JSMITH',
+      })
+
+      expect(prisma.jobRun.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          triggeredByUser: 'JSMITH',
+        }),
       })
     })
 

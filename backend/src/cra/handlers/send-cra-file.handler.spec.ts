@@ -181,6 +181,7 @@ describe('SendCraFileHandler', () => {
 
       expect(result.success).toBe(true)
       expect(result.message).toContain('No batch to process')
+      expect(result.metadata).toEqual({ no_batch: true })
       expect(mockBatchesService.updateBatchStatus).not.toHaveBeenCalled()
       expect(mockOutboundFileService.createFile).not.toHaveBeenCalled()
     })
@@ -196,6 +197,7 @@ describe('SendCraFileHandler', () => {
 
       expect(result.success).toBe(true)
       expect(result.message).toContain('No batch to process')
+      expect(result.metadata).toEqual({ no_batch: true })
       expect(mockBatchesService.updateBatchStatus).not.toHaveBeenCalled()
       expect(mockOutboundFileService.createFile).not.toHaveBeenCalled()
     })
@@ -335,6 +337,7 @@ describe('SendCraFileHandler', () => {
       expect(result.metadata).toEqual({
         batch_id: 10,
         file_path: '/tmp/cra/testfile.txt',
+        file_name: 'testfile.txt',
         record_count: 3,
         contacts_count: 2,
       })

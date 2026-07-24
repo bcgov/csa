@@ -95,7 +95,7 @@ export class SendCraFileHandler extends BaseJob {
 
   async execute(_context: JobContext): Promise<JobResult> {
     if (!this.batch || this.batchDetails.length === 0) {
-      return { success: true, message: 'No batch to process' }
+      return { success: true, message: 'No batch to process', metadata: { no_batch: true } }
     }
 
     const { header, details, trailer } = this.outboundDataService.buildCraFileData(

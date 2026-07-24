@@ -216,11 +216,10 @@ model JobRun {
   jobType     String    @map("job_type")
   status      String
   parentJobId Int?      @map("parent_job_id")
-  jobTrigger  String    @map("job_trigger")
-  retryCount  Int       @default(0) @map("retry_count")
+  jobTrigger       String    @map("job_trigger")
+  triggeredByUser  String?   @map("triggered_by_user")
+  retryCount       Int       @default(0) @map("retry_count")
   error       String?
-  summary     String?
-  warning     String?
   metadata    Json      @default("{}")
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   startedAt   DateTime  @map("started_at") @db.Timestamptz()

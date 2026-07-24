@@ -28,7 +28,14 @@ import {
   type MonitoringHistoryFilters,
 } from 'src/jobs/jobs.service'
 import { OpenshiftJobLauncher } from 'src/jobs/openshift-job-launcher.service'
+import {
+  formatJobDisplayName,
+  formatJobSummary,
+  formatMonitoringStatus,
+  formatTriggeredBy,
+} from 'src/jobs/job-monitoring.utils'
 import { CSAGuard } from '../common/guards/csa.guard'
+import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { canRunBulkJobInApiProcess } from './bulk-job-deploy-env'
 import { getJobRunWarning } from './job-openshift-advisory'
 
@@ -37,15 +44,6 @@ const LIMIT_DEFAULT = 20
 const LIMIT_MAX = 200
 const GENERIC_JOB_FAILURE_SUFFIX =
   'failed unexpectedly. Please retry. If it persists, contact support.'
-const JOB_DISPLAY_NAMES: Record<string, string> = {
-  [JobType.INGEST_DATA]: 'Data Fetch',
-  [JobType.INGEST_MIS]: 'Data Fetch - MIS',
-  [JobType.INGEST_ICM]: 'Data Fetch - ICM',
-  [JobType.RUN_ELIGIBILITY]: 'Eligibility',
-  [JobType.AUTO_BATCH]: 'Auto Batch',
-  [JobType.SEND_CRA_FILE]: 'Send CRA File',
-  [JobType.POLL_CRA_RESPONSE]: 'Weekly Response',
-}
 
 interface JobRunResponse {
   id: number
@@ -120,11 +118,12 @@ export class JobsController {
     private readonly openshiftJobLauncher: OpenshiftJobLauncher,
   ) {}
 
-  private async createEndUserJobRun(jobType: JobType) {
+  private async createEndUserJobRun(jobType: JobType, triggeredByUser: string) {
     try {
       return await this.jobsService.createJob({
         jobType,
         jobTrigger: JobTrigger.END_USER,
+        triggeredByUser,
       })
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -138,8 +137,9 @@ export class JobsController {
   // so the second concurrent createJob for the same type raises P2002. We translate that to 409.
   private async startFireAndForgetJob(
     jobType: JobType,
+    triggeredByUser: string,
   ): Promise<{ jobRunId: number; message: string }> {
-    const jobRun = await this.createEndUserJobRun(jobType)
+    const jobRun = await this.createEndUserJobRun(jobType, triggeredByUser)
 
     this.jobRunner.executeJob(jobRun.id).catch((err) => {
       this.logger.error(
@@ -156,18 +156,19 @@ export class JobsController {
 
   private async launchOpenShiftJob(
     jobType: JobType,
+    triggeredByUser: string,
   ): Promise<{ jobRunId: number; message: string; openshiftJobName?: string }> {
     if (!this.openshiftJobLauncher.isEnabled()) {
       const deployEnv = this.configService.get<DeployEnv>('app.deployEnv', 'local')
       if (canRunBulkJobInApiProcess(deployEnv)) {
-        return this.startFireAndForgetJob(jobType)
+        return this.startFireAndForgetJob(jobType, triggeredByUser)
       }
 
       throw new ServiceUnavailableException(
         `Bulk ${jobType} jobs must run in OpenShift when DEPLOY_ENV is ${deployEnv}. The job launcher is not available.`,
       )
     }
-    const jobRun = await this.createEndUserJobRun(jobType)
+    const jobRun = await this.createEndUserJobRun(jobType, triggeredByUser)
 
     this.logger.log(`Created job_run ${jobRun.id} for ${jobType}, launching OpenShift Job...`)
 
@@ -247,24 +248,24 @@ export class JobsController {
   @ApiResponse({ status: 201, description: 'RUN_ELIGIBILITY job started' })
   @ApiResponse({ status: 409, description: 'RUN_ELIGIBILITY is already running' })
   @ApiResponse({ status: 503, description: 'Failed to launch OpenShift Job' })
-  async runEligibility() {
-    return this.launchOpenShiftJob(JobType.RUN_ELIGIBILITY)
+  async runEligibility(@CurrentUser() userId: string) {
+    return this.launchOpenShiftJob(JobType.RUN_ELIGIBILITY, userId)
   }
 
   @Post('auto-batch')
   @ApiResponse({ status: 201, description: 'AUTO_BATCH job started' })
   @ApiResponse({ status: 409, description: 'AUTO_BATCH is already running' })
   @ApiResponse({ status: 503, description: 'Failed to launch OpenShift Job' })
-  async autoBatch() {
-    return this.launchOpenShiftJob(JobType.AUTO_BATCH)
+  async autoBatch(@CurrentUser() userId: string) {
+    return this.launchOpenShiftJob(JobType.AUTO_BATCH, userId)
   }
 
   @Post('send-cra-file')
   @ApiResponse({ status: 201, description: 'SEND_CRA_FILE job started' })
   @ApiResponse({ status: 409, description: 'SEND_CRA_FILE is already running' })
   @ApiResponse({ status: 503, description: 'Failed to launch OpenShift Job' })
-  async sendCraFile() {
-    return this.launchOpenShiftJob(JobType.SEND_CRA_FILE)
+  async sendCraFile(@CurrentUser() userId: string) {
+    return this.launchOpenShiftJob(JobType.SEND_CRA_FILE, userId)
   }
 
   @Get('monitoring/latest')
@@ -376,27 +377,23 @@ export class JobsController {
       jobType: string
       status: string
       jobTrigger: string
+      triggeredByUser?: string | null
       startedAt: Date | null
       completedAt: Date | null
-      summary?: string | null
-      warning?: string | null
+      metadata?: unknown
     },
     advisoryWarning?: string,
   ): MonitoringJobResponse {
     return {
       id: job.id,
       jobId: job.id,
-      jobName: JOB_DISPLAY_NAMES[job.jobType] ?? job.jobType,
-      status: job.status,
-      triggeredBy: this.getTriggeredBy(job.jobTrigger),
+      jobName: formatJobDisplayName(job.jobType),
+      status: formatMonitoringStatus(job.status),
+      triggeredBy: formatTriggeredBy(job),
       started: job.startedAt,
       finished: job.completedAt,
-      summary: job.summary,
-      warning: advisoryWarning ?? job.warning,
+      summary: formatJobSummary(job),
+      warning: advisoryWarning ?? null,
     }
-  }
-
-  private getTriggeredBy(jobTrigger: string): string {
-    return jobTrigger === JobTrigger.END_USER ? 'USER' : 'SYSTEM'
   }
 }

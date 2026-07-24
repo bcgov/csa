@@ -11,7 +11,13 @@ import { CSAGuard } from '../common/guards/csa.guard'
 import { clearOpenshiftStatusCacheForTests } from './job-openshift-advisory'
 import { JobsController } from './jobs.controller'
 
-const mockCSAGuard = { canActivate: () => true }
+const mockCSAGuard = {
+  canActivate: (context: { switchToHttp: () => { getRequest: () => any } }) => {
+    const req = context.switchToHttp().getRequest()
+    req.username = 'JSMITH'
+    return true
+  },
+}
 
 describe('JobsController', () => {
   let app: INestApplication
@@ -140,6 +146,7 @@ describe('JobsController', () => {
       expect(mockJobsService.createJob).toHaveBeenCalledWith({
         jobType: 'RUN_ELIGIBILITY',
         jobTrigger: 'END_USER',
+        triggeredByUser: 'JSMITH',
       })
       expect(mockOpenshiftJobLauncher.launchJob).toHaveBeenCalledWith('RUN_ELIGIBILITY', 42)
     })
@@ -316,6 +323,7 @@ describe('JobsController', () => {
       expect(mockJobsService.createJob).toHaveBeenCalledWith({
         jobType: 'SEND_CRA_FILE',
         jobTrigger: 'END_USER',
+        triggeredByUser: 'JSMITH',
       })
       expect(mockOpenshiftJobLauncher.launchJob).toHaveBeenCalledWith('SEND_CRA_FILE', 789)
     })
@@ -395,10 +403,10 @@ describe('JobsController', () => {
           jobType: 'RUN_ELIGIBILITY',
           status: 'SUCCESS',
           jobTrigger: 'END_USER',
+          triggeredByUser: 'JSMITH',
           startedAt: now,
           completedAt: now,
-          summary: 'Processed 100 records',
-          warning: null,
+          metadata: { processed: 100, statusChanges: 2, newContacts: 1, skipped: 3 },
         },
       ])
 
@@ -409,11 +417,11 @@ describe('JobsController', () => {
           id: 41,
           jobId: 41,
           jobName: 'Eligibility',
-          status: 'SUCCESS',
-          triggeredBy: 'USER',
+          status: 'Success',
+          triggeredBy: 'JSMITH',
           started: now.toISOString(),
           finished: now.toISOString(),
-          summary: 'Processed 100 records',
+          summary: '100 processed, 2 updated, 1 new, 3 skipped',
           warning: null,
         },
       ])
@@ -432,8 +440,7 @@ describe('JobsController', () => {
             jobTrigger: 'CRON',
             startedAt: now,
             completedAt: now,
-            summary: 'Job failed',
-            warning: null,
+            metadata: null,
           },
         ],
         total: 1,
@@ -458,6 +465,7 @@ describe('JobsController', () => {
         id: 7,
         jobName: 'Send CRA File',
         triggeredBy: 'SYSTEM',
+        summary: 'Job failed',
       })
     })
   })

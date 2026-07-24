@@ -6,8 +6,14 @@ import { JobActivityType } from './enums/job-activity-type.enum'
 import { JobStatus } from './enums/job-status.enum'
 import { JobTrigger } from './enums/job-trigger.enum'
 import { JobType } from './enums/job-type.enum'
+import {
+  isMonitoredChildJobType,
+  MONITORED_JOB_LIST_TYPES,
+} from './job-monitoring.utils'
 
 const RETRYABLE_END_USER_JOB_TYPES: JobType[] = [JobType.SEND_CRA_FILE]
+
+/** @deprecated Use MONITORED_JOB_LIST_TYPES — history query updated in step 2. */
 export const MONITORED_JOB_TYPES: JobType[] = [
   JobType.INGEST_DATA,
   JobType.RUN_ELIGIBILITY,
@@ -42,6 +48,7 @@ export interface CreateJobDto {
   jobType: JobType
   jobTrigger: JobTrigger
   parentJobId?: number
+  triggeredByUser?: string
   metadata?: Record<string, unknown>
 }
 
@@ -56,6 +63,7 @@ export class JobsService {
         jobType: dto.jobType,
         jobTrigger: dto.jobTrigger,
         parentJobId: dto.parentJobId,
+        triggeredByUser: dto.triggeredByUser,
         status: JobStatus.RUNNING,
         retryCount: 0,
         metadata: (dto.metadata ?? {}) as any,
@@ -100,13 +108,12 @@ export class JobsService {
     })
   }
 
-  async markSuccess(id: number, summary?: string, metadata?: Record<string, unknown>) {
+  async markSuccess(id: number, metadata?: Record<string, unknown>) {
     const result = await this.prisma.jobRun.updateMany({
       where: { id, status: JobStatus.RUNNING },
       data: {
         status: JobStatus.SUCCESS,
         completedAt: new Date(),
-        ...(summary && { summary }),
         ...(metadata && { metadata: metadata as any }),
       },
     })
@@ -127,7 +134,6 @@ export class JobsService {
       data: {
         status: JobStatus.FAILED,
         error,
-        summary: 'Job failed',
         retryCount: { increment: 1 },
         completedAt: new Date(),
       },
@@ -277,14 +283,19 @@ export class JobsService {
   }
 
   async getLatestJobsPerType() {
-    return this.prisma.jobRun.findMany({
-      where: {
-        parentJobId: null,
-        jobType: { in: MONITORED_JOB_TYPES },
-      },
-      distinct: ['jobType'],
-      orderBy: [{ jobType: 'asc' }, { createdAt: 'desc' }],
-    })
+    const runs = await Promise.all(
+      MONITORED_JOB_LIST_TYPES.map((jobType) =>
+        this.prisma.jobRun.findFirst({
+          where: {
+            jobType,
+            ...(isMonitoredChildJobType(jobType) ? {} : { parentJobId: null }),
+          },
+          orderBy: { startedAt: 'desc' },
+        }),
+      ),
+    )
+
+    return runs.filter((run): run is NonNullable<typeof run> => run !== null)
   }
 
   async getJobHistory(filters: MonitoringHistoryFilters = {}) {

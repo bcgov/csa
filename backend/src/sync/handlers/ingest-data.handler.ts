@@ -39,6 +39,7 @@ export class IngestDataHandler extends BaseJob {
     return {
       success: true,
       message: 'Data ingestion completed successfully',
+      metadata: { icmResult, misResult },
     }
   }
 }

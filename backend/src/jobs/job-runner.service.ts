@@ -105,7 +105,7 @@ export class JobRunner {
         const result = await handler.execute(context)
 
         if (result.success) {
-          await this.jobsService.markSuccess(jobId, result.message, result.metadata)
+          await this.jobsService.markSuccess(jobId, result.metadata)
           try {
             await handler.onSuccess?.(context, result)
           } catch (hookError) {

@@ -10,7 +10,7 @@ decision-makers: [CSA development team]
 
 The backend runs in OpenShift where logs are captured from stdout and forwarded to a centralised log aggregator. Production logs must be machine-parseable for alerting and search; development logs must remain human-readable. The default NestJS console logger does not support JSON output, structured metadata, or the syslog severity levels required by operations.
 
-Job Monitoring (see [job-monitoring-implementation-plan.md](../../documentation/job-monitoring-implementation-plan.md)) adds a second consumer: a curated **Activities** table for the Monitoring UI. That table must not mirror all Splunk output.
+Job Monitoring adds a second consumer: a curated **Activities** table for the Monitoring UI. That table must not mirror all Splunk output.
 
 ## Decision Drivers
 
@@ -66,7 +66,7 @@ Splunk receives all application logs. The Activities table receives only **tagge
 
 Infra concerns (auth, OpenShift, mocks) use the standard NestJS logger and never write to Activities. Engineering noise (mocks, config fallbacks, internal backfill detail) is logged at informational level. Integration failures, auth denials, and data-quality issues remain at warning level in Splunk even when not promoted to Activities.
 
-Implementation detail (tag fields, call-site conventions) lives in the [job monitoring implementation plan](../../documentation/job-monitoring-implementation-plan.md) Phase 5.1, not in this ADR.
+Implementation detail (tag fields, call-site conventions) is documented outside this ADR (job monitoring implementation plan, Phase 5.1).
 
 ### Consequences
 

@@ -385,6 +385,3 @@ backend/generated/
 
 # Local npm config (for dev-specific SSL/proxy settings)
 .npmrc
-
-# Local documentation (runbooks, FDDs, remediation guides — not in repo)
-documentation/

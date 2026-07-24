@@ -1,10 +1,42 @@
 import { Injectable } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { JobActivitySeverity } from './enums/job-activity-severity.enum'
+import { JobActivityType } from './enums/job-activity-type.enum'
 import { JobStatus } from './enums/job-status.enum'
 import { JobTrigger } from './enums/job-trigger.enum'
 import { JobType } from './enums/job-type.enum'
 
 const RETRYABLE_END_USER_JOB_TYPES: JobType[] = [JobType.SEND_CRA_FILE]
+export const MONITORED_JOB_TYPES: JobType[] = [
+  JobType.INGEST_DATA,
+  JobType.RUN_ELIGIBILITY,
+  JobType.AUTO_BATCH,
+  JobType.SEND_CRA_FILE,
+  JobType.POLL_CRA_RESPONSE,
+]
+
+export interface MonitoringHistoryFilters {
+  page?: number
+  limit?: number
+  jobType?: JobType
+  status?: JobStatus
+  triggeredBy?: string
+  jobId?: number
+  sortBy?: 'id' | 'jobType' | 'status' | 'jobTrigger' | 'startedAt' | 'completedAt' | 'createdAt'
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface MonitoringActivityFilters {
+  page?: number
+  limit?: number
+  jobRunId?: number
+  severity?: JobActivitySeverity
+  type?: JobActivityType
+  sortBy?: 'when' | 'severity' | 'type' | 'jobRunId'
+  sortOrder?: 'asc' | 'desc'
+  fromWhen?: Date
+}
 
 export interface CreateJobDto {
   jobType: JobType
@@ -19,7 +51,7 @@ export class JobsService {
 
   async createJob(dto: CreateJobDto) {
     const now = new Date()
-    return this.prisma.jobRun.create({
+    const job = await this.prisma.jobRun.create({
       data: {
         jobType: dto.jobType,
         jobTrigger: dto.jobTrigger,
@@ -31,6 +63,13 @@ export class JobsService {
         startedAt: now,
       },
     })
+
+    await this.addActivity(job.id, {
+      severity: JobActivitySeverity.INFO,
+      type: JobActivityType.STARTED,
+    })
+
+    return job
   }
 
   async getJobs(filters: { jobType?: JobType; status?: JobStatus; page?: number; limit?: number }) {
@@ -61,27 +100,48 @@ export class JobsService {
     })
   }
 
-  async markSuccess(id: number, metadata?: Record<string, unknown>) {
-    return this.prisma.jobRun.updateMany({
+  async markSuccess(id: number, summary?: string, metadata?: Record<string, unknown>) {
+    const result = await this.prisma.jobRun.updateMany({
       where: { id, status: JobStatus.RUNNING },
       data: {
         status: JobStatus.SUCCESS,
         completedAt: new Date(),
+        ...(summary && { summary }),
         ...(metadata && { metadata: metadata as any }),
       },
     })
+
+    if (result.count > 0) {
+      await this.addActivity(id, {
+        severity: JobActivitySeverity.INFO,
+        type: JobActivityType.COMPLETED,
+      })
+    }
+
+    return result
   }
 
   async markFailed(id: number, error: string) {
-    return this.prisma.jobRun.updateMany({
+    const result = await this.prisma.jobRun.updateMany({
       where: { id, status: JobStatus.RUNNING },
       data: {
         status: JobStatus.FAILED,
         error,
+        summary: 'Job failed',
         retryCount: { increment: 1 },
         completedAt: new Date(),
       },
     })
+
+    if (result.count > 0) {
+      await this.addActivity(id, {
+        severity: JobActivitySeverity.ERROR,
+        type: JobActivityType.FAILED,
+        related: error.slice(0, 512),
+      })
+    }
+
+    return result
   }
 
   async resetToRunning(id: number) {
@@ -214,5 +274,122 @@ export class JobsService {
       select: { id: true },
     })
     return failed !== null
+  }
+
+  async getLatestJobsPerType() {
+    return this.prisma.jobRun.findMany({
+      where: {
+        parentJobId: null,
+        jobType: { in: MONITORED_JOB_TYPES },
+      },
+      distinct: ['jobType'],
+      orderBy: [{ jobType: 'asc' }, { createdAt: 'desc' }],
+    })
+  }
+
+  async getJobHistory(filters: MonitoringHistoryFilters = {}) {
+    const page = filters.page ?? 1
+    const limit = filters.limit ?? 10
+    const oneMonthAgo = new Date()
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
+
+    const where: Prisma.JobRunWhereInput = {
+      parentJobId: null,
+      createdAt: { gte: oneMonthAgo },
+      jobType: { in: MONITORED_JOB_TYPES },
+      ...(filters.jobType && { jobType: filters.jobType }),
+      ...(filters.status && { status: filters.status }),
+      ...(filters.jobId && { id: filters.jobId }),
+    }
+
+    if (filters.triggeredBy) {
+      if (filters.triggeredBy === 'SYSTEM') {
+        where.jobTrigger = { in: [JobTrigger.CRON, JobTrigger.SYSTEM] }
+      } else if (filters.triggeredBy === 'USER' || filters.triggeredBy === JobTrigger.END_USER) {
+        where.jobTrigger = JobTrigger.END_USER
+      } else if (
+        filters.triggeredBy === JobTrigger.CRON ||
+        filters.triggeredBy === JobTrigger.SYSTEM
+      ) {
+        where.jobTrigger = filters.triggeredBy
+      } else {
+        where.jobTrigger = filters.triggeredBy as JobTrigger
+      }
+    }
+
+    const sortBy = filters.sortBy ?? 'createdAt'
+    const sortOrder = filters.sortOrder ?? 'desc'
+
+    const [data, total] = await Promise.all([
+      this.prisma.jobRun.findMany({
+        where,
+        orderBy: { [sortBy]: sortOrder },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.jobRun.count({ where }),
+    ])
+
+    return { data, total, page, limit }
+  }
+
+  async addActivity(
+    jobRunId: number,
+    activity: { severity: JobActivitySeverity; type: JobActivityType; related?: string },
+  ) {
+    return this.prisma.jobActivity.create({
+      data: {
+        jobRunId,
+        severity: activity.severity,
+        type: activity.type,
+        related: activity.related,
+        when: new Date(),
+      },
+    })
+  }
+
+  async getActivities(filters: MonitoringActivityFilters = {}) {
+    const page = filters.page ?? 1
+    const limit = filters.limit ?? 10
+    const sortBy = filters.sortBy ?? 'when'
+    const sortOrder = filters.sortOrder ?? 'desc'
+
+    const where = {
+      ...(filters.jobRunId && { jobRunId: filters.jobRunId }),
+      ...(filters.severity && { severity: filters.severity }),
+      ...(filters.type && { type: filters.type }),
+      ...(filters.fromWhen && { when: { gte: filters.fromWhen } }),
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.jobActivity.findMany({
+        where,
+        orderBy: { [sortBy]: sortOrder },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.jobActivity.count({ where }),
+    ])
+
+    return { data, total, page, limit }
+  }
+
+  async getRecentActivities(
+    page: number = 1,
+    limit: number = 10,
+    filters: Omit<MonitoringActivityFilters, 'page' | 'limit' | 'jobRunId' | 'fromWhen'> = {},
+  ) {
+    const oneMonthAgo = new Date()
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
+
+    return this.getActivities({
+      page,
+      limit,
+      severity: filters.severity,
+      type: filters.type,
+      sortBy: filters.sortBy ?? 'when',
+      sortOrder: filters.sortOrder ?? 'desc',
+      fromWhen: oneMonthAgo,
+    })
   }
 }

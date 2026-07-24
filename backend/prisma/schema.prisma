@@ -219,16 +219,36 @@ model JobRun {
   jobTrigger  String    @map("job_trigger")
   retryCount  Int       @default(0) @map("retry_count")
   error       String?
+  summary     String?
+  warning     String?
   metadata    Json      @default("{}")
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   startedAt   DateTime  @map("started_at") @db.Timestamptz()
   completedAt DateTime? @map("completed_at") @db.Timestamptz()
   parentJob   JobRun?   @relation("ChildJobs", fields: [parentJobId], references: [id])
   childJobs   JobRun[]  @relation("ChildJobs")
+  activities  JobActivity[]
 
   @@index([status])
   @@index([parentJobId])
   @@index([jobType, status])
+  @@index([createdAt(sort: Desc)])
   @@map("job_runs")
+  @@schema("csa")
+}
+
+model JobActivity {
+  id       Int      @id @default(autoincrement())
+  jobRunId Int      @map("job_run_id")
+  when     DateTime @default(now()) @db.Timestamptz()
+  severity String
+  type     String
+  related  String?
+  jobRun   JobRun   @relation(fields: [jobRunId], references: [id], onDelete: Cascade)
+
+  @@index([jobRunId, when(sort: Desc)])
+  @@index([severity])
+  @@index([type])
+  @@map("job_activities")
   @@schema("csa")
 }

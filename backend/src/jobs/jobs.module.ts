@@ -5,6 +5,7 @@ import { RetryFailedHandler } from './handlers/retry-failed.handler'
 import { JobActivityService } from './job-activity.service'
 import { JobRegistry } from './job-registry.service'
 import { JobRunner } from './job-runner.service'
+import { registerJobActivityRecorder } from './job-monitoring-log'
 import { JobsService } from './jobs.service'
 import { OpenshiftJobLauncher } from './openshift-job-launcher.service'
 
@@ -27,9 +28,11 @@ export class JobsModule implements OnModuleInit {
   constructor(
     private readonly registry: JobRegistry,
     private readonly retryFailedHandler: RetryFailedHandler,
+    private readonly jobActivityService: JobActivityService,
   ) {}
 
   onModuleInit() {
+    registerJobActivityRecorder((params) => this.jobActivityService.recordActivity(params))
     this.registry.register(this.retryFailedHandler.jobType, this.retryFailedHandler)
   }
 }

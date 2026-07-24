@@ -2,11 +2,9 @@ import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
-import { JobActivitySeverity } from 'src/jobs/enums/job-activity-severity.enum'
 import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
-import { JobActivityService } from 'src/jobs/job-activity.service'
 import { JobsService } from 'src/jobs/jobs.service'
 import { IcmSyncBackService, SyncBackResult } from '../icm/icm-sync-back.service'
 import { EligibilityService } from '../eligibility/eligibility.service'
@@ -23,7 +21,6 @@ export class RunEligibilityHandler extends BaseJob {
     private readonly eligibilityService: EligibilityService,
     private readonly icmSyncBackService: IcmSyncBackService,
     private readonly jobsService: JobsService,
-    private readonly jobActivityService: JobActivityService,
     private readonly configService: ConfigService,
   ) {
     super()
@@ -34,34 +31,33 @@ export class RunEligibilityHandler extends BaseJob {
     const result = await this.eligibilityService.run(threshold)
 
     if (result.skipped > 0) {
-      await this.jobActivityService.recordActivity({
-        jobRunId: context.jobRunId,
-        severity: JobActivitySeverity.CRITICAL,
-        activityType: JobActivityType.DATA_QUALITY,
-        related: `${result.skipped} contacts skipped (missing required fields)`,
-      })
+      this.logger.activityCrit(
+        `${result.skipped} contacts skipped (missing required fields)`,
+        {
+          activityType: JobActivityType.DATA_QUALITY,
+          related: `${result.skipped} contacts skipped (missing required fields)`,
+        },
+      )
     }
 
     let syncResult: SyncBackResult | null = null
     try {
       syncResult = await this.icmSyncBackService.syncFlaggedWithRetry()
     } catch (err) {
-      this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`)
-      await this.jobActivityService.recordActivity({
-        jobRunId: context.jobRunId,
-        severity: JobActivitySeverity.WARNING,
+      this.logger.activityWarn(`ICM sync-back failed: ${(err as Error).message}`, {
         activityType: JobActivityType.ICM,
         related: `ICM sync-back failed: ${(err as Error).message}`,
       })
     }
 
     if (syncResult && syncResult.failed > 0) {
-      await this.jobActivityService.recordActivity({
-        jobRunId: context.jobRunId,
-        severity: JobActivitySeverity.WARNING,
-        activityType: JobActivityType.ICM,
-        related: `ICM sync-back partial failure (${syncResult.synced} synced, ${syncResult.failed} failed)`,
-      })
+      this.logger.activityWarn(
+        `ICM sync-back partial failure (${syncResult.synced} synced, ${syncResult.failed} failed)`,
+        {
+          activityType: JobActivityType.ICM,
+          related: `ICM sync-back partial failure (${syncResult.synced} synced, ${syncResult.failed} failed)`,
+        },
+      )
     }
 
     return {

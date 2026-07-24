@@ -9,12 +9,15 @@ COMMENT ON COLUMN csa.job_runs.triggered_by_user IS
 -- Activity log table for job-level monitoring details.
 CREATE TABLE IF NOT EXISTS csa.job_activities (
   id SERIAL PRIMARY KEY,
-  job_run_id INTEGER NOT NULL REFERENCES csa.job_runs(id) ON DELETE CASCADE,
+  job_run_id INTEGER REFERENCES csa.job_runs(id) ON DELETE SET NULL,
   "when" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   severity TEXT NOT NULL,
   type TEXT NOT NULL,
   related TEXT
 );
+
+COMMENT ON COLUMN csa.job_activities.job_run_id IS
+  'Associated job run when the activity occurred during a job; NULL for standalone operator actions';
 
 CREATE INDEX IF NOT EXISTS idx_job_runs_created_at_desc
   ON csa.job_runs (created_at DESC);

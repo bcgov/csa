@@ -319,6 +319,6 @@ flowchart LR
 ## Related documentation
 
 - [Job Monitoring FDD](job-runs-and-activity-log.md)
-- [ADR 0012 — Structured Logging](../decisions/0012-structured-logging-design.md) — stdout logging remains; Activities is a curated UI subset
-- [ADR 0004 — OpenShift CronJobs](../decisions/0004-openshift-cronjobs-no-in-app-scheduler.md) — job execution model
-- [Database schema wiki](../../local-context/wiki/4-data-integration/4.1-database-schema.md) — update after migration lands
+- [ADR 0012 — Structured Logging](../docs/decisions/0012-structured-logging-design.md) — stdout logging remains; Activities is a curated UI subset
+- [ADR 0004 — OpenShift CronJobs](../docs/decisions/0004-openshift-cronjobs-no-in-app-scheduler.md) — job execution model
+- [Database schema wiki](../local-context/wiki/4-data-integration/4.1-database-schema.md) — update after migration lands

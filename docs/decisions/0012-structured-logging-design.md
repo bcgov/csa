@@ -8,99 +8,92 @@ decision-makers: [CSA development team]
 
 ## Context and Problem Statement
 
-The backend runs in OpenShift where logs are captured from stdout and forwarded to a centralised log aggregator. Production logs must be machine-parseable for alerting and search; development logs must remain human-readable. The default NestJS console logger does not support JSON output, structured metadata, or the syslog severity levels required by operations.
-
-Job Monitoring adds a second consumer: a curated **Activities** table for the Monitoring UI. That table must not mirror all Splunk output.
+The backend runs in OpenShift where logs are captured from stdout and forwarded to a centralised log aggregator. Log output must be machine-parseable in production for alerting and search, and human-readable in development for local debugging. The default NestJS console logger does not support JSON output, structured metadata fields, or the syslog severity levels required by operations.
 
 ## Decision Drivers
 
-- Production logs must be structured JSON so aggregators (e.g. Splunk) can index fields
+- Production logs must be structured JSON so log aggregators (e.g., Splunk, ELK) can index fields
 - Development logs must be human-readable with colours and timestamps
-- Logs flow to stdout only; the platform collects and forwards them — no file writing in the application
+- Logs must flow to stdout only; the platform (OpenShift/Kubernetes) collects and forwards them, no file writing in the application
 - Log level must be configurable at runtime via an environment variable
-- Severity must distinguish data-quality failures (`crit`) from general errors and system emergencies (`alert`)
-- Structured metadata must be attachable to individual log entries
-- Monitoring Activities must capture operator-relevant events only, not engineering narrative or infra noise
+- Severity must distinguish `crit` (data quality failure, requires intervention) from `error` (unexpected runtime error, may self-recover) and `alert` (system-level emergency)
+- Structured metadata (e.g., `{ category: 'DATA_QUALITY', caseRowId: '...' }`) must be attachable to individual log entries
 
 ## Considered Options
 
-- **Winston + nest-winston**: production-grade logging; replaces NestJS default logger; supports custom levels, JSON format, and metadata
-- **NestJS built-in ConsoleLogger**: plaintext only; no JSON, custom levels, or structured metadata
-- **Pino**: high-performance JSON logger; less NestJS ecosystem support for custom levels
+- **Winston + nest-winston**:production-grade logging library; replaces NestJS's default logger; supports custom levels, JSON format, and metadata fields
+- **NestJS built-in `ConsoleLogger`**:default logger; outputs plaintext; no JSON support; no custom log levels; no structured metadata
+- **Pino**:high-performance JSON logger for Node.js; minimal API
 
 ## Decision Outcome
 
-**Chosen: Winston via nest-winston, with a custom AppLogger wrapper**
+**Chosen: Winston via `nest-winston`, with a custom `AppLogger` wrapper**
 
-Winston replaces the NestJS built-in logger as the global logger. Format switches by environment:
+Winston replaces the NestJS built-in logger as the global logger via `WinstonModule.createLogger()`. The format switches based on `NODE_ENV`:
 
-- **Production:** structured JSON to stdout
-- **Development:** human-readable output with colours and timestamps
+- **Production** (`NODE_ENV=production`): `winston.format.json()` with timestamps and error stacks, machine-parseable JSON to stdout
+- **Development**: NestJS-style pretty-print with colours and millisecond timestamps
 
-A single console transport writes to stdout only. OpenShift collects logs via its pipeline; the application does not write log files.
+A custom `AppLogger` class extends NestJS's `Logger` and adds two methods beyond the standard set: `crit()` and `alert()`. Both accept an optional `metadata` object whose key-value pairs are merged into the log entry as top-level JSON fields, enabling structured filtering in log aggregators (e.g., `category:DATA_QUALITY`).
 
-Log level is configurable via `LOG_LEVEL` (default `info` in production, `debug` in development).
+### Custom Log Levels (syslog-inspired)
 
-### Severity levels (syslog-inspired)
+| Level | Priority | Use |
+|-------|----------|-----|
+| `alert` | 0 (highest) | System-level emergency requiring immediate escalation |
+| `crit` | 1 | Data quality or integrity failure requiring human intervention (e.g., a contact skipped due to missing required fields) |
+| `error` | 2 | Unexpected runtime error; may self-recover on retry |
+| `warn` | 3 | Recoverable issue or expected edge case worth noting |
+| `info` | 4 | Normal operational events (job start/end, record counts) |
+| `debug` | 5 | Detailed trace for development |
+| `verbose` | 6 | Highly detailed trace; NestJS framework-level |
 
-| Level | Use |
-|-------|-----|
-| `alert` | System-level emergency |
-| `crit` | Data quality or integrity failure requiring intervention |
-| `error` | Unexpected runtime error |
-| `warn` | Recoverable issue or expected edge case |
-| `info` | Normal operational events |
-| `debug` / `verbose` | Trace detail |
+Winston's level filter includes all messages at or above the configured level. Default: `info` in production, `debug` in development.
 
-AppLogger extends the NestJS logger and adds `crit()` and `alert()`, each accepting optional metadata merged as top-level JSON fields for aggregator filtering.
+### Console-Only Transport
 
-### Activities dual-write (Monitoring)
-
-Splunk receives all application logs. The Activities table receives only **tagged** operator-relevant warnings, errors, and critical events from monitored domains (jobs, eligibility, batch, CRA, WKL, ICM).
-
-| Event type | Splunk | Activities |
-|------------|--------|------------|
-| Informational / debug narrative | Yes | No |
-| Warnings, errors, critical events without Monitoring tags | Yes | No |
-| Warnings, errors, critical events tagged for Monitoring | Yes | Yes |
-
-Infra concerns (auth, OpenShift, mocks) use the standard NestJS logger and never write to Activities. Engineering noise (mocks, config fallbacks, internal backfill detail) is logged at informational level. Integration failures, auth denials, and data-quality issues remain at warning level in Splunk even when not promoted to Activities.
-
-Implementation detail (tag fields, call-site conventions) is documented outside this ADR (job monitoring implementation plan, Phase 5.1).
+A single `Console` transport writes to stdout. No file transports are configured. This is intentional: OpenShift collects stdout via its log pipeline, centralises storage, and provides log rotation. Writing to files inside a container would bypass this pipeline and create disk-space management concerns.
 
 ### Consequences
 
-- **Good:** Production logs are structured and indexable; custom levels support targeted alerting
-- **Good:** Metadata on log entries avoids string interpolation for structured search
-- **Good:** Monitoring UI shows a curated operator view without duplicating Splunk
-- **Bad:** Winston adds a dependency and configuration beyond the NestJS default
-- **Bad:** Custom levels require AppLogger; callers cannot rely on the NestJS Logger interface alone
-- **Bad:** Dual-write policy requires discipline at call sites to avoid Activities noise or missed operator events
+- **Good:** Production logs are structured JSON; all fields (timestamp, level, context, message, metadata) are individually indexable
+- **Good:** `crit` and `alert` levels allow alerting rules to distinguish data quality failures from general errors
+- **Good:** Metadata object on `AppLogger.crit()` / `.alert()` lets callers attach structured context (e.g., `{ caseRowId, invalidFields }`) without string interpolation
+- **Good:** Log level configurable at runtime via `LOG_LEVEL` env var without redeployment
+- **Good:** Development output is human-readable with colours; no JSON noise locally
+- **Bad:** Winston adds a dependency and configuration layer not present in the NestJS default logger
+- **Bad:** Custom levels (`crit`, `alert`) are not part of NestJS's `LogLevel` type; callers must use `AppLogger` rather than the interface type to access them
 
 ## Pros and Cons of the Options
 
 ### Winston + nest-winston (chosen)
 
 **Pros:**
-- JSON in production; readable output in development
-- Custom syslog levels with metadata support
-- Console-only transport; platform-native log collection
+- JSON output in production; human-readable in development
+- Custom syslog levels (`crit`, `alert`) with metadata support
+- Console-only transport; platform collects logs
+- Log level configurable via `LOG_LEVEL` env var
 
 **Cons:**
-- Additional dependency and custom level wiring
+- Additional dependency; custom level wiring required
 
-### NestJS ConsoleLogger
+### NestJS built-in ConsoleLogger
 
 **Pros:**
-- No additional dependencies
+- Zero additional dependencies
 
 **Cons:**
-- Plaintext only; no structured metadata or custom levels
+- Plaintext output only; no JSON format
+- No custom log levels; no structured metadata fields
+- Cannot distinguish `crit` from `error` without string conventions
 
 ### Pino
 
 **Pros:**
-- Fast JSON logging with low overhead
+- Fastest JSON logger for Node.js; very low overhead
+- JSON output by default
 
 **Cons:**
-- Less NestJS integration for custom levels; pretty-print needs extra tooling in development
+- Less NestJS ecosystem support than `nest-winston`
+- Custom log levels require additional configuration
+- Pretty-print in development requires a separate `pino-pretty` dependency

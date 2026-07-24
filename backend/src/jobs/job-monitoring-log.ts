@@ -1,6 +1,12 @@
 import { JobActivitySeverity } from './enums/job-activity-severity.enum'
 import { JobActivityType } from './enums/job-activity-type.enum'
-import { getCurrentJobRunId, getJobActivityAggregator, runWithJobScope, trackPendingActivityWrite, flushPendingActivityWrites } from './job-execution.scope'
+import {
+  getCurrentJobRunId,
+  getJobActivityAggregator,
+  runWithJobScope,
+  trackPendingActivityWrite,
+  flushPendingActivityWrites,
+} from './job-execution.scope'
 
 export type JobMonitoringLogMeta = {
   activityType?: JobActivityType

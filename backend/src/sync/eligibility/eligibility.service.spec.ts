@@ -823,9 +823,7 @@ describe('EligibilityService', () => {
   })
 
   it('should warn when user-set but csa_status_effective_date is missing', async () => {
-    const warnSpy = vi
-      .spyOn(AppLogger.prototype, 'warn')
-      .mockImplementation(() => undefined)
+    const warnSpy = vi.spyOn(AppLogger.prototype, 'warn').mockImplementation(() => undefined)
     mockPrisma.$queryRawUnsafe.mockReset().mockResolvedValueOnce([
       makeEligibleContact({
         csaStatus: 'not_eligible_out_of_pay',

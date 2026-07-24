@@ -21,8 +21,22 @@ import { OpenshiftJobLauncher } from './openshift-job-launcher.service'
  */
 @Module({
   imports: [PrismaModule, IcmSyncBackModule],
-  providers: [JobsService, JobActivityService, JobRunner, JobRegistry, RetryFailedHandler, OpenshiftJobLauncher],
-  exports: [JobsService, JobActivityService, JobRunner, JobRegistry, RetryFailedHandler, OpenshiftJobLauncher],
+  providers: [
+    JobsService,
+    JobActivityService,
+    JobRunner,
+    JobRegistry,
+    RetryFailedHandler,
+    OpenshiftJobLauncher,
+  ],
+  exports: [
+    JobsService,
+    JobActivityService,
+    JobRunner,
+    JobRegistry,
+    RetryFailedHandler,
+    OpenshiftJobLauncher,
+  ],
 })
 export class JobsModule implements OnModuleInit {
   constructor(

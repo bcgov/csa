@@ -1,8 +1,5 @@
 import { Logger } from '@nestjs/common'
-import {
-  JobMonitoringLogMeta,
-  persistJobMonitoringLog,
-} from 'src/jobs/job-monitoring-log'
+import { JobMonitoringLogMeta, persistJobMonitoringLog } from 'src/jobs/job-monitoring-log'
 import { winstonInstance } from './logger.config'
 
 function asMonitoringMeta(value: unknown): JobMonitoringLogMeta | undefined {
@@ -51,8 +48,7 @@ export class AppLogger extends Logger {
       return
     }
 
-    const aggregateDefault =
-      level === 'crit' && !!meta.category ? undefined : false
+    const aggregateDefault = level === 'crit' && !!meta.category ? undefined : false
 
     void persistJobMonitoringLog(level, message, {
       ...meta,

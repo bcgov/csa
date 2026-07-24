@@ -61,14 +61,18 @@ export function formatMonitoringStatus(status: string): string {
   return MONITORING_STATUS_LABELS[status] ?? status
 }
 
-export function formatTriggeredBy(job: Pick<JobRunForMonitoring, 'jobTrigger' | 'triggeredByUser'>): string {
+export function formatTriggeredBy(
+  job: Pick<JobRunForMonitoring, 'jobTrigger' | 'triggeredByUser'>,
+): string {
   if (job.jobTrigger === JobTrigger.END_USER && job.triggeredByUser) {
     return job.triggeredByUser.toUpperCase()
   }
   return 'SYSTEM'
 }
 
-export function formatJobSummary(job: Pick<JobRunForMonitoring, 'jobType' | 'status' | 'metadata'>): string | null {
+export function formatJobSummary(
+  job: Pick<JobRunForMonitoring, 'jobType' | 'status' | 'metadata'>,
+): string | null {
   if (job.status === JobStatus.FAILED) {
     return 'Job failed'
   }
@@ -171,7 +175,9 @@ export function formatJobSummary(job: Pick<JobRunForMonitoring, 'jobType' | 'sta
       }
 
       const misRows = mis?.metadata?.totalRows
-      const misFileCount = Array.isArray(mis?.metadata?.results) ? mis.metadata.results.length : undefined
+      const misFileCount = Array.isArray(mis?.metadata?.results)
+        ? mis.metadata.results.length
+        : undefined
       if (misRows !== undefined && misFileCount !== undefined) {
         parts.push(`MIS: ${misRows} rows, ${misFileCount} files`)
       }

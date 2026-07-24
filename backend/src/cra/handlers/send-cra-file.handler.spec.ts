@@ -482,9 +482,7 @@ describe('SendCraFileHandler', () => {
     it('should warn and persist batch failure state when status transition fails', async () => {
       const batch = makeBatch({ id: 10 })
       const detail = makeBatchDetail({ id: 100, contactId: 1, batchId: 10 })
-      const warnSpy = vi
-        .spyOn(AppLogger.prototype, 'warn')
-        .mockImplementation(() => undefined)
+      const warnSpy = vi.spyOn(AppLogger.prototype, 'warn').mockImplementation(() => undefined)
 
       mockPrisma.batch.findFirst.mockResolvedValue(batch)
       mockPrisma.batch.findUnique.mockResolvedValue({
@@ -522,9 +520,7 @@ describe('SendCraFileHandler', () => {
 
     it('should warn with Issue 1 message when only systemComments can be persisted', async () => {
       const batch = makeBatch({ id: 10, status: 'processed' })
-      const warnSpy = vi
-        .spyOn(AppLogger.prototype, 'warn')
-        .mockImplementation(() => undefined)
+      const warnSpy = vi.spyOn(AppLogger.prototype, 'warn').mockImplementation(() => undefined)
 
       mockPrisma.batch.findUnique.mockResolvedValue({
         systemComments: null,

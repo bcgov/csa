@@ -321,7 +321,10 @@ describe('JobsService', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             startedAt: { gte: expect.any(Date) },
-            OR: [{ jobType: { in: [JobType.INGEST_ICM, JobType.INGEST_MIS] } }, { parentJobId: null }],
+            OR: [
+              { jobType: { in: [JobType.INGEST_ICM, JobType.INGEST_MIS] } },
+              { parentJobId: null },
+            ],
           }),
           orderBy: { startedAt: 'desc' },
         }),

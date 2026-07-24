@@ -38,12 +38,20 @@ describe('job-monitoring-log', () => {
 
   it('should aggregate category-tagged crit logs and flush at job end', async () => {
     await runWithJobExecutionScope(7, async () => {
-      await persistJobMonitoringLog('crit', 'Skipping contact: empty/null in required fields [dob]', {
-        category: 'DATA_QUALITY',
-      })
-      await persistJobMonitoringLog('crit', 'Skipping contact: empty/null in required fields [name]', {
-        category: 'DATA_QUALITY',
-      })
+      await persistJobMonitoringLog(
+        'crit',
+        'Skipping contact: empty/null in required fields [dob]',
+        {
+          category: 'DATA_QUALITY',
+        },
+      )
+      await persistJobMonitoringLog(
+        'crit',
+        'Skipping contact: empty/null in required fields [name]',
+        {
+          category: 'DATA_QUALITY',
+        },
+      )
     })
 
     expect(recordActivity).toHaveBeenCalledOnce()

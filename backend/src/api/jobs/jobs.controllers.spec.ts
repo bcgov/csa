@@ -473,7 +473,9 @@ describe('JobsController', () => {
   describe('GET /jobs/monitoring/activities', () => {
     it('should return recent activities with pagination and filters', async () => {
       mockJobsService.getRecentActivities.mockResolvedValue({
-        data: [{ id: 1, jobRunId: 5, severity: 'WARNING', type: 'CRA', related: 'Invalid file format' }],
+        data: [
+          { id: 1, jobRunId: 5, severity: 'WARNING', type: 'CRA', related: 'Invalid file format' },
+        ],
         total: 1,
         page: 1,
         limit: 10,

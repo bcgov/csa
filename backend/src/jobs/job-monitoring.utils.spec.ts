@@ -35,9 +35,9 @@ describe('job-monitoring.utils', () => {
   })
 
   it('returns IDIR for end-user jobs and SYSTEM otherwise', () => {
-    expect(
-      formatTriggeredBy({ jobTrigger: JobTrigger.END_USER, triggeredByUser: 'jsmith' }),
-    ).toBe('JSMITH')
+    expect(formatTriggeredBy({ jobTrigger: JobTrigger.END_USER, triggeredByUser: 'jsmith' })).toBe(
+      'JSMITH',
+    )
     expect(formatTriggeredBy({ jobTrigger: JobTrigger.CRON, triggeredByUser: null })).toBe('SYSTEM')
   })
 

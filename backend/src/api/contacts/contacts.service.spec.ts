@@ -1715,7 +1715,9 @@ describe('ContactsService', () => {
       vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(null)
 
       await expect(service.runContactEligibility(999, 'JSMITH')).rejects.toThrow(NotFoundException)
-      await expect(service.runContactEligibility(999, 'JSMITH')).rejects.toThrow('Contact 999 not found')
+      await expect(service.runContactEligibility(999, 'JSMITH')).rejects.toThrow(
+        'Contact 999 not found',
+      )
     })
 
     it('should map EligibilityInputError to UnprocessableEntityException', async () => {
@@ -1726,7 +1728,9 @@ describe('ContactsService', () => {
         .mockRejectedValue(new EligibilityInputError('Contact ICM-1 not found in staging tables'))
       const errorSpy = vi.spyOn(service['logger'], 'error').mockImplementation(() => {})
 
-      await expect(service.runContactEligibility(1, 'JSMITH')).rejects.toThrow(UnprocessableEntityException)
+      await expect(service.runContactEligibility(1, 'JSMITH')).rejects.toThrow(
+        UnprocessableEntityException,
+      )
       await expect(service.runContactEligibility(1, 'JSMITH')).rejects.toThrow(
         'Contact ICM-1 not found in staging tables',
       )
@@ -1811,13 +1815,10 @@ describe('ContactsService', () => {
       })
 
       await vi.waitFor(() => {
-        expect(warnSpy).toHaveBeenCalledWith(
-          'Immediate ICM sync failed for contact 1: ICM down',
-          {
-            activityType: 'ICM',
-            related: 'ICM sync failed after manual eligibility contact 1 by JSMITH',
-          },
-        )
+        expect(warnSpy).toHaveBeenCalledWith('Immediate ICM sync failed for contact 1: ICM down', {
+          activityType: 'ICM',
+          related: 'ICM sync failed after manual eligibility contact 1 by JSMITH',
+        })
       })
       warnSpy.mockRestore()
     })

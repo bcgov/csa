@@ -130,7 +130,11 @@ const getStatusIcon = (status: string) => {
 const getSeverityIcon = (severity: string) => {
   const s = severity.toUpperCase()
   if (s === 'ERROR' || s === 'CRITICAL') {
-    return <ErrorOutlineIcon sx={{ fontSize: '1rem', color: s === 'CRITICAL' ? '#b71c1c' : '#f44336' }} />
+    return (
+      <ErrorOutlineIcon
+        sx={{ fontSize: '1rem', color: s === 'CRITICAL' ? '#b71c1c' : '#f44336' }}
+      />
+    )
   }
   if (s === 'WARNING') return <WarningAmberIcon sx={{ fontSize: '1rem', color: '#ff9800' }} />
   return null
@@ -335,15 +339,27 @@ export default function JobMonitoringTab() {
   ])
 
   useEffect(() => {
-    fetchJobList()
+    const timeoutId = window.setTimeout(() => {
+      void fetchJobList()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [fetchJobList])
 
   useEffect(() => {
-    fetchJobHistory()
+    const timeoutId = window.setTimeout(() => {
+      void fetchJobHistory()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [fetchJobHistory])
 
   useEffect(() => {
-    fetchActivities()
+    const timeoutId = window.setTimeout(() => {
+      void fetchActivities()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [fetchActivities])
 
   const hasRunningJobs = jobListData.some((row) => row.status.toUpperCase() === 'RUNNING')

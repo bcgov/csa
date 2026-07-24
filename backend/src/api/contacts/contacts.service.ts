@@ -846,13 +846,10 @@ export class ContactsService {
       result = await this.eligibilityService.runForContact(contact.personIdIcm)
     } catch (err) {
       if (err instanceof EligibilityInputError) {
-        this.logger.error(
-          `Manual eligibility failed for contact ${contactId}: ${err.message}`,
-          {
-            activityType: JobActivityType.DATA_QUALITY,
-            related: `Manual eligibility contact ${contactId} (${contact.personIdIcm}) by ${triggeredByUser}: ${err.message}`,
-          },
-        )
+        this.logger.error(`Manual eligibility failed for contact ${contactId}: ${err.message}`, {
+          activityType: JobActivityType.DATA_QUALITY,
+          related: `Manual eligibility contact ${contactId} (${contact.personIdIcm}) by ${triggeredByUser}: ${err.message}`,
+        })
         throw new UnprocessableEntityException(err.message)
       }
       throw err

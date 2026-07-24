@@ -6,8 +6,6 @@ export interface EligibilityContext {
   hasPlacement?: boolean
   hasNonPlacement?: boolean
   eligiblePlacements?: PlacementRecord[]
-  contractNumbers?: string[]
-  agreementRowIds?: string[]
   cancelReasonCode?: string | null
   careEndDate?: Date | null
 }

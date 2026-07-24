@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config'
-import { describe, it, expect, beforeEach } from 'vitest'
+import path from 'path'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { InboundFileService } from './inbound-file.service'
 
 const TEST_ENV_FLAG = 'A'
@@ -107,7 +108,7 @@ describe('InboundFileService', () => {
   describe('getLocalFilePath', () => {
     it('joins fileStoragePath, destinationId, the inbound subdirectory, and the file name', () => {
       expect(service.getLocalFilePath('cra', 'craUserId.ARSP0001.txt')).toBe(
-        `${TEST_STORAGE_PATH}/cra/inbound/craUserId.ARSP0001.txt`,
+        path.join(TEST_STORAGE_PATH, 'cra', 'inbound', 'craUserId.ARSP0001.txt'),
       )
     })
   })

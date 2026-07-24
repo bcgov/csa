@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BatchesService } from 'src/api/batches/batches.service'
 import { BATCH_STATUS } from 'src/common/state-machine/constants/batch-status.constants'
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AutoBatchService } from './auto-batch.service'
 
 describe('AutoBatchService', () => {
@@ -31,6 +31,7 @@ describe('AutoBatchService', () => {
         },
         success: [10, 11],
         skipped: [],
+        incomplete: [],
       }),
     }
     service = new AutoBatchService(
@@ -48,7 +49,7 @@ describe('AutoBatchService', () => {
     expect(mockBatchesService.addContactsToPendingBatch).not.toHaveBeenCalled()
   })
 
-  it('should delegate to addContactsToPendingBatch with SYSTEM actor', async () => {
+  it('should delegate to addContactsToPendingBatch with SYSTEM userId and actor', async () => {
     mockPrisma.contact.findMany.mockResolvedValue([
       { id: 10, csaStatus: CSA_STATUS.ELIGIBLE },
       { id: 11, csaStatus: CSA_STATUS.NOT_ELIGIBLE_IN_PAY },
@@ -56,7 +57,11 @@ describe('AutoBatchService', () => {
 
     const result = await service.run()
 
-    expect(mockBatchesService.addContactsToPendingBatch).toHaveBeenCalledWith([10, 11], 'SYSTEM')
+    expect(mockBatchesService.addContactsToPendingBatch).toHaveBeenCalledWith(
+      [10, 11],
+      'SYSTEM', // userId for audit trail
+      'SYSTEM', // actor: SYSTEM for auto-batch
+    )
     expect(result).toEqual({ application: 1, cancellation: 1 })
   })
 
@@ -70,10 +75,41 @@ describe('AutoBatchService', () => {
       batch: { id: 42 },
       success: [10, 12],
       skipped: [{ id: 11, reason: 'invalid_transition' }],
+      incomplete: [],
     })
 
     const result = await service.run()
 
     expect(result).toEqual({ application: 1, cancellation: 1 })
+  })
+
+  describe('User Story 40101 - S2: Auto-batch with CRA validation & auto-hold', () => {
+    it('should handle incomplete records (missing CRA fields) with auto-hold reason', async () => {
+      mockPrisma.contact.findMany.mockResolvedValue([
+        { id: 10, csaStatus: CSA_STATUS.ELIGIBLE },
+        { id: 11, csaStatus: CSA_STATUS.ELIGIBLE },
+        { id: 12, csaStatus: CSA_STATUS.NOT_ELIGIBLE_IN_PAY },
+      ])
+      mockBatchesService.addContactsToPendingBatch.mockResolvedValue({
+        batch: { id: 42, batchNumber: 'B-2026-42' },
+        success: [10, 12], // Only 2 succeeded
+        skipped: [],
+        incomplete: [
+          { id: 11, missingFields: ['First Name', 'Gender'] }, // auto-held by S2
+        ],
+      })
+
+      const result = await service.run()
+
+      // Only successful records counted
+      expect(result).toEqual({ application: 1, cancellation: 1 })
+
+      // Verify actor='SYSTEM' was passed (enables auto-hold)
+      expect(mockBatchesService.addContactsToPendingBatch).toHaveBeenCalledWith(
+        [10, 11, 12],
+        'SYSTEM',
+        'SYSTEM',
+      )
+    })
   })
 })

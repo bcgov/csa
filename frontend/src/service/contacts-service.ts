@@ -190,6 +190,7 @@ export const fullTextSearchContacts = async (
 export interface BulkOperationResponse {
   success: number[]
   skipped: Array<{ id: number; reason: string }>
+  incomplete?: Array<{ id: number; missingFields: string[] }>
 }
 
 export interface Batch {

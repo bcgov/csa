@@ -30,7 +30,7 @@ export class AutoBatchHandler extends BaseJob {
       try {
         syncResult = await this.icmSyncBackService.syncFlaggedWithRetry()
       } catch (err) {
-        this.logger.activityWarn(`ICM sync-back failed: ${(err as Error).message}`, {
+        this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`, {
           activityType: JobActivityType.ICM,
           related: `ICM sync-back failed: ${(err as Error).message}`,
         })

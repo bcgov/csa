@@ -125,7 +125,7 @@ export class PollCraResponseHandler extends BaseJob {
     try {
       syncResult = await this.icmSyncBackService.syncFlaggedWithRetry()
     } catch (err) {
-      this.logger.activityWarn(`ICM sync-back failed: ${(err as Error).message}`, {
+      this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`, {
         activityType: JobActivityType.ICM,
         related: `ICM sync-back failed: ${(err as Error).message}`,
       })
@@ -219,7 +219,7 @@ export class PollCraResponseHandler extends BaseJob {
       const valid = this.inboundFileService.isValidResponseFile(file.fileName)
       if (!valid) {
         this.invalidFileFormatCount += 1
-        this.logger.activityWarn(`Invalid response file format: ${file.fileName}`, {
+        this.logger.warn(`Invalid response file format: ${file.fileName}`, {
           activityType: JobActivityType.CRA,
           aggregate: true,
           aggregateKey: 'invalid-response-file-format',
@@ -267,7 +267,7 @@ export class PollCraResponseHandler extends BaseJob {
         parsed = this.inboundResponseService.parseFile(localFilePath)
       }
     } catch (error) {
-      this.logger.activityError(`Failed to parse response file ${responseFile.fileName}: ${error}`, {
+      this.logger.error(`Failed to parse response file ${responseFile.fileName}: ${error}`, {
         activityType: JobActivityType.CRA,
         related: `Failed to parse response file ${responseFile.fileName}`,
       })
@@ -338,7 +338,7 @@ export class PollCraResponseHandler extends BaseJob {
     })
 
     if (!batchDetail) {
-      this.logger.activityWarn(`Batch detail not found for referenceNum ${detail.referenceNum}`, {
+      this.logger.warn(`Batch detail not found for referenceNum ${detail.referenceNum}`, {
         activityType: JobActivityType.CRA,
         aggregate: true,
         aggregateKey: 'batch-detail-not-found',
@@ -415,7 +415,7 @@ export class PollCraResponseHandler extends BaseJob {
     const wklType = TRANSACTION_TYPE_MAP[detail.transactionType]
 
     if (!wklType || !TRANSACTION_TYPES.includes(wklType)) {
-      this.logger.activityWarn(`WKL: unexpected transaction type ${detail.transactionType}, skipping`, {
+      this.logger.warn(`WKL: unexpected transaction type ${detail.transactionType}, skipping`, {
         activityType: JobActivityType.WKL,
         aggregate: true,
         aggregateKey: 'wkl-unexpected-transaction',
@@ -428,7 +428,7 @@ export class PollCraResponseHandler extends BaseJob {
 
     const batchDetail = await this.weeklyContactMatcher.findMatchingBatchDetail(detail)
     if (!batchDetail) {
-      this.logger.activityWarn(
+      this.logger.warn(
         `WKL: no matching batch detail for ${detail.childGivenName.trim()} ${detail.childSurName.trim()} ` +
           `(DIN: ${detail.childDin?.trim() || 'none'})`,
         {
@@ -440,7 +440,7 @@ export class PollCraResponseHandler extends BaseJob {
       )
       const contacts = await this.weeklyContactMatcher.findMatchingContact(detail)
       if (!contacts) {
-        this.logger.activityWarn(
+        this.logger.warn(
           `WKL: no matching contacts for ${detail.childGivenName.trim()} ${detail.childSurName.trim()} ` +
             `(DIN: ${detail.childDin?.trim() || 'none'})`,
           {
@@ -480,7 +480,7 @@ export class PollCraResponseHandler extends BaseJob {
     this.processedBatchIds.add(batchDetail.batchId)
 
     if (batchDetail.transactionType !== wklType) {
-      this.logger.activityWarn(
+      this.logger.warn(
         `WKL: transaction type mismatch for contact ${batchDetail.contactId} — ` +
           `WKL says ${wklType}, batch detail says ${batchDetail.transactionType}`,
         {
@@ -551,7 +551,7 @@ export class PollCraResponseHandler extends BaseJob {
         processedAt: new Date(),
       })
     } else {
-      this.logger.activityWarn(
+      this.logger.warn(
         `WKL: unexpected status '${detail.status}' for contact ${batchDetail.contactId}, skipping`,
         {
           activityType: JobActivityType.WKL,

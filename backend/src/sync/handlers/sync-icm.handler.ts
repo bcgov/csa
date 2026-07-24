@@ -32,7 +32,7 @@ export class SyncIcmHandler extends BaseJob {
     const result = await this.icmSyncBackService.syncFlaggedContacts()
 
     if (result.failed > 0 && result.synced === 0) {
-      this.logger.activityError(`ICM sync failed: all ${result.failed} contacts failed`, {
+      this.logger.error(`ICM sync failed: all ${result.failed} contacts failed`, {
         activityType: JobActivityType.ICM,
         related: `ICM sync failed: all ${result.failed} contacts failed`,
       })
@@ -44,7 +44,7 @@ export class SyncIcmHandler extends BaseJob {
     }
 
     if (result.failed > 0) {
-      this.logger.activityWarn(
+      this.logger.warn(
         `ICM sync partial failure: ${result.synced} synced, ${result.failed} failed`,
         {
           activityType: JobActivityType.ICM,

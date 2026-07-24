@@ -34,7 +34,7 @@ export class RetryFailedHandler extends BaseJob {
         syncResult = await this.icmSyncBackService.syncFlaggedContacts()
 
         if (syncResult.failed > 0) {
-          this.logger.activityWarn(
+          this.logger.warn(
             `ICM sweep partial failure: ${syncResult.synced} synced, ${syncResult.failed} failed`,
             {
               activityType: JobActivityType.ICM,
@@ -50,7 +50,7 @@ export class RetryFailedHandler extends BaseJob {
         metadata: { syncResult },
       }
     } catch (error) {
-      this.logger.activityError(`Error processing failed jobs: ${error.message}`, {
+      this.logger.error(`Error processing failed jobs: ${error.message}`, {
         activityType: JobActivityType.JOB,
         related: error.message,
       })

@@ -540,7 +540,7 @@ export class WeeklyFilesService {
     try {
       await this.icmSyncBackService.syncFlaggedWithRetry()
     } catch (err) {
-      this.logger.activityWarn(`ICM sync-back failed after WKL record reprocess: ${(err as Error).message}`, {
+      this.logger.warn(`ICM sync-back failed after WKL record reprocess: ${(err as Error).message}`, {
         activityType: JobActivityType.ICM,
         related: `ICM sync-back failed after WKL record reprocess: ${(err as Error).message}`,
       })
@@ -632,7 +632,7 @@ export class WeeklyFilesService {
     try {
       await this.icmSyncBackService.syncFlaggedWithRetry()
     } catch (err) {
-      this.logger.activityWarn(`ICM sync-back failed after WKL reprocess: ${(err as Error).message}`, {
+      this.logger.warn(`ICM sync-back failed after WKL reprocess: ${(err as Error).message}`, {
         activityType: JobActivityType.ICM,
         related: `ICM sync-back failed after WKL reprocess: ${(err as Error).message}`,
       })

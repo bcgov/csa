@@ -186,7 +186,7 @@ export class SendCraFileHandler extends BaseJob {
     try {
       await this.icmSyncBackService.syncFlaggedWithRetry()
     } catch (err) {
-      this.logger.activityWarn(`ICM sync-back failed: ${(err as Error).message}`, {
+      this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`, {
         activityType: JobActivityType.ICM,
         related: `ICM sync-back failed: ${(err as Error).message}`,
       })
@@ -196,7 +196,7 @@ export class SendCraFileHandler extends BaseJob {
   private async ensureBatchDetailsReady(): Promise<void> {
     const missingRefDetails = this.batchDetails.filter((detail) => !detail.referenceNumber)
     if (missingRefDetails.length > 0) {
-      this.logger.warn(
+      this.logger.log(
         `Batch ${this.batch!.id}: ${missingRefDetails.length} details missing referenceNumber, backfilling`,
       )
       for (const detail of missingRefDetails) {
@@ -216,7 +216,7 @@ export class SendCraFileHandler extends BaseJob {
 
     if (!this.batch) return
 
-    this.logger.activityError(`File transfer failed for batch ${this.batch.id}`, {
+    this.logger.error(`File transfer failed for batch ${this.batch.id}`, {
       activityType: JobActivityType.CRA,
       related: error.message || 'File transfer failed',
     })
@@ -243,7 +243,7 @@ export class SendCraFileHandler extends BaseJob {
       }
 
       if (data.status) {
-        this.logger.activityWarn(
+        this.logger.warn(
           `Batch ${this.batch.id}: SEND_FAILED transition failed (${result.reason}); persisted systemComments and status via direct update`,
           {
             activityType: JobActivityType.BATCH,
@@ -251,7 +251,7 @@ export class SendCraFileHandler extends BaseJob {
           },
         )
       } else {
-        this.logger.activityWarn(
+        this.logger.warn(
           `Batch ${this.batch.id}: SEND_FAILED transition failed (${result.reason}); persisted systemComments only`,
           {
             activityType: JobActivityType.BATCH,

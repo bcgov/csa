@@ -30,7 +30,7 @@ export class IngestDataHandler extends BaseJob {
     ])
 
     if (!icmResult.success || !misResult.success) {
-      this.logger.activityError('Ingestion failed', {
+      this.logger.error('Ingestion failed', {
         activityType: JobActivityType.JOB,
         related: `Data ingestion failed (ICM success=${icmResult.success}, MIS success=${misResult.success})`,
       })

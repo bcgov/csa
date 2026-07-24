@@ -685,7 +685,7 @@ export class EligibilityService {
 
     for (const profile of profiles) {
       if (!profile.dateOfBirth) {
-        this.logger.activityWarn(`Skipping contact ${profile.personIdIcm}: missing date of birth`, {
+        this.logger.warn(`Skipping contact ${profile.personIdIcm}: missing date of birth`, {
           activityType: JobActivityType.DATA_QUALITY,
           aggregate: true,
           aggregateKey: 'missing-dob',
@@ -779,7 +779,7 @@ export class EligibilityService {
   }
 
   private warnUserSetWithoutEffectiveDate(profile: ContactProfile): void {
-    this.logger.activityWarn(
+    this.logger.warn(
       `User-set CSA status for ${profile.personIdIcm} (last_updated_by=${profile.lastUpdatedBy}) but no csa_status_effective_date on master or ICM; running eligibility without BL-14B/14C skip`,
       {
         activityType: JobActivityType.DATA_QUALITY,

@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common'
 import { BatchesService } from 'src/api/batches/batches.service'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { AppLogger } from 'src/common/logger/app-logger'
-import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
 
 export interface AutoBatchResult {
@@ -69,26 +68,6 @@ export class AutoBatchService {
       if (!successIds.has(candidate.contactId)) continue
       if (candidate.kind === 'application') application++
       else cancellation++
-    }
-
-    if (result.skipped.length > 0) {
-      this.logger.activityWarn(
-        `Auto-batch skipped ${result.skipped.length} contacts (batch ${result.batch.id})`,
-        {
-          activityType: JobActivityType.BATCH,
-          related: `${result.skipped.length} contacts skipped during auto-batch (batch ${result.batch.id})`,
-        },
-      )
-    }
-
-    if (result.incomplete.length > 0) {
-      this.logger.activityWarn(
-        `Auto-batch Records Validation: ${result.incomplete.length} contacts auto-held due to missing CRA mandatory fields (batch ${result.batch.id})`,
-        {
-          activityType: JobActivityType.BATCH,
-          related: `${result.incomplete.length} contacts auto-held due to missing CRA mandatory fields (batch ${result.batch.id})`,
-        },
-      )
     }
 
     this.logger.log(

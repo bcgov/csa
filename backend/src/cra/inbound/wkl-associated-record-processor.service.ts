@@ -48,7 +48,7 @@ export class WklAssociatedRecordProcessorService {
   ): Promise<{ contactId: number; batchDetailId: number } | null> {
     const wklType = TRANSACTION_TYPE_MAP[detail.transactionType]
     if (!wklType || !TRANSACTION_TYPES.includes(wklType)) {
-      this.logger.activityWarn(
+      this.logger.warn(
         `WKL: unexpected transaction type ${detail.transactionType}, skipping [origin: ${ctx.origin}]`,
         {
           activityType: JobActivityType.WKL,
@@ -74,7 +74,7 @@ export class WklAssociatedRecordProcessorService {
       batchDetail = await this.batchesService.findInProgressBatchDetailForContact(contactId)
       if (batchDetail) {
         if (batchDetail.transactionType !== wklType) {
-          this.logger.activityWarn(
+          this.logger.warn(
             `WKL: transaction type mismatch for contact ${contactId} — ` +
               `WKL says ${wklType}, batch detail says ${batchDetail.transactionType} ` +
               `[origin: ${ctx.origin}]`,
@@ -155,7 +155,7 @@ export class WklAssociatedRecordProcessorService {
       )
       counters.refused++
     } else {
-      this.logger.activityWarn(
+      this.logger.warn(
         `WKL: unexpected status '${detail.status}' for contact ${batchDetail.contactId}, skipping ` +
           `[origin: ${ctx.origin}]`,
         {

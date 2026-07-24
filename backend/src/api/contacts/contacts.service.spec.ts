@@ -1714,8 +1714,8 @@ describe('ContactsService', () => {
     it('should throw NotFoundException when contact does not exist', async () => {
       vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(null)
 
-      await expect(service.runContactEligibility(999)).rejects.toThrow(NotFoundException)
-      await expect(service.runContactEligibility(999)).rejects.toThrow('Contact 999 not found')
+      await expect(service.runContactEligibility(999, 'JSMITH')).rejects.toThrow(NotFoundException)
+      await expect(service.runContactEligibility(999, 'JSMITH')).rejects.toThrow('Contact 999 not found')
     })
 
     it('should map EligibilityInputError to UnprocessableEntityException', async () => {
@@ -1724,11 +1724,21 @@ describe('ContactsService', () => {
       eligibility.runForContact = vi
         .fn()
         .mockRejectedValue(new EligibilityInputError('Contact ICM-1 not found in staging tables'))
+      const errorSpy = vi.spyOn(service['logger'], 'error').mockImplementation(() => {})
 
-      await expect(service.runContactEligibility(1)).rejects.toThrow(UnprocessableEntityException)
-      await expect(service.runContactEligibility(1)).rejects.toThrow(
+      await expect(service.runContactEligibility(1, 'JSMITH')).rejects.toThrow(UnprocessableEntityException)
+      await expect(service.runContactEligibility(1, 'JSMITH')).rejects.toThrow(
         'Contact ICM-1 not found in staging tables',
       )
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Manual eligibility failed for contact 1: Contact ICM-1 not found in staging tables',
+        {
+          activityType: 'DATA_QUALITY',
+          related:
+            'Manual eligibility contact 1 (ICM-1) by JSMITH: Contact ICM-1 not found in staging tables',
+        },
+      )
+      errorSpy.mockRestore()
     })
 
     it('should propagate generic Errors without wrapping (becomes 500 at HTTP layer)', async () => {
@@ -1737,9 +1747,9 @@ describe('ContactsService', () => {
       const dbError = new Error('connection terminated unexpectedly')
       eligibility.runForContact = vi.fn().mockRejectedValue(dbError)
 
-      await expect(service.runContactEligibility(1)).rejects.toBe(dbError)
+      await expect(service.runContactEligibility(1, 'JSMITH')).rejects.toBe(dbError)
       // Specifically must NOT have been rewrapped as a 422
-      await expect(service.runContactEligibility(1)).rejects.not.toBeInstanceOf(
+      await expect(service.runContactEligibility(1, 'JSMITH')).rejects.not.toBeInstanceOf(
         UnprocessableEntityException,
       )
     })
@@ -1751,7 +1761,7 @@ describe('ContactsService', () => {
         .fn()
         .mockResolvedValue({ previousStatus: 'eligible', newStatus: 'in_pay' })
 
-      await expect(service.runContactEligibility(1)).resolves.toEqual({
+      await expect(service.runContactEligibility(1, 'JSMITH')).resolves.toEqual({
         previousStatus: 'eligible',
         newStatus: 'in_pay',
       })
@@ -1766,7 +1776,7 @@ describe('ContactsService', () => {
         .mockResolvedValue({ previousStatus: 'eligible', newStatus: 'in_pay' })
       const icmSync = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
 
-      await service.runContactEligibility(1)
+      await service.runContactEligibility(1, 'JSMITH')
 
       expect(icmSync).toHaveBeenCalledWith(1)
     })
@@ -1779,7 +1789,7 @@ describe('ContactsService', () => {
         .mockResolvedValue({ previousStatus: 'eligible', newStatus: 'eligible' })
       const icmSync = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
 
-      await service.runContactEligibility(1)
+      await service.runContactEligibility(1, 'JSMITH')
 
       expect(icmSync).not.toHaveBeenCalled()
     })
@@ -1793,11 +1803,23 @@ describe('ContactsService', () => {
       vi.spyOn(service['icmSyncBackService'], 'syncSingleContact').mockRejectedValue(
         new Error('ICM down'),
       )
+      const warnSpy = vi.spyOn(service['logger'], 'warn').mockImplementation(() => {})
 
-      await expect(service.runContactEligibility(1)).resolves.toEqual({
+      await expect(service.runContactEligibility(1, 'JSMITH')).resolves.toEqual({
         previousStatus: 'eligible',
         newStatus: 'in_pay',
       })
+
+      await vi.waitFor(() => {
+        expect(warnSpy).toHaveBeenCalledWith(
+          'Immediate ICM sync failed for contact 1: ICM down',
+          {
+            activityType: 'ICM',
+            related: 'ICM sync failed after manual eligibility contact 1 by JSMITH',
+          },
+        )
+      })
+      warnSpy.mockRestore()
     })
   })
 })

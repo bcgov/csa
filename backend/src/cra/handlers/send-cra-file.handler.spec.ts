@@ -482,8 +482,8 @@ describe('SendCraFileHandler', () => {
     it('should warn and persist batch failure state when status transition fails', async () => {
       const batch = makeBatch({ id: 10 })
       const detail = makeBatchDetail({ id: 100, contactId: 1, batchId: 10 })
-      const activityWarnSpy = vi
-        .spyOn(AppLogger.prototype, 'activityWarn')
+      const warnSpy = vi
+        .spyOn(AppLogger.prototype, 'warn')
         .mockImplementation(() => undefined)
 
       mockPrisma.batch.findFirst.mockResolvedValue(batch)
@@ -502,7 +502,7 @@ describe('SendCraFileHandler', () => {
       await handler.onStart(mockContext)
       await handler.onFailure(mockContext, new Error('Connection refused'))
 
-      expect(activityWarnSpy).toHaveBeenCalledWith(
+      expect(warnSpy).toHaveBeenCalledWith(
         'Batch 10: SEND_FAILED transition failed (Invalid transition); persisted systemComments and status via direct update',
         expect.objectContaining({
           activityType: 'BATCH',
@@ -517,13 +517,13 @@ describe('SendCraFileHandler', () => {
       })
       expect(mockPrisma.contactBatchDetail.update).not.toHaveBeenCalled()
 
-      activityWarnSpy.mockRestore()
+      warnSpy.mockRestore()
     })
 
     it('should warn with Issue 1 message when only systemComments can be persisted', async () => {
       const batch = makeBatch({ id: 10, status: 'processed' })
-      const activityWarnSpy = vi
-        .spyOn(AppLogger.prototype, 'activityWarn')
+      const warnSpy = vi
+        .spyOn(AppLogger.prototype, 'warn')
         .mockImplementation(() => undefined)
 
       mockPrisma.batch.findUnique.mockResolvedValue({
@@ -538,7 +538,7 @@ describe('SendCraFileHandler', () => {
 
       await handler.onFailure(mockContext, new Error('Connection refused'))
 
-      expect(activityWarnSpy).toHaveBeenCalledWith(
+      expect(warnSpy).toHaveBeenCalledWith(
         'Batch 10: SEND_FAILED transition failed (Invalid transition); persisted systemComments only',
         expect.objectContaining({
           activityType: 'BATCH',
@@ -549,7 +549,7 @@ describe('SendCraFileHandler', () => {
         data: { systemComments: expect.stringContaining('Connection refused') },
       })
 
-      activityWarnSpy.mockRestore()
+      warnSpy.mockRestore()
     })
 
     it('should mark pending batch as system_error when send transition never completed', async () => {

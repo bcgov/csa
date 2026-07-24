@@ -60,25 +60,59 @@ describe('AppLogger', () => {
     })
   })
 
-  describe('activityWarn()', () => {
-    it('should log to Winston and persist a job activity when scope is active', async () => {
-      await runWithJobExecutionScope(99, async () => {
-        logger.activityWarn('ICM sync-back failed: timeout', {
-          activityType: JobActivityType.ICM,
-          related: 'ICM sync-back failed: timeout',
+  describe('warn() monitoring dual-write', () => {
+    it('should persist a job activity when activityType is provided', async () => {
+      await runWithJobExecutionScope(12, async () => {
+        logger.warn('Manual add to batch: 2 contacts skipped (batch 5)', {
+          activityType: JobActivityType.BATCH,
+          related: '2 contacts skipped during add (batch 5)',
         })
       })
 
       expect(recordActivity).toHaveBeenCalledWith({
-        jobRunId: 99,
+        jobRunId: 12,
         severity: JobActivitySeverity.WARNING,
-        activityType: JobActivityType.ICM,
-        related: 'ICM sync-back failed: timeout',
+        activityType: JobActivityType.BATCH,
+        related: '2 contacts skipped during add (batch 5)',
+      })
+    })
+
+    it('should not persist when warn is untagged', async () => {
+      await runWithJobExecutionScope(12, async () => {
+        logger.warn('Job already running, skipping')
+      })
+
+      expect(recordActivity).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('error() monitoring dual-write', () => {
+    it('should persist a job activity when activityType is provided', async () => {
+      await runWithJobExecutionScope(7, async () => {
+        logger.error('Manual remove from batch failed for contact 3', {
+          activityType: JobActivityType.BATCH,
+          related: 'Manual remove from batch contact 3: invalid_transition',
+        })
+      })
+
+      expect(recordActivity).toHaveBeenCalledWith({
+        jobRunId: 7,
+        severity: JobActivitySeverity.ERROR,
+        activityType: JobActivityType.BATCH,
+        related: 'Manual remove from batch contact 3: invalid_transition',
       })
     })
   })
 
   describe('crit() monitoring dual-write', () => {
+    it('should not persist when crit is untagged', async () => {
+      await runWithJobExecutionScope(5, async () => {
+        logger.crit('Job failed after all retries')
+      })
+
+      expect(recordActivity).not.toHaveBeenCalled()
+    })
+
     it('should aggregate DATA_QUALITY crit logs tagged by category', async () => {
       await runWithJobExecutionScope(5, async () => {
         logger.crit('Skipping contact: empty/null in required fields [dob]', {

@@ -31,7 +31,7 @@ export class RunEligibilityHandler extends BaseJob {
     const result = await this.eligibilityService.run(threshold)
 
     if (result.skipped > 0) {
-      this.logger.activityCrit(
+      this.logger.crit(
         `${result.skipped} contacts skipped (missing required fields)`,
         {
           activityType: JobActivityType.DATA_QUALITY,
@@ -44,14 +44,14 @@ export class RunEligibilityHandler extends BaseJob {
     try {
       syncResult = await this.icmSyncBackService.syncFlaggedWithRetry()
     } catch (err) {
-      this.logger.activityWarn(`ICM sync-back failed: ${(err as Error).message}`, {
+      this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`, {
         activityType: JobActivityType.ICM,
         related: `ICM sync-back failed: ${(err as Error).message}`,
       })
     }
 
     if (syncResult && syncResult.failed > 0) {
-      this.logger.activityWarn(
+      this.logger.warn(
         `ICM sync-back partial failure (${syncResult.synced} synced, ${syncResult.failed} failed)`,
         {
           activityType: JobActivityType.ICM,

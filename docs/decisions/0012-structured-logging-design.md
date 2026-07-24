@@ -97,3 +97,28 @@ A single `Console` transport writes to stdout. No file transports are configured
 - Less NestJS ecosystem support than `nest-winston`
 - Custom log levels require additional configuration
 - Pretty-print in development requires a separate `pino-pretty` dependency
+
+## Job Monitoring dual-write (Activities table)
+
+The Monitoring UI (`job_activities`) stores a **curated subset** of logs — not a copy of Splunk.
+
+| Level / API | Splunk | Activities |
+|-------------|--------|------------|
+| `log` / `info` / `debug` | Yes | No |
+| `warn` / `error` / `crit` **without** `activityType` or `category` | Yes (Splunk alerting) | No |
+| `warn` / `error` / `crit` **with** `activityType` or `category` on `AppLogger` | Yes | Yes |
+
+Demote to `log` only **engineering noise** (mocks, config fallbacks, internal backfill detail). Keep integration failures, auth denials, and data-quality skips at **`warn`** in Splunk even when they are not written to Activities.
+
+Use **`AppLogger`** in monitored domains (jobs, eligibility, batch, CRA, WKL, ICM). Use Nest **`Logger`** for infra (auth, OpenShift, mocks, Prisma) where Activities do not apply.
+
+Tag example:
+
+```typescript
+this.logger.warn('2 contacts skipped due to missing CRA fields (batch 5)', {
+  activityType: JobActivityType.BATCH,
+  related: '2 contacts skipped due to missing CRA mandatory fields (batch 5)',
+})
+```
+
+See [job-monitoring-implementation-plan.md](../functional-design/job-monitoring-implementation-plan.md) Phase 5.1.

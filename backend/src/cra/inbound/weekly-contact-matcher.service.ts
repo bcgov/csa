@@ -163,7 +163,7 @@ export class WeeklyContactMatcherService {
     if (matches.length === 1) return this.toResult(matches[0])
 
     if (matches.length > 1) {
-      this.logger.activityWarn(
+      this.logger.warn(
         `WKL: multiple batch detail matches (${matches.length}) for ` +
           `${wklDetail.childGivenName.trim()} ${wklDetail.childSurName.trim()}, skipping`,
         {
@@ -231,7 +231,7 @@ export class WeeklyContactMatcherService {
 
     if (matches.length === 1) return this.toResult(matches[0])
     if (matches.length > 1) {
-      this.logger.activityWarn(
+      this.logger.warn(
         `WKL backfill: multiple CRA batch details for contact ${contactId} on ${weeklyFileDate.toISOString().slice(0, 10)}`,
         {
           activityType: JobActivityType.WKL,
@@ -281,7 +281,7 @@ export class WeeklyContactMatcherService {
       })
       if (dinMatches.length === 1) return dinMatches[0]
       if (dinMatches.length > 1) {
-        this.logger.activityWarn(`WKL contact match: multiple contacts with DIN ${din}, skipping`, {
+        this.logger.warn(`WKL contact match: multiple contacts with DIN ${din}, skipping`, {
           activityType: JobActivityType.WKL,
           aggregate: true,
           aggregateKey: 'wkl-multiple-contacts-din',
@@ -343,7 +343,7 @@ export class WeeklyContactMatcherService {
     if (detailMatches.length === 1) return detailMatches[0]
 
     if (detailMatches.length > 1) {
-      this.logger.activityWarn(
+      this.logger.warn(
         `WKL contact match: multiple contacts (${detailMatches.length}) for ` +
           `${wklDetail.childGivenName.trim()} ${wklDetail.childSurName.trim()}, skipping`,
         {

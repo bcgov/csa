@@ -1,5 +1,6 @@
+/** FDD APL-12 severity levels (OS-CSA-JA-02). */
 export enum JobActivitySeverity {
-  ERROR = 'ERROR',
   WARNING = 'WARNING',
-  INFO = 'INFO',
+  ERROR = 'ERROR',
+  CRITICAL = 'CRITICAL',
 }

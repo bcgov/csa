@@ -9,8 +9,6 @@ import { BATCH_DETAIL_EVENT, CSA_EVENT } from 'src/common/state-machine/constant
 
 import { csaProcessingBatchDate, parseWklDate } from 'src/common/utils'
 import { BaseJob } from 'src/jobs/base-job'
-import { JobActivitySeverity } from 'src/jobs/enums/job-activity-severity.enum'
-import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
@@ -110,12 +108,6 @@ export class PollCraResponseHandler extends BaseJob {
         metadata: { files_processed: 0, records_updated: 0 },
       }
     }
-
-    await this.jobsService.addActivity(_context.jobRunId, {
-      severity: JobActivitySeverity.INFO,
-      type: JobActivityType.FILE_RECEIVED,
-      related: `${sortedFiles.length} inbound file(s) queued`,
-    })
 
     let totalRecordsProcessed = 0
     for (const responseFile of sortedFiles) {

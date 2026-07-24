@@ -57,17 +57,16 @@ const STATUS_TO_API: Record<string, string> = {
   Failed: 'FAILED',
 }
 const TRIGGER_OPTIONS = ['SYSTEM', 'USER']
-const ACTIVITY_SEVERITIES = ['ERROR', 'WARNING', 'INFO']
-const ACTIVITY_TYPES = [
-  'STARTED',
-  'RECORD_PROCESSED',
-  'BATCH_CREATED',
-  'FILE_SENT',
-  'FILE_RECEIVED',
-  'COMPLETED',
-  'FAILED',
-  'WARNING',
-]
+const ACTIVITY_SEVERITIES = ['ERROR', 'WARNING', 'CRITICAL']
+const ACTIVITY_TYPES = ['DATA_QUALITY', 'JOB', 'CRA', 'WKL', 'ICM', 'BATCH']
+const ACTIVITY_TYPE_LABELS: Record<string, string> = {
+  DATA_QUALITY: 'Data quality',
+  JOB: 'Job',
+  CRA: 'CRA',
+  WKL: 'Weekly file (WKL)',
+  ICM: 'ICM',
+  BATCH: 'Batch',
+}
 
 /** Format a date string to PT timezone: yyyy-Mmm-dd HH:mm:ss */
 const formatDatePT = (dateStr: string | null | undefined): string => {
@@ -111,7 +110,11 @@ const matchesTriggerFilter = (triggeredBy: string, filter: string): boolean => {
 }
 
 const normalizeSeverity = (severity: string): string => {
-  const map: Record<string, string> = { ERROR: 'Error', WARNING: 'Warning', INFO: 'Info' }
+  const map: Record<string, string> = {
+    ERROR: 'Error',
+    WARNING: 'Warning',
+    CRITICAL: 'Critical',
+  }
   return map[severity] ?? severity
 }
 
@@ -125,7 +128,9 @@ const getStatusIcon = (status: string) => {
 
 const getSeverityIcon = (severity: string) => {
   const s = severity.toUpperCase()
-  if (s === 'ERROR') return <ErrorOutlineIcon sx={{ fontSize: '1rem', color: '#f44336' }} />
+  if (s === 'ERROR' || s === 'CRITICAL') {
+    return <ErrorOutlineIcon sx={{ fontSize: '1rem', color: s === 'CRITICAL' ? '#b71c1c' : '#f44336' }} />
+  }
   if (s === 'WARNING') return <WarningAmberIcon sx={{ fontSize: '1rem', color: '#ff9800' }} />
   return null
 }
@@ -979,7 +984,7 @@ export default function JobMonitoringTab() {
                         <span>{normalizeSeverity(row.severity)}</span>
                       </Box>
                     </TableCell>
-                    <TableCell sx={cellSx}>{row.type}</TableCell>
+                    <TableCell sx={cellSx}>{ACTIVITY_TYPE_LABELS[row.type] ?? row.type}</TableCell>
                     <TableCell sx={cellSx}>
                       {row.related ? (
                         <Tooltip title={row.related}>

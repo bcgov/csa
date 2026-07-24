@@ -75,13 +75,6 @@ describe('JobsService', () => {
           retryCount: 0,
         }),
       })
-      expect(prisma.jobActivity.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          jobRunId: mockJobRun.id,
-          severity: JobActivitySeverity.INFO,
-          type: JobActivityType.STARTED,
-        }),
-      })
       expect(result).toEqual(mockJobRun)
     })
 
@@ -207,13 +200,6 @@ describe('JobsService', () => {
           completedAt: expect.any(Date),
         }),
       })
-      expect(prisma.jobActivity.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          jobRunId: 1,
-          severity: JobActivitySeverity.INFO,
-          type: JobActivityType.COMPLETED,
-        }),
-      })
     })
 
     it('should update metadata if provided', async () => {
@@ -246,7 +232,7 @@ describe('JobsService', () => {
         data: expect.objectContaining({
           jobRunId: 1,
           severity: JobActivitySeverity.ERROR,
-          type: JobActivityType.FAILED,
+          type: JobActivityType.JOB,
           related: 'Connection timeout',
         }),
       })

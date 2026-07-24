@@ -65,11 +65,6 @@ export class JobsService {
       },
     })
 
-    await this.addActivity(job.id, {
-      severity: JobActivitySeverity.INFO,
-      type: JobActivityType.STARTED,
-    })
-
     return job
   }
 
@@ -111,13 +106,6 @@ export class JobsService {
       },
     })
 
-    if (result.count > 0) {
-      await this.addActivity(id, {
-        severity: JobActivitySeverity.INFO,
-        type: JobActivityType.COMPLETED,
-      })
-    }
-
     return result
   }
 
@@ -135,7 +123,7 @@ export class JobsService {
     if (result.count > 0) {
       await this.addActivity(id, {
         severity: JobActivitySeverity.ERROR,
-        type: JobActivityType.FAILED,
+        type: JobActivityType.JOB,
         related: error.slice(0, 512),
       })
     }

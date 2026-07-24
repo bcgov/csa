@@ -2,6 +2,7 @@ import { Module, OnModuleInit } from '@nestjs/common'
 import { PrismaModule } from 'src/common/database/prisma.module'
 import { IcmSyncBackModule } from 'src/sync/icm/icm-sync-back.module'
 import { RetryFailedHandler } from './handlers/retry-failed.handler'
+import { JobActivityService } from './job-activity.service'
 import { JobRegistry } from './job-registry.service'
 import { JobRunner } from './job-runner.service'
 import { JobsService } from './jobs.service'
@@ -19,8 +20,8 @@ import { OpenshiftJobLauncher } from './openshift-job-launcher.service'
  */
 @Module({
   imports: [PrismaModule, IcmSyncBackModule],
-  providers: [JobsService, JobRunner, JobRegistry, RetryFailedHandler, OpenshiftJobLauncher],
-  exports: [JobsService, JobRunner, JobRegistry, RetryFailedHandler, OpenshiftJobLauncher],
+  providers: [JobsService, JobActivityService, JobRunner, JobRegistry, RetryFailedHandler, OpenshiftJobLauncher],
+  exports: [JobsService, JobActivityService, JobRunner, JobRegistry, RetryFailedHandler, OpenshiftJobLauncher],
 })
 export class JobsModule implements OnModuleInit {
   constructor(

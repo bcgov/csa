@@ -473,7 +473,7 @@ describe('JobsController', () => {
   describe('GET /jobs/monitoring/activities', () => {
     it('should return recent activities with pagination and filters', async () => {
       mockJobsService.getRecentActivities.mockResolvedValue({
-        data: [{ id: 1, jobRunId: 5, severity: 'INFO', type: 'STARTED', related: null }],
+        data: [{ id: 1, jobRunId: 5, severity: 'WARNING', type: 'CRA', related: 'Invalid file format' }],
         total: 1,
         page: 1,
         limit: 10,
@@ -481,12 +481,12 @@ describe('JobsController', () => {
 
       const res = await request(app.getHttpServer())
         .get('/jobs/monitoring/activities')
-        .query({ severity: 'INFO', type: 'STARTED', page: 1, limit: 10 })
+        .query({ severity: 'WARNING', type: 'CRA', page: 1, limit: 10 })
         .expect(200)
 
       expect(mockJobsService.getRecentActivities).toHaveBeenCalledWith(1, 10, {
-        severity: 'INFO',
-        type: 'STARTED',
+        severity: 'WARNING',
+        type: 'CRA',
         sortBy: undefined,
         sortOrder: undefined,
       })
@@ -497,7 +497,7 @@ describe('JobsController', () => {
   describe('GET /jobs/:id/activities', () => {
     it('should return activities for selected job run', async () => {
       mockJobsService.getActivities.mockResolvedValue({
-        data: [{ id: 11, jobRunId: 99, severity: 'ERROR', type: 'FAILED', related: 'boom' }],
+        data: [{ id: 11, jobRunId: 99, severity: 'ERROR', type: 'JOB', related: 'boom' }],
         total: 1,
         page: 1,
         limit: 10,
@@ -505,7 +505,7 @@ describe('JobsController', () => {
 
       const res = await request(app.getHttpServer())
         .get('/jobs/99/activities')
-        .query({ page: 1, limit: 10, severity: 'ERROR', type: 'FAILED' })
+        .query({ page: 1, limit: 10, severity: 'ERROR', type: 'JOB' })
         .expect(200)
 
       expect(mockJobsService.getActivities).toHaveBeenCalledWith({
@@ -513,7 +513,7 @@ describe('JobsController', () => {
         page: 1,
         limit: 10,
         severity: 'ERROR',
-        type: 'FAILED',
+        type: 'JOB',
         sortBy: undefined,
         sortOrder: undefined,
       })

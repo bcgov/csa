@@ -22,6 +22,7 @@ import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
 import { ContactsService } from '../contacts/contacts.service'
 import { BulkOperationResponse } from '../contacts/interfaces'
+import { validateCraRequiredFields } from './cra-fields-validator'
 
 const { BATCH_INITIATED_BY, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
@@ -43,10 +44,27 @@ const BATCH_NUMBER_ADVISORY_LOCK_OBJECT = 0
 const PENDING_BATCH_ADVISORY_LOCK_OBJECT = 1
 const WKL_UNMATCHED_BATCH_ADVISORY_LOCK_OBJECT = 2
 
+/**
+ * CSA statuses that represent a Cancellation transaction when added to a batch.
+ * Used to determine transactionType before the state-machine transition fires
+ * so that CRA mandatory-field validation knows which conditional fields to check.
+ */
+const CANCELLATION_STATUSES = new Set<string>([
+  CSA_STATUS.NOT_ELIGIBLE_IN_PAY,
+  CSA_STATUS.NOT_ELIGIBLE_IP_TBD,
+  CSA_STATUS.CANCELLATION_REFUSED_CRA,
+  CSA_STATUS.CRA_ERROR_CANCELLATION,
+])
+
 class TransitionSkipError extends Error {
   constructor(public readonly reason: string) {
     super(reason)
   }
+}
+
+export interface IncompleteRecord {
+  id: number
+  missingFields: string[]
 }
 
 export interface BatchOperationResult extends BulkOperationResponse {
@@ -59,6 +77,8 @@ export interface BatchOperationResult extends BulkOperationResponse {
     createdAt: Date
     systemComments: string | null
   }
+  /** Contacts that failed CRA mandatory-field validation and were NOT added to the batch. */
+  incomplete: IncompleteRecord[]
 }
 
 export interface UpdateBatchStatusOptions {
@@ -368,6 +388,7 @@ export class BatchesService {
   async addContactsToPendingBatch(
     contactIds: number[],
     userId: string,
+    actor: 'USER' | 'SYSTEM' = 'USER',
   ): Promise<BatchOperationResult> {
     const pendingBatch = await this.findOrCreatePendingBatch()
 
@@ -375,6 +396,7 @@ export class BatchesService {
       batch: pendingBatch,
       success: [],
       skipped: [],
+      incomplete: [],
     }
 
     const existingContacts = await this.prisma.contact.findMany({
@@ -386,6 +408,14 @@ export class BatchesService {
         cancelReasonCode: true,
         careEndDate: true,
         effectiveDate: true,
+        // Fields required for CRA mandatory-field validation (US-40101)
+        firstName: true,
+        lastName: true,
+        gender: true,
+        dateOfBirth: true,
+        birthCity: true,
+        birthCountry: true,
+        birthProvince: true,
       },
     })
     const existingContactMap = new Map(existingContacts.map((c) => [c.id, c]))
@@ -411,12 +441,49 @@ export class BatchesService {
         continue
       }
 
+      // --- CRA mandatory-field validation (US-40101) ---
+      // Determine the transaction type from the current status before the state
+      // machine fires so we know which conditional fields to validate.
+      const preValidationTxType = CANCELLATION_STATUSES.has(contact.csaStatus ?? '')
+        ? TRANSACTION_TYPES.CANCELLATION
+        : TRANSACTION_TYPES.APPLICATION
+      const craValidation = validateCraRequiredFields(contact, preValidationTxType)
+      if (!craValidation.isValid) {
+        this.logger.log(
+          `Contact ${contactId}: skipped — missing CRA mandatory fields: ${craValidation.missingFields.join(', ')}`,
+        )
+
+        // S2: If actor is SYSTEM (auto-batch), automatically put on hold with specific missing fields
+        if (actor === 'SYSTEM') {
+          const holdReason = `Missing: ${craValidation.missingFields.join(', ')}`
+          try {
+            await this.contactsService.updateCsaStatus(contactId, CSA_EVENT.HOLD, 'SYSTEM', {
+              userId,
+              origin:
+                'BatchesService.addContactsToPendingBatch — auto-hold for incomplete CRA fields',
+              additionalData: { holdReason },
+            })
+            this.logger.log(`Contact ${contactId}: auto-held with reason: ${holdReason}`)
+          } catch (error) {
+            this.logger.warn(
+              `Contact ${contactId}: failed to auto-hold — ${error instanceof Error ? error.message : 'unknown error'}`,
+            )
+          }
+        }
+
+        result.incomplete.push({
+          id: contactId,
+          missingFields: craValidation.missingFields,
+        })
+        continue
+      }
+
       try {
         await this.prisma.$transaction(async (tx) => {
           const transition = await this.contactsService.updateCsaStatus(
             contactId,
             CSA_EVENT.ADD_TO_BATCH,
-            'USER',
+            actor,
             { userId, tx, origin: 'BatchesService.addContactsToPendingBatch' },
           )
 
@@ -681,6 +748,7 @@ export class BatchesService {
       batch: enrichLabels(pendingBatch),
       success: [],
       skipped: [],
+      incomplete: [],
     }
 
     for (const contactId of contactIds) {

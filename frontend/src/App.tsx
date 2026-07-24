@@ -45,6 +45,8 @@ import {
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
+import { IncompleteRecordsDialog } from './components/IncompleteRecordsDialog'
+import JobMonitoringTab from './components/JobMonitoringTab'
 import { OnHoldDialog } from './components/OnHoldDialog'
 import WeeklyFileProcessingTab from './components/WeeklyFileProcessingTab'
 import { getRuntimeConfig } from './config/keycloak.config'
@@ -362,6 +364,13 @@ function App() {
   const [pendingHoldIds, setPendingHoldIds] = useState<number[]>([])
   const [pendingResumeIds, setPendingResumeIds] = useState<number[]>([])
   const [editingContactId, setEditingContactId] = useState<number | null>(null)
+
+  // Incomplete records (CRA fields validation) dialog state
+  const [incompleteRecordsDialogOpen, setIncompleteRecordsDialogOpen] = useState(false)
+  const [incompleteRecords, setIncompleteRecords] = useState<
+    Array<{ id: number; missingFields: string[] }>
+  >([])
+  const [incompleteRecordsLoading, setIncompleteRecordsLoading] = useState(false)
   const [editingContactReason, setEditingContactReason] = useState<string>('')
 
   // Last successful job runs state
@@ -1756,6 +1765,78 @@ function App() {
     }
   }
 
+  // Handle incomplete records dialog confirmation - put records on hold with missing fields reason
+  const handleIncompleteRecordsConfirm = async () => {
+    setIncompleteRecordsLoading(true)
+
+    try {
+      // Put each incomplete record on hold in parallel for better performance
+      // Each record gets its own unique hold reason with its specific missing fields
+      const holdPromises = incompleteRecords.map((record) => {
+        const holdReason = `Missing: ${record.missingFields.join(', ')}`
+        return holdContacts([record.id], holdReason).catch((err) => {
+          console.error(`Failed to hold record ${record.id}:`, err)
+          return { success: [], skipped: [{ id: record.id, reason: 'HOLD_FAILED' }] }
+        })
+      })
+
+      const holdResults = await Promise.all(holdPromises)
+
+      // Aggregate results from all parallel calls
+      let successCount = 0
+      let failureCount = 0
+
+      holdResults.forEach((response) => {
+        successCount += response.success.length
+        failureCount += response.skipped.length
+      })
+
+      setSnackbar({
+        open: true,
+        message:
+          failureCount > 0
+            ? `${successCount} record(s) placed on hold. ${failureCount} failed. They can be updated and added to batch later.`
+            : `${successCount} record(s) placed on hold. They can be updated and added to batch later.`,
+        severity: failureCount > 0 ? 'warning' : 'success',
+      })
+
+      // Close dialog and reset state
+      setIncompleteRecordsDialogOpen(false)
+      setIncompleteRecords([])
+
+      // Reload contacts to reflect the changes
+      const apiFilters = [
+        'All Records',
+        'Pending User review/action',
+        'All children On Hold from CSA',
+        'Children In Pay',
+        'Children Out of Pay',
+        'CRA Refused CSA List',
+        'Children within a batch',
+        'Children over 18 years (never eligible)',
+      ]
+
+      if (apiFilters.includes(preDefinedFilter)) {
+        if (isSearchActive && searchTerm.trim().length >= 3) {
+          await performFullTextSearch(searchTerm.trim(), currentPage)
+        } else if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+          await performColumnFiltersSearch(activeColumnFilters, currentPage)
+        } else {
+          await fetchContacts(currentPage)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to put incomplete records on hold:', error)
+      setSnackbar({
+        open: true,
+        message: 'Failed to put records on hold. Please try again.',
+        severity: 'error',
+      })
+    } finally {
+      setIncompleteRecordsLoading(false)
+    }
+  }
+
   // CSA Eligible handler
   const handleCSAEligible = async () => {
     if (selected.length === 0) return
@@ -2159,23 +2240,37 @@ function App() {
       // Show success/warning message based on results
       const successCount = response.success.length
       const skippedCount = response.skipped.length
+      const incompleteCount = response.incomplete?.length ?? 0
 
-      if (successCount > 0 && skippedCount === 0) {
+      // If there are incomplete records, show the dialog
+      if (incompleteCount > 0) {
+        setIncompleteRecords(response.incomplete || [])
+        setIncompleteRecordsDialogOpen(true)
+      }
+
+      if (successCount > 0 && skippedCount === 0 && incompleteCount === 0) {
         setSnackbar({
           open: true,
           message: `Successfully added ${successCount} contact${successCount > 1 ? 's' : ''} to batch`,
           severity: 'success',
         })
-      } else if (successCount > 0 && skippedCount > 0) {
+      } else if (successCount > 0 && (skippedCount > 0 || incompleteCount > 0)) {
+        const messages = []
+        messages.push(`Added ${successCount} contact${successCount > 1 ? 's' : ''} to batch`)
+        if (skippedCount > 0) messages.push(`${skippedCount} skipped`)
+        if (incompleteCount > 0) messages.push(`${incompleteCount} with missing fields`)
         setSnackbar({
           open: true,
-          message: `Added ${successCount} contact${successCount > 1 ? 's' : ''} to batch. ${skippedCount} skipped (already in batch or not found)`,
+          message: messages.join('. '),
           severity: 'warning',
         })
-      } else {
+      } else if (successCount === 0 && (skippedCount > 0 || incompleteCount > 0)) {
+        const messages = []
+        if (skippedCount > 0) messages.push(`${skippedCount} skipped`)
+        if (incompleteCount > 0) messages.push(`${incompleteCount} with missing fields`)
         setSnackbar({
           open: true,
-          message: 'No contacts were added. All contacts were skipped.',
+          message: messages.join('. '),
           severity: 'warning',
         })
       }
@@ -3068,7 +3163,9 @@ function App() {
       return (
         cached &&
         (cached.csaStatusRaw === 'not_eligible_out_of_pay' ||
-          cached.csaStatusRaw === 'not_eligible_ip_tbd')
+          cached.csaStatusRaw === 'not_eligible_ip_tbd' ||
+          cached.csaStatusRaw === 'application_refused_cra' ||
+          cached.csaStatusRaw === 'cancellation_refused_cra')
       )
     })
   }, [selected, selectedRecordsCache])
@@ -3084,7 +3181,9 @@ function App() {
         cached &&
         (cached.csaStatusRaw === 'eligible_tbd' ||
           cached.csaStatusRaw === 'in_pay' ||
-          cached.csaStatusRaw === 'on_hold')
+          cached.csaStatusRaw === 'on_hold' ||
+          cached.csaStatusRaw === 'application_refused_cra' ||
+          cached.csaStatusRaw === 'cancellation_refused_cra')
       )
     })
   }, [selected, selectedRecordsCache])
@@ -3633,6 +3732,7 @@ function App() {
               <Tab label="Eligibility List" />
               <Tab label="Batch Requests" />
               <Tab label="Weekly File Processing" />
+              <Tab label="Job Monitoring" />
             </Tabs>
 
             {/* Last Successful Runs Info */}
@@ -7876,6 +7976,7 @@ function App() {
             )}
 
             {selectedTab === 2 && <WeeklyFileProcessingTab />}
+            {selectedTab === 3 && <JobMonitoringTab />}
           </Box>
 
           {/* Sort and Filter Menus - Outside tabs so they're always available */}
@@ -8353,6 +8454,15 @@ function App() {
         onConfirm={handleOnHoldDialogConfirm}
         mode={onHoldDialogMode}
         initialReason={onHoldDialogMode === 'edit' ? editingContactReason : ''}
+      />
+
+      {/* Incomplete Records Dialog for CRA field validation */}
+      <IncompleteRecordsDialog
+        open={incompleteRecordsDialogOpen}
+        onClose={() => setIncompleteRecordsDialogOpen(false)}
+        onConfirm={handleIncompleteRecordsConfirm}
+        incompletRecords={incompleteRecords}
+        isLoading={incompleteRecordsLoading}
       />
 
       {/* Snackbar for hold/resume feedback */}

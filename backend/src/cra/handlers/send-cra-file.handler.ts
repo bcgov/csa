@@ -15,6 +15,7 @@ import {
 import { appendSystemComment, pacificToday } from 'src/common/utils'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { JobsService } from 'src/jobs/jobs.service'
@@ -185,7 +186,10 @@ export class SendCraFileHandler extends BaseJob {
     try {
       await this.icmSyncBackService.syncFlaggedWithRetry()
     } catch (err) {
-      this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`)
+      this.logger.activityWarn(`ICM sync-back failed: ${(err as Error).message}`, {
+        activityType: JobActivityType.ICM,
+        related: `ICM sync-back failed: ${(err as Error).message}`,
+      })
     }
   }
 
@@ -212,7 +216,10 @@ export class SendCraFileHandler extends BaseJob {
 
     if (!this.batch) return
 
-    this.logger.error(`File transfer failed for batch ${this.batch.id}`, error)
+    this.logger.activityError(`File transfer failed for batch ${this.batch.id}`, {
+      activityType: JobActivityType.CRA,
+      related: error.message || 'File transfer failed',
+    })
     const errorMessage = error.message || 'File transfer failed'
     const batchRecord = await this.prisma.batch.findUnique({
       where: { id: this.batch.id },
@@ -236,12 +243,20 @@ export class SendCraFileHandler extends BaseJob {
       }
 
       if (data.status) {
-        this.logger.warn(
+        this.logger.activityWarn(
           `Batch ${this.batch.id}: SEND_FAILED transition failed (${result.reason}); persisted systemComments and status via direct update`,
+          {
+            activityType: JobActivityType.BATCH,
+            related: `Batch ${this.batch.id}: send failed transition error`,
+          },
         )
       } else {
-        this.logger.warn(
+        this.logger.activityWarn(
           `Batch ${this.batch.id}: SEND_FAILED transition failed (${result.reason}); persisted systemComments only`,
+          {
+            activityType: JobActivityType.BATCH,
+            related: `Batch ${this.batch.id}: send failed transition error`,
+          },
         )
       }
       await this.prisma.batch.update({

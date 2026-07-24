@@ -284,6 +284,7 @@ function App() {
     isAuthenticated: keycloakAuthenticated,
     isLoading,
     hasCSAAccess,
+    hasMonitoringAccess,
     user,
     login,
     logout,
@@ -1535,8 +1536,17 @@ function App() {
   }
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    if (newValue === 3 && !hasMonitoringAccess) {
+      return
+    }
     setSelectedTab(newValue)
   }
+
+  useEffect(() => {
+    if (selectedTab === 3 && !hasMonitoringAccess) {
+      setSelectedTab(0)
+    }
+  }, [selectedTab, hasMonitoringAccess])
 
   // Logout handler
   const handleLogout = () => {
@@ -3732,7 +3742,7 @@ function App() {
               <Tab label="Eligibility List" />
               <Tab label="Batch Requests" />
               <Tab label="Weekly File Processing" />
-              <Tab label="Job Monitoring" />
+              {hasMonitoringAccess && <Tab label="Job Monitoring" />}
             </Tabs>
 
             {/* Last Successful Runs Info */}
@@ -7976,7 +7986,7 @@ function App() {
             )}
 
             {selectedTab === 2 && <WeeklyFileProcessingTab />}
-            {selectedTab === 3 && <JobMonitoringTab />}
+            {selectedTab === 3 && hasMonitoringAccess && <JobMonitoringTab />}
           </Box>
 
           {/* Sort and Filter Menus - Outside tabs so they're always available */}

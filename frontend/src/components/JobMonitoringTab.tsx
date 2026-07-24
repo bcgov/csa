@@ -38,6 +38,7 @@ import {
 } from '../service/jobs-service'
 
 const ITEMS_PER_PAGE = 10
+const RUNNING_JOB_POLL_MS = 30_000
 
 // Map display job names to backend JobType enum values for server-side filtering
 const JOB_NAME_TO_TYPE: Record<string, string> = {
@@ -344,6 +345,22 @@ export default function JobMonitoringTab() {
   useEffect(() => {
     fetchActivities()
   }, [fetchActivities])
+
+  const hasRunningJobs = jobListData.some((row) => row.status.toUpperCase() === 'RUNNING')
+
+  useEffect(() => {
+    if (!hasRunningJobs) {
+      return
+    }
+
+    const interval = setInterval(() => {
+      void fetchJobList()
+      void fetchJobHistory()
+      void fetchActivities()
+    }, RUNNING_JOB_POLL_MS)
+
+    return () => clearInterval(interval)
+  }, [hasRunningJobs, fetchJobList, fetchJobHistory, fetchActivities])
 
   // ── Sort handlers ────────────────────────────────────────────────────────
   const handleJlSort = (field: string) => {

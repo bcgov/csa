@@ -7,6 +7,8 @@ interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   hasCSAAccess: boolean | null
+  hasMonitoringAccess: boolean
+  icmResponsibility: string | null
   csaAccessError: string | null
   csaAccessAlert: string | null
   clearCsaAccessAlert: () => void
@@ -24,10 +26,20 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+function hasWriteResponsibility(responsibility?: string): boolean {
+  return normalizeResponsibility(responsibility).includes('ICM CSA APPLICATION - RW')
+}
+
+function normalizeResponsibility(responsibility?: string): string {
+  return (responsibility ?? '').trim().toUpperCase()
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [hasCSAAccess, setHasCSAAccess] = useState<boolean | null>(null)
+  const [hasMonitoringAccess, setHasMonitoringAccess] = useState(false)
+  const [icmResponsibility, setIcmResponsibility] = useState<string | null>(null)
   const [csaAccessError, setCsaAccessError] = useState<string | null>(null)
   const [csaAccessAlert, setCsaAccessAlert] = useState<string | null>(null)
   const [user, setUser] = useState<AuthContextType['user']>(null)
@@ -90,6 +102,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     sessionStorage.removeItem('csaAccessDenied')
                     setIsAuthenticated(true)
                     setHasCSAAccess(true)
+                    setIcmResponsibility(csaAccessResponse.icmResponsibility ?? null)
+                    setHasMonitoringAccess(hasWriteResponsibility(csaAccessResponse.icmResponsibility))
                     setUser({
                       name: keycloakInstance.tokenParsed.name,
                       email: keycloakInstance.tokenParsed.email,
@@ -187,6 +201,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated,
         isLoading,
         hasCSAAccess,
+        hasMonitoringAccess,
+        icmResponsibility,
         csaAccessError,
         csaAccessAlert,
         clearCsaAccessAlert,

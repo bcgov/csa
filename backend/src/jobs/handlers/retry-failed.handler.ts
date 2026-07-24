@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { IcmSyncBackService, SyncBackResult } from 'src/sync/icm/icm-sync-back.service'
 import { BaseJob } from '../base-job'
 import { JobType } from '../enums/job-type.enum'
+import { JobActivityType } from '../enums/job-activity-type.enum'
 import { JobResult } from '../interfaces/job-result.interface'
 import { JobContext } from '../interfaces/job.interface'
 import { JobRunner } from '../job-runner.service'
@@ -33,8 +34,12 @@ export class RetryFailedHandler extends BaseJob {
         syncResult = await this.icmSyncBackService.syncFlaggedContacts()
 
         if (syncResult.failed > 0) {
-          this.logger.warn(
+          this.logger.activityWarn(
             `ICM sweep partial failure: ${syncResult.synced} synced, ${syncResult.failed} failed`,
+            {
+              activityType: JobActivityType.ICM,
+              related: `ICM sweep partial failure (${syncResult.synced} synced, ${syncResult.failed} failed)`,
+            },
           )
         }
       }

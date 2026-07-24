@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { BatchesService } from 'src/api/batches/batches.service'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { AppLogger } from 'src/common/logger/app-logger'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
 
 export interface AutoBatchResult {
@@ -71,8 +72,12 @@ export class AutoBatchService {
     }
 
     if (result.skipped.length > 0) {
-      this.logger.log(
+      this.logger.activityWarn(
         `Auto-batch skipped ${result.skipped.length} contacts (batch ${result.batch.id})`,
+        {
+          activityType: JobActivityType.BATCH,
+          related: `${result.skipped.length} contacts skipped during auto-batch (batch ${result.batch.id})`,
+        },
       )
     }
 

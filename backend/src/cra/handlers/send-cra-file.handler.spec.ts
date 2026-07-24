@@ -482,7 +482,9 @@ describe('SendCraFileHandler', () => {
     it('should warn and persist batch failure state when status transition fails', async () => {
       const batch = makeBatch({ id: 10 })
       const detail = makeBatchDetail({ id: 100, contactId: 1, batchId: 10 })
-      const warnSpy = vi.spyOn(AppLogger.prototype, 'warn').mockImplementation(() => undefined)
+      const activityWarnSpy = vi
+        .spyOn(AppLogger.prototype, 'activityWarn')
+        .mockImplementation(() => undefined)
 
       mockPrisma.batch.findFirst.mockResolvedValue(batch)
       mockPrisma.batch.findUnique.mockResolvedValue({
@@ -500,8 +502,11 @@ describe('SendCraFileHandler', () => {
       await handler.onStart(mockContext)
       await handler.onFailure(mockContext, new Error('Connection refused'))
 
-      expect(warnSpy).toHaveBeenCalledWith(
+      expect(activityWarnSpy).toHaveBeenCalledWith(
         'Batch 10: SEND_FAILED transition failed (Invalid transition); persisted systemComments and status via direct update',
+        expect.objectContaining({
+          activityType: 'BATCH',
+        }),
       )
       expect(mockPrisma.batch.update).toHaveBeenCalledWith({
         where: { id: 10 },
@@ -512,12 +517,14 @@ describe('SendCraFileHandler', () => {
       })
       expect(mockPrisma.contactBatchDetail.update).not.toHaveBeenCalled()
 
-      warnSpy.mockRestore()
+      activityWarnSpy.mockRestore()
     })
 
     it('should warn with Issue 1 message when only systemComments can be persisted', async () => {
       const batch = makeBatch({ id: 10, status: 'processed' })
-      const warnSpy = vi.spyOn(AppLogger.prototype, 'warn').mockImplementation(() => undefined)
+      const activityWarnSpy = vi
+        .spyOn(AppLogger.prototype, 'activityWarn')
+        .mockImplementation(() => undefined)
 
       mockPrisma.batch.findUnique.mockResolvedValue({
         systemComments: null,
@@ -531,15 +538,18 @@ describe('SendCraFileHandler', () => {
 
       await handler.onFailure(mockContext, new Error('Connection refused'))
 
-      expect(warnSpy).toHaveBeenCalledWith(
+      expect(activityWarnSpy).toHaveBeenCalledWith(
         'Batch 10: SEND_FAILED transition failed (Invalid transition); persisted systemComments only',
+        expect.objectContaining({
+          activityType: 'BATCH',
+        }),
       )
       expect(mockPrisma.batch.update).toHaveBeenCalledWith({
         where: { id: 10 },
         data: { systemComments: expect.stringContaining('Connection refused') },
       })
 
-      warnSpy.mockRestore()
+      activityWarnSpy.mockRestore()
     })
 
     it('should mark pending batch as system_error when send transition never completed', async () => {

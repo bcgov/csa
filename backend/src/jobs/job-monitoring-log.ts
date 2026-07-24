@@ -20,7 +20,7 @@ const CATEGORY_TO_ACTIVITY_TYPE: Record<string, JobActivityType> = {
 }
 
 type RecordActivityFn = (params: {
-  jobRunId: number
+  jobRunId: number | null
   severity: JobActivitySeverity
   activityType: JobActivityType
   related?: string
@@ -64,7 +64,7 @@ export function mapLogLevelToSeverity(
 }
 
 async function writeActivity(params: {
-  jobRunId: number
+  jobRunId: number | null
   severity: JobActivitySeverity
   activityType: JobActivityType
   related?: string
@@ -81,7 +81,7 @@ async function writeActivity(params: {
 }
 
 function queueImmediateActivity(params: {
-  jobRunId: number
+  jobRunId: number | null
   severity: JobActivitySeverity
   activityType: JobActivityType
   related: string
@@ -93,7 +93,7 @@ export async function persistJobMonitoringLog(
   level: 'warn' | 'error' | 'crit' | 'alert',
   message: string,
   meta?: JobMonitoringLogMeta,
-  explicitJobRunId?: number,
+  explicitJobRunId?: number | null,
 ): Promise<void> {
   if (!meta) {
     return
@@ -104,10 +104,8 @@ export async function persistJobMonitoringLog(
     return
   }
 
-  const jobRunId = explicitJobRunId ?? getCurrentJobRunId()
-  if (!jobRunId) {
-    return
-  }
+  const jobRunId =
+    explicitJobRunId !== undefined ? explicitJobRunId : (getCurrentJobRunId() ?? null)
 
   const severity = mapLogLevelToSeverity(level)
   const related = (meta.related ?? message).slice(0, 512)
@@ -131,9 +129,9 @@ export async function persistJobMonitoringLog(
 
 export async function flushJobMonitoringAggregates(): Promise<void> {
   const aggregator = getJobActivityAggregator()
-  const jobRunId = getCurrentJobRunId()
+  const jobRunId = getCurrentJobRunId() ?? null
 
-  if (!aggregator || !jobRunId || aggregator.size === 0) {
+  if (!aggregator || aggregator.size === 0) {
     return
   }
 

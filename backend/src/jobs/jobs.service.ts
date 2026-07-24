@@ -185,12 +185,12 @@ export class JobsService {
   }
 
   async markStuckJobsAsFailed(stuckThresholdMinutes: number = 60) {
-    const threshold = new Date(Date.now() - stuckThresholdMinutes * 60 * 1000)
-    return this.prisma.jobRun.updateMany({
+    const stuckJobs = await this.getStuckRunningJobs(stuckThresholdMinutes)
+    const result = await this.prisma.jobRun.updateMany({
       where: {
         status: JobStatus.RUNNING,
         startedAt: {
-          lt: threshold,
+          lt: new Date(Date.now() - stuckThresholdMinutes * 60 * 1000),
         },
       },
       data: {
@@ -199,10 +199,22 @@ export class JobsService {
         completedAt: new Date(),
       },
     })
+
+    if (result.count > 0) {
+      for (const job of stuckJobs) {
+        await this.addActivity(job.id, {
+          severity: JobActivitySeverity.WARNING,
+          type: JobActivityType.JOB,
+          related: 'Job timed out (stuck)',
+        })
+      }
+    }
+
+    return result
   }
 
   async markStuckJobAsFailed(id: number, error: string = 'Job timed out (stuck)') {
-    return this.prisma.jobRun.updateMany({
+    const result = await this.prisma.jobRun.updateMany({
       where: { id, status: JobStatus.RUNNING },
       data: {
         status: JobStatus.FAILED,
@@ -210,6 +222,16 @@ export class JobsService {
         completedAt: new Date(),
       },
     })
+
+    if (result.count > 0) {
+      await this.addActivity(id, {
+        severity: JobActivitySeverity.WARNING,
+        type: JobActivityType.JOB,
+        related: error.slice(0, 512),
+      })
+    }
+
+    return result
   }
 
   async getChildJobs(parentJobId: number) {
@@ -328,7 +350,7 @@ export class JobsService {
   }
 
   async addActivity(
-    jobRunId: number,
+    jobRunId: number | null,
     activity: { severity: JobActivitySeverity; type: JobActivityType; related?: string },
   ) {
     return this.prisma.jobActivity.create({

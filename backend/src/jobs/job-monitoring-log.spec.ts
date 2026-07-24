@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { JobActivitySeverity } from './enums/job-activity-severity.enum'
 import { JobActivityType } from './enums/job-activity-type.enum'
-import { runWithJobScope } from './job-execution.scope'
 import {
-  flushJobMonitoringAggregates,
   persistJobMonitoringLog,
   registerJobActivityRecorder,
   resetJobActivityRecorder,
@@ -60,13 +58,24 @@ describe('job-monitoring-log', () => {
   it('should no-op when no recorder is registered', async () => {
     resetJobActivityRecorder()
 
-    await runWithJobScope(1, async () => {
-      await persistJobMonitoringLog('error', 'Job failed', {
-        activityType: JobActivityType.JOB,
-      })
-      await flushJobMonitoringAggregates()
+    await persistJobMonitoringLog('error', 'Job failed', {
+      activityType: JobActivityType.JOB,
     })
 
     expect(recordActivity).not.toHaveBeenCalled()
+  })
+
+  it('should persist without a job run when no scope is active', async () => {
+    await persistJobMonitoringLog('warn', 'ICM sync-back failed after WKL reprocess', {
+      activityType: JobActivityType.ICM,
+      related: 'ICM sync-back failed after WKL reprocess: timeout',
+    })
+
+    expect(recordActivity).toHaveBeenCalledWith({
+      jobRunId: null,
+      severity: JobActivitySeverity.WARNING,
+      activityType: JobActivityType.ICM,
+      related: 'ICM sync-back failed after WKL reprocess: timeout',
+    })
   })
 })

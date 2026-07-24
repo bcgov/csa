@@ -267,7 +267,10 @@ export class PollCraResponseHandler extends BaseJob {
         parsed = this.inboundResponseService.parseFile(localFilePath)
       }
     } catch (error) {
-      this.logger.error(`Failed to parse response file ${responseFile.fileName}: ${error}`)
+      this.logger.activityError(`Failed to parse response file ${responseFile.fileName}: ${error}`, {
+        activityType: JobActivityType.CRA,
+        related: `Failed to parse response file ${responseFile.fileName}`,
+      })
       await this.prisma.transferFile.update({
         where: { id: responseFile.id },
         data: { isValid: false, isDetailsProcessed: true },

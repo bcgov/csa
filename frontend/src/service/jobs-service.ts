@@ -13,7 +13,7 @@ export interface MonitoringJobRow {
 
 export interface JobActivityRow {
   id: number
-  jobRunId: number
+  jobRunId: number | null
   when: string
   severity: string
   type: string

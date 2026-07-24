@@ -1011,7 +1011,7 @@ export default function JobMonitoringTab() {
                         '—'
                       )}
                     </TableCell>
-                    <TableCell sx={cellSx}>{row.jobRunId}</TableCell>
+                    <TableCell sx={cellSx}>{row.jobRunId ?? '—'}</TableCell>
                   </TableRow>
                 ))
               )}

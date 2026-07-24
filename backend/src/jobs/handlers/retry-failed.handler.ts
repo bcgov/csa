@@ -50,7 +50,10 @@ export class RetryFailedHandler extends BaseJob {
         metadata: { syncResult },
       }
     } catch (error) {
-      this.logger.error(`Error processing failed jobs: ${error.message}`, error.stack)
+      this.logger.activityError(`Error processing failed jobs: ${error.message}`, {
+        activityType: JobActivityType.JOB,
+        related: error.message,
+      })
       return {
         success: false,
         message: error.message,

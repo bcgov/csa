@@ -1,12 +1,14 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { AppLogger } from 'src/common/logger/app-logger'
 import { csaProcessingBatchDate } from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from 'src/cra/cra.constant'
 import type { DetailRecord04, HeaderRecord } from 'src/cra/inbound/inbound-weekly.interface'
 import { RecordTypeCode, TranCode } from 'src/cra/inbound/inbound-weekly.interface'
 import { WklAssociatedRecordProcessorService } from 'src/cra/inbound/wkl-associated-record-processor.service'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { BatchesService } from '../batches/batches.service'
 import type { ReprocessWeeklyFileResultDto } from './dto/associate-wkl-record.dto'
@@ -268,7 +270,7 @@ const wklRecordDtoInclude = {
 
 @Injectable()
 export class WeeklyFilesService {
-  private readonly logger = new Logger(WeeklyFilesService.name)
+  private readonly logger = new AppLogger(WeeklyFilesService.name)
 
   constructor(
     private readonly prisma: PrismaService,
@@ -538,7 +540,10 @@ export class WeeklyFilesService {
     try {
       await this.icmSyncBackService.syncFlaggedWithRetry()
     } catch (err) {
-      this.logger.warn(`ICM sync-back failed after WKL record reprocess: ${(err as Error).message}`)
+      this.logger.activityWarn(`ICM sync-back failed after WKL record reprocess: ${(err as Error).message}`, {
+        activityType: JobActivityType.ICM,
+        related: `ICM sync-back failed after WKL record reprocess: ${(err as Error).message}`,
+      })
     }
 
     const updated = await this.prisma.wklFileRecord.findFirst({
@@ -627,7 +632,10 @@ export class WeeklyFilesService {
     try {
       await this.icmSyncBackService.syncFlaggedWithRetry()
     } catch (err) {
-      this.logger.warn(`ICM sync-back failed after WKL reprocess: ${(err as Error).message}`)
+      this.logger.activityWarn(`ICM sync-back failed after WKL reprocess: ${(err as Error).message}`, {
+        activityType: JobActivityType.ICM,
+        related: `ICM sync-back failed after WKL reprocess: ${(err as Error).message}`,
+      })
     }
 
     return { processedRecordIds, skippedRecords }

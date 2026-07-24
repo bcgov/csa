@@ -10,7 +10,7 @@ export class JobActivityService {
   constructor(private readonly jobsService: JobsService) {}
 
   async recordActivity(params: {
-    jobRunId: number
+    jobRunId: number | null
     severity: JobActivitySeverity
     activityType: JobActivityType
     related?: string

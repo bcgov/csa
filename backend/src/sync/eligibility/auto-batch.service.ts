@@ -82,8 +82,12 @@ export class AutoBatchService {
     }
 
     if (result.incomplete.length > 0) {
-      this.logger.log(
+      this.logger.activityWarn(
         `Auto-batch Records Validation: ${result.incomplete.length} contacts auto-held due to missing CRA mandatory fields (batch ${result.batch.id})`,
+        {
+          activityType: JobActivityType.BATCH,
+          related: `${result.incomplete.length} contacts auto-held due to missing CRA mandatory fields (batch ${result.batch.id})`,
+        },
       )
     }
 

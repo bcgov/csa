@@ -238,12 +238,12 @@ model JobRun {
 
 model JobActivity {
   id       Int      @id @default(autoincrement())
-  jobRunId Int      @map("job_run_id")
+  jobRunId Int?     @map("job_run_id")
   when     DateTime @default(now()) @db.Timestamptz()
   severity String
   type     String
   related  String?
-  jobRun   JobRun   @relation(fields: [jobRunId], references: [id], onDelete: Cascade)
+  jobRun   JobRun?  @relation(fields: [jobRunId], references: [id], onDelete: SetNull)
 
   @@index([jobRunId, when(sort: Desc)])
   @@index([severity])

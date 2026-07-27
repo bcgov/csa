@@ -4,6 +4,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import ClearIcon from '@mui/icons-material/Clear'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
+import FilterListIcon from '@mui/icons-material/FilterList'
 import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import {
@@ -11,6 +12,8 @@ import {
   Box,
   Button,
   CircularProgress,
+  IconButton,
+  Menu,
   MenuItem,
   Pagination,
   Paper,
@@ -25,16 +28,16 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type MouseEvent } from 'react'
 import {
-  type ActivityParams,
-  type JobActivityRow,
-  type JobHistoryParams,
-  type MonitoringJobRow,
   getJobActivities,
   getJobHistory,
   getLatestJobs,
   getRecentActivities,
+  type ActivityParams,
+  type JobActivityRow,
+  type JobHistoryParams,
+  type MonitoringJobRow,
 } from '../service/jobs-service'
 
 const ITEMS_PER_PAGE = 10
@@ -163,6 +166,8 @@ interface SortableHeaderCellProps {
   currentSortOrder: 'asc' | 'desc'
   onSort: (field: string) => void
   sortable?: boolean
+  onFilterClick?: (event: MouseEvent<HTMLElement>) => void
+  filterActive?: boolean
 }
 
 function SortableHeaderCell({
@@ -172,6 +177,8 @@ function SortableHeaderCell({
   currentSortOrder,
   onSort,
   sortable = true,
+  onFilterClick,
+  filterActive = false,
 }: SortableHeaderCellProps) {
   const isActive = currentSortField === field
   return (
@@ -186,26 +193,65 @@ function SortableHeaderCell({
       }}
       onClick={sortable ? () => onSort(field) : undefined}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-        {label}
-        {sortable &&
-          (isActive ? (
-            currentSortOrder === 'asc' ? (
-              <ArrowUpwardIcon sx={{ fontSize: '0.875rem' }} />
+      <Box
+        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.5 }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          {label}
+          {sortable &&
+            (isActive ? (
+              currentSortOrder === 'asc' ? (
+                <ArrowUpwardIcon sx={{ fontSize: '0.875rem' }} />
+              ) : (
+                <ArrowDownwardIcon sx={{ fontSize: '0.875rem' }} />
+              )
             ) : (
-              <ArrowDownwardIcon sx={{ fontSize: '0.875rem' }} />
-            )
-          ) : (
-            <UnfoldMoreIcon sx={{ fontSize: '0.875rem', opacity: 0.4 }} />
-          ))}
+              <UnfoldMoreIcon sx={{ fontSize: '0.875rem', opacity: 0.4 }} />
+            ))}
+        </Box>
+        {onFilterClick && (
+          <IconButton
+            size="small"
+            onClick={(event) => {
+              event.stopPropagation()
+              onFilterClick(event)
+            }}
+            sx={{ p: 0.5, color: filterActive ? '#1976d2' : '#666' }}
+          >
+            <FilterListIcon fontSize="small" />
+          </IconButton>
+        )}
       </Box>
     </TableCell>
   )
 }
 
 const cellSx = { fontSize: '0.875rem' }
-const filterCellSx = { py: 0.5, px: 1, backgroundColor: '#fafafa' }
 const nonSortHeaderSx = { fontWeight: 600, fontSize: '0.875rem', backgroundColor: '#f5f5f5' }
+
+type JobListFilterColumn = 'id' | 'jobName' | 'status' | 'triggeredBy'
+type JobHistoryFilterColumn = 'id' | 'jobType' | 'status' | 'jobTrigger'
+type ActivityFilterColumn = 'severity' | 'type' | 'jobRunId'
+
+const JOB_LIST_FILTER_LABELS: Record<JobListFilterColumn, string> = {
+  id: 'Job ID',
+  jobName: 'Job Name',
+  status: 'Status',
+  triggeredBy: 'Trigger By',
+}
+
+const JOB_HISTORY_FILTER_LABELS: Record<JobHistoryFilterColumn, string> = {
+  id: 'Job ID',
+  jobType: 'Job Name',
+  status: 'Status',
+  jobTrigger: 'Trigger By',
+}
+
+const ACTIVITY_FILTER_LABELS: Record<ActivityFilterColumn, string> = {
+  severity: 'Severity',
+  type: 'Type',
+  jobRunId: 'Job ID',
+}
 
 export default function JobMonitoringTab() {
   // ── Job List ────────────────────────────────────────────────────────────
@@ -219,6 +265,10 @@ export default function JobMonitoringTab() {
   const [jlFilterTrigger, setJlFilterTrigger] = useState('')
   const [jlSortField, setJlSortField] = useState('id')
   const [jlSortOrder, setJlSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [jlFilterAnchor, setJlFilterAnchor] = useState<{
+    element: HTMLElement | null
+    column: JobListFilterColumn | ''
+  }>({ element: null, column: '' })
 
   // ── Job History ─────────────────────────────────────────────────────────
   const [jobHistoryData, setJobHistoryData] = useState<MonitoringJobRow[]>([])
@@ -235,6 +285,10 @@ export default function JobMonitoringTab() {
   const [jhSortField, setJhSortField] = useState('startedAt')
   const [jhSortOrder, setJhSortOrder] = useState<'asc' | 'desc'>('desc')
   const [selectedJobHistoryId, setSelectedJobHistoryId] = useState<number | null>(null)
+  const [jhFilterAnchor, setJhFilterAnchor] = useState<{
+    element: HTMLElement | null
+    column: JobHistoryFilterColumn | ''
+  }>({ element: null, column: '' })
 
   // ── Activities ──────────────────────────────────────────────────────────
   const [activitiesData, setActivitiesData] = useState<JobActivityRow[]>([])
@@ -249,6 +303,10 @@ export default function JobMonitoringTab() {
   const [actAppliedFilterJobId, setActAppliedFilterJobId] = useState('')
   const [actSortField, setActSortField] = useState('when')
   const [actSortOrder, setActSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [actFilterAnchor, setActFilterAnchor] = useState<{
+    element: HTMLElement | null
+    column: ActivityFilterColumn | ''
+  }>({ element: null, column: '' })
 
   // ── Data fetching ───────────────────────────────────────────────────────
   const fetchJobList = useCallback(async () => {
@@ -408,6 +466,30 @@ export default function JobMonitoringTab() {
     }
   }
 
+  const openJlFilter = (event: MouseEvent<HTMLElement>, column: JobListFilterColumn) => {
+    setJlFilterAnchor({ element: event.currentTarget, column })
+  }
+
+  const closeJlFilter = () => {
+    setJlFilterAnchor({ element: null, column: '' })
+  }
+
+  const openJhFilter = (event: MouseEvent<HTMLElement>, column: JobHistoryFilterColumn) => {
+    setJhFilterAnchor({ element: event.currentTarget, column })
+  }
+
+  const closeJhFilter = () => {
+    setJhFilterAnchor({ element: null, column: '' })
+  }
+
+  const openActFilter = (event: MouseEvent<HTMLElement>, column: ActivityFilterColumn) => {
+    setActFilterAnchor({ element: event.currentTarget, column })
+  }
+
+  const closeActFilter = () => {
+    setActFilterAnchor({ element: null, column: '' })
+  }
+
   // ── Job History row selection ─────────────────────────────────────────────
   const handleJobHistoryRowClick = (jobId: number) => {
     setSelectedJobHistoryId((prev) => (prev === jobId ? null : jobId))
@@ -510,6 +592,8 @@ export default function JobMonitoringTab() {
                   currentSortField={jlSortField}
                   currentSortOrder={jlSortOrder}
                   onSort={handleJlSort}
+                  onFilterClick={(event) => openJlFilter(event, 'id')}
+                  filterActive={jlFilterId.length > 0}
                 />
                 <SortableHeaderCell
                   label="Job Name"
@@ -517,6 +601,8 @@ export default function JobMonitoringTab() {
                   currentSortField={jlSortField}
                   currentSortOrder={jlSortOrder}
                   onSort={handleJlSort}
+                  onFilterClick={(event) => openJlFilter(event, 'jobName')}
+                  filterActive={jlFilterName.length > 0}
                 />
                 <SortableHeaderCell
                   label="Status"
@@ -524,6 +610,8 @@ export default function JobMonitoringTab() {
                   currentSortField={jlSortField}
                   currentSortOrder={jlSortOrder}
                   onSort={handleJlSort}
+                  onFilterClick={(event) => openJlFilter(event, 'status')}
+                  filterActive={jlFilterStatus.length > 0}
                 />
                 <SortableHeaderCell
                   label="Trigger By"
@@ -531,6 +619,8 @@ export default function JobMonitoringTab() {
                   currentSortField={jlSortField}
                   currentSortOrder={jlSortOrder}
                   onSort={handleJlSort}
+                  onFilterClick={(event) => openJlFilter(event, 'triggeredBy')}
+                  filterActive={jlFilterTrigger.length > 0}
                 />
                 <SortableHeaderCell
                   label="Started (PT)"
@@ -548,60 +638,6 @@ export default function JobMonitoringTab() {
                 />
                 <TableCell sx={nonSortHeaderSx}>Summary</TableCell>
                 <TableCell sx={nonSortHeaderSx}>Warning</TableCell>
-              </TableRow>
-              {/* Filter row */}
-              <TableRow>
-                <TableCell sx={filterCellSx}>
-                  <TextField
-                    {...filterTextFieldProps}
-                    value={jlFilterId}
-                    onChange={(e) => setJlFilterId(e.target.value)}
-                  />
-                </TableCell>
-                <TableCell sx={filterCellSx}>
-                  <TextField
-                    {...filterTextFieldProps}
-                    value={jlFilterName}
-                    onChange={(e) => setJlFilterName(e.target.value)}
-                  />
-                </TableCell>
-                <TableCell sx={filterCellSx}>
-                  <Select
-                    size="small"
-                    displayEmpty
-                    value={jlFilterStatus}
-                    onChange={(e) => setJlFilterStatus(e.target.value)}
-                    sx={filterSelectSx}
-                  >
-                    <MenuItem value="">
-                      <em>All</em>
-                    </MenuItem>
-                    {STATUSES.map((s) => (
-                      <MenuItem key={s} value={s} sx={{ fontSize: '0.75rem' }}>
-                        {normalizeStatus(s)}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </TableCell>
-                <TableCell sx={filterCellSx}>
-                  <Select
-                    size="small"
-                    displayEmpty
-                    value={jlFilterTrigger}
-                    onChange={(e) => setJlFilterTrigger(e.target.value)}
-                    sx={filterSelectSx}
-                  >
-                    <MenuItem value="">
-                      <em>All</em>
-                    </MenuItem>
-                    {TRIGGER_OPTIONS.map((t) => (
-                      <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
-                        {t}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </TableCell>
-                <TableCell sx={filterCellSx} colSpan={4} />
               </TableRow>
             </TableHead>
             <TableBody>
@@ -641,6 +677,107 @@ export default function JobMonitoringTab() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <Menu
+          anchorEl={jlFilterAnchor.element}
+          open={Boolean(jlFilterAnchor.element)}
+          onClose={closeJlFilter}
+          PaperProps={{
+            sx: {
+              maxHeight: 400,
+              width: 250,
+            },
+          }}
+        >
+          <Box sx={{ p: 1.5, minWidth: 220 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 1,
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                Filter by{' '}
+                {jlFilterAnchor.column ? JOB_LIST_FILTER_LABELS[jlFilterAnchor.column] : ''}
+              </Typography>
+              <Button
+                size="small"
+                onClick={() => {
+                  if (jlFilterAnchor.column === 'id') setJlFilterId('')
+                  if (jlFilterAnchor.column === 'jobName') setJlFilterName('')
+                  if (jlFilterAnchor.column === 'status') setJlFilterStatus('')
+                  if (jlFilterAnchor.column === 'triggeredBy') setJlFilterTrigger('')
+                  closeJlFilter()
+                }}
+                sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+              >
+                Clear
+              </Button>
+            </Box>
+            {jlFilterAnchor.column === 'id' && (
+              <TextField
+                {...filterTextFieldProps}
+                fullWidth
+                value={jlFilterId}
+                onChange={(e) => setJlFilterId(e.target.value)}
+              />
+            )}
+            {jlFilterAnchor.column === 'jobName' && (
+              <TextField
+                {...filterTextFieldProps}
+                fullWidth
+                value={jlFilterName}
+                onChange={(e) => setJlFilterName(e.target.value)}
+              />
+            )}
+            {jlFilterAnchor.column === 'status' && (
+              <Select
+                size="small"
+                fullWidth
+                displayEmpty
+                value={jlFilterStatus}
+                onChange={(e) => {
+                  setJlFilterStatus(e.target.value)
+                  closeJlFilter()
+                }}
+                sx={filterSelectSx}
+              >
+                <MenuItem value="">
+                  <em>All</em>
+                </MenuItem>
+                {STATUSES.map((s) => (
+                  <MenuItem key={s} value={s} sx={{ fontSize: '0.75rem' }}>
+                    {normalizeStatus(s)}
+                  </MenuItem>
+                ))}
+              </Select>
+            )}
+            {jlFilterAnchor.column === 'triggeredBy' && (
+              <Select
+                size="small"
+                fullWidth
+                displayEmpty
+                value={jlFilterTrigger}
+                onChange={(e) => {
+                  setJlFilterTrigger(e.target.value)
+                  closeJlFilter()
+                }}
+                sx={filterSelectSx}
+              >
+                <MenuItem value="">
+                  <em>All</em>
+                </MenuItem>
+                {TRIGGER_OPTIONS.map((t) => (
+                  <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
+                    {t}
+                  </MenuItem>
+                ))}
+              </Select>
+            )}
+          </Box>
+        </Menu>
       </Box>
 
       {/* ── Job History ── */}
@@ -676,6 +813,8 @@ export default function JobMonitoringTab() {
                   currentSortField={jhSortField}
                   currentSortOrder={jhSortOrder}
                   onSort={handleJhSort}
+                  onFilterClick={(event) => openJhFilter(event, 'id')}
+                  filterActive={jhAppliedFilterId.length > 0}
                 />
                 <SortableHeaderCell
                   label="Job Name"
@@ -683,6 +822,8 @@ export default function JobMonitoringTab() {
                   currentSortField={jhSortField}
                   currentSortOrder={jhSortOrder}
                   onSort={handleJhSort}
+                  onFilterClick={(event) => openJhFilter(event, 'jobType')}
+                  filterActive={jhFilterJobName.length > 0}
                 />
                 <SortableHeaderCell
                   label="Status"
@@ -690,6 +831,8 @@ export default function JobMonitoringTab() {
                   currentSortField={jhSortField}
                   currentSortOrder={jhSortOrder}
                   onSort={handleJhSort}
+                  onFilterClick={(event) => openJhFilter(event, 'status')}
+                  filterActive={jhFilterStatus.length > 0}
                 />
                 <SortableHeaderCell
                   label="Trigger By"
@@ -697,6 +840,8 @@ export default function JobMonitoringTab() {
                   currentSortField={jhSortField}
                   currentSortOrder={jhSortOrder}
                   onSort={handleJhSort}
+                  onFilterClick={(event) => openJhFilter(event, 'jobTrigger')}
+                  filterActive={jhFilterTrigger.length > 0}
                 />
                 <SortableHeaderCell
                   label="Started (PT)"
@@ -714,86 +859,6 @@ export default function JobMonitoringTab() {
                 />
                 <TableCell sx={nonSortHeaderSx}>Summary</TableCell>
                 <TableCell sx={nonSortHeaderSx}>Warning</TableCell>
-              </TableRow>
-              {/* Filter row — Job ID and Job Name filter on Enter; dropdowns apply immediately */}
-              <TableRow>
-                <TableCell sx={filterCellSx}>
-                  <TextField
-                    {...filterTextFieldProps}
-                    value={jhFilterId}
-                    onChange={(e) => setJhFilterId(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        setJhAppliedFilterId(jhFilterId)
-                        setJobHistoryPage(1)
-                      }
-                    }}
-                  />
-                </TableCell>
-                <TableCell sx={filterCellSx}>
-                  <Select
-                    size="small"
-                    displayEmpty
-                    value={jhFilterJobName}
-                    onChange={(e) => {
-                      setJhFilterJobName(e.target.value)
-                      setJobHistoryPage(1)
-                    }}
-                    sx={{ ...filterSelectSx, minWidth: 140 }}
-                  >
-                    <MenuItem value="">
-                      <em>All</em>
-                    </MenuItem>
-                    {MONITORED_JOB_NAMES.map((n) => (
-                      <MenuItem key={n} value={n} sx={{ fontSize: '0.75rem' }}>
-                        {n}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </TableCell>
-                <TableCell sx={filterCellSx}>
-                  <Select
-                    size="small"
-                    displayEmpty
-                    value={jhFilterStatus}
-                    onChange={(e) => {
-                      setJhFilterStatus(e.target.value)
-                      setJobHistoryPage(1)
-                    }}
-                    sx={filterSelectSx}
-                  >
-                    <MenuItem value="">
-                      <em>All</em>
-                    </MenuItem>
-                    {STATUSES.map((s) => (
-                      <MenuItem key={s} value={s} sx={{ fontSize: '0.75rem' }}>
-                        {normalizeStatus(s)}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </TableCell>
-                <TableCell sx={filterCellSx}>
-                  <Select
-                    size="small"
-                    displayEmpty
-                    value={jhFilterTrigger}
-                    onChange={(e) => {
-                      setJhFilterTrigger(e.target.value)
-                      setJobHistoryPage(1)
-                    }}
-                    sx={filterSelectSx}
-                  >
-                    <MenuItem value="">
-                      <em>All</em>
-                    </MenuItem>
-                    {TRIGGER_OPTIONS.map((t) => (
-                      <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
-                        {t}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </TableCell>
-                <TableCell sx={filterCellSx} colSpan={4} />
               </TableRow>
             </TableHead>
             <TableBody>
@@ -843,6 +908,144 @@ export default function JobMonitoringTab() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <Menu
+          anchorEl={jhFilterAnchor.element}
+          open={Boolean(jhFilterAnchor.element)}
+          onClose={closeJhFilter}
+          PaperProps={{
+            sx: {
+              maxHeight: 400,
+              width: 250,
+            },
+          }}
+        >
+          <Box sx={{ p: 1.5, minWidth: 220 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 1,
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                Filter by{' '}
+                {jhFilterAnchor.column ? JOB_HISTORY_FILTER_LABELS[jhFilterAnchor.column] : ''}
+              </Typography>
+              <Button
+                size="small"
+                onClick={() => {
+                  if (jhFilterAnchor.column === 'id') {
+                    setJhFilterId('')
+                    setJhAppliedFilterId('')
+                    setJobHistoryPage(1)
+                  }
+                  if (jhFilterAnchor.column === 'jobType') {
+                    setJhFilterJobName('')
+                    setJobHistoryPage(1)
+                  }
+                  if (jhFilterAnchor.column === 'status') {
+                    setJhFilterStatus('')
+                    setJobHistoryPage(1)
+                  }
+                  if (jhFilterAnchor.column === 'jobTrigger') {
+                    setJhFilterTrigger('')
+                    setJobHistoryPage(1)
+                  }
+                  closeJhFilter()
+                }}
+                sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+              >
+                Clear
+              </Button>
+            </Box>
+            {jhFilterAnchor.column === 'id' && (
+              <TextField
+                {...filterTextFieldProps}
+                fullWidth
+                value={jhFilterId}
+                onChange={(e) => setJhFilterId(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setJhAppliedFilterId(jhFilterId)
+                    setJobHistoryPage(1)
+                    closeJhFilter()
+                  }
+                }}
+              />
+            )}
+            {jhFilterAnchor.column === 'jobType' && (
+              <Select
+                size="small"
+                fullWidth
+                displayEmpty
+                value={jhFilterJobName}
+                onChange={(e) => {
+                  setJhFilterJobName(e.target.value)
+                  setJobHistoryPage(1)
+                  closeJhFilter()
+                }}
+                sx={{ ...filterSelectSx, minWidth: 140 }}
+              >
+                <MenuItem value="">
+                  <em>All</em>
+                </MenuItem>
+                {MONITORED_JOB_NAMES.map((n) => (
+                  <MenuItem key={n} value={n} sx={{ fontSize: '0.75rem' }}>
+                    {n}
+                  </MenuItem>
+                ))}
+              </Select>
+            )}
+            {jhFilterAnchor.column === 'status' && (
+              <Select
+                size="small"
+                fullWidth
+                displayEmpty
+                value={jhFilterStatus}
+                onChange={(e) => {
+                  setJhFilterStatus(e.target.value)
+                  setJobHistoryPage(1)
+                  closeJhFilter()
+                }}
+                sx={filterSelectSx}
+              >
+                <MenuItem value="">
+                  <em>All</em>
+                </MenuItem>
+                {STATUSES.map((s) => (
+                  <MenuItem key={s} value={s} sx={{ fontSize: '0.75rem' }}>
+                    {normalizeStatus(s)}
+                  </MenuItem>
+                ))}
+              </Select>
+            )}
+            {jhFilterAnchor.column === 'jobTrigger' && (
+              <Select
+                size="small"
+                fullWidth
+                displayEmpty
+                value={jhFilterTrigger}
+                onChange={(e) => {
+                  setJhFilterTrigger(e.target.value)
+                  setJobHistoryPage(1)
+                  closeJhFilter()
+                }}
+                sx={filterSelectSx}
+              >
+                <MenuItem value="">
+                  <em>All</em>
+                </MenuItem>
+                {TRIGGER_OPTIONS.map((t) => (
+                  <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
+                    {t}
+                  </MenuItem>
+                ))}
+              </Select>
+            )}
+          </Box>
+        </Menu>
 
         <Box
           sx={{
@@ -915,6 +1118,8 @@ export default function JobMonitoringTab() {
                   currentSortField={actSortField}
                   currentSortOrder={actSortOrder}
                   onSort={handleActSort}
+                  onFilterClick={(event) => openActFilter(event, 'severity')}
+                  filterActive={actFilterSeverity.length > 0}
                 />
                 <SortableHeaderCell
                   label="Type"
@@ -922,6 +1127,8 @@ export default function JobMonitoringTab() {
                   currentSortField={actSortField}
                   currentSortOrder={actSortOrder}
                   onSort={handleActSort}
+                  onFilterClick={(event) => openActFilter(event, 'type')}
+                  filterActive={actFilterType.length > 0}
                 />
                 {/* Related is not sortable per FDD */}
                 <TableCell sx={nonSortHeaderSx}>Related</TableCell>
@@ -931,67 +1138,9 @@ export default function JobMonitoringTab() {
                   currentSortField={actSortField}
                   currentSortOrder={actSortOrder}
                   onSort={handleActSort}
+                  onFilterClick={(event) => openActFilter(event, 'jobRunId')}
+                  filterActive={actAppliedFilterJobId.length > 0}
                 />
-              </TableRow>
-              {/* Filter row */}
-              <TableRow>
-                <TableCell sx={filterCellSx} />
-                <TableCell sx={filterCellSx}>
-                  <Select
-                    size="small"
-                    displayEmpty
-                    value={actFilterSeverity}
-                    onChange={(e) => {
-                      setActFilterSeverity(e.target.value)
-                      setActivitiesPage(1)
-                    }}
-                    sx={filterSelectSx}
-                  >
-                    <MenuItem value="">
-                      <em>All</em>
-                    </MenuItem>
-                    {ACTIVITY_SEVERITIES.map((s) => (
-                      <MenuItem key={s} value={s} sx={{ fontSize: '0.75rem' }}>
-                        {normalizeSeverity(s)}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </TableCell>
-                <TableCell sx={filterCellSx}>
-                  <Select
-                    size="small"
-                    displayEmpty
-                    value={actFilterType}
-                    onChange={(e) => {
-                      setActFilterType(e.target.value)
-                      setActivitiesPage(1)
-                    }}
-                    sx={{ ...filterSelectSx, minWidth: 150 }}
-                  >
-                    <MenuItem value="">
-                      <em>All</em>
-                    </MenuItem>
-                    {ACTIVITY_TYPES.map((t) => (
-                      <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
-                        {t}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </TableCell>
-                <TableCell sx={filterCellSx} />
-                <TableCell sx={filterCellSx}>
-                  <TextField
-                    {...filterTextFieldProps}
-                    value={actFilterJobId}
-                    onChange={(e) => setActFilterJobId(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        setActAppliedFilterJobId(actFilterJobId)
-                        setActivitiesPage(1)
-                      }
-                    }}
-                  />
-                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1034,6 +1183,117 @@ export default function JobMonitoringTab() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <Menu
+          anchorEl={actFilterAnchor.element}
+          open={Boolean(actFilterAnchor.element)}
+          onClose={closeActFilter}
+          PaperProps={{
+            sx: {
+              maxHeight: 400,
+              width: 250,
+            },
+          }}
+        >
+          <Box sx={{ p: 1.5, minWidth: 220 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 1,
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                Filter by{' '}
+                {actFilterAnchor.column ? ACTIVITY_FILTER_LABELS[actFilterAnchor.column] : ''}
+              </Typography>
+              <Button
+                size="small"
+                onClick={() => {
+                  if (actFilterAnchor.column === 'severity') {
+                    setActFilterSeverity('')
+                    setActivitiesPage(1)
+                  }
+                  if (actFilterAnchor.column === 'type') {
+                    setActFilterType('')
+                    setActivitiesPage(1)
+                  }
+                  if (actFilterAnchor.column === 'jobRunId') {
+                    setActFilterJobId('')
+                    setActAppliedFilterJobId('')
+                    setActivitiesPage(1)
+                  }
+                  closeActFilter()
+                }}
+                sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+              >
+                Clear
+              </Button>
+            </Box>
+            {actFilterAnchor.column === 'severity' && (
+              <Select
+                size="small"
+                fullWidth
+                displayEmpty
+                value={actFilterSeverity}
+                onChange={(e) => {
+                  setActFilterSeverity(e.target.value)
+                  setActivitiesPage(1)
+                  closeActFilter()
+                }}
+                sx={filterSelectSx}
+              >
+                <MenuItem value="">
+                  <em>All</em>
+                </MenuItem>
+                {ACTIVITY_SEVERITIES.map((s) => (
+                  <MenuItem key={s} value={s} sx={{ fontSize: '0.75rem' }}>
+                    {normalizeSeverity(s)}
+                  </MenuItem>
+                ))}
+              </Select>
+            )}
+            {actFilterAnchor.column === 'type' && (
+              <Select
+                size="small"
+                fullWidth
+                displayEmpty
+                value={actFilterType}
+                onChange={(e) => {
+                  setActFilterType(e.target.value)
+                  setActivitiesPage(1)
+                  closeActFilter()
+                }}
+                sx={{ ...filterSelectSx, minWidth: 150 }}
+              >
+                <MenuItem value="">
+                  <em>All</em>
+                </MenuItem>
+                {ACTIVITY_TYPES.map((t) => (
+                  <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
+                    {t}
+                  </MenuItem>
+                ))}
+              </Select>
+            )}
+            {actFilterAnchor.column === 'jobRunId' && (
+              <TextField
+                {...filterTextFieldProps}
+                fullWidth
+                value={actFilterJobId}
+                onChange={(e) => setActFilterJobId(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setActAppliedFilterJobId(actFilterJobId)
+                    setActivitiesPage(1)
+                    closeActFilter()
+                  }
+                }}
+              />
+            )}
+          </Box>
+        </Menu>
 
         <Box
           sx={{

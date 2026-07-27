@@ -253,6 +253,72 @@ const ACTIVITY_FILTER_LABELS: Record<ActivityFilterColumn, string> = {
   jobRunId: 'Job ID',
 }
 
+const JOB_LIST_DATE_FIELDS = new Set(['started', 'finished'])
+const JOB_HISTORY_DATE_FIELDS = new Set(['startedAt', 'completedAt', 'createdAt'])
+const ACTIVITIES_DATE_FIELDS = new Set(['when'])
+
+const toTimeOrNull = (value: unknown): number | null => {
+  if (!value) return null
+  const time = new Date(String(value)).getTime()
+  return Number.isNaN(time) ? null : time
+}
+
+const compareWithNullsLast = (
+  left: number | string | null,
+  right: number | string | null,
+): number => {
+  if (left === null && right === null) return 0
+  if (left === null) return 1
+  if (right === null) return -1
+  if (typeof left === 'number' && typeof right === 'number') return left - right
+  return String(left).localeCompare(String(right), undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  })
+}
+
+const compareJobListRows = (a: MonitoringJobRow, b: MonitoringJobRow, field: string): number => {
+  const getSortValue = (row: MonitoringJobRow, sortField: string): unknown => {
+    switch (sortField) {
+      case 'id':
+        return row.id
+      case 'jobName':
+        return row.jobName
+      case 'status':
+        return row.status
+      case 'triggeredBy':
+        return row.triggeredBy
+      case 'started':
+        return row.started
+      case 'finished':
+        return row.finished
+      case 'summary':
+        return row.summary
+      case 'warning':
+        return row.warning
+      default:
+        return null
+    }
+  }
+
+  if (field === 'id') {
+    return compareWithNullsLast(a.id ?? null, b.id ?? null)
+  }
+
+  if (JOB_LIST_DATE_FIELDS.has(field)) {
+    const aTime = toTimeOrNull(getSortValue(a, field))
+    const bTime = toTimeOrNull(getSortValue(b, field))
+    return compareWithNullsLast(aTime, bTime)
+  }
+
+  const valA = getSortValue(a, field)
+  const valB = getSortValue(b, field)
+  return compareWithNullsLast(
+    valA == null ? null : String(valA),
+    valB == null ? null : String(valB),
+  )
+}
+
 export default function JobMonitoringTab() {
   // ── Job List ────────────────────────────────────────────────────────────
   const [jobListData, setJobListData] = useState<MonitoringJobRow[]>([])
@@ -442,7 +508,7 @@ export default function JobMonitoringTab() {
       setJlSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))
     } else {
       setJlSortField(field)
-      setJlSortOrder('asc')
+      setJlSortOrder(JOB_LIST_DATE_FIELDS.has(field) ? 'desc' : 'asc')
     }
   }
 
@@ -452,7 +518,7 @@ export default function JobMonitoringTab() {
       setJhSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))
     } else {
       setJhSortField(field)
-      setJhSortOrder('asc')
+      setJhSortOrder(JOB_HISTORY_DATE_FIELDS.has(field) ? 'desc' : 'asc')
     }
   }
 
@@ -462,7 +528,7 @@ export default function JobMonitoringTab() {
       setActSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))
     } else {
       setActSortField(field)
-      setActSortOrder('asc')
+      setActSortOrder(ACTIVITIES_DATE_FIELDS.has(field) ? 'desc' : 'asc')
     }
   }
 
@@ -512,7 +578,7 @@ export default function JobMonitoringTab() {
     setJhFilterJobName('')
     setJhFilterStatus('')
     setJhFilterTrigger('')
-    setJhSortField('createdAt')
+    setJhSortField('startedAt')
     setJhSortOrder('desc')
     setJobHistoryPage(1)
     setSelectedJobHistoryId(null)
@@ -540,9 +606,7 @@ export default function JobMonitoringTab() {
       return true
     })
     .sort((a, b) => {
-      const valA = String((a as Record<string, unknown>)[jlSortField] ?? '')
-      const valB = String((b as Record<string, unknown>)[jlSortField] ?? '')
-      const cmp = valA.localeCompare(valB)
+      const cmp = compareJobListRows(a, b, jlSortField)
       return jlSortOrder === 'asc' ? cmp : -cmp
     })
 

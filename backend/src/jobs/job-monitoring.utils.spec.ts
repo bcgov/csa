@@ -2,12 +2,12 @@ import { JobStatus } from './enums/job-status.enum'
 import { JobTrigger } from './enums/job-trigger.enum'
 import { JobType } from './enums/job-type.enum'
 import {
-    formatJobDisplayName,
-    formatJobSummary,
-    formatMonitoringStatus,
-    formatTriggeredBy,
-    MONITORED_JOB_HISTORY_TYPES,
-    MONITORED_JOB_LIST_TYPES,
+  formatJobDisplayName,
+  formatJobSummary,
+  formatMonitoringStatus,
+  formatTriggeredBy,
+  MONITORED_JOB_HISTORY_TYPES,
+  MONITORED_JOB_LIST_TYPES,
 } from './job-monitoring.utils'
 
 describe('job-monitoring.utils', () => {

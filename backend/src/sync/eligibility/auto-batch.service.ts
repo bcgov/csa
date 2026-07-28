@@ -70,18 +70,6 @@ export class AutoBatchService {
       else cancellation++
     }
 
-    if (result.skipped.length > 0) {
-      this.logger.log(
-        `Auto-batch skipped ${result.skipped.length} contacts (batch ${result.batch.id})`,
-      )
-    }
-
-    if (result.incomplete.length > 0) {
-      this.logger.log(
-        `Auto-batch Records Validation: ${result.incomplete.length} contacts auto-held due to missing CRA mandatory fields (batch ${result.batch.id})`,
-      )
-    }
-
     this.logger.log(
       `Auto-batched ${application} application + ${cancellation} cancellation contacts into batch ${result.batch.id}`,
     )

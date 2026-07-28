@@ -4,6 +4,7 @@ import { PrismaService } from 'src/common/database/prisma.service'
 import { BATCH_DETAIL_STATUS } from 'src/common/state-machine/constants/batch-detail-status.constants'
 import { BATCH_STATUS } from 'src/common/state-machine/constants/batch-status.constants'
 import { AppLogger } from 'src/common/logger/app-logger'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { normalize, parseWklDate } from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { CraMatchingSnapshot } from './cra-matching-snapshot.interface'
@@ -165,6 +166,12 @@ export class WeeklyContactMatcherService {
       this.logger.warn(
         `WKL: multiple batch detail matches (${matches.length}) for ` +
           `${wklDetail.childGivenName.trim()} ${wklDetail.childSurName.trim()}, skipping`,
+        {
+          activityType: JobActivityType.WKL,
+          aggregate: true,
+          aggregateKey: 'wkl-multiple-batch-detail-matches',
+          related: 'Multiple batch detail matches for WKL record',
+        },
       )
       return null
     }
@@ -226,6 +233,12 @@ export class WeeklyContactMatcherService {
     if (matches.length > 1) {
       this.logger.warn(
         `WKL backfill: multiple CRA batch details for contact ${contactId} on ${weeklyFileDate.toISOString().slice(0, 10)}`,
+        {
+          activityType: JobActivityType.WKL,
+          aggregate: true,
+          aggregateKey: 'wkl-multiple-cra-batch-details',
+          related: 'Multiple CRA batch details for WKL backfill match',
+        },
       )
     }
     return null
@@ -268,7 +281,12 @@ export class WeeklyContactMatcherService {
       })
       if (dinMatches.length === 1) return dinMatches[0]
       if (dinMatches.length > 1) {
-        this.logger.warn(`WKL contact match: multiple contacts with DIN ${din}, skipping`)
+        this.logger.warn(`WKL contact match: multiple contacts with DIN ${din}, skipping`, {
+          activityType: JobActivityType.WKL,
+          aggregate: true,
+          aggregateKey: 'wkl-multiple-contacts-din',
+          related: `Multiple contacts matched for DIN (example: ${din})`,
+        })
         return null
       }
     }
@@ -328,6 +346,12 @@ export class WeeklyContactMatcherService {
       this.logger.warn(
         `WKL contact match: multiple contacts (${detailMatches.length}) for ` +
           `${wklDetail.childGivenName.trim()} ${wklDetail.childSurName.trim()}, skipping`,
+        {
+          activityType: JobActivityType.WKL,
+          aggregate: true,
+          aggregateKey: 'wkl-multiple-contacts-details',
+          related: 'Multiple contacts matched for WKL child details',
+        },
       )
       return null
     }

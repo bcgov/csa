@@ -2,12 +2,12 @@ import { JobStatus } from './enums/job-status.enum'
 import { JobTrigger } from './enums/job-trigger.enum'
 import { JobType } from './enums/job-type.enum'
 import {
-  formatJobDisplayName,
-  formatJobSummary,
-  formatMonitoringStatus,
-  formatTriggeredBy,
-  MONITORED_JOB_HISTORY_TYPES,
-  MONITORED_JOB_LIST_TYPES,
+    formatJobDisplayName,
+    formatJobSummary,
+    formatMonitoringStatus,
+    formatTriggeredBy,
+    MONITORED_JOB_HISTORY_TYPES,
+    MONITORED_JOB_LIST_TYPES,
 } from './job-monitoring.utils'
 
 describe('job-monitoring.utils', () => {
@@ -111,6 +111,27 @@ describe('job-monitoring.utils', () => {
     ).toBe('2 files processed, 10 accepted, 1 rejected')
   })
 
+  it('includes CRA response file names in weekly response summary', () => {
+    expect(
+      formatJobSummary({
+        jobType: JobType.POLL_CRA_RESPONSE,
+        status: JobStatus.SUCCESS,
+        metadata: {
+          files_processed: 3,
+          file_names: [
+            'craUserId.ARSP0001.txt',
+            'craUserId.AWKL0001.txt',
+            'craUserId.ARSP0002.txt',
+          ],
+          records_accepted: 10,
+          records_rejected: 1,
+        },
+      }),
+    ).toBe(
+      '3 files processed (craUserId.ARSP0001.txt, craUserId.AWKL0001.txt +1 more), 10 accepted, 1 rejected',
+    )
+  })
+
   it('formats send CRA no-batch summary from metadata', () => {
     expect(
       formatJobSummary({
@@ -119,6 +140,21 @@ describe('job-monitoring.utils', () => {
         metadata: { no_batch: true },
       }),
     ).toBe('No batch to process')
+  })
+
+  it('includes CRA outbound file name in send CRA summary', () => {
+    expect(
+      formatJobSummary({
+        jobType: JobType.SEND_CRA_FILE,
+        status: JobStatus.SUCCESS,
+        metadata: {
+          batch_id: 8155,
+          file_name: 'II20260728.0001.dat',
+          record_count: 24,
+          contacts_count: 24,
+        },
+      }),
+    ).toBe('Batch 8155, file II20260728.0001.dat, 24 records, 24 contacts')
   })
 
   it('formats ingest data summary from child job metadata', () => {

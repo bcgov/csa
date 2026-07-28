@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { AppLogger } from 'src/common/logger/app-logger'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { Prisma } from '@prisma/client'
 import { PrismaService } from 'src/common/database/prisma.service'
 import {
@@ -87,7 +89,7 @@ export interface UpdateBatchStatusOptions {
 
 @Injectable()
 export class BatchesService {
-  private readonly logger = new Logger(BatchesService.name)
+  private readonly logger = new AppLogger(BatchesService.name)
 
   constructor(
     private prisma: PrismaService,
@@ -102,6 +104,44 @@ export class BatchesService {
         `Immediate ICM sync failed for contact ${contactId}: ${(err as Error).message}`,
       )
     })
+  }
+
+  private logBatchOperationIssues(
+    operation: 'add' | 'remove',
+    userId: string,
+    batchId: number,
+    result: Pick<BatchOperationResult, 'skipped' | 'incomplete'>,
+  ): void {
+    const batchLabel = `batch ${batchId}`
+    const isAutoBatch = userId === 'SYSTEM'
+    const trigger = isAutoBatch ? 'Auto-batch' : `Manual ${operation} to batch by ${userId}`
+
+    if (result.incomplete.length > 0) {
+      const count = result.incomplete.length
+      const detail = isAutoBatch
+        ? `${count} contacts auto-held due to missing CRA mandatory fields`
+        : `${count} contacts skipped due to missing CRA mandatory fields`
+      this.logger.warn(`${trigger}: ${detail} (${batchLabel})`, {
+        activityType: JobActivityType.BATCH,
+        related: `${detail} (${batchLabel})`,
+      })
+    }
+
+    const errors = result.skipped.filter((entry) => entry.reason === 'error')
+    if (errors.length > 0) {
+      this.logger.error(`${trigger}: ${errors.length} contacts failed (${batchLabel})`, {
+        activityType: JobActivityType.BATCH,
+        related: `${errors.length} contacts failed during ${operation} (${batchLabel})`,
+      })
+    }
+
+    const otherSkipped = result.skipped.filter((entry) => entry.reason !== 'error')
+    if (otherSkipped.length > 0) {
+      this.logger.warn(`${trigger}: ${otherSkipped.length} contacts skipped (${batchLabel})`, {
+        activityType: JobActivityType.BATCH,
+        related: `${otherSkipped.length} contacts skipped during ${operation} (${batchLabel})`,
+      })
+    }
   }
 
   private async nextBatchNumber(tx: Prisma.TransactionClient): Promise<number> {
@@ -566,6 +606,8 @@ export class BatchesService {
       }),
     )
 
+    this.logBatchOperationIssues('add', userId, result.batch.id, result)
+
     return result
   }
 
@@ -712,6 +754,13 @@ export class BatchesService {
       )
 
       if (!transition.success) {
+        this.logger.error(
+          `Manual remove from batch failed for contact ${contactId}: ${transition.reason}`,
+          {
+            activityType: JobActivityType.BATCH,
+            related: `Manual remove from batch contact ${contactId} by ${userId ?? 'unknown'}: ${transition.reason}`,
+          },
+        )
         throw new BadRequestException(
           `Failed to transition contact ${contactId} on REMOVE_FROM_BATCH: ${transition.reason}`,
         )
@@ -804,6 +853,8 @@ export class BatchesService {
         data: { recordCount: actualCount },
       }),
     )
+
+    this.logBatchOperationIssues('remove', userId, result.batch.id, result)
 
     return result
   }

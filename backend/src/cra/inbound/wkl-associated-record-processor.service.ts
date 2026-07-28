@@ -1,7 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { BatchesService } from 'src/api/batches/batches.service'
 import { ContactsService } from 'src/api/contacts/contacts.service'
+import { AppLogger } from 'src/common/logger/app-logger'
 import { BATCH_DETAIL_EVENT, CSA_STATUS } from 'src/common/state-machine/constants'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { buildWklUpdatePayloads } from './wkl-snapshot-data'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import type { DetailRecord04, HeaderRecord } from './inbound-weekly.interface'
@@ -29,7 +31,7 @@ export interface WklUnmatchedProcessCounters {
 
 @Injectable()
 export class WklAssociatedRecordProcessorService {
-  private readonly logger = new Logger(WklAssociatedRecordProcessorService.name)
+  private readonly logger = new AppLogger(WklAssociatedRecordProcessorService.name)
 
   constructor(
     private readonly batchesService: BatchesService,
@@ -48,6 +50,12 @@ export class WklAssociatedRecordProcessorService {
     if (!wklType || !TRANSACTION_TYPES.includes(wklType)) {
       this.logger.warn(
         `WKL: unexpected transaction type ${detail.transactionType}, skipping [origin: ${ctx.origin}]`,
+        {
+          activityType: JobActivityType.WKL,
+          aggregate: true,
+          aggregateKey: 'wkl-unexpected-transaction',
+          related: `Unexpected WKL transaction type (example: ${detail.transactionType})`,
+        },
       )
       counters.skipped++
       return null
@@ -70,6 +78,12 @@ export class WklAssociatedRecordProcessorService {
             `WKL: transaction type mismatch for contact ${contactId} — ` +
               `WKL says ${wklType}, batch detail says ${batchDetail.transactionType} ` +
               `[origin: ${ctx.origin}]`,
+            {
+              activityType: JobActivityType.WKL,
+              aggregate: true,
+              aggregateKey: 'wkl-transaction-type-mismatch',
+              related: 'WKL transaction type mismatch with batch detail',
+            },
           )
           counters.skipped++
           return null
@@ -144,6 +158,12 @@ export class WklAssociatedRecordProcessorService {
       this.logger.warn(
         `WKL: unexpected status '${detail.status}' for contact ${batchDetail.contactId}, skipping ` +
           `[origin: ${ctx.origin}]`,
+        {
+          activityType: JobActivityType.WKL,
+          aggregate: true,
+          aggregateKey: 'wkl-unexpected-status',
+          related: `Unexpected WKL status (example: ${detail.status})`,
+        },
       )
       counters.skipped++
       return null

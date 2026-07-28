@@ -1,10 +1,11 @@
 import {
   BadRequestException,
   Injectable,
-  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
+import { AppLogger } from 'src/common/logger/app-logger'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
 import {
@@ -36,7 +37,7 @@ import type {
 
 @Injectable()
 export class ContactsService {
-  private readonly logger = new Logger(ContactsService.name)
+  private readonly logger = new AppLogger(ContactsService.name)
 
   constructor(
     private prisma: PrismaService,
@@ -829,6 +830,7 @@ export class ContactsService {
 
   async runContactEligibility(
     contactId: number,
+    triggeredByUser: string,
   ): Promise<{ previousStatus: string | null; newStatus: string }> {
     const contact = await this.prisma.contact.findUnique({
       where: { id: contactId },
@@ -844,6 +846,10 @@ export class ContactsService {
       result = await this.eligibilityService.runForContact(contact.personIdIcm)
     } catch (err) {
       if (err instanceof EligibilityInputError) {
+        this.logger.error(`Manual eligibility failed for contact ${contactId}: ${err.message}`, {
+          activityType: JobActivityType.DATA_QUALITY,
+          related: `Manual eligibility contact ${contactId} (${contact.personIdIcm}) by ${triggeredByUser}: ${err.message}`,
+        })
         throw new UnprocessableEntityException(err.message)
       }
       throw err
@@ -866,6 +872,10 @@ export class ContactsService {
       this.icmSyncBackService.syncSingleContact(contactId).catch((err) => {
         this.logger.warn(
           `Immediate ICM sync failed for contact ${contactId}: ${(err as Error).message}`,
+          {
+            activityType: JobActivityType.ICM,
+            related: `ICM sync failed after manual eligibility contact ${contactId} by ${triggeredByUser}`,
+          },
         )
       })
     }

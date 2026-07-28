@@ -10,8 +10,10 @@ import { BATCH_DETAIL_EVENT, CSA_EVENT } from 'src/common/state-machine/constant
 import { csaProcessingBatchDate, parseWklDate } from 'src/common/utils'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
+import { JobsService } from 'src/jobs/jobs.service'
 import { IcmSyncBackService, SyncBackResult } from 'src/sync/icm/icm-sync-back.service'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { InboundFileService } from '../inbound/inbound-file.service'
@@ -19,10 +21,10 @@ import { InboundResponseService } from '../inbound/inbound-response.service'
 import { InboundWeeklyResponseService } from '../inbound/inbound-weekly-response.service'
 import type { DetailRecord04, HeaderRecord } from '../inbound/inbound-weekly.interface'
 import { DETAIL_OUTCOME, type CraResDetail } from '../inbound/inbound.interface'
-import { WklAssociatedRecordProcessorService } from '../inbound/wkl-associated-record-processor.service'
-import { buildWklUpdatePayloads } from '../inbound/wkl-snapshot-data'
 import { WeeklyContactMatcherService } from '../inbound/weekly-contact-matcher.service'
+import { WklAssociatedRecordProcessorService } from '../inbound/wkl-associated-record-processor.service'
 import { WklFileRecordService } from '../inbound/wkl-file-record.service'
+import { buildWklUpdatePayloads } from '../inbound/wkl-snapshot-data'
 import { CraTransferService } from '../transfer/cra-transfer.service'
 const {
   DESTINATION_ID,
@@ -57,6 +59,7 @@ export class PollCraResponseHandler extends BaseJob {
   private recordsWklUnmatchedApproved!: number
   private recordsWklUnmatchedRefused!: number
   private recordsWklUnmatchedSkipped!: number
+  private invalidFileFormatCount!: number
   private newCraRecordsInWkl: DetailRecord04[] = []
   private unmatchedWklBatchId: number | null = null
 
@@ -68,6 +71,7 @@ export class PollCraResponseHandler extends BaseJob {
     private readonly prisma: PrismaService,
     private readonly batchesService: BatchesService,
     private readonly contactsService: ContactsService,
+    private readonly jobsService: JobsService,
     private readonly icmSyncBackService: IcmSyncBackService,
     private readonly weeklyContactMatcher: WeeklyContactMatcherService,
     private readonly wklFileRecordService: WklFileRecordService,
@@ -87,6 +91,7 @@ export class PollCraResponseHandler extends BaseJob {
     this.recordsWklUnmatchedApproved = 0
     this.recordsWklUnmatchedRefused = 0
     this.recordsWklUnmatchedSkipped = 0
+    this.invalidFileFormatCount = 0
     this.unmatchedWklBatchId = null
     this.newCraRecordsInWkl = []
 
@@ -120,7 +125,10 @@ export class PollCraResponseHandler extends BaseJob {
     try {
       syncResult = await this.icmSyncBackService.syncFlaggedWithRetry()
     } catch (err) {
-      this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`)
+      this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`, {
+        activityType: JobActivityType.ICM,
+        related: `ICM sync-back failed: ${(err as Error).message}`,
+      })
     }
 
     const totalUpdated =
@@ -131,11 +139,13 @@ export class PollCraResponseHandler extends BaseJob {
       this.recordsWklUnmatchedApproved +
       this.recordsWklUnmatchedRefused
 
+    const fileNames = sortedFiles.map((f) => f.fileName).join(', ')
     return {
       success: true,
-      message: `Processed ${totalRecordsProcessed} CRA response records from ${sortedFiles.length} file(s)`,
+      message: `Processed ${totalRecordsProcessed} records from ${sortedFiles.length} file(s): ${fileNames}`,
       metadata: {
         files_processed: sortedFiles.length,
+        file_names: sortedFiles.map((f) => f.fileName),
         records_updated: totalUpdated,
         records_accepted: this.recordsAccepted,
         records_rejected: this.recordsRejected,
@@ -146,6 +156,7 @@ export class PollCraResponseHandler extends BaseJob {
         records_wkl_unmatched_approved: this.recordsWklUnmatchedApproved,
         records_wkl_unmatched_refused: this.recordsWklUnmatchedRefused,
         records_wkl_unmatched_skipped: this.recordsWklUnmatchedSkipped,
+        invalid_file_format_count: this.invalidFileFormatCount,
         batch_ids: [...this.processedBatchIds],
         syncResult,
         craNewRecordsInWkl: {
@@ -207,7 +218,13 @@ export class PollCraResponseHandler extends BaseJob {
 
       const valid = this.inboundFileService.isValidResponseFile(file.fileName)
       if (!valid) {
-        this.logger.warn(`Invalid response file format: ${file.fileName}`)
+        this.invalidFileFormatCount += 1
+        this.logger.warn(`Invalid response file format: ${file.fileName}`, {
+          activityType: JobActivityType.CRA,
+          aggregate: true,
+          aggregateKey: 'invalid-response-file-format',
+          related: `Invalid response file format (example: ${file.fileName})`,
+        })
       }
 
       await this.prisma.transferFile.create({
@@ -250,7 +267,10 @@ export class PollCraResponseHandler extends BaseJob {
         parsed = this.inboundResponseService.parseFile(localFilePath)
       }
     } catch (error) {
-      this.logger.error(`Failed to parse response file ${responseFile.fileName}: ${error}`)
+      this.logger.error(`Failed to parse response file ${responseFile.fileName}: ${error}`, {
+        activityType: JobActivityType.CRA,
+        related: `Failed to parse response file ${responseFile.fileName}`,
+      })
       await this.prisma.transferFile.update({
         where: { id: responseFile.id },
         data: { isValid: false, isDetailsProcessed: true },
@@ -318,7 +338,12 @@ export class PollCraResponseHandler extends BaseJob {
     })
 
     if (!batchDetail) {
-      this.logger.warn(`Batch detail not found for referenceNum ${detail.referenceNum}`)
+      this.logger.warn(`Batch detail not found for referenceNum ${detail.referenceNum}`, {
+        activityType: JobActivityType.CRA,
+        aggregate: true,
+        aggregateKey: 'batch-detail-not-found',
+        related: `Batch detail not found for reference number (example: ${detail.referenceNum})`,
+      })
       return
     }
 
@@ -390,7 +415,12 @@ export class PollCraResponseHandler extends BaseJob {
     const wklType = TRANSACTION_TYPE_MAP[detail.transactionType]
 
     if (!wklType || !TRANSACTION_TYPES.includes(wklType)) {
-      this.logger.warn(`WKL: unexpected transaction type ${detail.transactionType}, skipping`)
+      this.logger.warn(`WKL: unexpected transaction type ${detail.transactionType}, skipping`, {
+        activityType: JobActivityType.WKL,
+        aggregate: true,
+        aggregateKey: 'wkl-unexpected-transaction',
+        related: `Unexpected WKL transaction type (example: ${detail.transactionType})`,
+      })
       await this.persistWklRecord(ctx, detail, { matchStatus: WKL_MATCH_STATUS.SKIPPED })
       this.recordsWklSkipped++
       return
@@ -401,12 +431,24 @@ export class PollCraResponseHandler extends BaseJob {
       this.logger.warn(
         `WKL: no matching batch detail for ${detail.childGivenName.trim()} ${detail.childSurName.trim()} ` +
           `(DIN: ${detail.childDin?.trim() || 'none'})`,
+        {
+          activityType: JobActivityType.WKL,
+          aggregate: true,
+          aggregateKey: 'wkl-no-batch-detail',
+          related: 'No matching batch detail for WKL record',
+        },
       )
       const contacts = await this.weeklyContactMatcher.findMatchingContact(detail)
       if (!contacts) {
         this.logger.warn(
           `WKL: no matching contacts for ${detail.childGivenName.trim()} ${detail.childSurName.trim()} ` +
             `(DIN: ${detail.childDin?.trim() || 'none'})`,
+          {
+            activityType: JobActivityType.WKL,
+            aggregate: true,
+            aggregateKey: 'wkl-no-matching-contacts',
+            related: 'No matching contacts for WKL record',
+          },
         )
         this.newCraRecordsInWkl.push(detail)
         await this.persistWklRecord(ctx, detail, { matchStatus: WKL_MATCH_STATUS.UNMATCHED })
@@ -441,6 +483,12 @@ export class PollCraResponseHandler extends BaseJob {
       this.logger.warn(
         `WKL: transaction type mismatch for contact ${batchDetail.contactId} — ` +
           `WKL says ${wklType}, batch detail says ${batchDetail.transactionType}`,
+        {
+          activityType: JobActivityType.WKL,
+          aggregate: true,
+          aggregateKey: 'wkl-transaction-type-mismatch',
+          related: 'WKL transaction type mismatch with batch detail',
+        },
       )
     }
 
@@ -505,6 +553,12 @@ export class PollCraResponseHandler extends BaseJob {
     } else {
       this.logger.warn(
         `WKL: unexpected status '${detail.status}' for contact ${batchDetail.contactId}, skipping`,
+        {
+          activityType: JobActivityType.WKL,
+          aggregate: true,
+          aggregateKey: 'wkl-unexpected-status',
+          related: `Unexpected WKL status (example: ${detail.status})`,
+        },
       )
       await this.persistWklRecord(ctx, detail, { matchStatus: WKL_MATCH_STATUS.SKIPPED })
       this.recordsWklSkipped++

@@ -2,8 +2,10 @@ import { Module, OnModuleInit } from '@nestjs/common'
 import { PrismaModule } from 'src/common/database/prisma.module'
 import { IcmSyncBackModule } from 'src/sync/icm/icm-sync-back.module'
 import { RetryFailedHandler } from './handlers/retry-failed.handler'
+import { JobActivityService } from './job-activity.service'
 import { JobRegistry } from './job-registry.service'
 import { JobRunner } from './job-runner.service'
+import { registerJobActivityRecorder } from './job-monitoring-log'
 import { JobsService } from './jobs.service'
 import { OpenshiftJobLauncher } from './openshift-job-launcher.service'
 
@@ -19,16 +21,32 @@ import { OpenshiftJobLauncher } from './openshift-job-launcher.service'
  */
 @Module({
   imports: [PrismaModule, IcmSyncBackModule],
-  providers: [JobsService, JobRunner, JobRegistry, RetryFailedHandler, OpenshiftJobLauncher],
-  exports: [JobsService, JobRunner, JobRegistry, RetryFailedHandler, OpenshiftJobLauncher],
+  providers: [
+    JobsService,
+    JobActivityService,
+    JobRunner,
+    JobRegistry,
+    RetryFailedHandler,
+    OpenshiftJobLauncher,
+  ],
+  exports: [
+    JobsService,
+    JobActivityService,
+    JobRunner,
+    JobRegistry,
+    RetryFailedHandler,
+    OpenshiftJobLauncher,
+  ],
 })
 export class JobsModule implements OnModuleInit {
   constructor(
     private readonly registry: JobRegistry,
     private readonly retryFailedHandler: RetryFailedHandler,
+    private readonly jobActivityService: JobActivityService,
   ) {}
 
   onModuleInit() {
+    registerJobActivityRecorder((params) => this.jobActivityService.recordActivity(params))
     this.registry.register(this.retryFailedHandler.jobType, this.retryFailedHandler)
   }
 }

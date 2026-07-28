@@ -399,7 +399,19 @@ describe('ContactsController', () => {
       const res = await request(app.getHttpServer()).post('/contacts/1/run-eligibility').expect(200)
 
       expect(res.body).toEqual(result)
-      expect(service.runContactEligibility).toHaveBeenCalledWith(1)
+      expect(service.runContactEligibility).toHaveBeenCalledWith(1, 'SYSTEM')
+    })
+
+    it('should pass username from @CurrentUser when guard sets it', async () => {
+      const result = { previousStatus: 'eligible', newStatus: 'in_pay' }
+      vi.spyOn(service, 'runContactEligibility').mockResolvedValue(result)
+
+      await request(app.getHttpServer())
+        .post('/contacts/1/run-eligibility')
+        .set('x-test-username', 'jsmith')
+        .expect(200)
+
+      expect(service.runContactEligibility).toHaveBeenCalledWith(1, 'jsmith')
     })
 
     it('should return 404 when contact not found', async () => {

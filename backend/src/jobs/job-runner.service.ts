@@ -5,6 +5,7 @@ import { JobType } from './enums/job-type.enum'
 import { JobResult } from './interfaces/job-result.interface'
 import { JobContext } from './interfaces/job.interface'
 import { JobRegistry } from './job-registry.service'
+import { runWithJobExecutionScope } from './job-monitoring-log'
 import { JobsService } from './jobs.service'
 import { OpenshiftJobLauncher } from './openshift-job-launcher.service'
 
@@ -55,6 +56,10 @@ export class JobRunner {
 
   // Execute a job with inline retry
   async executeJob(jobId: number): Promise<JobResult> {
+    return runWithJobExecutionScope(jobId, () => this.executeJobScoped(jobId))
+  }
+
+  private async executeJobScoped(jobId: number): Promise<JobResult> {
     const job = await this.jobsService.getJob(jobId)
     if (!job) {
       throw new Error(`Job ${jobId} not found`)

@@ -61,6 +61,7 @@ describe('PollCraResponseHandler', () => {
   let mockPrisma: any
   let mockBatchesService: any
   let mockContactsService: any
+  let mockJobsService: any
   let mockIcmSyncBackService: any
   let mockWeeklyContactMatcher: any
   let mockWklFileRecordService: any
@@ -149,6 +150,10 @@ describe('PollCraResponseHandler', () => {
       updateCsaStatus: vi.fn().mockResolvedValue({ success: true }),
     }
 
+    mockJobsService = {
+      addActivity: vi.fn().mockResolvedValue(undefined),
+    }
+
     mockIcmSyncBackService = {
       syncFlaggedWithRetry: vi.fn().mockResolvedValue({
         totalFlagged: 0,
@@ -183,6 +188,7 @@ describe('PollCraResponseHandler', () => {
       mockPrisma,
       mockBatchesService,
       mockContactsService,
+      mockJobsService,
       mockIcmSyncBackService as any,
       mockWeeklyContactMatcher,
       mockWklFileRecordService,

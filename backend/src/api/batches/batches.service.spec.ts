@@ -877,6 +877,37 @@ describe('BatchesService', () => {
 
       expectIncomplete(result, 104, ['Cancellation End Date', 'Cancellation Reason Code'])
     })
+
+    it('should tag manual add incomplete validation with BATCH warn metadata', async () => {
+      const contactMissingProvince = makeContact({
+        id: 102,
+        caseNumber: 'CASE-102',
+        birthProvince: null,
+      })
+
+      setupCommonMocks([contactMissingProvince])
+      mockPrisma.batch.update.mockResolvedValue({
+        id: 1,
+        batchNumber: 1,
+        status: 'pending',
+        recordCount: 0,
+        batchDate: null,
+        createdAt: new Date(),
+        systemComments: null,
+      })
+      const warnSpy = vi.spyOn(service['logger'], 'warn').mockImplementation(() => {})
+
+      await service.addContactsToPendingBatch([102], 'jsmith')
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Manual add to batch by jsmith'),
+        expect.objectContaining({
+          activityType: 'BATCH',
+          related: expect.stringContaining('skipped due to missing CRA mandatory fields'),
+        }),
+      )
+      warnSpy.mockRestore()
+    })
   })
 
   describe('User Story 40101 - S2: Auto-batch with CRA validation & auto-hold', () => {

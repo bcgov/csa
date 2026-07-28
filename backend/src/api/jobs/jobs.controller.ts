@@ -16,13 +16,26 @@ import { ConfigService } from '@nestjs/config'
 import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { Prisma } from '@prisma/client'
 import type { DeployEnv } from 'src/config/app.config'
+import { JobActivitySeverity } from 'src/jobs/enums/job-activity-severity.enum'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { JobStatus } from 'src/jobs/enums/job-status.enum'
 import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobRunner } from 'src/jobs/job-runner.service'
-import { JobsService } from 'src/jobs/jobs.service'
+import {
+  JobsService,
+  type MonitoringActivityFilters,
+  type MonitoringHistoryFilters,
+} from 'src/jobs/jobs.service'
 import { OpenshiftJobLauncher } from 'src/jobs/openshift-job-launcher.service'
+import {
+  formatJobDisplayName,
+  formatJobSummary,
+  formatMonitoringStatus,
+  formatTriggeredBy,
+} from 'src/jobs/job-monitoring.utils'
 import { CSAGuard } from '../common/guards/csa.guard'
+import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { canRunBulkJobInApiProcess } from './bulk-job-deploy-env'
 import { getJobRunWarning } from './job-openshift-advisory'
 
@@ -44,6 +57,18 @@ interface JobRunResponse {
   startedAt: Date | null
   completedAt: Date | null
   warning?: string
+}
+
+interface MonitoringJobResponse {
+  id: number
+  jobId: number
+  jobName: string
+  status: string
+  triggeredBy: string
+  started: Date | null
+  finished: Date | null
+  summary: string | null
+  warning: string | null
 }
 
 function toUserFacingJobError(jobType: string, error: string | null): string | null {
@@ -93,16 +118,12 @@ export class JobsController {
     private readonly openshiftJobLauncher: OpenshiftJobLauncher,
   ) {}
 
-  // Concurrency: csa.job_runs has a partial unique index on (job_type) WHERE status='RUNNING'
-  // so the second concurrent createJob for the same type raises P2002. We translate that to 409.
-  private async startFireAndForgetJob(
-    jobType: JobType,
-  ): Promise<{ jobRunId: number; message: string }> {
-    let jobRun
+  private async createEndUserJobRun(jobType: JobType, triggeredByUser: string) {
     try {
-      jobRun = await this.jobsService.createJob({
+      return await this.jobsService.createJob({
         jobType,
         jobTrigger: JobTrigger.END_USER,
+        triggeredByUser,
       })
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -110,6 +131,15 @@ export class JobsController {
       }
       throw err
     }
+  }
+
+  // Concurrency: csa.job_runs has a partial unique index on (job_type) WHERE status='RUNNING'
+  // so the second concurrent createJob for the same type raises P2002. We translate that to 409.
+  private async startFireAndForgetJob(
+    jobType: JobType,
+    triggeredByUser: string,
+  ): Promise<{ jobRunId: number; message: string }> {
+    const jobRun = await this.createEndUserJobRun(jobType, triggeredByUser)
 
     this.jobRunner.executeJob(jobRun.id).catch((err) => {
       this.logger.error(
@@ -126,30 +156,19 @@ export class JobsController {
 
   private async launchOpenShiftJob(
     jobType: JobType,
+    triggeredByUser: string,
   ): Promise<{ jobRunId: number; message: string; openshiftJobName?: string }> {
     if (!this.openshiftJobLauncher.isEnabled()) {
       const deployEnv = this.configService.get<DeployEnv>('app.deployEnv', 'local')
       if (canRunBulkJobInApiProcess(deployEnv)) {
-        return this.startFireAndForgetJob(jobType)
+        return this.startFireAndForgetJob(jobType, triggeredByUser)
       }
 
       throw new ServiceUnavailableException(
         `Bulk ${jobType} jobs must run in OpenShift when DEPLOY_ENV is ${deployEnv}. The job launcher is not available.`,
       )
     }
-
-    let jobRun
-    try {
-      jobRun = await this.jobsService.createJob({
-        jobType,
-        jobTrigger: JobTrigger.END_USER,
-      })
-    } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        throw new ConflictException(`${jobType} is already running`)
-      }
-      throw err
-    }
+    const jobRun = await this.createEndUserJobRun(jobType, triggeredByUser)
 
     this.logger.log(`Created job_run ${jobRun.id} for ${jobType}, launching OpenShift Job...`)
 
@@ -229,24 +248,114 @@ export class JobsController {
   @ApiResponse({ status: 201, description: 'RUN_ELIGIBILITY job started' })
   @ApiResponse({ status: 409, description: 'RUN_ELIGIBILITY is already running' })
   @ApiResponse({ status: 503, description: 'Failed to launch OpenShift Job' })
-  async runEligibility() {
-    return this.launchOpenShiftJob(JobType.RUN_ELIGIBILITY)
+  async runEligibility(@CurrentUser() userId: string) {
+    return this.launchOpenShiftJob(JobType.RUN_ELIGIBILITY, userId)
   }
 
   @Post('auto-batch')
   @ApiResponse({ status: 201, description: 'AUTO_BATCH job started' })
   @ApiResponse({ status: 409, description: 'AUTO_BATCH is already running' })
   @ApiResponse({ status: 503, description: 'Failed to launch OpenShift Job' })
-  async autoBatch() {
-    return this.launchOpenShiftJob(JobType.AUTO_BATCH)
+  async autoBatch(@CurrentUser() userId: string) {
+    return this.launchOpenShiftJob(JobType.AUTO_BATCH, userId)
   }
 
   @Post('send-cra-file')
   @ApiResponse({ status: 201, description: 'SEND_CRA_FILE job started' })
   @ApiResponse({ status: 409, description: 'SEND_CRA_FILE is already running' })
   @ApiResponse({ status: 503, description: 'Failed to launch OpenShift Job' })
-  async sendCraFile() {
-    return this.launchOpenShiftJob(JobType.SEND_CRA_FILE)
+  async sendCraFile(@CurrentUser() userId: string) {
+    return this.launchOpenShiftJob(JobType.SEND_CRA_FILE, userId)
+  }
+
+  @Get('monitoring/latest')
+  @ApiResponse({ status: 200, description: 'Latest monitored job run per job type' })
+  async getLatestJobs() {
+    const jobs = await this.jobsService.getLatestJobsPerType()
+    return Promise.all(
+      jobs.map(async (job) => {
+        const advisory = await getJobRunWarning(job, this.openshiftJobLauncher)
+        return this.toMonitoringResponse(job, advisory)
+      }),
+    )
+  }
+
+  @Get('monitoring/history')
+  @ApiResponse({ status: 200, description: 'Monitored job history (last month)' })
+  async getJobHistory(
+    @Query('jobType', new ParseEnumPipe(JobType, { optional: true })) jobType?: JobType,
+    @Query('status', new ParseEnumPipe(JobStatus, { optional: true })) status?: JobStatus,
+    @Query('jobId', new ParseIntPipe({ optional: true })) jobId?: number,
+    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit = 10,
+    @Query('triggeredBy') triggeredBy?: string,
+    @Query('sortBy') sortBy?: MonitoringHistoryFilters['sortBy'],
+    @Query('sortOrder') sortOrder?: MonitoringHistoryFilters['sortOrder'],
+  ) {
+    const result = await this.jobsService.getJobHistory({
+      jobType,
+      status,
+      jobId,
+      page,
+      limit,
+      triggeredBy,
+      sortBy,
+      sortOrder,
+    })
+
+    const data = await Promise.all(
+      result.data.map(async (job) => {
+        const advisory = await getJobRunWarning(job, this.openshiftJobLauncher)
+        return this.toMonitoringResponse(job, advisory)
+      }),
+    )
+
+    return {
+      ...result,
+      data,
+    }
+  }
+
+  @Get('monitoring/activities')
+  @ApiResponse({ status: 200, description: 'Recent monitoring activities' })
+  async getRecentActivities(
+    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit = 10,
+    @Query('severity', new ParseEnumPipe(JobActivitySeverity, { optional: true }))
+    severity?: JobActivitySeverity,
+    @Query('type', new ParseEnumPipe(JobActivityType, { optional: true })) type?: JobActivityType,
+    @Query('sortBy') sortBy?: MonitoringActivityFilters['sortBy'],
+    @Query('sortOrder') sortOrder?: MonitoringActivityFilters['sortOrder'],
+  ) {
+    return this.jobsService.getRecentActivities(page, limit, {
+      severity,
+      type,
+      sortBy,
+      sortOrder,
+    })
+  }
+
+  @Get(':id/activities')
+  @ApiResponse({ status: 200, description: 'Monitoring activities for a specific job run' })
+  async getJobActivities(
+    @Param('id', ParseIntPipe) jobId: number,
+    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit = 10,
+    @Query('severity', new ParseEnumPipe(JobActivitySeverity, { optional: true }))
+    severity?: JobActivitySeverity,
+    @Query('type', new ParseEnumPipe(JobActivityType, { optional: true })) type?: JobActivityType,
+    @Query('sortBy') sortBy?: MonitoringActivityFilters['sortBy'],
+    @Query('sortOrder') sortOrder?: MonitoringActivityFilters['sortOrder'],
+  ) {
+    return this.jobsService.getActivities({
+      jobRunId: jobId,
+      page,
+      limit,
+      severity,
+      type,
+      sortBy,
+      sortOrder,
+    })
   }
 
   @Get(':id')
@@ -260,5 +369,31 @@ export class JobsController {
 
     const warning = await getJobRunWarning(job, this.openshiftJobLauncher)
     return toJobRunResponse(job, warning)
+  }
+
+  private toMonitoringResponse(
+    job: {
+      id: number
+      jobType: string
+      status: string
+      jobTrigger: string
+      triggeredByUser?: string | null
+      startedAt: Date | null
+      completedAt: Date | null
+      metadata?: unknown
+    },
+    advisoryWarning?: string,
+  ): MonitoringJobResponse {
+    return {
+      id: job.id,
+      jobId: job.id,
+      jobName: formatJobDisplayName(job.jobType),
+      status: formatMonitoringStatus(job.status),
+      triggeredBy: formatTriggeredBy(job),
+      started: job.startedAt,
+      finished: job.completedAt,
+      summary: formatJobSummary(job),
+      warning: advisoryWarning ?? null,
+    }
   }
 }

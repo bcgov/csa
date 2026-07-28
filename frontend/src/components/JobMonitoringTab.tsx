@@ -595,6 +595,30 @@ export default function JobMonitoringTab() {
     setSelectedJobHistoryId(null)
   }
 
+  const isJobListClearActive =
+    jlFilterId !== '' ||
+    jlFilterName !== '' ||
+    jlFilterStatus !== '' ||
+    jlFilterTrigger !== '' ||
+    jlSortField !== 'id' ||
+    jlSortOrder !== 'asc'
+
+  const isJobHistoryClearActive =
+    jhAppliedFilterId !== '' ||
+    jhFilterJobName !== '' ||
+    jhFilterStatus !== '' ||
+    jhFilterTrigger !== '' ||
+    jhSortField !== 'startedAt' ||
+    jhSortOrder !== 'desc'
+
+  const isActivitiesClearActive =
+    actFilterSeverity !== '' ||
+    actFilterType !== '' ||
+    actAppliedFilterJobId !== '' ||
+    selectedJobHistoryId !== null ||
+    actSortField !== 'when' ||
+    actSortOrder !== 'desc'
+
   // ── Job List: client-side filter + sort ──────────────────────────────────
   const filteredJobList = jobListData
     .filter((row) => {
@@ -635,6 +659,12 @@ export default function JobMonitoringTab() {
             onClick={clearJobListFilters}
             variant="outlined"
             color="inherit"
+            disabled={!isJobListClearActive}
+            sx={{
+              opacity: isJobListClearActive ? 1 : 0.45,
+              filter: isJobListClearActive ? 'none' : 'blur(0.6px)',
+              transition: 'opacity 0.2s ease, filter 0.2s ease',
+            }}
           >
             Clear Filters &amp; Sort
           </Button>
@@ -856,6 +886,12 @@ export default function JobMonitoringTab() {
             onClick={clearJobHistoryFilters}
             variant="outlined"
             color="inherit"
+            disabled={!isJobHistoryClearActive}
+            sx={{
+              opacity: isJobHistoryClearActive ? 1 : 0.45,
+              filter: isJobHistoryClearActive ? 'none' : 'blur(0.6px)',
+              transition: 'opacity 0.2s ease, filter 0.2s ease',
+            }}
           >
             Clear Filters &amp; Sort
           </Button>
@@ -1154,6 +1190,12 @@ export default function JobMonitoringTab() {
             onClick={clearActivitiesFilters}
             variant="outlined"
             color="inherit"
+            disabled={!isActivitiesClearActive}
+            sx={{
+              opacity: isActivitiesClearActive ? 1 : 0.45,
+              filter: isActivitiesClearActive ? 'none' : 'blur(0.6px)',
+              transition: 'opacity 0.2s ease, filter 0.2s ease',
+            }}
           >
             Clear Filters &amp; Sort
           </Button>

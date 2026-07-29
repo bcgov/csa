@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest'
-import { step1B_CancellationCheck } from './step1b-cancellation-determination'
-import { EligibilityContext } from '../rule.interface'
+import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
+import { describe, expect, it } from 'vitest'
+import { CANCEL_REASON } from '../../cancellation/cancellation-reason.constants'
 import { ContactProfile } from '../../eligibility.types'
 import { makeContact } from '../../test-helpers'
-import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
-import { CANCEL_REASON } from '../../cancellation/cancellation-reason.constants'
+import { EligibilityContext } from '../rule.interface'
+import { step1B_CancellationCheck } from './step1b-cancellation-determination'
 
 const makeCtx = (overrides: Partial<ContactProfile> = {}): EligibilityContext => ({
   contact: makeContact({ csaStatus: CSA_STATUS.IN_PAY, existingContactId: 1, ...overrides }),
@@ -150,18 +150,20 @@ describe('step1B_CancellationCheck', () => {
   })
 
   describe('care end date computation', () => {
-    it('should compute careEndDate from order end dates when cancellation triggered', () => {
+    it('should compute careEndDate from placement end dates when cancellation triggered', () => {
       const ctx = makeCtx({
         deceased: 'Y',
         csaStatus: CSA_STATUS.IN_PAY,
-        orders: [
+        placements: [
           {
-            orderType: 'Variable',
-            orderStatus: 'Closed',
-            effectiveStartDate: new Date('2025-01-01'),
-            effectiveEndDate: new Date('2025-06-15'),
-            amount: 100,
+            type: 'Non-Placement Location',
+            serviceType: 'Absent/Unknown Location',
+            status: 'Active',
+            startDate: new Date('2025-01-01'),
+            endDate: new Date('2025-06-15'),
             contractNumber: null,
+            agreementRowId: null,
+            paidUnpaid: null,
             source: 'ICM',
           },
         ],
@@ -170,7 +172,7 @@ describe('step1B_CancellationCheck', () => {
       expect(result!.careEndDate).toEqual(new Date('2025-06-15'))
     })
 
-    it('should compute careEndDate from placement end dates when no order end dates', () => {
+    it('should compute careEndDate from placement end dates', () => {
       const ctx = makeCtx({
         deceased: 'Y',
         csaStatus: CSA_STATUS.IN_PAY,
@@ -192,21 +194,10 @@ describe('step1B_CancellationCheck', () => {
       expect(result!.careEndDate).toEqual(new Date('2025-08-01'))
     })
 
-    it('should pick earliest of order and placement end dates', () => {
+    it('should pick latest across ICM and MIS placement end dates', () => {
       const ctx = makeCtx({
         deceased: 'Y',
         csaStatus: CSA_STATUS.IN_PAY,
-        orders: [
-          {
-            orderType: 'Variable',
-            orderStatus: 'Closed',
-            effectiveStartDate: new Date('2025-01-01'),
-            effectiveEndDate: new Date('2025-10-01'),
-            amount: 100,
-            contractNumber: null,
-            source: 'ICM',
-          },
-        ],
         placements: [
           {
             type: 'Non-Placement Location',
@@ -219,10 +210,21 @@ describe('step1B_CancellationCheck', () => {
             paidUnpaid: null,
             source: 'ICM',
           },
+          {
+            type: 'Non-Placement Location',
+            rawType: 'AW',
+            status: 'Active',
+            startDate: new Date('2025-02-01'),
+            endDate: new Date('2025-09-01'),
+            contractNumber: null,
+            agreementRowId: null,
+            paidUnpaid: null,
+            source: 'MIS',
+          },
         ],
       })
       const result = step1B_CancellationCheck.evaluate(ctx)
-      expect(result!.careEndDate).toEqual(new Date('2025-06-01'))
+      expect(result!.careEndDate).toEqual(new Date('2025-09-01'))
     })
 
     it('should set careEndDate to null when no end dates exist', () => {
@@ -232,17 +234,18 @@ describe('step1B_CancellationCheck', () => {
       expect(result!.careEndDate).not.toBeNull() // Step 9 applies system date
     })
 
-    it('should return null (continue chain) when no cancellation triggered, but stash computed careEndDate on ctx for downstream rules', () => {
+    it('should return null (continue chain) when no cancellation triggered, but stash placement-based careEndDate on ctx for downstream rules', () => {
       const ctx = makeCtx({
         deceased: null,
-        orders: [
+        placements: [
           {
-            orderType: 'Variable',
-            orderStatus: 'Closed',
-            effectiveStartDate: new Date('2025-01-01'),
-            effectiveEndDate: new Date('2025-06-15'),
-            amount: 100,
+            type: 'Placement',
+            status: 'Ended',
+            startDate: new Date('2025-01-01'),
+            endDate: new Date('2025-06-15'),
             contractNumber: null,
+            agreementRowId: null,
+            paidUnpaid: null,
             source: 'ICM',
           },
         ],

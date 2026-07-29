@@ -9,8 +9,6 @@ export interface AutoBatchResult {
   cancellation: number
 }
 
-const AUTO_BATCH_ACTOR = 'SYSTEM'
-
 type AutoBatchCandidate = {
   contactId: number
   kind: 'application' | 'cancellation'
@@ -59,7 +57,8 @@ export class AutoBatchService {
 
     const result = await this.batchesService.addContactsToPendingBatch(
       candidates.map((c) => c.contactId),
-      AUTO_BATCH_ACTOR,
+      'SYSTEM', // userId for audit trail
+      'SYSTEM', // actor: SYSTEM for auto-batch
     )
 
     const successIds = new Set(result.success)
@@ -69,12 +68,6 @@ export class AutoBatchService {
       if (!successIds.has(candidate.contactId)) continue
       if (candidate.kind === 'application') application++
       else cancellation++
-    }
-
-    if (result.skipped.length > 0) {
-      this.logger.log(
-        `Auto-batch skipped ${result.skipped.length} contacts (batch ${result.batch.id})`,
-      )
     }
 
     this.logger.log(

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { IcmSyncBackService, SyncBackResult } from 'src/sync/icm/icm-sync-back.service'
 import { BaseJob } from '../base-job'
 import { JobType } from '../enums/job-type.enum'
+import { JobActivityType } from '../enums/job-activity-type.enum'
 import { JobResult } from '../interfaces/job-result.interface'
 import { JobContext } from '../interfaces/job.interface'
 import { JobRunner } from '../job-runner.service'
@@ -35,6 +36,10 @@ export class RetryFailedHandler extends BaseJob {
         if (syncResult.failed > 0) {
           this.logger.warn(
             `ICM sweep partial failure: ${syncResult.synced} synced, ${syncResult.failed} failed`,
+            {
+              activityType: JobActivityType.ICM,
+              related: `ICM sweep partial failure (${syncResult.synced} synced, ${syncResult.failed} failed)`,
+            },
           )
         }
       }
@@ -45,7 +50,10 @@ export class RetryFailedHandler extends BaseJob {
         metadata: { syncResult },
       }
     } catch (error) {
-      this.logger.error(`Error processing failed jobs: ${error.message}`, error.stack)
+      this.logger.error(`Error processing failed jobs: ${error.message}`, {
+        activityType: JobActivityType.JOB,
+        related: error.message,
+      })
       return {
         success: false,
         message: error.message,

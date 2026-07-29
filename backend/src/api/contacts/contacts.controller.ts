@@ -227,8 +227,8 @@ export class ContactsController {
   @ApiResponse({ status: 200, description: 'Eligibility result with previous and new status' })
   @ApiResponse({ status: 404, description: 'Contact not found' })
   @ApiResponse({ status: 422, description: 'Contact not found in staging tables' })
-  async runEligibility(@Param('id', ParseIntPipe) id: number) {
-    return this.contactsService.runContactEligibility(id)
+  async runEligibility(@Param('id', ParseIntPipe) id: number, @CurrentUser() userId: string) {
+    return this.contactsService.runContactEligibility(id, userId)
   }
 
   @Patch(':id/review-flag')

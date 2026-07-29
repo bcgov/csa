@@ -835,8 +835,17 @@ describe('EligibilityService', () => {
 
     await service.runForContact('ICM-ELIG')
 
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('ICM-ELIG'))
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('BL-14B/14C skip'))
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('ICM-ELIG'),
+      expect.objectContaining({
+        activityType: 'DATA_QUALITY',
+        aggregateKey: 'user-set-missing-effective-date',
+      }),
+    )
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('BL-14B/14C skip'),
+      expect.any(Object),
+    )
     warnSpy.mockRestore()
   })
 

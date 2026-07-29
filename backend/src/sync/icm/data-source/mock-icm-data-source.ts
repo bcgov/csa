@@ -13,7 +13,7 @@ export class MockIcmDataSource extends IcmDataSource {
     const mockFile = path.join(mockDir, `${config.name}.json`)
 
     if (!fs.existsSync(mockFile)) {
-      this.logger.warn(`Mock file not found for ${config.name}: ${mockFile}`)
+      this.logger.log(`Mock file not found for ${config.name}: ${mockFile}`)
       return []
     }
 

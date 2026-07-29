@@ -63,7 +63,7 @@ import { S3CraTransferService } from './transfer/s3-cra-transfer.service'
           return new S3CraTransferService(configService)
         }
         if (transferMode !== 'http') {
-          logger.warn(`Unknown CRA_TRANSFER_MODE "${transferMode}", falling back to http`)
+          logger.log(`Unknown CRA_TRANSFER_MODE "${transferMode}", falling back to http`)
         }
         return new HttpCraTransferService(httpService, configService)
       },

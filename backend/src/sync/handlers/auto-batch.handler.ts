@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { IcmSyncBackService, SyncBackResult } from '../icm/icm-sync-back.service'
@@ -29,7 +30,10 @@ export class AutoBatchHandler extends BaseJob {
       try {
         syncResult = await this.icmSyncBackService.syncFlaggedWithRetry()
       } catch (err) {
-        this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`)
+        this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`, {
+          activityType: JobActivityType.ICM,
+          related: `ICM sync-back failed: ${(err as Error).message}`,
+        })
       }
     }
 

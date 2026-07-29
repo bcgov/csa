@@ -155,6 +155,26 @@ describe('StateMachineService', () => {
         service.isActorAllowed(CSA_STATUS.IN_BATCH_APPLICATION, CSA_EVENT.SEND_TO_CRA, 'USER'),
       ).toBe(false)
     })
+
+    it('should allow USER to trigger BECOME_ELIGIBLE from application_refused_cra', () => {
+      expect(
+        service.isActorAllowed(
+          CSA_STATUS.APPLICATION_REFUSED_CRA,
+          CSA_EVENT.BECOME_ELIGIBLE,
+          'USER',
+        ),
+      ).toBe(true)
+    })
+
+    it('should allow USER to trigger BECOME_ELIGIBLE from cancellation_refused_cra', () => {
+      expect(
+        service.isActorAllowed(
+          CSA_STATUS.CANCELLATION_REFUSED_CRA,
+          CSA_EVENT.BECOME_ELIGIBLE,
+          'USER',
+        ),
+      ).toBe(true)
+    })
   })
 
   describe('transitionContact (pure)', () => {
@@ -210,6 +230,28 @@ describe('StateMachineService', () => {
       expect(result.success).toBe(true)
       expect(result.from).toBe(CSA_STATUS.ELIGIBLE_TBD)
       expect(result.to).toBe(CSA_STATUS.ON_HOLD)
+    })
+
+    it('should transition application_refused_cra to in_pay on BECOME_ELIGIBLE by USER', () => {
+      const result = service.transitionContact(
+        CSA_STATUS.APPLICATION_REFUSED_CRA,
+        CSA_EVENT.BECOME_ELIGIBLE,
+        'USER',
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.to).toBe(CSA_STATUS.IN_PAY)
+    })
+
+    it('should transition cancellation_refused_cra to in_pay on BECOME_ELIGIBLE by USER', () => {
+      const result = service.transitionContact(
+        CSA_STATUS.CANCELLATION_REFUSED_CRA,
+        CSA_EVENT.BECOME_ELIGIBLE,
+        'USER',
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.to).toBe(CSA_STATUS.IN_PAY)
     })
 
     it('should require targetState for RESUME event (dynamic transition)', () => {

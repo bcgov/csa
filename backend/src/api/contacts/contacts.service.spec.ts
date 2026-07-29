@@ -893,6 +893,70 @@ describe('ContactsService', () => {
     })
   })
 
+  describe('button bulk status handlers', () => {
+    it('should treat application/cancellation refused as eligible targets for ELIGIBLE action', async () => {
+      const contactMap = new Map([
+        [1, { id: 1, csaStatus: 'application_refused_cra' }],
+        [2, { id: 2, csaStatus: 'cancellation_refused_cra' }],
+      ])
+
+      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+        Promise.resolve(contactMap.get(where.id) as any),
+      )
+      const updateSpy = vi
+        .spyOn(service, 'updateCsaStatus')
+        .mockResolvedValue({ success: true, from: 'x', to: 'y' } as any)
+
+      const result = await service.updateEligibilityStatus([1, 2], 'ELIGIBLE', 'user1')
+
+      expect(result.success).toEqual([1, 2])
+      expect(result.skipped).toEqual([])
+      expect(updateSpy).toHaveBeenCalledWith(
+        1,
+        'BECOME_ELIGIBLE',
+        'USER',
+        expect.objectContaining({ userId: 'user1' }),
+      )
+      expect(updateSpy).toHaveBeenCalledWith(
+        2,
+        'BECOME_ELIGIBLE',
+        'USER',
+        expect.objectContaining({ userId: 'user1' }),
+      )
+    })
+
+    it('should treat application/cancellation refused as valid sources for SET_NOT_ELIGIBLE action', async () => {
+      const contactMap = new Map([
+        [1, { id: 1, csaStatus: 'application_refused_cra' }],
+        [2, { id: 2, csaStatus: 'cancellation_refused_cra' }],
+      ])
+
+      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+        Promise.resolve(contactMap.get(where.id) as any),
+      )
+      const updateSpy = vi
+        .spyOn(service, 'updateCsaStatus')
+        .mockResolvedValue({ success: true, from: 'x', to: 'y' } as any)
+
+      const result = await service.updateNotEligibleStatus([1, 2], 'SET_NOT_ELIGIBLE', 'user1')
+
+      expect(result.success).toEqual([1, 2])
+      expect(result.skipped).toEqual([])
+      expect(updateSpy).toHaveBeenCalledWith(
+        1,
+        'SET_NOT_ELIGIBLE',
+        'USER',
+        expect.objectContaining({ userId: 'user1' }),
+      )
+      expect(updateSpy).toHaveBeenCalledWith(
+        2,
+        'SET_NOT_ELIGIBLE',
+        'USER',
+        expect.objectContaining({ userId: 'user1' }),
+      )
+    })
+  })
+
   describe('updateCsaStatus', () => {
     it('should transition contact with static target', async () => {
       const contact = { id: 1, csaStatus: 'eligible', resumeStatus: null }
@@ -1223,8 +1287,18 @@ describe('ContactsService', () => {
 
     describe('cancellation fields on SET_NOT_ELIGIBLE', () => {
       it('should set cancelReasonCode and careEndDate from in_pay', async () => {
-        const contact = { id: 1, csaStatus: 'in_pay', cancelReasonCode: null, resumeStatus: null }
+        const contact = {
+          id: 1,
+          csaStatus: 'in_pay',
+          cancelReasonCode: null,
+          personIdIcm: 'ICM-1',
+          personIdMis: 'MIS-1',
+          resumeStatus: null,
+        }
         vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        vi.spyOn(prisma, '$queryRaw').mockResolvedValue([
+          { maxEndDate: new Date('2025-07-01') },
+        ] as any)
         const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
         const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
@@ -1235,7 +1309,7 @@ describe('ContactsService', () => {
         expect(result.to).toBe('not_eligible_ip_tbd')
         const updateCall = updateSpy.mock.calls[0][0] as any
         expect(updateCall.data.cancelReasonCode).toBe('21')
-        expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
+        expect(updateCall.data.careEndDate).toEqual(new Date('2025-07-01'))
       })
 
       it('should NOT set cancellation fields from eligible_tbd', async () => {
@@ -1281,8 +1355,16 @@ describe('ContactsService', () => {
       })
 
       it('should NOT overwrite cancelReasonCode when already set but still set careEndDate', async () => {
-        const contact = { id: 1, csaStatus: 'in_pay', cancelReasonCode: '14', resumeStatus: null }
+        const contact = {
+          id: 1,
+          csaStatus: 'in_pay',
+          cancelReasonCode: '14',
+          personIdIcm: 'ICM-1',
+          personIdMis: null,
+          resumeStatus: null,
+        }
         vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        vi.spyOn(prisma, '$queryRaw').mockResolvedValue([{ maxEndDate: null }] as any)
         const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
         const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
@@ -1632,8 +1714,10 @@ describe('ContactsService', () => {
     it('should throw NotFoundException when contact does not exist', async () => {
       vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(null)
 
-      await expect(service.runContactEligibility(999)).rejects.toThrow(NotFoundException)
-      await expect(service.runContactEligibility(999)).rejects.toThrow('Contact 999 not found')
+      await expect(service.runContactEligibility(999, 'JSMITH')).rejects.toThrow(NotFoundException)
+      await expect(service.runContactEligibility(999, 'JSMITH')).rejects.toThrow(
+        'Contact 999 not found',
+      )
     })
 
     it('should map EligibilityInputError to UnprocessableEntityException', async () => {
@@ -1642,11 +1726,23 @@ describe('ContactsService', () => {
       eligibility.runForContact = vi
         .fn()
         .mockRejectedValue(new EligibilityInputError('Contact ICM-1 not found in staging tables'))
+      const errorSpy = vi.spyOn(service['logger'], 'error').mockImplementation(() => {})
 
-      await expect(service.runContactEligibility(1)).rejects.toThrow(UnprocessableEntityException)
-      await expect(service.runContactEligibility(1)).rejects.toThrow(
+      await expect(service.runContactEligibility(1, 'JSMITH')).rejects.toThrow(
+        UnprocessableEntityException,
+      )
+      await expect(service.runContactEligibility(1, 'JSMITH')).rejects.toThrow(
         'Contact ICM-1 not found in staging tables',
       )
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Manual eligibility failed for contact 1: Contact ICM-1 not found in staging tables',
+        {
+          activityType: 'DATA_QUALITY',
+          related:
+            'Manual eligibility contact 1 (ICM-1) by JSMITH: Contact ICM-1 not found in staging tables',
+        },
+      )
+      errorSpy.mockRestore()
     })
 
     it('should propagate generic Errors without wrapping (becomes 500 at HTTP layer)', async () => {
@@ -1655,9 +1751,9 @@ describe('ContactsService', () => {
       const dbError = new Error('connection terminated unexpectedly')
       eligibility.runForContact = vi.fn().mockRejectedValue(dbError)
 
-      await expect(service.runContactEligibility(1)).rejects.toBe(dbError)
+      await expect(service.runContactEligibility(1, 'JSMITH')).rejects.toBe(dbError)
       // Specifically must NOT have been rewrapped as a 422
-      await expect(service.runContactEligibility(1)).rejects.not.toBeInstanceOf(
+      await expect(service.runContactEligibility(1, 'JSMITH')).rejects.not.toBeInstanceOf(
         UnprocessableEntityException,
       )
     })
@@ -1669,7 +1765,7 @@ describe('ContactsService', () => {
         .fn()
         .mockResolvedValue({ previousStatus: 'eligible', newStatus: 'in_pay' })
 
-      await expect(service.runContactEligibility(1)).resolves.toEqual({
+      await expect(service.runContactEligibility(1, 'JSMITH')).resolves.toEqual({
         previousStatus: 'eligible',
         newStatus: 'in_pay',
       })
@@ -1684,7 +1780,7 @@ describe('ContactsService', () => {
         .mockResolvedValue({ previousStatus: 'eligible', newStatus: 'in_pay' })
       const icmSync = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
 
-      await service.runContactEligibility(1)
+      await service.runContactEligibility(1, 'JSMITH')
 
       expect(icmSync).toHaveBeenCalledWith(1)
     })
@@ -1697,7 +1793,7 @@ describe('ContactsService', () => {
         .mockResolvedValue({ previousStatus: 'eligible', newStatus: 'eligible' })
       const icmSync = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
 
-      await service.runContactEligibility(1)
+      await service.runContactEligibility(1, 'JSMITH')
 
       expect(icmSync).not.toHaveBeenCalled()
     })
@@ -1711,11 +1807,20 @@ describe('ContactsService', () => {
       vi.spyOn(service['icmSyncBackService'], 'syncSingleContact').mockRejectedValue(
         new Error('ICM down'),
       )
+      const warnSpy = vi.spyOn(service['logger'], 'warn').mockImplementation(() => {})
 
-      await expect(service.runContactEligibility(1)).resolves.toEqual({
+      await expect(service.runContactEligibility(1, 'JSMITH')).resolves.toEqual({
         previousStatus: 'eligible',
         newStatus: 'in_pay',
       })
+
+      await vi.waitFor(() => {
+        expect(warnSpy).toHaveBeenCalledWith('Immediate ICM sync failed for contact 1: ICM down', {
+          activityType: 'ICM',
+          related: 'ICM sync failed after manual eligibility contact 1 by JSMITH',
+        })
+      })
+      warnSpy.mockRestore()
     })
   })
 })

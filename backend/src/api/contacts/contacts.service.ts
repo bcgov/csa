@@ -1,10 +1,11 @@
 import {
   BadRequestException,
   Injectable,
-  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
+import { AppLogger } from 'src/common/logger/app-logger'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
 import {
@@ -36,7 +37,7 @@ import type {
 
 @Injectable()
 export class ContactsService {
-  private readonly logger = new Logger(ContactsService.name)
+  private readonly logger = new AppLogger(ContactsService.name)
 
   constructor(
     private prisma: PrismaService,
@@ -329,7 +330,11 @@ export class ContactsService {
       if (!contact.cancelReasonCode) {
         updateData.cancelReasonCode = '21'
       }
-      updateData.careEndDate = pacificToday()
+      const placementCareEndDate = await this.findLatestPlacementEndDateFromStaging(
+        contact.personIdIcm,
+        contact.personIdMis,
+      )
+      updateData.careEndDate = placementCareEndDate ?? pacificToday()
     }
 
     if (event === CSA_EVENT.SET_ELIGIBLE_TBD || event === CSA_EVENT.BECOME_ELIGIBLE) {
@@ -356,6 +361,38 @@ export class ContactsService {
     }
 
     return { success: true, from: currentState, to: nextState }
+  }
+
+  private async findLatestPlacementEndDateFromStaging(
+    personIdIcm: string | null | undefined,
+    personIdMis: string | null | undefined,
+  ): Promise<Date | null> {
+    const personIcm = personIdIcm?.trim() || null
+    const personMis = personIdMis?.trim() || null
+
+    const rows = await this.prisma.$queryRaw<{ maxEndDate: Date | null }[]>`
+      WITH placement_end_dates AS (
+        SELECT icm_plc.X_END_DATE AS end_date
+        FROM stg_icm_cases cases
+        INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
+        WHERE ${personIcm} IS NOT NULL
+          AND cases.X_CONTACT_NUM = ${personIcm}
+          AND icm_plc.X_END_DATE IS NOT NULL
+
+        UNION ALL
+
+        SELECT mis_plc.END_DATE AS end_date
+        FROM stg_mis_placements mis_plc
+        WHERE ${personMis} IS NOT NULL
+          AND mis_plc.person_id_mis = ${personMis}
+          AND mis_plc.END_DATE IS NOT NULL
+      )
+      SELECT MAX(end_date) AS "maxEndDate"
+      FROM placement_end_dates
+    `
+
+    const maxEndDate = rows?.[0]?.maxEndDate
+    return maxEndDate ? new Date(maxEndDate) : null
   }
 
   async forceUpdateCsaStatus(
@@ -599,6 +636,13 @@ export class ContactsService {
         // not_eligible_ip_tbd -> in_pay using BECOME_ELIGIBLE
         event = CSA_EVENT.BECOME_ELIGIBLE
         actor = 'USER'
+      } else if (
+        contact.csaStatus === CSA_STATUS.APPLICATION_REFUSED_CRA ||
+        contact.csaStatus === CSA_STATUS.CANCELLATION_REFUSED_CRA
+      ) {
+        // refused states -> in_pay using BECOME_ELIGIBLE
+        event = CSA_EVENT.BECOME_ELIGIBLE
+        actor = 'USER'
       } else {
         // Current status is not eligible for this operation
         result.skipped.push({ id, reason: BULK_OPERATION_SKIP_REASONS.INVALID_TRANSITION })
@@ -651,7 +695,15 @@ export class ContactsService {
       // eligible_tbd -> not_eligible_out_of_pay
       // on_hold -> not_eligible_out_of_pay
       // in_pay -> not_eligible_ip_tbd
-      const validStatuses = [CSA_STATUS.ELIGIBLE_TBD, CSA_STATUS.ON_HOLD, CSA_STATUS.IN_PAY]
+      // application_refused_cra -> not_eligible_out_of_pay
+      // cancellation_refused_cra -> not_eligible_out_of_pay
+      const validStatuses = [
+        CSA_STATUS.ELIGIBLE_TBD,
+        CSA_STATUS.ON_HOLD,
+        CSA_STATUS.IN_PAY,
+        CSA_STATUS.APPLICATION_REFUSED_CRA,
+        CSA_STATUS.CANCELLATION_REFUSED_CRA,
+      ]
 
       if (!validStatuses.includes(contact.csaStatus as any)) {
         // Current status is not eligible for this operation
@@ -778,6 +830,7 @@ export class ContactsService {
 
   async runContactEligibility(
     contactId: number,
+    triggeredByUser: string,
   ): Promise<{ previousStatus: string | null; newStatus: string }> {
     const contact = await this.prisma.contact.findUnique({
       where: { id: contactId },
@@ -793,6 +846,10 @@ export class ContactsService {
       result = await this.eligibilityService.runForContact(contact.personIdIcm)
     } catch (err) {
       if (err instanceof EligibilityInputError) {
+        this.logger.error(`Manual eligibility failed for contact ${contactId}: ${err.message}`, {
+          activityType: JobActivityType.DATA_QUALITY,
+          related: `Manual eligibility contact ${contactId} (${contact.personIdIcm}) by ${triggeredByUser}: ${err.message}`,
+        })
         throw new UnprocessableEntityException(err.message)
       }
       throw err
@@ -815,6 +872,10 @@ export class ContactsService {
       this.icmSyncBackService.syncSingleContact(contactId).catch((err) => {
         this.logger.warn(
           `Immediate ICM sync failed for contact ${contactId}: ${(err as Error).message}`,
+          {
+            activityType: JobActivityType.ICM,
+            related: `ICM sync failed after manual eligibility contact ${contactId} by ${triggeredByUser}`,
+          },
         )
       })
     }

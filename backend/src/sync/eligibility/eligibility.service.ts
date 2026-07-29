@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { AppLogger } from 'src/common/logger/app-logger'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import {
   getAgeCutoffDate,
   isEligibleAge,
@@ -9,13 +10,13 @@ import {
   parseISODatePacific,
 } from 'src/common/utils'
 import { CANCEL_REASON } from './cancellation/cancellation-reason.constants'
+import { getPreviousMonth, isInMonth } from './eligibility-month'
 import {
   ELIGIBILITY_CONFIG,
   PROTECTED_STATUSES,
   PROTECTED_STATUSES_SQL,
 } from './eligibility.config'
 import { EligibilityInputError } from './eligibility.errors'
-import { getPreviousMonth, isInMonth } from './eligibility-month'
 import {
   buildContactHasStagingChangesSql,
   buildFindAgedOutContactIdsSql,
@@ -37,7 +38,6 @@ import { step1B_CancellationCheck } from './rules/steps/step1b-cancellation-dete
 import { step2_LegalStatusCheck } from './rules/steps/step2-legal-status-check'
 import { step3_PlacementCheck } from './rules/steps/step3-placement-check'
 import { step4_FetchAgreementContract } from './rules/steps/step4-fetch-agreement-contract'
-import { step6_OrderPaymentCheck } from './rules/steps/step6-order-payment-check'
 
 const { STEP8_LEGAL_AUTH_CODES } = ELIGIBILITY_CONFIG
 
@@ -66,7 +66,6 @@ const RULES: EligibilityRule[] = [
   step2_LegalStatusCheck,
   step3_PlacementCheck,
   step4_FetchAgreementContract,
-  step6_OrderPaymentCheck,
 ]
 // Select one representative placement, order, and agreement to denormalize
 // into the master contacts table.
@@ -686,7 +685,12 @@ export class EligibilityService {
 
     for (const profile of profiles) {
       if (!profile.dateOfBirth) {
-        this.logger.warn(`Skipping contact ${profile.personIdIcm}: missing date of birth`)
+        this.logger.warn(`Skipping contact ${profile.personIdIcm}: missing date of birth`, {
+          activityType: JobActivityType.DATA_QUALITY,
+          aggregate: true,
+          aggregateKey: 'missing-dob',
+          related: 'Contact skipped: missing date of birth',
+        })
         stats.skipped++
         continue
       }
@@ -777,6 +781,12 @@ export class EligibilityService {
   private warnUserSetWithoutEffectiveDate(profile: ContactProfile): void {
     this.logger.warn(
       `User-set CSA status for ${profile.personIdIcm} (last_updated_by=${profile.lastUpdatedBy}) but no csa_status_effective_date on master or ICM; running eligibility without BL-14B/14C skip`,
+      {
+        activityType: JobActivityType.DATA_QUALITY,
+        aggregate: true,
+        aggregateKey: 'user-set-missing-effective-date',
+        related: 'User-set CSA status without effective date',
+      },
     )
   }
 

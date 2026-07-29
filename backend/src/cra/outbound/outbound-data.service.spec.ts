@@ -8,6 +8,9 @@ const { HEADER_TRAN_CODE, DETAIL_TRAN_CODE, TRAILER_TRAN_CODE, VERSION_NUM } = R
 
 const TEST_BUSINESS_NUM = process.env.CRA_BUSINESS_NUM!
 
+const utcDate = (year: number, monthIndex: number, day: number): Date =>
+  new Date(Date.UTC(year, monthIndex, day))
+
 const mockConfigService = {
   get: vi.fn((key: string) => {
     if (key === 'cra.businessNum') return TEST_BUSINESS_NUM
@@ -23,15 +26,15 @@ const makeContact = (overrides = {}) => ({
   akaFirstName: '',
   akaLastName: '',
   personIdIcm: 'ICM001',
-  dateOfBirth: new Date(2015, 1, 15),
+  dateOfBirth: utcDate(2015, 1, 15),
   gender: 'F',
   birthCity: 'TORONTO',
   birthProvince: 'ON',
   birthCountry: 'Canada',
   din: '987654321',
-  effectiveDate: new Date(2024, 5, 1),
+  effectiveDate: utcDate(2024, 5, 1),
   legacyFileNumber: 'LFN001',
-  csaStatusEffectiveDate: new Date(2024, 5, 1),
+  csaStatusEffectiveDate: utcDate(2024, 5, 1),
   prevRecipientFirstName: null,
   prevRecipientLastName: null,
   cancelReasonCode: null,
@@ -46,7 +49,7 @@ const makeDetail = (overrides = {}) => ({
   transactionType: 'application',
   referenceNumber: 'LFN001-100',
   status: 'pending',
-  effectiveDate: new Date(2024, 5, 1),
+  effectiveDate: utcDate(2024, 5, 1),
   cancelReasonCode: null,
   contact: makeContact(),
   ...overrides,
@@ -142,7 +145,7 @@ describe('OutboundDataService', () => {
         lastName: 'SMITH',
         akaFirstName: 'EM',
         akaLastName: 'SMYTH',
-        dateOfBirth: new Date(2015, 1, 15),
+        dateOfBirth: utcDate(2015, 1, 15),
         gender: 'F',
         birthCity: 'TORONTO',
         birthProvince: 'ON',
@@ -208,7 +211,7 @@ describe('OutboundDataService', () => {
     })
 
     it('should set appStartDate from contact.effectiveDate for applications', () => {
-      const contact = makeContact({ effectiveDate: new Date(2024, 5, 1) })
+      const contact = makeContact({ effectiveDate: utcDate(2024, 5, 1) })
       const batchDetails = [makeDetail({ transactionType: 'application', contact })]
       const result = service.buildCraFileData(batchDetails)
 
@@ -266,12 +269,12 @@ describe('OutboundDataService', () => {
     })
 
     it('should set cancelEndDate from batch detail effectiveDate', () => {
-      const contact = makeContact({ careEndDate: new Date(2025, 2, 15) })
+      const contact = makeContact({ careEndDate: utcDate(2025, 2, 15) })
       const batchDetails = [
         makeDetail({
           transactionType: 'cancellation',
           contact,
-          effectiveDate: new Date(2025, 2, 15),
+          effectiveDate: utcDate(2025, 2, 15),
         }),
       ]
       const result = service.buildCraFileData(batchDetails)

@@ -194,6 +194,26 @@ describe('csaStatusMachine', () => {
       state = getNextCsaState(state, CSA_EVENT.CRA_WKL_REFUSED) as string
       expect(state).toBe(CSA_STATUS.CANCELLATION_REFUSED_CRA)
     })
+
+    it('should transition application_refused_cra to in_pay on BECOME_ELIGIBLE', () => {
+      const state = getNextCsaState(CSA_STATUS.APPLICATION_REFUSED_CRA, CSA_EVENT.BECOME_ELIGIBLE)
+      expect(state).toBe(CSA_STATUS.IN_PAY)
+    })
+
+    it('should transition cancellation_refused_cra to in_pay on BECOME_ELIGIBLE', () => {
+      const state = getNextCsaState(CSA_STATUS.CANCELLATION_REFUSED_CRA, CSA_EVENT.BECOME_ELIGIBLE)
+      expect(state).toBe(CSA_STATUS.IN_PAY)
+    })
+
+    it('should transition application_refused_cra to not_eligible_out_of_pay on SET_NOT_ELIGIBLE', () => {
+      const state = getNextCsaState(CSA_STATUS.APPLICATION_REFUSED_CRA, CSA_EVENT.SET_NOT_ELIGIBLE)
+      expect(state).toBe(CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY)
+    })
+
+    it('should transition cancellation_refused_cra to not_eligible_out_of_pay on SET_NOT_ELIGIBLE', () => {
+      const state = getNextCsaState(CSA_STATUS.CANCELLATION_REFUSED_CRA, CSA_EVENT.SET_NOT_ELIGIBLE)
+      expect(state).toBe(CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY)
+    })
   })
 
   describe('remove from batch', () => {

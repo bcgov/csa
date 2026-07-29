@@ -4,6 +4,7 @@ import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { JobRunner } from 'src/jobs/job-runner.service'
 
 /*
@@ -29,6 +30,10 @@ export class IngestDataHandler extends BaseJob {
     ])
 
     if (!icmResult.success || !misResult.success) {
+      this.logger.error('Ingestion failed', {
+        activityType: JobActivityType.JOB,
+        related: `Data ingestion failed (ICM success=${icmResult.success}, MIS success=${misResult.success})`,
+      })
       return {
         success: false,
         message: 'Ingestion failed',
@@ -39,6 +44,7 @@ export class IngestDataHandler extends BaseJob {
     return {
       success: true,
       message: 'Data ingestion completed successfully',
+      metadata: { icmResult, misResult },
     }
   }
 }

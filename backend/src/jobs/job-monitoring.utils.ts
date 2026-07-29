@@ -86,6 +86,18 @@ export function formatJobSummary(
     return null
   }
 
+  const formatFileNames = (value: unknown): string | null => {
+    if (!Array.isArray(value)) return null
+
+    const names = value
+      .map((name) => (typeof name === 'string' ? name.trim() : ''))
+      .filter((name) => name.length > 0)
+
+    if (names.length === 0) return null
+    if (names.length <= 2) return names.join(', ')
+    return `${names.slice(0, 2).join(', ')} +${names.length - 2} more`
+  }
+
   switch (job.jobType) {
     case JobType.INGEST_ICM: {
       const fetched = metadata.totalFetched ?? metadata.fetched
@@ -126,10 +138,15 @@ export function formatJobSummary(
         return 'No batch to process'
       }
       const batchId = metadata.batch_id
+      const fileName = typeof metadata.file_name === 'string' ? metadata.file_name : undefined
       const recordCount = metadata.record_count
       const contactsCount = metadata.contacts_count
       if (batchId !== undefined) {
-        return `Batch ${batchId}, ${recordCount ?? 0} records, ${contactsCount ?? 0} contacts`
+        const filePart = fileName ? `file ${fileName}, ` : ''
+        return `Batch ${batchId}, ${filePart}${recordCount ?? 0} records, ${contactsCount ?? 0} contacts`
+      }
+      if (fileName) {
+        return `File ${fileName} sent`
       }
       break
     }
@@ -141,7 +158,9 @@ export function formatJobSummary(
         }
         const accepted = metadata.records_accepted ?? 0
         const rejected = metadata.records_rejected ?? 0
-        return `${filesProcessed} files processed, ${accepted} accepted, ${rejected} rejected`
+        const fileNames = formatFileNames(metadata.file_names)
+        const filePart = fileNames ? ` (${fileNames})` : ''
+        return `${filesProcessed} files processed${filePart}, ${accepted} accepted, ${rejected} rejected`
       }
       break
     }

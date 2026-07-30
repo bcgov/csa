@@ -19,6 +19,7 @@ export class AdminService {
   async verifyCSAAccess(username: string): Promise<{
     hasAccess: boolean
     message: string
+    userProfile?: string
     icmResponsibility?: string
   }> {
     try {
@@ -26,6 +27,7 @@ export class AdminService {
 
       let hasCSAResponsibility = false
       let icmResponsibilityName: string | undefined
+      let isDataQualitySteward = false
 
       if (icmData?.items?.Responsibility) {
         const responsibilities = Array.isArray(icmData.items.Responsibility)
@@ -37,10 +39,15 @@ export class AdminService {
         const roResponsibility = responsibilities.find(
           (r) => normalize(r.Name) === 'ICM CSA APPLICATION - RO',
         )
+        const dataStewardResponsibility = responsibilities.find(
+          (r) => normalize(r.Name) === 'ICM DATA STEWARD',
+        )
 
-        if (rwResponsibility || roResponsibility) {
+        if (rwResponsibility || roResponsibility || dataStewardResponsibility) {
           hasCSAResponsibility = true
-          icmResponsibilityName = rwResponsibility?.Name || roResponsibility?.Name
+          isDataQualitySteward = !!dataStewardResponsibility
+          icmResponsibilityName =
+            rwResponsibility?.Name || roResponsibility?.Name || dataStewardResponsibility?.Name
         }
       }
 
@@ -48,6 +55,7 @@ export class AdminService {
         return {
           hasAccess: true,
           message: 'User has CSA access',
+          userProfile: isDataQualitySteward ? 'DATA_QUALITY_STEWARD' : 'CSA_STANDARD',
           icmResponsibility: icmResponsibilityName,
         }
       }
@@ -96,7 +104,7 @@ export class AdminService {
           Responsibility: {
             fields: 'Name',
             searchspec:
-              "[Name] = 'ICM CSA Application - RW' OR [Name] = 'ICM CSA Application - RO'",
+              "[Name] = 'ICM CSA Application - RW' OR [Name] = 'ICM CSA Application - RO' OR [Name] ='ICM Data Steward'",
           },
         },
       }

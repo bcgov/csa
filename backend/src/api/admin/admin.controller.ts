@@ -51,6 +51,7 @@ export class AdminController {
     username: string
     userInfo: UserInfoDto
     message: string
+    userProfile?: string
     icmResponsibility?: string
   }> {
     const result = await this.adminService.verifyCSAAccess(username)

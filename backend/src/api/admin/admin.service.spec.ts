@@ -80,6 +80,7 @@ describe('AdminService', () => {
 
       expect(result.hasAccess).toBe(true)
       expect(result.message).toBe('User has CSA access')
+      expect(result.userProfile).toBe('CSA_STANDARD')
       expect(result.icmResponsibility).toBe('ICM CSA Application - RW')
     })
 
@@ -92,7 +93,53 @@ describe('AdminService', () => {
 
       expect(result.hasAccess).toBe(true)
       expect(result.message).toBe('User has CSA access')
+      expect(result.userProfile).toBe('CSA_STANDARD')
       expect(result.icmResponsibility).toBe('ICM CSA Application - RO')
+    })
+
+    it('should return DATA_QUALITY_STEWARD for users with Data Steward and RW responsibilities', async () => {
+      mockHttpService.get.mockReturnValue(
+        of(
+          createICMApiResponse([
+            { Name: 'ICM Data Steward' },
+            { Name: 'ICM CSA Application - RW' },
+          ]),
+        ),
+      )
+
+      const result = await service.verifyCSAAccess('data.steward.user')
+
+      expect(result.hasAccess).toBe(true)
+      expect(result.message).toBe('User has CSA access')
+      expect(result.userProfile).toBe('DATA_QUALITY_STEWARD')
+      expect(result.icmResponsibility).toBe('ICM CSA Application - RW')
+    })
+
+    it('should return CSA_STANDARD for users with Data Steward and RO responsibilities', async () => {
+      mockHttpService.get.mockReturnValue(
+        of(
+          createICMApiResponse([
+            { Name: 'ICM Data Steward' },
+            { Name: 'ICM CSA Application - RO' },
+          ]),
+        ),
+      )
+
+      const result = await service.verifyCSAAccess('data.steward.ro.user')
+
+      expect(result.hasAccess).toBe(true)
+      expect(result.message).toBe('User has CSA access')
+      expect(result.userProfile).toBe('CSA_STANDARD')
+      expect(result.icmResponsibility).toBe('ICM CSA Application - RO')
+    })
+
+    it('should return hasAccess false for users with only Data Steward responsibility', async () => {
+      mockHttpService.get.mockReturnValue(of(createICMApiResponse([{ Name: 'ICM Data Steward' }])))
+
+      const result = await service.verifyCSAAccess('data.steward.only.user')
+
+      expect(result.hasAccess).toBe(false)
+      expect(result.message).toBe('User does not have ICM CSA Application responsibility')
     })
 
     it('should return hasAccess false for users without CSA responsibility', async () => {
@@ -126,6 +173,7 @@ describe('AdminService', () => {
       const result = await service.verifyCSAAccess('admin.user')
 
       expect(result.hasAccess).toBe(true)
+      expect(result.userProfile).toBe('CSA_STANDARD')
       expect(result.icmResponsibility).toBe('ICM CSA Application - RW')
     })
   })

@@ -16,6 +16,7 @@ interface AuthContextType {
     username?: string
     idirUsername?: string
     roles?: string[]
+    userProfile?: 'DATA_QUALITY_STEWARD' | 'CSA_STANDARD'
   } | null
   login: () => void
   logout: () => void
@@ -73,6 +74,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     setHasCSAAccess(false)
                     setCsaAccessAlert('Your session has expired. Please login again.')
                     sessionStorage.removeItem('authToken')
+                    sessionStorage.removeItem('userProfile')
+                    sessionStorage.removeItem('icmResponsibility')
                     setIsLoading(false)
                     keycloakInstance.logout({ redirectUri: window.location.origin })
                     return
@@ -88,6 +91,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   if (hasValidAccess) {
                     // Clear any previous access denied flag
                     sessionStorage.removeItem('csaAccessDenied')
+                    if (csaAccessResponse.userProfile) {
+                      sessionStorage.setItem('userProfile', csaAccessResponse.userProfile)
+                    }
+                    if (csaAccessResponse.icmResponsibility) {
+                      sessionStorage.setItem(
+                        'icmResponsibility',
+                        csaAccessResponse.icmResponsibility,
+                      )
+                    }
                     setIsAuthenticated(true)
                     setHasCSAAccess(true)
                     setUser({
@@ -96,6 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                       username: keycloakInstance.tokenParsed.preferred_username,
                       idirUsername: keycloakInstance.tokenParsed.idir_username?.toUpperCase(),
                       roles: keycloakInstance.tokenParsed.realm_access?.roles || [],
+                      userProfile: csaAccessResponse.userProfile,
                     })
                     setIsLoading(false)
 
@@ -123,6 +136,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     )
                     setCsaAccessAlert('User not authorised to access CSA')
                     sessionStorage.removeItem('authToken')
+                    sessionStorage.removeItem('userProfile')
+                    sessionStorage.removeItem('icmResponsibility')
                     // Set flag to prevent SSO loop on redirect
                     sessionStorage.setItem('csaAccessDenied', 'true')
                     // Clear Keycloak token locally without triggering IdP logout
@@ -138,6 +153,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   setCsaAccessError('Failed to verify CSA access. Please try again.')
                   setCsaAccessAlert('User not authorised to access CSA')
                   sessionStorage.removeItem('authToken')
+                  sessionStorage.removeItem('userProfile')
+                  sessionStorage.removeItem('icmResponsibility')
                   // Set flag to prevent SSO loop on redirect
                   sessionStorage.setItem('csaAccessDenied', 'true')
                   // Clear Keycloak token locally without triggering IdP logout
@@ -176,6 +193,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     sessionStorage.removeItem('authToken')
+    sessionStorage.removeItem('userProfile')
+    sessionStorage.removeItem('icmResponsibility')
     keycloak?.logout({
       redirectUri: window.location.origin,
     })

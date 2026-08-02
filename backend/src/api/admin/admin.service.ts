@@ -19,6 +19,7 @@ export class AdminService {
   async verifyCSAAccess(username: string): Promise<{
     hasAccess: boolean
     message: string
+    userProfile?: string
     icmResponsibility?: string
   }> {
     try {
@@ -26,6 +27,7 @@ export class AdminService {
 
       let hasCSAResponsibility = false
       let icmResponsibilityName: string | undefined
+      let userProfile: string | undefined
 
       if (icmData?.items?.Responsibility) {
         const responsibilities = Array.isArray(icmData.items.Responsibility)
@@ -37,9 +39,20 @@ export class AdminService {
         const roResponsibility = responsibilities.find(
           (r) => normalize(r.Name) === 'ICM CSA APPLICATION - RO',
         )
+        const dataStewardResponsibility = responsibilities.find(
+          (r) => normalize(r.Name) === 'ICM DATA STEWARD',
+        )
 
-        if (rwResponsibility || roResponsibility) {
-          hasCSAResponsibility = true
+        const hasRwResponsibility = !!rwResponsibility
+        const hasRoResponsibility = !!roResponsibility
+        const hasDataStewardResponsibility = !!dataStewardResponsibility
+
+        hasCSAResponsibility = hasRwResponsibility || hasRoResponsibility
+        if (hasCSAResponsibility) {
+          userProfile =
+            hasRwResponsibility && hasDataStewardResponsibility
+              ? 'DATA_QUALITY_STEWARD'
+              : 'CSA_STANDARD'
           icmResponsibilityName = rwResponsibility?.Name || roResponsibility?.Name
         }
       }
@@ -48,6 +61,7 @@ export class AdminService {
         return {
           hasAccess: true,
           message: 'User has CSA access',
+          userProfile,
           icmResponsibility: icmResponsibilityName,
         }
       }
@@ -96,7 +110,7 @@ export class AdminService {
           Responsibility: {
             fields: 'Name',
             searchspec:
-              "[Name] = 'ICM CSA Application - RW' OR [Name] = 'ICM CSA Application - RO'",
+              "[Name] = 'ICM CSA Application - RW' OR [Name] = 'ICM CSA Application - RO' OR [Name] ='ICM Data Steward'",
           },
         },
       }

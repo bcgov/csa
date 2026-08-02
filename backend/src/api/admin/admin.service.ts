@@ -27,7 +27,7 @@ export class AdminService {
 
       let hasCSAResponsibility = false
       let icmResponsibilityName: string | undefined
-      let isDataQualitySteward = false
+      let userProfile: string | undefined
 
       if (icmData?.items?.Responsibility) {
         const responsibilities = Array.isArray(icmData.items.Responsibility)
@@ -43,11 +43,17 @@ export class AdminService {
           (r) => normalize(r.Name) === 'ICM DATA STEWARD',
         )
 
-        if (rwResponsibility || roResponsibility || dataStewardResponsibility) {
-          hasCSAResponsibility = true
-          isDataQualitySteward = !!dataStewardResponsibility
-          icmResponsibilityName =
-            rwResponsibility?.Name || roResponsibility?.Name || dataStewardResponsibility?.Name
+        const hasRwResponsibility = !!rwResponsibility
+        const hasRoResponsibility = !!roResponsibility
+        const hasDataStewardResponsibility = !!dataStewardResponsibility
+
+        hasCSAResponsibility = hasRwResponsibility || hasRoResponsibility
+        if (hasCSAResponsibility) {
+          userProfile =
+            hasRwResponsibility && hasDataStewardResponsibility
+              ? 'DATA_QUALITY_STEWARD'
+              : 'CSA_STANDARD'
+          icmResponsibilityName = rwResponsibility?.Name || roResponsibility?.Name
         }
       }
 
@@ -55,7 +61,7 @@ export class AdminService {
         return {
           hasAccess: true,
           message: 'User has CSA access',
-          userProfile: isDataQualitySteward ? 'DATA_QUALITY_STEWARD' : 'CSA_STANDARD',
+          userProfile,
           icmResponsibility: icmResponsibilityName,
         }
       }

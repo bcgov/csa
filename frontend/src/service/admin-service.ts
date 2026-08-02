@@ -12,6 +12,7 @@ export interface CSAAccessResponse {
   username: string
   userInfo: UserInfo
   message: string
+  userProfile?: 'DATA_QUALITY_STEWARD' | 'CSA_STANDARD'
   icmResponsibility?: string
   tokenExpired?: boolean
 }

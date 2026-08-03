@@ -1,3 +1,5 @@
+import { CSA_STATUS } from 'src/common/state-machine/constants'
+
 export const ALLOWED_FILTER_SORT_FIELDS = [
   'id',
   'lastName',
@@ -29,25 +31,6 @@ export const ALLOWED_FILTER_SORT_FIELDS = [
   'birthCountry',
 ] as const
 
-export const CSA_STATUSES = {
-  ELIGIBLE: 'eligible',
-  ELIGIBLE_TBD: 'eligible_tbd',
-  NOT_ELIGIBLE_OUT_OF_PAY: 'not_eligible_out_of_pay',
-  ON_HOLD: 'on_hold',
-  IN_BATCH_APPLICATION: 'in_batch_application',
-  BATCH_SENT_APPLICATION: 'batch_sent_application',
-  APPLICATION_REFUSED_CRA: 'application_refused_cra',
-  IN_PAY: 'in_pay',
-  NOT_ELIGIBLE_IN_PAY: 'not_eligible_in_pay',
-  NOT_ELIGIBLE_IP_TBD: 'not_eligible_ip_tbd',
-  IN_BATCH_CANCELLATION: 'in_batch_cancellation',
-  BATCH_SENT_CANCELLATION: 'batch_sent_cancellation',
-  CANCELLATION_REFUSED_CRA: 'cancellation_refused_cra',
-  OVER_18: 'over_18',
-} as const
-
-export type CsaStatus = (typeof CSA_STATUSES)[keyof typeof CSA_STATUSES]
-
 export const BATCH_STATUSES = {
   PENDING: 'pending',
   IN_PROGRESS: 'in_progress',
@@ -78,4 +61,30 @@ export const BULK_OPERATION_SKIP_REASONS = {
   NOT_FOUND: 'not_found',
   ALREADY_IN_BATCH: 'already_in_batch',
   INVALID_TRANSITION: 'invalid_transition',
+} as const
+
+/**
+ * Protected CSA statuses that prevent edit/delete operations (BL-35)
+ * Note: OVER_18 is NOT protected - DQ can still edit/delete those records
+ */
+export const PROTECTED_CSA_STATUSES = new Set<string>([
+  CSA_STATUS.ON_HOLD,
+  CSA_STATUS.IN_BATCH_APPLICATION,
+  CSA_STATUS.IN_BATCH_CANCELLATION,
+  CSA_STATUS.BATCH_SENT_APPLICATION,
+  CSA_STATUS.BATCH_SENT_CANCELLATION,
+  CSA_STATUS.APPLICATION_REFUSED_CRA,
+  CSA_STATUS.CANCELLATION_REFUSED_CRA,
+  CSA_STATUS.CRA_ERROR_APPLICATION,
+  CSA_STATUS.CRA_ERROR_CANCELLATION,
+])
+
+/**
+ * Fields that are auditable (tracked in contact_audit_trail)
+ */
+export const AUDITABLE_FIELDS = {
+  DIN: 'din',
+  CSA_STATUS: 'csaStatus',
+  CSA_STATUS_EFFECTIVE_DATE: 'csaStatusEffectiveDate',
+  CSA_SENT_DATE: 'csaSentDate',
 } as const

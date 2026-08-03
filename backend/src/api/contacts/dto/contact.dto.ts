@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { IsDateString, IsOptional, IsString, Length, Matches } from 'class-validator'
 
 export class ContactDto {
   // REQUIRED FIELDS (NOT NULL)
@@ -191,4 +192,45 @@ export class ContactDto {
 
   @ApiPropertyOptional({ description: 'Product type related to the contact' })
   product?: string
+}
+
+/**
+ * DTO for updating CSA source-of-truth fields (BL-36)
+ * Only Data Quality Stewards can update these fields
+ */
+export class UpdateContactDto {
+  @ApiPropertyOptional({
+    description: 'DIN (Document Identification Number) - 9 digits with Luhn checksum',
+    example: '123456782',
+    pattern: '^\\d{9}$',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(9, 9, { message: 'DIN must be exactly 9 digits' })
+  @Matches(/^\d{9}$/, { message: 'DIN must contain only numeric digits' })
+  din?: string
+
+  @ApiPropertyOptional({
+    description: 'CSA Status code',
+    example: 'eligible',
+  })
+  @IsOptional()
+  @IsString()
+  csaStatus?: string
+
+  @ApiPropertyOptional({
+    description: 'Effective date of the CSA status (ISO 8601 format)',
+    example: '2026-08-03T00:00:00Z',
+  })
+  @IsOptional()
+  @IsDateString({}, { message: 'CSA Status Effective Date must be a valid ISO 8601 date' })
+  csaStatusEffectiveDate?: Date
+
+  @ApiPropertyOptional({
+    description: 'CSA sent date (ISO 8601 format)',
+    example: '2026-08-02T00:00:00Z',
+  })
+  @IsOptional()
+  @IsDateString({}, { message: 'CSA Sent Date must be a valid ISO 8601 date' })
+  csaSentDate?: string
 }

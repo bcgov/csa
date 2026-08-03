@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config'
 import { firstValueFrom } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { normalize } from 'src/common/utils'
+import { getUserProfileFromResponsibilities, UserProfile } from './constants/user-profile.constants'
 import { ICMEmployeeResponse } from './interfaces/icm-api.interface'
 
 @Injectable()
@@ -62,6 +63,38 @@ export class AdminService {
         hasAccess: false,
         message: 'Failed to verify user access from ICM system',
       }
+    }
+  }
+
+  /**
+   * Get user's ICM responsibility level and map to user profile.
+   * Returns the user profile type based on ICM responsibilities.
+   * - If user has 'ICM DATA STEWARD' → DATA_QUALITY_STEWARD
+   * - Otherwise → CSA_STANDARD
+   *
+   * @param username - The username to check
+   * @returns UserProfile type or null if no valid responsibility found
+   */
+  async getUserProfile(username: string): Promise<UserProfile | null> {
+    try {
+      const icmData = await this.fetchUserFromICM(username)
+
+      if (icmData?.items?.Responsibility) {
+        const responsibilities = Array.isArray(icmData.items.Responsibility)
+          ? icmData.items.Responsibility
+          : [icmData.items.Responsibility]
+
+        // Extract responsibility names and normalize them
+        const responsibilityNames = responsibilities.map((r) => normalize(r.Name))
+
+        // Determine user profile based on responsibilities
+        return getUserProfileFromResponsibilities(responsibilityNames)
+      }
+
+      return null
+    } catch (error) {
+      this.logger.error('Failed to fetch user profile from ICM:', error)
+      return null
     }
   }
 

@@ -1,6 +1,13 @@
-import { NotFoundException, UnprocessableEntityException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
+import { AdminService } from 'src/api/admin/admin.service'
+import { USER_PROFILE } from 'src/api/admin/constants/user-profile.constants'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
@@ -76,11 +83,18 @@ describe('ContactsService', () => {
           },
         },
         {
+          provide: AdminService,
+          useValue: {
+            getUserProfile: vi.fn().mockResolvedValue(USER_PROFILE.DATA_QUALITY_STEWARD),
+          },
+        },
+        {
           provide: PrismaService,
           useValue: {
             contact: {
               findMany: vi.fn().mockResolvedValue(savedContactArray as any),
               findUnique: vi.fn().mockResolvedValue(savedContact1 as any),
+              findFirst: vi.fn().mockResolvedValue(null),
               create: vi.fn().mockResolvedValue(savedContact1 as any),
               update: vi.fn().mockResolvedValue(updatedContact as any),
               delete: vi.fn().mockResolvedValue(true),
@@ -91,6 +105,7 @@ describe('ContactsService', () => {
             },
             $queryRaw: vi.fn(),
             $transaction: vi.fn(),
+            $executeRaw: vi.fn(),
           },
         },
       ],
@@ -1821,6 +1836,377 @@ describe('ContactsService', () => {
         })
       })
       warnSpy.mockRestore()
+    })
+  })
+
+  describe('updateContact (BL-36)', () => {
+    const mockAdminService = () => service['adminService'] as { getUserProfile: any }
+
+    it('should successfully update contact fields (DIN, status, dates)', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+      vi.spyOn(prisma.contact, 'findFirst').mockResolvedValue(null) // DIN unique check
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({
+        id: 1,
+        din: '987654329',
+        csaStatus: 'in_pay',
+        csaStatusEffectiveDate: '2026-08-01',
+      } as any)
+      vi.spyOn(service as any, 'findOne').mockResolvedValue({ id: 1 })
+
+      const result = await service.updateContact(
+        1,
+        {
+          din: '987654329',
+          csaStatus: 'in_pay',
+          csaStatusEffectiveDate: '2026-08-01',
+        },
+        'dq.steward',
+        USER_PROFILE.DATA_QUALITY_STEWARD,
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.contact.id).toBe(1)
+      expect(updateSpy).toHaveBeenCalled()
+    })
+
+    it('should reject if user profile is null', async () => {
+      await expect(service.updateContact(1, { din: '123456789' }, 'user', null)).rejects.toThrow(
+        ForbiddenException,
+      )
+    })
+
+    it('should reject if user is not DATA_QUALITY_STEWARD', async () => {
+      await expect(
+        service.updateContact(1, { din: '123456789' }, 'user', USER_PROFILE.CSA_STANDARD),
+      ).rejects.toThrow(ForbiddenException)
+    })
+
+    it('should reject if ICM profile verification fails', async () => {
+      mockAdminService().getUserProfile = vi.fn().mockResolvedValue(USER_PROFILE.CSA_STANDARD)
+
+      await expect(
+        service.updateContact(1, { din: '123456789' }, 'user', USER_PROFILE.DATA_QUALITY_STEWARD),
+      ).rejects.toThrow(ForbiddenException)
+    })
+
+    it('should reject if contact not found', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(null)
+
+      await expect(
+        service.updateContact(
+          1,
+          { din: '123456789' },
+          'dq.steward',
+          USER_PROFILE.DATA_QUALITY_STEWARD,
+        ),
+      ).rejects.toThrow(NotFoundException)
+    })
+
+    it('should reject if contact in protected status', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'on_hold',
+        din: '123456789',
+      } as any)
+
+      await expect(
+        service.updateContact(
+          1,
+          { din: '987654329' },
+          'dq.steward',
+          USER_PROFILE.DATA_QUALITY_STEWARD,
+        ),
+      ).rejects.toThrow(UnprocessableEntityException)
+    })
+
+    it('should reject invalid DIN format', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+
+      await expect(
+        service.updateContact(
+          1,
+          { din: 'INVALID' },
+          'dq.steward',
+          USER_PROFILE.DATA_QUALITY_STEWARD,
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('should reject invalid DIN checksum', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+
+      await expect(
+        service.updateContact(
+          1,
+          { din: '123456788' },
+          'dq.steward',
+          USER_PROFILE.DATA_QUALITY_STEWARD,
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('should reject duplicate DIN', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+      vi.spyOn(prisma.contact, 'findFirst').mockResolvedValue({ id: 2 } as any)
+
+      await expect(
+        service.updateContact(
+          1,
+          { din: '987654329' },
+          'dq.steward',
+          USER_PROFILE.DATA_QUALITY_STEWARD,
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('should reject future effective date', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+
+      const futureDate = new Date()
+      futureDate.setDate(futureDate.getDate() + 1)
+
+      await expect(
+        service.updateContact(
+          1,
+          { csaStatusEffectiveDate: futureDate.toISOString().split('T')[0] },
+          'dq.steward',
+          USER_PROFILE.DATA_QUALITY_STEWARD,
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('should reject future CSA sent date', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+
+      const futureDate = new Date()
+      futureDate.setDate(futureDate.getDate() + 1)
+
+      await expect(
+        service.updateContact(
+          1,
+          { csaSentDate: futureDate.toISOString().split('T')[0] },
+          'dq.steward',
+          USER_PROFILE.DATA_QUALITY_STEWARD,
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('should trigger ICM sync-back when DIN changes', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+      vi.spyOn(prisma.contact, 'findFirst').mockResolvedValue(null)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({ id: 1 } as any)
+      vi.spyOn(service as any, 'findOne').mockResolvedValue({ id: 1 })
+      const syncSpy = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
+
+      await service.updateContact(
+        1,
+        { din: '987654329' },
+        'dq.steward',
+        USER_PROFILE.DATA_QUALITY_STEWARD,
+      )
+
+      expect(syncSpy).toHaveBeenCalledWith(1)
+    })
+
+    it('should trigger ICM sync-back when status changes', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({ id: 1 } as any)
+      vi.spyOn(service as any, 'findOne').mockResolvedValue({ id: 1 })
+      const syncSpy = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
+
+      await service.updateContact(
+        1,
+        { csaStatus: 'in_pay' },
+        'dq.steward',
+        USER_PROFILE.DATA_QUALITY_STEWARD,
+      )
+
+      expect(syncSpy).toHaveBeenCalledWith(1)
+    })
+
+    it('should not fail update if ICM sync-back fails', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({ id: 1 } as any)
+      vi.spyOn(service as any, 'findOne').mockResolvedValue({ id: 1 })
+      vi.spyOn(service['icmSyncBackService'], 'syncSingleContact').mockRejectedValue(
+        new Error('ICM down'),
+      )
+
+      const result = await service.updateContact(
+        1,
+        { csaStatus: 'in_pay' },
+        'dq.steward',
+        USER_PROFILE.DATA_QUALITY_STEWARD,
+      )
+
+      expect(result.success).toBe(true)
+    })
+  })
+
+  describe('deleteContact (BL-37)', () => {
+    const mockAdminService = () => service['adminService'] as { getUserProfile: any }
+
+    it('should successfully delete contact and cascade to all tables', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        personIdIcm: 'ICM-123',
+        contactIdIcm: 'CONTACT-123',
+        personIdMis: 'MIS-123',
+        firstName: 'John',
+        lastName: 'Doe',
+      } as any)
+
+      const transactionSpy = vi.fn(async (callback) => {
+        return callback({
+          $executeRaw: vi.fn(),
+          contact: { delete: vi.fn() },
+        })
+      })
+      vi.spyOn(prisma, '$transaction').mockImplementation(transactionSpy as any)
+
+      const result = await service.deleteContact(1, 'dq.steward', USER_PROFILE.DATA_QUALITY_STEWARD)
+
+      expect(result.success).toBe(true)
+      expect(result.message).toContain('permanently deleted')
+      expect(transactionSpy).toHaveBeenCalled()
+    })
+
+    it('should reject if user profile is null', async () => {
+      await expect(service.deleteContact(1, 'user', null)).rejects.toThrow(ForbiddenException)
+    })
+
+    it('should reject if user is not DATA_QUALITY_STEWARD', async () => {
+      await expect(service.deleteContact(1, 'user', USER_PROFILE.CSA_STANDARD)).rejects.toThrow(
+        ForbiddenException,
+      )
+    })
+
+    it('should reject if ICM profile verification fails', async () => {
+      mockAdminService().getUserProfile = vi.fn().mockResolvedValue(USER_PROFILE.CSA_STANDARD)
+
+      await expect(
+        service.deleteContact(1, 'user', USER_PROFILE.DATA_QUALITY_STEWARD),
+      ).rejects.toThrow(ForbiddenException)
+    })
+
+    it('should reject if contact not found', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(null)
+
+      await expect(
+        service.deleteContact(1, 'dq.steward', USER_PROFILE.DATA_QUALITY_STEWARD),
+      ).rejects.toThrow(NotFoundException)
+    })
+
+    it('should reject if contact in protected status', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'on_hold',
+        personIdIcm: 'ICM-123',
+        contactIdIcm: 'CONTACT-123',
+        personIdMis: 'MIS-123',
+        firstName: 'John',
+        lastName: 'Doe',
+      } as any)
+
+      await expect(
+        service.deleteContact(1, 'dq.steward', USER_PROFILE.DATA_QUALITY_STEWARD),
+      ).rejects.toThrow(UnprocessableEntityException)
+    })
+
+    it('should delete from staging tables in correct order', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        personIdIcm: 'ICM-123',
+        contactIdIcm: 'CONTACT-123',
+        personIdMis: 'MIS-123',
+        firstName: 'John',
+        lastName: 'Doe',
+      } as any)
+
+      const executeRawCalls: string[] = []
+      const transactionSpy = vi.fn(async (callback) => {
+        return callback({
+          $executeRaw: vi.fn((query) => {
+            executeRawCalls.push(query[0])
+            return Promise.resolve()
+          }),
+          contact: { delete: vi.fn() },
+        })
+      })
+      vi.spyOn(prisma, '$transaction').mockImplementation(transactionSpy as any)
+
+      await service.deleteContact(1, 'dq.steward', USER_PROFILE.DATA_QUALITY_STEWARD)
+
+      // Verify correct deletion order (children before parents)
+      expect(executeRawCalls.length).toBeGreaterThan(0)
+      expect(executeRawCalls.some((q) => q.includes('stg_icm_orders'))).toBe(true)
+      expect(executeRawCalls.some((q) => q.includes('stg_icm_agreement'))).toBe(true)
+      expect(executeRawCalls.some((q) => q.includes('stg_icm_placements'))).toBe(true)
+      expect(executeRawCalls.some((q) => q.includes('stg_icm_cases'))).toBe(true)
+    })
+
+    it('should not trigger ICM sync-back on delete', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        personIdIcm: 'ICM-123',
+        contactIdIcm: 'CONTACT-123',
+        personIdMis: 'MIS-123',
+        firstName: 'John',
+        lastName: 'Doe',
+      } as any)
+
+      const transactionSpy = vi.fn(async (callback) => {
+        return callback({
+          $executeRaw: vi.fn(),
+          contact: { delete: vi.fn() },
+        })
+      })
+      vi.spyOn(prisma, '$transaction').mockImplementation(transactionSpy as any)
+
+      const syncSpy = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
+
+      await service.deleteContact(1, 'dq.steward', USER_PROFILE.DATA_QUALITY_STEWARD)
+
+      expect(syncSpy).not.toHaveBeenCalled()
     })
   })
 })

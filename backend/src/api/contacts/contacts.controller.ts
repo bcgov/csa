@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpException,
@@ -8,12 +9,14 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common'
 import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
-import { CurrentUser } from '../common/decorators'
+import { AuditTrailService } from '../audit-trail/audit-trail.service'
+import { CurrentUser, UserProfileDecorator } from '../common/decorators'
 import {
   ContactIdsWithActionDto,
   HoldContactsDto,
@@ -21,9 +24,8 @@ import {
   UpdateHoldReasonDto,
 } from '../common/dto/contact-ids.dto'
 import { CSAGuard } from '../common/guards/csa.guard'
-import { AuditTrailService } from '../audit-trail/audit-trail.service'
 import { ContactsService } from './contacts.service'
-import { ContactDto } from './dto/contact.dto'
+import { ContactDto, UpdateContactDto } from './dto/contact.dto'
 import { BulkOperationResponse } from './interfaces'
 
 @ApiTags('contacts')
@@ -237,5 +239,34 @@ export class ContactsController {
   @ApiResponse({ status: 404, description: 'Contact not found' })
   async clearReviewFlag(@Param('id', ParseIntPipe) id: number, @CurrentUser() userId: string) {
     return this.contactsService.clearReviewFlag(id, userId)
+  }
+
+  @Put(':id/update')
+  @HttpCode(200)
+  @ApiResponse({ status: 200, description: 'Contact updated successfully' })
+  @ApiResponse({ status: 404, description: 'Contact not found' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Data Quality Steward role required' })
+  @ApiResponse({ status: 422, description: 'Contact in protected status' })
+  async updateContact(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateContactDto: UpdateContactDto,
+    @CurrentUser() userId: string,
+    @UserProfileDecorator() userProfile: string | null,
+  ) {
+    return this.contactsService.updateContact(id, updateContactDto, userId, userProfile)
+  }
+
+  @Delete(':id')
+  @HttpCode(200)
+  @ApiResponse({ status: 200, description: 'Contact permanently deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Contact not found' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Data Quality Steward role required' })
+  @ApiResponse({ status: 422, description: 'Contact in protected status' })
+  async deleteContact(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() userId: string,
+    @UserProfileDecorator() userProfile: string | null,
+  ) {
+    return this.contactsService.deleteContact(id, userId, userProfile)
   }
 }

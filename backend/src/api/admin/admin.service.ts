@@ -47,12 +47,18 @@ export class AdminService {
         const hasRoResponsibility = !!roResponsibility
         const hasDataStewardResponsibility = !!dataStewardResponsibility
 
-        hasCSAResponsibility = hasRwResponsibility || hasRoResponsibility
+        const hasStandardCsaResponsibilities =
+          (hasRwResponsibility || hasRoResponsibility) && !hasDataStewardResponsibility
+        const hasDataQualityStewardResponsibilities =
+          hasRwResponsibility && hasDataStewardResponsibility
+
+        hasCSAResponsibility =
+          hasStandardCsaResponsibilities || hasDataQualityStewardResponsibilities
+
         if (hasCSAResponsibility) {
-          userProfile =
-            hasRwResponsibility && hasDataStewardResponsibility
-              ? 'DATA_QUALITY_STEWARD'
-              : 'CSA_STANDARD'
+          userProfile = hasDataQualityStewardResponsibilities
+            ? 'DATA_QUALITY_STEWARD'
+            : 'CSA_STANDARD'
           icmResponsibilityName = rwResponsibility?.Name || roResponsibility?.Name
         }
       }

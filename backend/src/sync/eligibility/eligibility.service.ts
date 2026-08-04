@@ -701,12 +701,13 @@ export class EligibilityService {
         continue
       }
 
-      // Protected statuses: preserve csa_status; upsert only when staging eligibility data changed.
+      // Protected statuses: preserve csa_status; upsert when staging eligibility data changed.
       if (
         profile.csaStatus &&
         (PROTECTED_STATUSES as readonly string[]).includes(profile.csaStatus)
       ) {
-        if (await this.shouldSkipUpsertForUnchangedStaging(profile)) {
+        if (await this.shouldSkipStatusRecalculationForUnchangedStaging(profile)) {
+          updates.push(this.buildPreservedStatusUpdate(profile))
           continue
         }
         updates.push({
@@ -720,18 +721,19 @@ export class EligibilityService {
         continue
       }
 
-      // User-set status (BL-14B): skip rules and upsert when staging eligibility data is unchanged.
+      // User-set status (BL-14B): skip rules when staging eligibility data is unchanged; still sync profile fields.
       if (isUserSetCsaStatus(profile.lastUpdatedBy)) {
         if (!profile.csaStatusEffectiveDate) {
           this.warnUserSetWithoutEffectiveDate(profile)
         }
         if (
-          await this.shouldSkipUpsertForUnchangedStaging(profile, {
+          await this.shouldSkipStatusRecalculationForUnchangedStaging(profile, {
             referenceDate,
             agedOutIds,
           })
         ) {
           stats.userSetPreserved++
+          updates.push(this.buildPreservedStatusUpdate(profile))
           continue
         }
       }
@@ -741,12 +743,13 @@ export class EligibilityService {
 
       if (
         result.newStatus === profile.csaStatus &&
-        (await this.shouldSkipUpsertForUnchangedStaging(profile, {
+        (await this.shouldSkipStatusRecalculationForUnchangedStaging(profile, {
           referenceDate,
           agedOutIds,
         }))
       ) {
         stats.stepCounts.noChange++
+        updates.push(this.buildPreservedStatusUpdate(profile, result))
         continue
       }
 
@@ -791,10 +794,11 @@ export class EligibilityService {
   }
 
   /**
-   * Skip upsert when staging eligibility data is unchanged since csa_status_effective_date.
+   * Skip status recalculation when staging eligibility data is unchanged since csa_status_effective_date.
+   * Profile fields from staging are still synced separately via buildPreservedStatusUpdate.
    * Age-out contacts are still processed when referenceDate/agedOutIds are provided.
    */
-  private async shouldSkipUpsertForUnchangedStaging(
+  private async shouldSkipStatusRecalculationForUnchangedStaging(
     profile: ContactProfile,
     options?: { referenceDate?: Date; agedOutIds?: string[] },
   ): Promise<boolean> {
@@ -814,10 +818,24 @@ export class EligibilityService {
     const unchanged = !(await this.hasStagingDataChanged(profile.personIdIcm, since))
     if (unchanged) {
       this.logger.log(
-        `Skipping upsert for ${profile.personIdIcm}: no staging data changes since ${since.toISOString()}`,
+        `Preserving CSA status for ${profile.personIdIcm}: no staging data changes since ${since.toISOString()}; syncing profile fields only`,
       )
     }
     return unchanged
+  }
+
+  private buildPreservedStatusUpdate(
+    profile: ContactProfile,
+    result?: EligibilityResult,
+  ): { profile: ContactProfile; result: EligibilityResult } {
+    return {
+      profile,
+      result: {
+        newStatus: profile.csaStatus!,
+        cancelReasonCode: result?.cancelReasonCode ?? profile.cancelReasonCode,
+        careEndDate: result?.careEndDate ?? profile.careEndDate,
+      },
+    }
   }
 
   private async hasStagingDataChanged(personIdIcm: string, since: Date): Promise<boolean> {
@@ -850,7 +868,8 @@ export class EligibilityService {
       profile.csaStatus &&
       (PROTECTED_STATUSES as readonly string[]).includes(profile.csaStatus)
     ) {
-      if (await this.shouldSkipUpsertForUnchangedStaging(profile)) {
+      if (await this.shouldSkipStatusRecalculationForUnchangedStaging(profile)) {
+        await this.upsertContacts([this.buildPreservedStatusUpdate(profile)])
         return { previousStatus, newStatus: profile.csaStatus }
       }
       await this.upsertContacts([
@@ -871,7 +890,8 @@ export class EligibilityService {
       if (!profile.csaStatusEffectiveDate) {
         this.warnUserSetWithoutEffectiveDate(profile)
       }
-      if (await this.shouldSkipUpsertForUnchangedStaging(profile, { referenceDate })) {
+      if (await this.shouldSkipStatusRecalculationForUnchangedStaging(profile, { referenceDate })) {
+        await this.upsertContacts([this.buildPreservedStatusUpdate(profile)])
         const status = previousStatus ?? profile.csaStatus
         if (!status) {
           throw new EligibilityInputError(`Contact ${personIdIcm} has no CSA status`)
@@ -892,8 +912,9 @@ export class EligibilityService {
     const resolvedStatus = result.newStatus ?? previousStatus ?? profile.csaStatus
     if (
       result.newStatus === profile.csaStatus &&
-      (await this.shouldSkipUpsertForUnchangedStaging(profile, { referenceDate }))
+      (await this.shouldSkipStatusRecalculationForUnchangedStaging(profile, { referenceDate }))
     ) {
+      await this.upsertContacts([this.buildPreservedStatusUpdate(profile, result)])
       if (!resolvedStatus) {
         throw new EligibilityInputError(`Contact ${personIdIcm} has no CSA status`)
       }

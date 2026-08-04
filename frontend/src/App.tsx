@@ -138,6 +138,19 @@ const VALID_BATCH_STATUSES = [
   'cra_error_cancellation', // CRA Error - Cancellation
 ]
 
+// Protected statuses for DQ update/delete actions (intentionally excludes over_18)
+const DQ_PROTECTED_STATUSES = new Set([
+  'on_hold',
+  'in_batch_application',
+  'batch_sent_application',
+  'in_batch_cancellation',
+  'batch_sent_cancellation',
+  'application_refused_cra',
+  'cancellation_refused_cra',
+  'cra_error_application',
+  'cra_error_cancellation',
+])
+
 // CSA Status options for filter dropdown
 const CSA_STATUS_FILTER_OPTIONS = [
   { value: 'not_eligible_out_of_pay', label: 'Not Eligible - Out of Pay' },
@@ -313,6 +326,16 @@ function App() {
   const [selectedBatch, setSelectedBatch] = useState<number | null>(null) // No batch selected initially
   const [isBatchHistoryExpanded, setIsBatchHistoryExpanded] = useState(false)
   const [isAuditTrailExpanded, setIsAuditTrailExpanded] = useState(false)
+  const [dqEditableRecordId, setDqEditableRecordId] = useState<number | null>(null)
+  const [dqEditValues, setDqEditValues] = useState<{
+    din: string
+    csaStatusRaw: string
+    statusEffective: string
+  }>({
+    din: '',
+    csaStatusRaw: '',
+    statusEffective: '',
+  })
 
   // Pre-defined filter state
   const [preDefinedFilter, setPreDefinedFilter] = useState('Pending User review/action')
@@ -3205,6 +3228,58 @@ function App() {
     })
   }, [selected, selectedRecordsCache])
 
+  // DQ update/delete is enabled only for a single selected, non-protected record.
+  const canDqModifySelected = useMemo(() => {
+    if (!isDataQualitySteward || selected.length !== 1) return false
+    const cached = selectedRecordsCache.get(selected[0])
+    if (!cached) return false
+    return !DQ_PROTECTED_STATUSES.has(cached.csaStatusRaw)
+  }, [isDataQualitySteward, selected, selectedRecordsCache])
+
+  // Exit DQ edit mode when selection moves away from the editable row.
+  useEffect(() => {
+    if (dqEditableRecordId === null) return
+    if (selected.length !== 1 || selected[0] !== dqEditableRecordId) {
+      setDqEditableRecordId(null)
+    }
+  }, [dqEditableRecordId, selected])
+
+  const handleDqUpdateClick = () => {
+    if (!canDqModifySelected) return
+
+    const selectedId = selected[0]
+    const selectedRow = filteredData.find((row) => row.id === selectedId)
+    if (!selectedRow) {
+      setSnackbar({
+        open: true,
+        message: 'Selected record is not available on the current page.',
+        severity: 'warning',
+      })
+      return
+    }
+
+    setDqEditableRecordId(selectedRow.id)
+    setDqEditValues({
+      din: selectedRow.din || '',
+      csaStatusRaw: selectedRow.csaStatusRaw || '',
+      statusEffective: selectedRow.statusEffective || '',
+    })
+    setSnackbar({
+      open: true,
+      message: 'Update mode enabled (placeholder).',
+      severity: 'info',
+    })
+  }
+
+  const handleDqDeleteClick = () => {
+    if (!canDqModifySelected) return
+    setSnackbar({
+      open: true,
+      message: 'Delete action placeholder.',
+      severity: 'info',
+    })
+  }
+
   // Filter batch history data (frontend-only filtering)
   const filteredBatchHistory = useMemo(() => {
     // Map API data to match the expected table structure
@@ -3827,6 +3902,29 @@ function App() {
                         </MenuItem>
                       </Select>
                     </FormControl>
+                    {isDataQualitySteward && (
+                      <>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={handleDqUpdateClick}
+                          disabled={!canDqModifySelected}
+                          sx={{ textTransform: 'none' }}
+                        >
+                          Update
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          color="error"
+                          onClick={handleDqDeleteClick}
+                          disabled={!canDqModifySelected}
+                          sx={{ textTransform: 'none' }}
+                        >
+                          Delete
+                        </Button>
+                      </>
+                    )}
                     {!isDataQualitySteward && (
                       <>
                         <Tooltip title="Clear all column filters and sorting" arrow>
@@ -4085,17 +4183,24 @@ function App() {
                             arrow
                           >
                             <Checkbox
-                              disabled={isRunningEligibilityAll || isRunningAutoBatch}
+                              disabled={
+                                isDataQualitySteward ||
+                                isRunningEligibilityAll ||
+                                isRunningAutoBatch
+                              }
                               indeterminate={
+                                !isDataQualitySteward &&
                                 selected.length > 0 &&
                                 selected.length < filteredData.length &&
                                 filteredData.some((row) => selected.includes(row.id))
                               }
                               checked={
+                                !isDataQualitySteward &&
                                 filteredData.length > 0 &&
                                 filteredData.every((row) => selected.includes(row.id))
                               }
                               onChange={(e) => {
+                                if (isDataQualitySteward) return
                                 if (e.target.checked) {
                                   // Select all rows on current page
                                   setSelected((prev) => {
@@ -4500,9 +4605,13 @@ function App() {
                                     return newCache
                                   })
                                 } else {
-                                  setSelected((prev) => [...prev, row.id])
+                                  setSelected((prev) =>
+                                    isDataQualitySteward ? [row.id] : [...prev, row.id],
+                                  )
                                   setSelectedRecordsCache((prev) => {
-                                    const newCache = new Map(prev)
+                                    const newCache = isDataQualitySteward
+                                      ? new Map()
+                                      : new Map(prev)
                                     newCache.set(row.id, {
                                       csaStatusRaw: row.csaStatusRaw,
                                       isOver18: row.isOver18,
@@ -4528,30 +4637,79 @@ function App() {
                           >
                             {row.dob}
                           </TableCell>
-                          <TableCell>{row.din}</TableCell>
-                          <TableCell>{row.csaStatus}</TableCell>
+                          <TableCell>
+                            {isDataQualitySteward && dqEditableRecordId === row.id ? (
+                              <TextField
+                                size="small"
+                                value={dqEditValues.din}
+                                onChange={(e) =>
+                                  setDqEditValues((prev) => ({ ...prev, din: e.target.value }))
+                                }
+                                sx={{ minWidth: 120 }}
+                              />
+                            ) : (
+                              row.din
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {isDataQualitySteward && dqEditableRecordId === row.id ? (
+                              <FormControl size="small" sx={{ minWidth: 160 }}>
+                                <Select
+                                  value={dqEditValues.csaStatusRaw}
+                                  onChange={(e) =>
+                                    setDqEditValues((prev) => ({
+                                      ...prev,
+                                      csaStatusRaw: String(e.target.value),
+                                    }))
+                                  }
+                                >
+                                  {CSA_STATUS_FILTER_OPTIONS.map((option) => (
+                                    <MenuItem key={option.value} value={option.value}>
+                                      {option.label}
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                            ) : (
+                              row.csaStatus
+                            )}
+                          </TableCell>
                           <TableCell sx={{ minWidth: 128 }}>
-                            {(() => {
-                              const [statusDateLine, statusTimeLine] = splitDateTimeIntoTwoLines(
-                                row.statusEffective,
-                              )
-                              return (
-                                <Box sx={{ lineHeight: 1.25 }}>
-                                  <Box
-                                    component="span"
-                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
-                                  >
-                                    {statusDateLine}
+                            {isDataQualitySteward && dqEditableRecordId === row.id ? (
+                              <TextField
+                                size="small"
+                                value={dqEditValues.statusEffective}
+                                onChange={(e) =>
+                                  setDqEditValues((prev) => ({
+                                    ...prev,
+                                    statusEffective: e.target.value,
+                                  }))
+                                }
+                                sx={{ minWidth: 160 }}
+                              />
+                            ) : (
+                              (() => {
+                                const [statusDateLine, statusTimeLine] = splitDateTimeIntoTwoLines(
+                                  row.statusEffective,
+                                )
+                                return (
+                                  <Box sx={{ lineHeight: 1.25 }}>
+                                    <Box
+                                      component="span"
+                                      sx={{ display: 'block', whiteSpace: 'nowrap' }}
+                                    >
+                                      {statusDateLine}
+                                    </Box>
+                                    <Box
+                                      component="span"
+                                      sx={{ display: 'block', whiteSpace: 'nowrap' }}
+                                    >
+                                      {statusTimeLine}
+                                    </Box>
                                   </Box>
-                                  <Box
-                                    component="span"
-                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
-                                  >
-                                    {statusTimeLine}
-                                  </Box>
-                                </Box>
-                              )
-                            })()}
+                                )
+                              })()
+                            )}
                           </TableCell>
                           <TableCell
                             sx={{

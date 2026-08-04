@@ -1010,13 +1010,6 @@ export class ContactsService {
       }
     }
 
-    if (fieldsToUpdate.csaSentDate) {
-      const sentDate = new Date(fieldsToUpdate.csaSentDate)
-      if (sentDate > now) {
-        throw new BadRequestException('CSA Sent Date cannot be in the future.')
-      }
-    }
-
     // 6. Update contact - DB trigger will create audit trail automatically
     await this.prisma.contact.update({
       where: { id: contactId },

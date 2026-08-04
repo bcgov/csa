@@ -26,18 +26,6 @@ export const CSA_ACCESS_ICM_RESPONSIBILITIES = [
 ]
 
 /**
- * Determines user profile based on ICM responsibilities array
- * - If user has 'ICM DATA STEWARD' → DATA_QUALITY_STEWARD
- * - Otherwise → CSA_STANDARD
- */
-export function getUserProfileFromResponsibilities(responsibilities: string[]): UserProfile {
-  if (responsibilities.includes(DATA_STEWARD_ICM_RESPONSIBILITY)) {
-    return USER_PROFILE.DATA_QUALITY_STEWARD
-  }
-  return USER_PROFILE.CSA_STANDARD
-}
-
-/**
  * Validates if a user profile string is valid
  */
 export function isValidUserProfile(profile: string): profile is UserProfile {

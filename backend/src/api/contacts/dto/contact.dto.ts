@@ -225,12 +225,4 @@ export class UpdateContactDto {
   @IsOptional()
   @IsDateString({}, { message: 'CSA Status Effective Date must be a valid ISO 8601 date' })
   csaStatusEffectiveDate?: Date
-
-  @ApiPropertyOptional({
-    description: 'CSA sent date (ISO 8601 format)',
-    example: '2026-08-02T00:00:00Z',
-  })
-  @IsOptional()
-  @IsDateString({}, { message: 'CSA Sent Date must be a valid ISO 8601 date' })
-  csaSentDate?: string
 }

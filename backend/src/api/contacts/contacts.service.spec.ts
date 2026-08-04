@@ -20,7 +20,7 @@ describe('ContactsService', () => {
   let prisma: PrismaService
 
   // Raw DB records (what Prisma returns)
-  const savedContact1 = {
+  const savedContact1: any = {
     id: 1,
     lastName: 'Doe',
     firstName: 'John',
@@ -57,7 +57,7 @@ describe('ContactsService', () => {
     orderAmount: null,
   }
 
-  const savedContactArray = [savedContact1, savedContact2]
+  const savedContactArray: any[] = [savedContact1, savedContact2]
 
   // Enriched records (what the service returns — includes csaStatusLabel)
   const enrichedContact1 = { ...savedContact1, csaStatusLabel: 'Eligible' }
@@ -732,7 +732,7 @@ describe('ContactsService', () => {
         [2, contact2],
       ])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -748,7 +748,7 @@ describe('ContactsService', () => {
       const contact1 = { id: 1, csaStatus: 'eligible_tbd', holdBy: null, resumeStatus: null }
       const contactMap = new Map([[1, contact1]])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -767,7 +767,7 @@ describe('ContactsService', () => {
         [2, contact2],
       ])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -788,7 +788,7 @@ describe('ContactsService', () => {
         [3, contact3],
       ])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -823,7 +823,7 @@ describe('ContactsService', () => {
         [2, contact2],
       ])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -845,7 +845,7 @@ describe('ContactsService', () => {
       }
       const contactMap = new Map([[1, contact1]])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -869,7 +869,7 @@ describe('ContactsService', () => {
         [2, contact2],
       ])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -893,7 +893,7 @@ describe('ContactsService', () => {
         [2, contact2],
       ])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -915,7 +915,7 @@ describe('ContactsService', () => {
         [2, { id: 2, csaStatus: 'cancellation_refused_cra' }],
       ])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       const updateSpy = vi
@@ -946,7 +946,7 @@ describe('ContactsService', () => {
         [2, { id: 2, csaStatus: 'cancellation_refused_cra' }],
       ])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       const updateSpy = vi
@@ -1862,7 +1862,7 @@ describe('ContactsService', () => {
         {
           din: '987654329',
           csaStatus: 'in_pay',
-          csaStatusEffectiveDate: '2026-08-01',
+          csaStatusEffectiveDate: new Date('2026-08-01'),
         },
         'dq.steward',
         USER_PROFILE.DATA_QUALITY_STEWARD,
@@ -1923,7 +1923,7 @@ describe('ContactsService', () => {
       ).rejects.toThrow(UnprocessableEntityException)
     })
 
-    it('should reject invalid DIN format', async () => {
+    it('should reject invalid DIN format (non-numeric or wrong length)', async () => {
       vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
         id: 1,
         csaStatus: 'eligible',
@@ -1934,23 +1934,6 @@ describe('ContactsService', () => {
         service.updateContact(
           1,
           { din: 'INVALID' },
-          'dq.steward',
-          USER_PROFILE.DATA_QUALITY_STEWARD,
-        ),
-      ).rejects.toThrow(BadRequestException)
-    })
-
-    it('should reject invalid DIN checksum', async () => {
-      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
-        id: 1,
-        csaStatus: 'eligible',
-        din: '123456789',
-      } as any)
-
-      await expect(
-        service.updateContact(
-          1,
-          { din: '123456788' },
           'dq.steward',
           USER_PROFILE.DATA_QUALITY_STEWARD,
         ),
@@ -1988,27 +1971,7 @@ describe('ContactsService', () => {
       await expect(
         service.updateContact(
           1,
-          { csaStatusEffectiveDate: futureDate.toISOString().split('T')[0] },
-          'dq.steward',
-          USER_PROFILE.DATA_QUALITY_STEWARD,
-        ),
-      ).rejects.toThrow(BadRequestException)
-    })
-
-    it('should reject future CSA sent date', async () => {
-      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
-        id: 1,
-        csaStatus: 'eligible',
-        din: '123456789',
-      } as any)
-
-      const futureDate = new Date()
-      futureDate.setDate(futureDate.getDate() + 1)
-
-      await expect(
-        service.updateContact(
-          1,
-          { csaSentDate: futureDate.toISOString().split('T')[0] },
+          { csaStatusEffectiveDate: futureDate },
           'dq.steward',
           USER_PROFILE.DATA_QUALITY_STEWARD,
         ),

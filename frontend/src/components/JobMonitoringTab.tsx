@@ -60,7 +60,6 @@ const STATUS_TO_API: Record<string, string> = {
   Running: 'RUNNING',
   Failed: 'FAILED',
 }
-const TRIGGER_OPTIONS = ['SYSTEM', 'USER']
 const ACTIVITY_SEVERITIES = ['ERROR', 'WARNING', 'CRITICAL']
 const ACTIVITY_TYPES = ['DATA_QUALITY', 'JOB', 'CRA', 'WKL', 'ICM', 'BATCH']
 const ACTIVITY_TYPE_LABELS: Record<string, string> = {
@@ -110,7 +109,7 @@ const normalizeStatus = (status: string): string => {
 const matchesTriggerFilter = (triggeredBy: string, filter: string): boolean => {
   if (!filter) return true
   if (filter === 'USER') return triggeredBy !== 'SYSTEM'
-  return triggeredBy === filter
+  return triggeredBy.toUpperCase() === filter.toUpperCase()
 }
 
 const normalizeSeverity = (severity: string): string => {
@@ -619,6 +618,26 @@ export default function JobMonitoringTab() {
     actSortField !== 'when' ||
     actSortOrder !== 'desc'
 
+  // Build trigger filter options from loaded monitoring data.
+  // Keep SYSTEM first, followed by discovered IDIRs in alphabetical order.
+  const triggerOptions = (() => {
+    const found = new Set<string>()
+    const add = (value: string | null | undefined) => {
+      const normalized = (value || '').trim().toUpperCase()
+      if (!normalized) return
+      found.add(normalized)
+    }
+
+    jobListData.forEach((row) => add(row.triggeredBy))
+    jobHistoryData.forEach((row) => add(row.triggeredBy))
+
+    const sortedIdirs = Array.from(found)
+      .filter((v) => v !== 'SYSTEM')
+      .sort((a, b) => a.localeCompare(b))
+
+    return found.has('SYSTEM') ? ['SYSTEM', ...sortedIdirs] : sortedIdirs
+  })()
+
   // ── Job List: client-side filter + sort ──────────────────────────────────
   const filteredJobList = jobListData
     .filter((row) => {
@@ -863,7 +882,7 @@ export default function JobMonitoringTab() {
                 <MenuItem value="">
                   <em>All</em>
                 </MenuItem>
-                {TRIGGER_OPTIONS.map((t) => (
+                {triggerOptions.map((t) => (
                   <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
                     {t}
                   </MenuItem>
@@ -1137,7 +1156,7 @@ export default function JobMonitoringTab() {
                 <MenuItem value="">
                   <em>All</em>
                 </MenuItem>
-                {TRIGGER_OPTIONS.map((t) => (
+                {triggerOptions.map((t) => (
                   <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
                     {t}
                   </MenuItem>

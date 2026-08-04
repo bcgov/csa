@@ -292,6 +292,15 @@ const splitDateTimeIntoTwoLines = (value: string): [string, string] => {
   return [trimmed.slice(0, firstSpaceIndex), trimmed.slice(firstSpaceIndex + 1)]
 }
 
+const toDateInputValue = (value: string): string => {
+  const parsed = parseFormattedDate(value)
+  if (!parsed) return ''
+  const year = parsed.getFullYear()
+  const month = String(parsed.getMonth() + 1).padStart(2, '0')
+  const day = String(parsed.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 function App() {
   const {
     isAuthenticated: keycloakAuthenticated,
@@ -3262,7 +3271,7 @@ function App() {
     setDqEditValues({
       din: selectedRow.din || '',
       csaStatusRaw: selectedRow.csaStatusRaw || '',
-      statusEffective: selectedRow.statusEffective || '',
+      statusEffective: toDateInputValue(selectedRow.statusEffective),
     })
     setSnackbar({
       open: true,
@@ -4678,6 +4687,7 @@ function App() {
                             {isDataQualitySteward && dqEditableRecordId === row.id ? (
                               <TextField
                                 size="small"
+                                type="date"
                                 value={dqEditValues.statusEffective}
                                 onChange={(e) =>
                                   setDqEditValues((prev) => ({
@@ -4685,7 +4695,7 @@ function App() {
                                     statusEffective: e.target.value,
                                   }))
                                 }
-                                sx={{ minWidth: 160 }}
+                                sx={{ minWidth: 176 }}
                               />
                             ) : (
                               (() => {

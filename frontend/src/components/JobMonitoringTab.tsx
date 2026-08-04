@@ -642,8 +642,7 @@ export default function JobMonitoringTab() {
   const filteredJobList = jobListData
     .filter((row) => {
       if (jlFilterId && !String(row.id).includes(jlFilterId)) return false
-      if (jlFilterName && !row.jobName.toLowerCase().includes(jlFilterName.toLowerCase()))
-        return false
+      if (jlFilterName && row.jobName !== jlFilterName) return false
       if (jlFilterStatus && row.status !== jlFilterStatus) return false
       if (!matchesTriggerFilter(row.triggeredBy, jlFilterTrigger)) return false
       return true
@@ -838,12 +837,26 @@ export default function JobMonitoringTab() {
               />
             )}
             {jlFilterAnchor.column === 'jobName' && (
-              <TextField
-                {...filterTextFieldProps}
+              <Select
+                size="small"
                 fullWidth
                 value={jlFilterName}
-                onChange={(e) => setJlFilterName(e.target.value)}
-              />
+                displayEmpty
+                onChange={(e) => {
+                  setJlFilterName(e.target.value)
+                  closeJlFilter()
+                }}
+                sx={{ ...filterSelectSx, minWidth: 140 }}
+              >
+                <MenuItem value="">
+                  <em>All</em>
+                </MenuItem>
+                {MONITORED_JOB_NAMES.map((n) => (
+                  <MenuItem key={n} value={n} sx={{ fontSize: '0.75rem' }}>
+                    {n}
+                  </MenuItem>
+                ))}
+              </Select>
             )}
             {jlFilterAnchor.column === 'status' && (
               <Select

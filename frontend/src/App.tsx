@@ -1549,6 +1549,7 @@ function App() {
   // Handle page change
   const handlePageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
     clearSelectedChildContext()
+    setDqEditableRecordId(null)
     setCurrentPage(page)
   }
 
@@ -1565,6 +1566,7 @@ function App() {
     // Clear selected records when changing PDQ filter
     setSelected([])
     setSelectedRecordsCache(new Map())
+    setDqEditableRecordId(null)
   }
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -3245,14 +3247,6 @@ function App() {
     return !DQ_PROTECTED_STATUSES.has(cached.csaStatusRaw)
   }, [isDataQualitySteward, selected, selectedRecordsCache])
 
-  // Exit DQ edit mode when selection moves away from the editable row.
-  useEffect(() => {
-    if (dqEditableRecordId === null) return
-    if (selected.length !== 1 || selected[0] !== dqEditableRecordId) {
-      setDqEditableRecordId(null)
-    }
-  }, [dqEditableRecordId, selected])
-
   const handleDqUpdateClick = () => {
     if (!canDqModifySelected) return
 
@@ -4237,6 +4231,7 @@ function App() {
                                   // Clear ALL selections across ALL pages
                                   setSelected([])
                                   setSelectedRecordsCache(new Map())
+                                  setDqEditableRecordId(null)
                                 }
                               }}
                             />
@@ -4607,6 +4602,9 @@ function App() {
                               onChange={(e) => {
                                 e.stopPropagation()
                                 if (selected.includes(row.id)) {
+                                  if (dqEditableRecordId === row.id) {
+                                    setDqEditableRecordId(null)
+                                  }
                                   setSelected((prev) => prev.filter((id) => id !== row.id))
                                   setSelectedRecordsCache((prev) => {
                                     const newCache = new Map(prev)
@@ -4614,6 +4612,9 @@ function App() {
                                     return newCache
                                   })
                                 } else {
+                                  if (isDataQualitySteward && dqEditableRecordId !== null) {
+                                    setDqEditableRecordId(null)
+                                  }
                                   setSelected((prev) =>
                                     isDataQualitySteward ? [row.id] : [...prev, row.id],
                                   )

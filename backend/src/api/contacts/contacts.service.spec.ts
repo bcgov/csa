@@ -1377,6 +1377,52 @@ describe('ContactsService', () => {
         expect(updateCall.data).not.toHaveProperty('cancelReasonCode')
         expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
       })
+
+      it('should fall back to today when staging returns blank placement end dates', async () => {
+        const contact = {
+          id: 1,
+          csaStatus: 'in_pay',
+          cancelReasonCode: null,
+          personIdIcm: '1-10981225231',
+          personIdMis: '',
+          resumeStatus: null,
+        }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        vi.spyOn(prisma, '$queryRaw').mockResolvedValue([{ maxEndDate: '' }] as any)
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
+          userId: 'user1',
+        })
+
+        expect(result.success).toBe(true)
+        const updateCall = updateSpy.mock.calls[0][0] as any
+        expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
+        expect(Number.isNaN(updateCall.data.careEndDate.getTime())).toBe(false)
+      })
+
+      it('should skip staging lookup when both person ids are blank', async () => {
+        const contact = {
+          id: 1,
+          csaStatus: 'in_pay',
+          cancelReasonCode: null,
+          personIdIcm: '   ',
+          personIdMis: '',
+          resumeStatus: null,
+        }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        const querySpy = vi.spyOn(prisma, '$queryRaw')
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
+          userId: 'user1',
+        })
+
+        expect(result.success).toBe(true)
+        expect(querySpy).not.toHaveBeenCalled()
+        const updateCall = updateSpy.mock.calls[0][0] as any
+        expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
+      })
     })
 
     describe('clear cancellation fields on eligible transitions', () => {

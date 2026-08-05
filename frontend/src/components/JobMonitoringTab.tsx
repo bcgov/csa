@@ -480,7 +480,11 @@ export default function JobMonitoringTab() {
   }, [fetchActivities])
 
   useEffect(() => {
-    void fetchTriggerOptions()
+    const timeoutId = window.setTimeout(() => {
+      void fetchTriggerOptions()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [fetchTriggerOptions])
 
   const hasRunningJobs = jobListData.some((row) => row.status.toUpperCase() === 'RUNNING')

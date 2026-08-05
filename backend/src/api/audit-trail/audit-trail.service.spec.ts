@@ -40,7 +40,7 @@ describe('AuditTrailService', () => {
 
     expect(mockPrisma.contactAuditTrail.findMany).toHaveBeenCalledWith({
       where: {},
-      orderBy: { actionedAt: 'desc' },
+      orderBy: [{ actionedAt: 'desc' }, { id: 'asc' }],
       skip: 0,
       take: 10,
     })

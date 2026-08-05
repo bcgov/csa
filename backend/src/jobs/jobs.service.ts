@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { buildStableOrderBy } from 'src/common/utils'
 import { JobActivitySeverity } from './enums/job-activity-severity.enum'
 import { JobActivityType } from './enums/job-activity-type.enum'
 import { JobStatus } from './enums/job-status.enum'
@@ -116,7 +117,7 @@ export class JobsService {
     const [data, total] = await Promise.all([
       this.prisma.jobRun.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: buildStableOrderBy({ createdAt: 'desc' }),
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -348,7 +349,7 @@ export class JobsService {
     const [data, total] = await Promise.all([
       this.prisma.jobRun.findMany({
         where,
-        orderBy: { [sortBy]: sortOrder },
+        orderBy: buildStableOrderBy({ [sortBy]: sortOrder }),
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -414,7 +415,7 @@ export class JobsService {
     const [data, total] = await Promise.all([
       this.prisma.jobActivity.findMany({
         where,
-        orderBy: { [sortBy]: sortOrder },
+        orderBy: buildStableOrderBy({ [sortBy]: sortOrder }),
         skip: (page - 1) * limit,
         take: limit,
       }),

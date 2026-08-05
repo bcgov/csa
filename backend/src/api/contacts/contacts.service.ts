@@ -19,6 +19,7 @@ import {
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import {
+  buildStableOrderBy,
   enrichLabels,
   isEligibleAge,
   pacificToday,
@@ -113,11 +114,13 @@ export class ContactsService {
       }
     }
 
+    const stableOrderBy = buildStableOrderBy(orderBy)
+
     const [data, total] = await Promise.all([
       this.prisma.contact.findMany({
         skip: (page - 1) * limit,
         take: limit,
-        orderBy,
+        orderBy: stableOrderBy,
         where,
       }),
       this.prisma.contact.count({ where }),
@@ -510,7 +513,7 @@ export class ContactsService {
         where,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        orderBy: buildStableOrderBy([{ lastName: 'asc' }, { firstName: 'asc' }]),
       }),
       this.prisma.contact.count({ where }),
     ])

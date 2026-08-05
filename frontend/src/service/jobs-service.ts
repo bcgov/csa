@@ -77,6 +77,11 @@ export const getJobHistory = async (
   return response.data
 }
 
+export const getMonitoringTriggeredByValues = async (): Promise<string[]> => {
+  const response = await APIService.getAxiosInstance().get('/jobs/monitoring/triggered-by')
+  return response.data
+}
+
 /**
  * Get paginated recent monitoring activities (default Activities view)
  */

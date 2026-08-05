@@ -33,6 +33,7 @@ describe('JobsController', () => {
     getJobs: vi.fn(),
     getLatestJobsPerType: vi.fn(),
     getJobHistory: vi.fn(),
+    getMonitoringTriggeredByValues: vi.fn(),
     getRecentActivities: vi.fn(),
     getActivities: vi.fn(),
     markFailed: vi.fn(),
@@ -467,6 +468,19 @@ describe('JobsController', () => {
         triggeredBy: 'SYSTEM',
         summary: 'Job failed',
       })
+    })
+  })
+
+  describe('GET /jobs/monitoring/triggered-by', () => {
+    it('should return distinct trigger values for monitoring filters', async () => {
+      mockJobsService.getMonitoringTriggeredByValues.mockResolvedValue(['SYSTEM', 'CGWRK22'])
+
+      const res = await request(app.getHttpServer())
+        .get('/jobs/monitoring/triggered-by')
+        .expect(200)
+
+      expect(mockJobsService.getMonitoringTriggeredByValues).toHaveBeenCalled()
+      expect(res.body).toEqual(['SYSTEM', 'CGWRK22'])
     })
   })
 

@@ -8,6 +8,7 @@ import { JobStatus } from './enums/job-status.enum'
 import { JobTrigger } from './enums/job-trigger.enum'
 import { JobType } from './enums/job-type.enum'
 import {
+  formatTriggeredBy,
   isMonitoredChildJobType,
   MONITORED_CHILD_JOB_TYPES,
   MONITORED_JOB_HISTORY_TYPES,
@@ -49,6 +50,41 @@ export interface CreateJobDto {
 @Injectable()
 export class JobsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private getMonitoringHistoryScopeWhere(
+    filters: Pick<MonitoringHistoryFilters, 'jobType' | 'status' | 'jobId' | 'triggeredBy'> = {},
+  ): Prisma.JobRunWhereInput {
+    const oneMonthAgo = new Date()
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
+
+    const monitoredTypes = filters.jobType ? [filters.jobType] : MONITORED_JOB_HISTORY_TYPES
+
+    const where: Prisma.JobRunWhereInput = {
+      startedAt: { gte: oneMonthAgo },
+      jobType: { in: monitoredTypes },
+      OR: [{ jobType: { in: MONITORED_CHILD_JOB_TYPES } }, { parentJobId: null }],
+      ...(filters.status && { status: filters.status }),
+      ...(filters.jobId && { id: filters.jobId }),
+    }
+
+    if (filters.triggeredBy) {
+      if (filters.triggeredBy === 'SYSTEM') {
+        where.jobTrigger = { in: [JobTrigger.CRON, JobTrigger.SYSTEM] }
+      } else if (filters.triggeredBy === JobTrigger.END_USER) {
+        where.jobTrigger = JobTrigger.END_USER
+      } else if (
+        filters.triggeredBy === JobTrigger.CRON ||
+        filters.triggeredBy === JobTrigger.SYSTEM
+      ) {
+        where.jobTrigger = filters.triggeredBy
+      } else {
+        where.jobTrigger = JobTrigger.END_USER
+        where.triggeredByUser = { equals: filters.triggeredBy, mode: 'insensitive' }
+      }
+    }
+
+    return where
+  }
 
   async createJob(dto: CreateJobDto) {
     const now = new Date()
@@ -305,34 +341,7 @@ export class JobsService {
   async getJobHistory(filters: MonitoringHistoryFilters = {}) {
     const page = filters.page ?? 1
     const limit = filters.limit ?? 10
-    const oneMonthAgo = new Date()
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
-
-    const monitoredTypes = filters.jobType ? [filters.jobType] : MONITORED_JOB_HISTORY_TYPES
-
-    const where: Prisma.JobRunWhereInput = {
-      startedAt: { gte: oneMonthAgo },
-      jobType: { in: monitoredTypes },
-      OR: [{ jobType: { in: MONITORED_CHILD_JOB_TYPES } }, { parentJobId: null }],
-      ...(filters.status && { status: filters.status }),
-      ...(filters.jobId && { id: filters.jobId }),
-    }
-
-    if (filters.triggeredBy) {
-      if (filters.triggeredBy === 'SYSTEM') {
-        where.jobTrigger = { in: [JobTrigger.CRON, JobTrigger.SYSTEM] }
-      } else if (filters.triggeredBy === 'USER' || filters.triggeredBy === JobTrigger.END_USER) {
-        where.jobTrigger = JobTrigger.END_USER
-      } else if (
-        filters.triggeredBy === JobTrigger.CRON ||
-        filters.triggeredBy === JobTrigger.SYSTEM
-      ) {
-        where.jobTrigger = filters.triggeredBy
-      } else {
-        where.jobTrigger = JobTrigger.END_USER
-        where.triggeredByUser = { equals: filters.triggeredBy, mode: 'insensitive' }
-      }
-    }
+    const where = this.getMonitoringHistoryScopeWhere(filters)
 
     const sortBy = filters.sortBy ?? 'startedAt'
     const sortOrder = filters.sortOrder ?? 'desc'
@@ -348,6 +357,31 @@ export class JobsService {
     ])
 
     return { data, total, page, limit }
+  }
+
+  async getMonitoringTriggeredByValues(): Promise<string[]> {
+    const rows = await this.prisma.jobRun.findMany({
+      where: this.getMonitoringHistoryScopeWhere(),
+      select: {
+        jobTrigger: true,
+        triggeredByUser: true,
+      },
+      distinct: ['jobTrigger', 'triggeredByUser'],
+    })
+
+    const values = Array.from(
+      new Set(
+        rows
+          .map((row) => formatTriggeredBy(row))
+          .map((value) => value.trim().toUpperCase())
+          .filter((value) => value.length > 0),
+      ),
+    )
+
+    const sortedIdirs = values
+      .filter((value) => value !== 'SYSTEM')
+      .sort((a, b) => a.localeCompare(b))
+    return values.includes('SYSTEM') ? ['SYSTEM', ...sortedIdirs] : sortedIdirs
   }
 
   async addActivity(

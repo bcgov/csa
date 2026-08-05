@@ -33,6 +33,7 @@ import {
   getJobActivities,
   getJobHistory,
   getLatestJobs,
+  getMonitoringTriggeredByValues,
   getRecentActivities,
   type ActivityParams,
   type JobActivityRow,
@@ -92,7 +93,6 @@ const normalizeStatus = (status: string): string => {
 
 const matchesTriggerFilter = (triggeredBy: string, filter: string): boolean => {
   if (!filter) return true
-  if (filter === 'USER') return triggeredBy !== 'SYSTEM'
   return triggeredBy.toUpperCase() === filter.toUpperCase()
 }
 
@@ -356,6 +356,7 @@ export default function JobMonitoringTab() {
     element: HTMLElement | null
     column: ActivityFilterColumn | ''
   }>({ element: null, column: '' })
+  const [triggerOptions, setTriggerOptions] = useState<string[]>([])
 
   // ── Data fetching ───────────────────────────────────────────────────────
   const fetchJobList = useCallback(async () => {
@@ -445,6 +446,15 @@ export default function JobMonitoringTab() {
     actSortOrder,
   ])
 
+  const fetchTriggerOptions = useCallback(async () => {
+    try {
+      const values = await getMonitoringTriggeredByValues()
+      setTriggerOptions(values)
+    } catch {
+      setTriggerOptions([])
+    }
+  }, [])
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void fetchJobList()
@@ -468,6 +478,10 @@ export default function JobMonitoringTab() {
 
     return () => window.clearTimeout(timeoutId)
   }, [fetchActivities])
+
+  useEffect(() => {
+    void fetchTriggerOptions()
+  }, [fetchTriggerOptions])
 
   const hasRunningJobs = jobListData.some((row) => row.status.toUpperCase() === 'RUNNING')
 
@@ -602,9 +616,7 @@ export default function JobMonitoringTab() {
     actSortField !== 'when' ||
     actSortOrder !== 'desc'
 
-  // Build trigger filter options from loaded monitoring data.
-  // Keep SYSTEM first, followed by discovered IDIRs in alphabetical order.
-  const triggerOptions = (() => {
+  const fallbackTriggerOptions = (() => {
     const found = new Set<string>()
     const add = (value: string | null | undefined) => {
       const normalized = (value || '').trim().toUpperCase()
@@ -621,6 +633,8 @@ export default function JobMonitoringTab() {
 
     return found.has('SYSTEM') ? ['SYSTEM', ...sortedIdirs] : sortedIdirs
   })()
+  const availableTriggerOptions =
+    triggerOptions.length > 0 ? triggerOptions : fallbackTriggerOptions
 
   // ── Job List: client-side filter + sort ──────────────────────────────────
   const filteredJobList = jobListData
@@ -879,7 +893,7 @@ export default function JobMonitoringTab() {
                 <MenuItem value="">
                   <em>All</em>
                 </MenuItem>
-                {triggerOptions.map((t) => (
+                {availableTriggerOptions.map((t) => (
                   <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
                     {t}
                   </MenuItem>
@@ -1153,7 +1167,7 @@ export default function JobMonitoringTab() {
                 <MenuItem value="">
                   <em>All</em>
                 </MenuItem>
-                {triggerOptions.map((t) => (
+                {availableTriggerOptions.map((t) => (
                   <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
                     {t}
                   </MenuItem>

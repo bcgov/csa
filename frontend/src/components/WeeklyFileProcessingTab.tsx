@@ -510,6 +510,7 @@ export default function WeeklyFileProcessingTab() {
     childSearchRequestIdRef.current += 1
 
     const timerId = window.setTimeout(() => {
+      setChildSearchTerm('')
       setLoadingChildSearch(false)
       setSelectedSearchContactId(null)
       setSearchedChildren([])
@@ -947,6 +948,16 @@ export default function WeeklyFileProcessingTab() {
     try {
       await reprocessWeeklyFileRecord(selectedFileId, selectedRecordId)
       await Promise.all([refreshWeeklyFiles(), refreshSelectedFileRecords()])
+
+      // Clear prior child-search context so the next matching workflow starts clean.
+      childSearchRequestIdRef.current += 1
+      setChildSearchTerm('')
+      setLoadingChildSearch(false)
+      setSelectedSearchContactId(null)
+      setSearchedChildren([])
+      setChildSearchPage(1)
+      setChildSearchTotalPages(1)
+      setChildSearchTotalRecords(0)
 
       setActionMessage(`Reprocess complete for record ${selectedRecordId}.`)
     } catch (err: any) {

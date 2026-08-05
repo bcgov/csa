@@ -110,7 +110,7 @@ describe('JobsService', () => {
 
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: { parentJobId: null },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: 0,
         take: 20,
       })
@@ -130,7 +130,7 @@ describe('JobsService', () => {
 
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: { parentJobId: null },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: 50,
         take: 25,
       })
@@ -141,7 +141,7 @@ describe('JobsService', () => {
 
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: { parentJobId: null, jobType: JobType.RUN_ELIGIBILITY },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: 0,
         take: 20,
       })
@@ -152,7 +152,7 @@ describe('JobsService', () => {
 
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: { parentJobId: null, status: JobStatus.FAILED },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: 0,
         take: 20,
       })
@@ -173,7 +173,7 @@ describe('JobsService', () => {
       }
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: expectedWhere,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: 10,
         take: 10,
       })
@@ -326,7 +326,7 @@ describe('JobsService', () => {
               { parentJobId: null },
             ],
           }),
-          orderBy: { startedAt: 'desc' },
+          orderBy: [{ startedAt: 'desc' }, { id: 'asc' }],
         }),
       )
     })

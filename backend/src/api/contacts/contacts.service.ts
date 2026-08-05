@@ -19,6 +19,7 @@ import {
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import {
+  buildStableOrderBy,
   enrichLabels,
   isEligibleAge,
   pacificToday,
@@ -113,7 +114,7 @@ export class ContactsService {
       }
     }
 
-    const stableOrderBy = this.buildStableOrderBy(orderBy)
+    const stableOrderBy = buildStableOrderBy(orderBy)
 
     const [data, total] = await Promise.all([
       this.prisma.contact.findMany({
@@ -512,7 +513,7 @@ export class ContactsService {
         where,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: this.buildStableOrderBy([{ lastName: 'asc' }, { firstName: 'asc' }]),
+        orderBy: buildStableOrderBy([{ lastName: 'asc' }, { firstName: 'asc' }]),
       }),
       this.prisma.contact.count({ where }),
     ])
@@ -524,25 +525,6 @@ export class ContactsService {
       total,
       totalPages: Math.ceil(total / limit),
     }
-  }
-
-  /**
-   * Ensures paginated contact queries use a deterministic order so rows do not
-   * shift between pages when sort keys tie or no sort is provided.
-   */
-  private buildStableOrderBy(
-    orderBy?: Array<Record<string, 'asc' | 'desc'>>,
-  ): Array<Record<string, 'asc' | 'desc'>> {
-    if (!orderBy || orderBy.length === 0) {
-      return [{ id: 'asc' }]
-    }
-
-    const hasIdSort = orderBy.some((item) => Object.keys(item)[0] === 'id')
-    if (hasIdSort) {
-      return orderBy
-    }
-
-    return [...orderBy, { id: 'asc' }]
   }
 
   async holdContacts(

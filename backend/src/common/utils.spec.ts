@@ -2,6 +2,7 @@ import { DateTime } from 'luxon'
 import { describe, expect, it, vi } from 'vitest'
 import {
   enrichLabels,
+  buildStableOrderBy,
   firstDayOfPreviousMonthPacific,
   formatDatePacific,
   formatDatePacificCompact,
@@ -542,5 +543,28 @@ describe('enrichLabels', () => {
     expect(result.csaStatusLabel).toBe('Eligible')
     expect(result.dateOfBirth).toBe('2012-03-15')
     expect(result.isOver18).toBeDefined()
+  })
+})
+
+describe('buildStableOrderBy', () => {
+  it('should default to id asc when no sort is provided', () => {
+    expect(buildStableOrderBy()).toEqual([{ id: 'asc' }])
+    expect(buildStableOrderBy([])).toEqual([{ id: 'asc' }])
+  })
+
+  it('should append id tie-breaker to user sort', () => {
+    expect(buildStableOrderBy({ lastName: 'asc' })).toEqual([
+      { lastName: 'asc' },
+      { id: 'asc' },
+    ])
+    expect(buildStableOrderBy([{ lastName: 'desc' }, { firstName: 'asc' }])).toEqual([
+      { lastName: 'desc' },
+      { firstName: 'asc' },
+      { id: 'asc' },
+    ])
+  })
+
+  it('should not duplicate id when sort already includes id', () => {
+    expect(buildStableOrderBy({ id: 'desc' })).toEqual([{ id: 'desc' }])
   })
 })

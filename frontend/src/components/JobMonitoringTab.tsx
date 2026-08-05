@@ -33,6 +33,7 @@ import {
   getJobActivities,
   getJobHistory,
   getLatestJobs,
+  getMonitoringTriggeredByValues,
   getRecentActivities,
   type ActivityParams,
   type JobActivityRow,
@@ -61,7 +62,6 @@ const STATUS_TO_API: Record<string, string> = {
   Running: 'RUNNING',
   Failed: 'FAILED',
 }
-const TRIGGER_OPTIONS = ['SYSTEM', 'USER']
 const ACTIVITY_SEVERITIES = ['ERROR', 'WARNING', 'CRITICAL']
 const ACTIVITY_TYPES = ['DATA_QUALITY', 'JOB', 'CRA', 'WKL', 'ICM', 'BATCH']
 const ACTIVITY_TYPE_LABELS: Record<string, string> = {
@@ -93,8 +93,7 @@ const normalizeStatus = (status: string): string => {
 
 const matchesTriggerFilter = (triggeredBy: string, filter: string): boolean => {
   if (!filter) return true
-  if (filter === 'USER') return triggeredBy !== 'SYSTEM'
-  return triggeredBy === filter
+  return triggeredBy.toUpperCase() === filter.toUpperCase()
 }
 
 const normalizeSeverity = (severity: string): string => {
@@ -357,6 +356,7 @@ export default function JobMonitoringTab() {
     element: HTMLElement | null
     column: ActivityFilterColumn | ''
   }>({ element: null, column: '' })
+  const [triggerOptions, setTriggerOptions] = useState<string[]>([])
 
   // ── Data fetching ───────────────────────────────────────────────────────
   const fetchJobList = useCallback(async () => {
@@ -446,6 +446,15 @@ export default function JobMonitoringTab() {
     actSortOrder,
   ])
 
+  const fetchTriggerOptions = useCallback(async () => {
+    try {
+      const values = await getMonitoringTriggeredByValues()
+      setTriggerOptions(values)
+    } catch {
+      setTriggerOptions([])
+    }
+  }, [])
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void fetchJobList()
@@ -469,6 +478,14 @@ export default function JobMonitoringTab() {
 
     return () => window.clearTimeout(timeoutId)
   }, [fetchActivities])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void fetchTriggerOptions()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [fetchTriggerOptions])
 
   const hasRunningJobs = jobListData.some((row) => row.status.toUpperCase() === 'RUNNING')
 
@@ -603,12 +620,31 @@ export default function JobMonitoringTab() {
     actSortField !== 'when' ||
     actSortOrder !== 'desc'
 
+  const fallbackTriggerOptions = (() => {
+    const found = new Set<string>()
+    const add = (value: string | null | undefined) => {
+      const normalized = (value || '').trim().toUpperCase()
+      if (!normalized) return
+      found.add(normalized)
+    }
+
+    jobListData.forEach((row) => add(row.triggeredBy))
+    jobHistoryData.forEach((row) => add(row.triggeredBy))
+
+    const sortedIdirs = Array.from(found)
+      .filter((v) => v !== 'SYSTEM')
+      .sort((a, b) => a.localeCompare(b))
+
+    return found.has('SYSTEM') ? ['SYSTEM', ...sortedIdirs] : sortedIdirs
+  })()
+  const availableTriggerOptions =
+    triggerOptions.length > 0 ? triggerOptions : fallbackTriggerOptions
+
   // ── Job List: client-side filter + sort ──────────────────────────────────
   const filteredJobList = jobListData
     .filter((row) => {
       if (jlFilterId && !String(row.id).includes(jlFilterId)) return false
-      if (jlFilterName && !row.jobName.toLowerCase().includes(jlFilterName.toLowerCase()))
-        return false
+      if (jlFilterName && row.jobName !== jlFilterName) return false
       if (jlFilterStatus && row.status !== jlFilterStatus) return false
       if (!matchesTriggerFilter(row.triggeredBy, jlFilterTrigger)) return false
       return true
@@ -803,12 +839,26 @@ export default function JobMonitoringTab() {
               />
             )}
             {jlFilterAnchor.column === 'jobName' && (
-              <TextField
-                {...filterTextFieldProps}
+              <Select
+                size="small"
                 fullWidth
                 value={jlFilterName}
-                onChange={(e) => setJlFilterName(e.target.value)}
-              />
+                displayEmpty
+                onChange={(e) => {
+                  setJlFilterName(e.target.value)
+                  closeJlFilter()
+                }}
+                sx={{ ...filterSelectSx, minWidth: 140 }}
+              >
+                <MenuItem value="">
+                  <em>All</em>
+                </MenuItem>
+                {MONITORED_JOB_NAMES.map((n) => (
+                  <MenuItem key={n} value={n} sx={{ fontSize: '0.75rem' }}>
+                    {n}
+                  </MenuItem>
+                ))}
+              </Select>
             )}
             {jlFilterAnchor.column === 'status' && (
               <Select
@@ -847,7 +897,7 @@ export default function JobMonitoringTab() {
                 <MenuItem value="">
                   <em>All</em>
                 </MenuItem>
-                {TRIGGER_OPTIONS.map((t) => (
+                {availableTriggerOptions.map((t) => (
                   <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
                     {t}
                   </MenuItem>
@@ -1121,7 +1171,7 @@ export default function JobMonitoringTab() {
                 <MenuItem value="">
                   <em>All</em>
                 </MenuItem>
-                {TRIGGER_OPTIONS.map((t) => (
+                {availableTriggerOptions.map((t) => (
                   <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
                     {t}
                   </MenuItem>

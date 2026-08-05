@@ -338,10 +338,7 @@ export class ContactsService {
         updateData.cancelReasonCode = '21'
       }
       updateData.careEndDate = this.resolveCareEndDateForCancellation(
-        await this.findLatestPlacementEndDateFromStaging(
-          contact.personIdIcm,
-          contact.personIdMis,
-        ),
+        await this.findLatestPlacementEndDateFromStaging(contact.personIdIcm, contact.personIdMis),
       )
     }
 

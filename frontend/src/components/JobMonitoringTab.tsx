@@ -39,6 +39,7 @@ import {
   type JobHistoryParams,
   type MonitoringJobRow,
 } from '../service/jobs-service'
+import { formatDateTimeYMDHMS } from '../utils/date-format'
 
 const ITEMS_PER_PAGE = 10
 const RUNNING_JOB_POLL_MS = 30_000
@@ -71,27 +72,10 @@ const ACTIVITY_TYPE_LABELS: Record<string, string> = {
   BATCH: 'Batch',
 }
 
-/** Format a date string to PT timezone: yyyy-Mmm-dd HH:mm:ss */
-const formatDatePT = (dateStr: string | null | undefined): string => {
+const formatMonitoringDate = (dateStr: string | null | undefined): string => {
   if (!dateStr) return '—'
-  try {
-    const date = new Date(dateStr)
-    if (isNaN(date.getTime())) return '—'
-    const tz = 'America/Vancouver'
-    const year = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric' }).format(date)
-    const month = new Intl.DateTimeFormat('en-US', { timeZone: tz, month: 'short' }).format(date)
-    const day = new Intl.DateTimeFormat('en-US', { timeZone: tz, day: '2-digit' }).format(date)
-    const time = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).format(date)
-    return `${year}-${month}-${day} ${time}`
-  } catch {
-    return '—'
-  }
+  if (Number.isNaN(new Date(dateStr).getTime())) return '—'
+  return formatDateTimeYMDHMS(dateStr)
 }
 
 const normalizeStatus = (status: string): string => {
@@ -735,14 +719,14 @@ export default function JobMonitoringTab() {
                   filterActive={jlFilterTrigger.length > 0}
                 />
                 <SortableHeaderCell
-                  label="Started (PT)"
+                  label="Started"
                   field="started"
                   currentSortField={jlSortField}
                   currentSortOrder={jlSortOrder}
                   onSort={handleJlSort}
                 />
                 <SortableHeaderCell
-                  label="Finished (PT)"
+                  label="Finished"
                   field="finished"
                   currentSortField={jlSortField}
                   currentSortOrder={jlSortOrder}
@@ -777,8 +761,8 @@ export default function JobMonitoringTab() {
                       </Box>
                     </TableCell>
                     <TableCell sx={cellSx}>{row.triggeredBy || '—'}</TableCell>
-                    <TableCell sx={cellSx}>{formatDatePT(row.started)}</TableCell>
-                    <TableCell sx={cellSx}>{formatDatePT(row.finished)}</TableCell>
+                    <TableCell sx={cellSx}>{formatMonitoringDate(row.started)}</TableCell>
+                    <TableCell sx={cellSx}>{formatMonitoringDate(row.finished)}</TableCell>
                     <TableCell sx={cellSx}>{row.summary || '—'}</TableCell>
                     <TableCell sx={cellSx}>
                       {row.warning ? warningChip(row.warning) : '—'}
@@ -976,14 +960,14 @@ export default function JobMonitoringTab() {
                   filterActive={jhFilterTrigger.length > 0}
                 />
                 <SortableHeaderCell
-                  label="Started (PT)"
+                  label="Started"
                   field="startedAt"
                   currentSortField={jhSortField}
                   currentSortOrder={jhSortOrder}
                   onSort={handleJhSort}
                 />
                 <SortableHeaderCell
-                  label="Finished (PT)"
+                  label="Finished"
                   field="completedAt"
                   currentSortField={jhSortField}
                   currentSortOrder={jhSortOrder}
@@ -1028,8 +1012,8 @@ export default function JobMonitoringTab() {
                       </Box>
                     </TableCell>
                     <TableCell sx={cellSx}>{row.triggeredBy || '—'}</TableCell>
-                    <TableCell sx={cellSx}>{formatDatePT(row.started)}</TableCell>
-                    <TableCell sx={cellSx}>{formatDatePT(row.finished)}</TableCell>
+                    <TableCell sx={cellSx}>{formatMonitoringDate(row.started)}</TableCell>
+                    <TableCell sx={cellSx}>{formatMonitoringDate(row.finished)}</TableCell>
                     <TableCell sx={cellSx}>{row.summary || '—'}</TableCell>
                     <TableCell sx={cellSx}>
                       {row.warning ? warningChip(row.warning) : '—'}
@@ -1244,7 +1228,7 @@ export default function JobMonitoringTab() {
             <TableHead>
               <TableRow>
                 <SortableHeaderCell
-                  label="When (PT)"
+                  label="When"
                   field="when"
                   currentSortField={actSortField}
                   currentSortOrder={actSortOrder}
@@ -1297,7 +1281,7 @@ export default function JobMonitoringTab() {
               ) : (
                 activitiesData.map((row) => (
                   <TableRow key={row.id} hover>
-                    <TableCell sx={cellSx}>{formatDatePT(row.when)}</TableCell>
+                    <TableCell sx={cellSx}>{formatMonitoringDate(row.when)}</TableCell>
                     <TableCell sx={cellSx}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {getSeverityIcon(row.severity)}
@@ -1410,7 +1394,7 @@ export default function JobMonitoringTab() {
                 </MenuItem>
                 {ACTIVITY_TYPES.map((t) => (
                   <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
-                    {t}
+                    {ACTIVITY_TYPE_LABELS[t] ?? t}
                   </MenuItem>
                 ))}
               </Select>

@@ -553,10 +553,7 @@ describe('buildStableOrderBy', () => {
   })
 
   it('should append id tie-breaker to user sort', () => {
-    expect(buildStableOrderBy({ lastName: 'asc' })).toEqual([
-      { lastName: 'asc' },
-      { id: 'asc' },
-    ])
+    expect(buildStableOrderBy({ lastName: 'asc' })).toEqual([{ lastName: 'asc' }, { id: 'asc' }])
     expect(buildStableOrderBy([{ lastName: 'desc' }, { firstName: 'asc' }])).toEqual([
       { lastName: 'desc' },
       { firstName: 'asc' },

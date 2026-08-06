@@ -10,7 +10,7 @@ import { Request } from 'express'
 import { JwtVerificationService } from 'src/common/auth/jwt-verification.service'
 import { extractUsernameFromPayload } from 'src/common/auth/token-utils'
 import { AdminService } from '../../admin/admin.service'
-import { UserProfile } from '../../admin/constants/user-profile.constants'
+import { isValidUserProfile, UserProfile } from '../../admin/constants/user-profile.constants'
 
 interface JwtPayload {
   exp?: number
@@ -26,7 +26,7 @@ interface JwtPayload {
 // Key: username, Value: { hasAccess: boolean, userProfile: UserProfile | null, expiresAt: number }
 const csaAccessCache = new Map<
   string,
-  { hasAccess: boolean; userProfile: UserProfile | null; expiresAt: number }
+  { hasAccess: boolean; userProfile?: UserProfile; expiresAt: number }
 >()
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes cache TTL
 
@@ -88,19 +88,22 @@ export class CSAGuard implements CanActivate {
         throw new UnauthorizedException('User does not have CSA access')
       }
       // Attach cached user profile to request
-      ;(request as any).userProfile = cached.userProfile
+      ;(request as any).userProfile = cached.userProfile ?? null
       return true
     }
 
     // Verify CSA access and fetch user profile from ICM
     this.logger.debug(`Verifying CSA access for user: ${username}`)
     const csaAccessResult = await this.adminService.verifyCSAAccess(username)
-    const userProfile = await this.adminService.getUserProfile(username)
+    const userProfile =
+      csaAccessResult.userProfile && isValidUserProfile(csaAccessResult.userProfile)
+        ? csaAccessResult.userProfile
+        : null
 
     // Cache the result
     csaAccessCache.set(username, {
       hasAccess: csaAccessResult.hasAccess,
-      userProfile,
+      ...(userProfile && { userProfile }),
       expiresAt: Date.now() + CACHE_TTL_MS,
     })
 

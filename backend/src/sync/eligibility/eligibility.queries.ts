@@ -458,7 +458,7 @@ export function buildLoadContactProfilesSql(
     master_contacts.last_updated_by   AS "lastUpdatedBy",
     COALESCE(master_contacts.csa_status, ${ICM_STATUS_CASE}) AS "csaStatus",
     COALESCE(master_contacts.csa_status_effective_date, (cases.X_CSA_EFF_DATE::timestamp AT TIME ZONE 'America/Vancouver')) AS "csaStatusEffectiveDate",
-    master_contacts.last_eligibility_evaluated_at AS "lastEligibilityEvaluatedAt",
+    master_contacts.last_eligibility_run_at AS "lastEligibilityRunAt",
     cases.PERSON_ID_MIS              AS "personIdMis",
     master_contacts.is_ineligible        AS "isIneligible",
     master_contacts.cancel_reason_code   AS "cancelReasonCode",

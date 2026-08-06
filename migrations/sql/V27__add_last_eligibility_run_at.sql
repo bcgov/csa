@@ -9,7 +9,7 @@ COMMENT ON COLUMN csa.contacts.last_eligibility_run_at IS
 -- Seed from existing CSA status effective date so BL-14C skip behaviour matches production
 -- (previously used csa_status_effective_date as the freshness watermark).
 -- Records with no effective date stay NULL (same as before: eligibility will not skip).
--- Hold/resume defect cohort may still have a resume-time watermark; fix via remediation script.
+-- Hold/resume defect cohort may still have a resume-time watermark; remediate separately (see wiki).
 UPDATE csa.contacts
 SET last_eligibility_run_at = csa_status_effective_date
 WHERE csa_status_effective_date IS NOT NULL

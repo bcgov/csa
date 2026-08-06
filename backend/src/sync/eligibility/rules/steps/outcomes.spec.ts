@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
 import { step7_UpdateEligible } from './step7-update-eligible'
-import { step8_Section54Update } from './step8-section54-update'
 import { step8_UpdateEligibleTbd } from './step8-update-eligible-tbd'
 import { step9_UpdateNotEligible } from './step9-update-not-eligible'
 import { step10_UpdateOver18 } from './step10-update-over18'
@@ -70,30 +69,8 @@ describe('step8_UpdateEligibleTbd', () => {
     expect(result.newStatus).toBe(CSA_STATUS.ELIGIBLE)
   })
 
-  it('should keep not_eligible_in_pay unchanged (non-Section 54 Step 8 path)', () => {
-    const result = step8_UpdateEligibleTbd(CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
-    expect(result.newStatus).toBe(CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
-  })
-})
-
-describe('step8_Section54Update', () => {
-  it('should return eligible_tbd when current status is not_eligible_out_of_pay', () => {
-    const result = step8_Section54Update(CSA_STATUS.NOT_ELIGIBLE_OUT_OF_PAY)
-    expect(result).toEqual({
-      step: 8,
-      newStatus: CSA_STATUS.ELIGIBLE_TBD,
-      cancelReasonCode: null,
-      careEndDate: null,
-    })
-  })
-
-  it('should return eligible_tbd when current status is blank (null)', () => {
-    const result = step8_Section54Update(null)
-    expect(result.newStatus).toBe(CSA_STATUS.ELIGIBLE_TBD)
-  })
-
   it('should return in_pay when current status is not_eligible_in_pay', () => {
-    const result = step8_Section54Update(CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
+    const result = step8_UpdateEligibleTbd(CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
     expect(result).toEqual({
       step: 8,
       newStatus: CSA_STATUS.IN_PAY,
@@ -103,12 +80,7 @@ describe('step8_Section54Update', () => {
   })
 
   it('should return in_pay when current status is not_eligible_ip_tbd', () => {
-    const result = step8_Section54Update(CSA_STATUS.NOT_ELIGIBLE_IP_TBD)
-    expect(result.newStatus).toBe(CSA_STATUS.IN_PAY)
-  })
-
-  it('should keep existing status when no transition applies', () => {
-    const result = step8_Section54Update(CSA_STATUS.IN_PAY)
+    const result = step8_UpdateEligibleTbd(CSA_STATUS.NOT_ELIGIBLE_IP_TBD)
     expect(result.newStatus).toBe(CSA_STATUS.IN_PAY)
   })
 })

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { buildStableOrderBy } from 'src/common/utils'
 import { toContactAuditTrailDto } from './contact-audit-trail.mapper'
 import { ContactAuditTrailDto } from './dto/contact-audit-trail.dto'
 
@@ -20,7 +21,7 @@ export class AuditTrailService {
     const [rows, total] = await Promise.all([
       this.prisma.contactAuditTrail.findMany({
         where,
-        orderBy: { actionedAt: 'desc' },
+        orderBy: buildStableOrderBy({ actionedAt: 'desc' }),
         skip: (safePage - 1) * safeLimit,
         take: safeLimit,
       }),

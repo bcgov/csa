@@ -129,7 +129,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 50,
         take: 25,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {},
       })
     })
@@ -144,7 +144,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 200,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {},
       })
     })
@@ -163,7 +163,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: [{ lastName: 'asc' }],
+        orderBy: [{ lastName: 'asc' }, { id: 'asc' }],
         where: { lastName: { contains: 'Doe', mode: 'insensitive' } },
       })
       expect(result.data).toEqual([enrichedContact1])
@@ -178,9 +178,48 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: [{ firstName: 'desc' }],
+        orderBy: [{ firstName: 'desc' }, { id: 'asc' }],
         where: {},
       })
+    })
+
+    it('should use stable default order when no sort is provided', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
+
+      await service.findAll()
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: [{ id: 'asc' }],
+        }),
+      )
+    })
+
+    it('should append id tie-breaker for user-selected sorts', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
+
+      await service.findAll(1, 10, '[{"lastName":"asc"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: [{ lastName: 'asc' }, { id: 'asc' }],
+        }),
+      )
+    })
+
+    it('should not duplicate id when sort already includes id', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
+
+      await service.findAll(1, 10, '[{"id":"desc"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: [{ id: 'desc' }],
+        }),
+      )
     })
 
     it('should handle filter without sort', async () => {
@@ -192,7 +231,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { din: { contains: 'ABC', mode: 'insensitive' } },
       })
     })
@@ -206,7 +245,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { din: { contains: '100\\%', mode: 'insensitive' } },
       })
     })
@@ -225,7 +264,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {
           OR: [
             { searchText: { contains: 'smith', mode: 'insensitive' } },
@@ -268,7 +307,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: [{ lastName: 'desc' }, { firstName: 'asc' }],
+        orderBy: [{ lastName: 'desc' }, { firstName: 'asc' }, { id: 'asc' }],
         where: {},
       })
     })
@@ -287,7 +326,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {
           AND: [{ lastName: { contains: 'Doe', mode: 'insensitive' } }, { age: { gte: 18 } }],
         },
@@ -308,7 +347,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {
           OR: [{ csaStatus: { equals: 'eligible' } }, { csaStatus: { equals: 'in_pay' } }],
         },
@@ -329,7 +368,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {
           AND: [
             { lastName: { contains: 'Doe', mode: 'insensitive' } },
@@ -348,7 +387,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { csaStatus: { equals: 'eligible' } },
       })
     })
@@ -362,7 +401,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { csaStatus: { not: { equals: 'deleted' } } },
       })
     })
@@ -376,7 +415,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { age: { gt: 18 } },
       })
     })
@@ -390,7 +429,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { age: { gte: 18 } },
       })
     })
@@ -404,7 +443,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { age: { lt: 65 } },
       })
     })
@@ -418,7 +457,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { age: { lte: 65 } },
       })
     })
@@ -437,7 +476,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { csaStatus: { in: ['eligible', 'in_pay'] } },
       })
     })
@@ -456,7 +495,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { csaStatus: { not: { in: ['deleted', 'archived'] } } },
       })
     })
@@ -470,7 +509,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { din: null },
       })
     })
@@ -484,7 +523,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { din: { not: null } },
       })
     })
@@ -498,7 +537,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { OR: [{ din: null }, { din: '' }] },
       })
     })
@@ -512,7 +551,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { NOT: { OR: [{ din: null }, { din: '' }] } },
       })
     })
@@ -526,7 +565,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {},
       })
     })
@@ -546,7 +585,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {},
       })
     })
@@ -584,7 +623,7 @@ describe('ContactsService', () => {
         where: { searchText: { contains: 'smi', mode: 'insensitive' } },
         skip: 0,
         take: 10,
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
       })
       expect(result).toEqual({
         data: mockData,
@@ -641,7 +680,7 @@ describe('ContactsService', () => {
         where: { searchText: { contains: '100\\%', mode: 'insensitive' } },
         skip: 0,
         take: 10,
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
       })
     })
 
@@ -655,7 +694,7 @@ describe('ContactsService', () => {
         where: { searchText: { contains: 'test\\_user', mode: 'insensitive' } },
         skip: 0,
         take: 10,
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
       })
     })
   })
@@ -1375,6 +1414,52 @@ describe('ContactsService', () => {
         expect(result.to).toBe('not_eligible_ip_tbd')
         const updateCall = updateSpy.mock.calls[0][0] as any
         expect(updateCall.data).not.toHaveProperty('cancelReasonCode')
+        expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
+      })
+
+      it('should fall back to today when staging returns blank placement end dates', async () => {
+        const contact = {
+          id: 1,
+          csaStatus: 'in_pay',
+          cancelReasonCode: null,
+          personIdIcm: '1-10981225231',
+          personIdMis: '',
+          resumeStatus: null,
+        }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        vi.spyOn(prisma, '$queryRaw').mockResolvedValue([{ maxEndDate: '' }] as any)
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
+          userId: 'user1',
+        })
+
+        expect(result.success).toBe(true)
+        const updateCall = updateSpy.mock.calls[0][0] as any
+        expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
+        expect(Number.isNaN(updateCall.data.careEndDate.getTime())).toBe(false)
+      })
+
+      it('should skip staging lookup when both person ids are blank', async () => {
+        const contact = {
+          id: 1,
+          csaStatus: 'in_pay',
+          cancelReasonCode: null,
+          personIdIcm: '   ',
+          personIdMis: '',
+          resumeStatus: null,
+        }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        const querySpy = vi.spyOn(prisma, '$queryRaw')
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
+          userId: 'user1',
+        })
+
+        expect(result.success).toBe(true)
+        expect(querySpy).not.toHaveBeenCalled()
+        const updateCall = updateSpy.mock.calls[0][0] as any
         expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
       })
     })

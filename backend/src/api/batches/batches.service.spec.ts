@@ -699,7 +699,7 @@ describe('BatchesService', () => {
       })
     })
 
-    it('should apply BL-05 defaults for cancellation when fields are blank', async () => {
+    it('should default cancellation fields when blank and capture them', async () => {
       const contact = {
         id: 3,
         caseNumber: 'CASE-3',
@@ -746,45 +746,6 @@ describe('BatchesService', () => {
       })
     })
 
-    it('should apply BL-05 default effectiveDate for application when blank', async () => {
-      const contact = {
-        id: 4,
-        caseNumber: 'CASE-4',
-        csaStatus: 'eligible',
-        firstName: 'Alice',
-        lastName: 'Green',
-        gender: 'F',
-        dateOfBirth: new Date('2000-03-10'),
-        birthCity: 'Victoria',
-        birthCountry: 'Canada',
-        birthProvince: 'BC',
-        effectiveDate: null,
-        careEndDate: null,
-        cancelReasonCode: null,
-      }
-
-      mockPrisma.batch.findFirst.mockResolvedValue({ id: 1, status: 'pending' })
-      mockPrisma.contact.findMany.mockResolvedValue([contact])
-      mockPrisma.contactBatchDetail.findMany.mockResolvedValue([])
-      mockContactsService.updateCsaStatus.mockResolvedValue({
-        success: true,
-        to: 'in_batch_application',
-      })
-      mockPrisma.contactBatchDetail.create.mockResolvedValue({ id: 13 })
-      mockPrisma.contactBatchDetail.update.mockResolvedValue({})
-      mockPrisma.batch.update.mockResolvedValue({})
-      mockPrisma.contact.update.mockResolvedValue({})
-
-      const result = await service.addContactsToPendingBatch([4], 'user@test.com')
-
-      expect(result.success).toContain(4)
-      expect(mockPrisma.contact.update).toHaveBeenCalledWith({
-        where: { id: 4 },
-        data: expect.objectContaining({
-          effectiveDate: expect.any(Date),
-        }),
-      })
-    })
   })
 
   describe('User Story 40101 - S1: Manual add with CRA validation & incomplete records', () => {
@@ -881,7 +842,7 @@ describe('BatchesService', () => {
       expect(mockContactsService.updateCsaStatus).not.toHaveBeenCalled()
     })
 
-    it('should add application records without effectiveDate and apply BL-05 default', async () => {
+    it('should add application records without effectiveDate when user fields are complete', async () => {
       const applicationNoEffectiveDate = makeContact({
         id: 103,
         caseNumber: 'CASE-103',
@@ -895,19 +856,21 @@ describe('BatchesService', () => {
 
       setupCommonMocks([applicationNoEffectiveDate])
       setupSuccessfulTransitionMock()
-      mockPrisma.contact.update.mockResolvedValue({})
 
       const result = await service.addContactsToPendingBatch([103], 'user@test.com')
 
       expect(result.success).toContain(103)
       expect(result.incomplete).toHaveLength(0)
-      expect(mockPrisma.contact.update).toHaveBeenCalledWith({
-        where: { id: 103 },
-        data: expect.objectContaining({ effectiveDate: expect.any(Date) }),
+      expect(mockPrisma.contact.update).not.toHaveBeenCalled()
+      expect(mockPrisma.contactBatchDetail.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          effectiveDate: null,
+          transactionType: 'application',
+        }),
       })
     })
 
-    it('should add cancellation records without careEndDate/cancelReasonCode and apply BL-05 defaults', async () => {
+    it('should add cancellation records without careEndDate or cancelReasonCode and default them', async () => {
       const cancellationMissingFields = makeContact({
         id: 104,
         caseNumber: 'CASE-104',

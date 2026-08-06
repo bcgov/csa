@@ -521,27 +521,21 @@ export class BatchesService {
 
           const caseNumber = contact.caseNumber ?? ''
 
-          // Per FDD BL-05: default system-generated fields when blank
-          const bl05Updates: Record<string, unknown> = {}
-          if (transactionType === TRANSACTION_TYPES.APPLICATION) {
-            if (!contact.effectiveDate) {
-              const today = pacificToday()
-              bl05Updates.effectiveDate = today
-              contact.effectiveDate = today
-            }
-          } else {
+          // Per FDD BL-05: default cancellation fields when blank
+          if (transactionType === TRANSACTION_TYPES.CANCELLATION) {
+            const contactUpdates: Record<string, unknown> = {}
             if (!contact.careEndDate) {
               const today = pacificToday()
-              bl05Updates.careEndDate = today
+              contactUpdates.careEndDate = today
               contact.careEndDate = today
             }
             if (!contact.cancelReasonCode) {
-              bl05Updates.cancelReasonCode = CANCEL_REASON.CHILD_LEFT
+              contactUpdates.cancelReasonCode = CANCEL_REASON.CHILD_LEFT
               contact.cancelReasonCode = CANCEL_REASON.CHILD_LEFT
             }
-          }
-          if (Object.keys(bl05Updates).length > 0) {
-            await tx.contact.update({ where: { id: contactId }, data: bl05Updates })
+            if (Object.keys(contactUpdates).length > 0) {
+              await tx.contact.update({ where: { id: contactId }, data: contactUpdates })
+            }
           }
 
           // Capture snapshot of effective date and cancellation reason at time of batching

@@ -28,8 +28,9 @@ function isPresent(value: string | Date | null | undefined): boolean {
  * before it is added to a batch.
  *
  * System-generated fields (Application Start Date, Cancellation End Date,
- * Cancellation Reason Code) are populated by BL-05 after validation passes
- * and are intentionally excluded here.
+ * Cancellation Reason Code) are excluded from pre-add validation. Cancellation
+ * defaults are applied during add-to-batch; application start date comes from
+ * eligibility data on the contact.
  *
  * Rules:
  *  - Always required: firstName, lastName, gender, dateOfBirth, birthCity, birthCountry

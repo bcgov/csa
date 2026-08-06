@@ -745,7 +745,6 @@ describe('BatchesService', () => {
         }),
       })
     })
-
   })
 
   describe('User Story 40101 - S1: Manual add with CRA validation & incomplete records', () => {

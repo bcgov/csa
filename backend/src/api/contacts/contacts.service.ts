@@ -350,6 +350,10 @@ export class ContactsService {
       updateData.careEndDate = null
     }
 
+    if (currentState === CSA_STATUS.ON_HOLD && nextState !== CSA_STATUS.ON_HOLD) {
+      updateData.needsReview = false
+    }
+
     await db.contact.update({
       where: { id: contactId },
       data: updateData,
@@ -475,6 +479,10 @@ export class ContactsService {
       updateData.csaStatusEffectiveDate = new Date()
     }
 
+    if (currentState === CSA_STATUS.ON_HOLD && nextState !== CSA_STATUS.ON_HOLD) {
+      updateData.needsReview = false
+    }
+
     await this.prisma.contact.update({
       where: { id: contactId },
       data: updateData,
@@ -580,11 +588,6 @@ export class ContactsService {
         additionalData: Object.keys(additionalData).length > 0 ? additionalData : undefined,
       })
       if (transitionResult.success) {
-        // Clear the review flag when resuming from hold
-        await this.prisma.contact.update({
-          where: { id },
-          data: { needsReview: false },
-        })
         result.success.push(id)
       } else {
         const skipReason =

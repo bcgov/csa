@@ -21,6 +21,23 @@ describe('step2_LegalStatusCheck', () => {
     expect(result!.step).toBe(8)
   })
 
+  it('should restore in_pay from not_eligible_in_pay when MIS Legal Auth Code is OPC', () => {
+    const ctx = makeCtx({ misLegalAuthCode: 'OPC', csaStatus: 'not_eligible_in_pay' })
+    const result = step2_LegalStatusCheck.evaluate(ctx)
+    expect(result).toEqual({
+      step: 8,
+      newStatus: 'in_pay',
+      cancelReasonCode: null,
+      careEndDate: null,
+    })
+  })
+
+  it('should restore in_pay from not_eligible_ip_tbd when MIS Legal Auth Code is OPO', () => {
+    const ctx = makeCtx({ misLegalAuthCode: 'OPO', csaStatus: 'not_eligible_ip_tbd' })
+    const result = step2_LegalStatusCheck.evaluate(ctx)
+    expect(result!.newStatus).toBe('in_pay')
+  })
+
   it('should route to step 8 when MIS Legal Auth Code is OPO', () => {
     const ctx = makeCtx({ misLegalAuthCode: 'OPO' })
     const result = step2_LegalStatusCheck.evaluate(ctx)

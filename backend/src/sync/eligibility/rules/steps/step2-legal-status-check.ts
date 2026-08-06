@@ -2,6 +2,7 @@ import { normalize } from 'src/common/utils'
 import { ELIGIBILITY_CONFIG } from '../../eligibility.config'
 import { EligibilityResult } from '../../eligibility.types'
 import { EligibilityContext, EligibilityRule } from '../rule.interface'
+import { step8_Section54Update } from './step8-section54-update'
 import { step8_UpdateEligibleTbd } from './step8-update-eligible-tbd'
 import { step9_UpdateNotEligible } from './step9-update-not-eligible'
 
@@ -24,7 +25,7 @@ export const step2_LegalStatusCheck: EligibilityRule = {
       misLegalAuthCode &&
       ELIGIBILITY_CONFIG.STEP8_LEGAL_AUTH_CODES.includes(normalize(misLegalAuthCode)!)
     ) {
-      return step8_UpdateEligibleTbd(csaStatus)
+      return step8_Section54Update(csaStatus)
     }
 
     const isNotExpired = legalExpiryDate === null || legalExpiryDate >= ctx.referenceDate

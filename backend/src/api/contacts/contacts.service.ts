@@ -4,11 +4,10 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
-import { AppLogger } from 'src/common/logger/app-logger'
-import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
-import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { Prisma } from '@prisma/client'
+import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { AppLogger } from 'src/common/logger/app-logger'
 import {
   CRA_FILE_REJECTED_TARGET,
   CSA_EVENT,
@@ -26,6 +25,7 @@ import {
   parseISODatePacific,
   parseWklDate,
 } from 'src/common/utils'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { getCancelReasonLabel } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
 import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
@@ -88,6 +88,15 @@ export class ContactsService {
               throw new BadRequestException(
                 `Invalid sort direction: ${direction}. Allowed values: asc, desc`,
               )
+            }
+
+            if (field === 'birthPlace') {
+              orderBy.push(
+                { birthCity: direction },
+                { birthProvince: direction },
+                { birthCountry: direction },
+              )
+              continue
             }
 
             orderBy.push({ [field]: direction })
@@ -171,6 +180,10 @@ export class ContactsService {
     let key = filterKey
     let value: unknown = filterValue
 
+    if (key === 'birthPlace') {
+      return this.convertBirthPlaceFilter(op, value)
+    }
+
     if (!ALLOWED_FILTER_SORT_FIELDS.includes(key as (typeof ALLOWED_FILTER_SORT_FIELDS)[number])) {
       throw new BadRequestException(
         `Invalid filter field: ${key}. Allowed fields: ${ALLOWED_FILTER_SORT_FIELDS.join(', ')}`,
@@ -242,6 +255,54 @@ export class ContactsService {
         throw new BadRequestException(
           `Invalid filter operation: ${op}. Allowed operations: eq, neq, like, gt, gte, lt, lte, in, notin, isnull, notnull, isblank, notblank`,
         )
+    }
+  }
+
+  private convertBirthPlaceFilter(op: string, value: unknown): Record<string, unknown> {
+    if (op !== 'eq' && op !== 'like') {
+      throw new BadRequestException(
+        `Unsupported operation for birthPlace filter: ${op}. Allowed values: eq, like`,
+      )
+    }
+
+    if (typeof value !== 'string') {
+      throw new BadRequestException('Invalid birthPlace filter value')
+    }
+
+    let parts: string[] = []
+
+    try {
+      const parsed = JSON.parse(value) as Partial<{
+        birthCity: string
+        birthProvince: string
+        birthCountry: string
+      }>
+
+      if (parsed && typeof parsed === 'object') {
+        parts = [parsed.birthCity, parsed.birthProvince, parsed.birthCountry]
+          .filter((part): part is string => typeof part === 'string')
+          .map((part) => part.trim())
+          .filter((part) => part.length > 0)
+      }
+    } catch {
+      parts = value
+        .split(',')
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0)
+    }
+
+    if (parts.length === 0) {
+      return {}
+    }
+
+    const birthPlaceFields = ['birthCity', 'birthProvince', 'birthCountry'] as const
+
+    return {
+      AND: parts.map((part, index) => ({
+        [birthPlaceFields[index]]: {
+          equals: part,
+        },
+      })),
     }
   }
 

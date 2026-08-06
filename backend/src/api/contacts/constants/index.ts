@@ -27,6 +27,7 @@ export const ALLOWED_FILTER_SORT_FIELDS = [
   'birthCity',
   'birthProvince',
   'birthCountry',
+  'birthPlace',
 ] as const
 
 export const CSA_STATUSES = {

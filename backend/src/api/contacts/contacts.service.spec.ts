@@ -183,6 +183,25 @@ describe('ContactsService', () => {
       })
     })
 
+    it('should sort by birthPlace using city/province/country backend fields', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
+
+      await service.findAll(1, 10, '[{"birthPlace":"asc"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: [
+          { birthCity: 'asc' },
+          { birthProvince: 'asc' },
+          { birthCountry: 'asc' },
+          { id: 'asc' },
+        ],
+        where: {},
+      })
+    })
+
     it('should use stable default order when no sort is provided', async () => {
       vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
       vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
@@ -373,6 +392,43 @@ describe('ContactsService', () => {
           AND: [
             { lastName: { contains: 'Doe', mode: 'insensitive' } },
             { OR: [{ csaStatus: { equals: 'eligible' } }, { csaStatus: { equals: 'in_pay' } }] },
+          ],
+        },
+      })
+    })
+
+    it('should handle birthPlace filter', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      const birthPlaceFilterValue = JSON.stringify({
+        birthCity: 'Toronto',
+        birthProvince: 'Ontario',
+        birthCountry: 'Canada',
+      })
+
+      await service.findAll(
+        1,
+        10,
+        undefined,
+        JSON.stringify([
+          {
+            key: 'birthPlace',
+            op: 'eq',
+            value: birthPlaceFilterValue,
+          },
+        ]),
+      )
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: [{ id: 'asc' }],
+        where: {
+          AND: [
+            { birthCity: { equals: 'Toronto' } },
+            { birthProvince: { equals: 'Ontario' } },
+            { birthCountry: { equals: 'Canada' } },
           ],
         },
       })

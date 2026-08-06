@@ -8,6 +8,7 @@ import {
 import { AdminService } from 'src/api/admin/admin.service'
 import { USER_PROFILE, isValidUserProfile } from 'src/api/admin/constants/user-profile.constants'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { AppLogger } from 'src/common/logger/app-logger'
 import {
@@ -19,9 +20,16 @@ import {
 } from 'src/common/state-machine/constants'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
-import { enrichLabels, isEligibleAge, pacificToday } from 'src/common/utils'
 import { validateDin } from 'src/common/utils/din-validator'
 import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
+import {
+  buildStableOrderBy,
+  enrichLabels,
+  isEligibleAge,
+  pacificToday,
+  parseISODatePacific,
+  parseWklDate,
+} from 'src/common/utils'
 import { getCancelReasonLabel } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
 import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
@@ -112,11 +120,13 @@ export class ContactsService {
       }
     }
 
+    const stableOrderBy = buildStableOrderBy(orderBy)
+
     const [data, total] = await Promise.all([
       this.prisma.contact.findMany({
         skip: (page - 1) * limit,
         take: limit,
-        orderBy,
+        orderBy: stableOrderBy,
         where,
       }),
       this.prisma.contact.count({ where }),
@@ -336,11 +346,9 @@ export class ContactsService {
       if (!contact.cancelReasonCode) {
         updateData.cancelReasonCode = '21'
       }
-      const placementCareEndDate = await this.findLatestPlacementEndDateFromStaging(
-        contact.personIdIcm,
-        contact.personIdMis,
+      updateData.careEndDate = this.resolveCareEndDateForCancellation(
+        await this.findLatestPlacementEndDateFromStaging(contact.personIdIcm, contact.personIdMis),
       )
-      updateData.careEndDate = placementCareEndDate ?? pacificToday()
     }
 
     if (event === CSA_EVENT.SET_ELIGIBLE_TBD || event === CSA_EVENT.BECOME_ELIGIBLE) {
@@ -369,6 +377,31 @@ export class ContactsService {
     return { success: true, from: currentState, to: nextState }
   }
 
+  /** Fallback when staging has no usable placement end date (BL-08 manual not-eligible). */
+  private resolveCareEndDateForCancellation(placementEndDate: Date | null): Date {
+    if (placementEndDate && !Number.isNaN(placementEndDate.getTime())) {
+      return placementEndDate
+    }
+    return pacificToday()
+  }
+
+  private parseStagingPlacementEndDate(value: unknown): Date | null {
+    if (value == null) return null
+
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value
+    }
+
+    const trimmed = String(value).trim()
+    if (!trimmed) return null
+
+    const wklDate = parseWklDate(trimmed)
+    if (wklDate) return wklDate
+
+    const isoDate = parseISODatePacific(trimmed)
+    return Number.isNaN(isoDate.getTime()) ? null : isoDate
+  }
+
   private async findLatestPlacementEndDateFromStaging(
     personIdIcm: string | null | undefined,
     personIdMis: string | null | undefined,
@@ -376,29 +409,40 @@ export class ContactsService {
     const personIcm = personIdIcm?.trim() || null
     const personMis = personIdMis?.trim() || null
 
-    const rows = await this.prisma.$queryRaw<{ maxEndDate: Date | null }[]>`
-      WITH placement_end_dates AS (
+    if (!personIcm && !personMis) {
+      return null
+    }
+
+    const branches: Prisma.Sql[] = []
+
+    if (personIcm) {
+      branches.push(Prisma.sql`
         SELECT icm_plc.X_END_DATE AS end_date
         FROM stg_icm_cases cases
         INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
-        WHERE ${personIcm} IS NOT NULL
-          AND cases.X_CONTACT_NUM = ${personIcm}
-          AND icm_plc.X_END_DATE IS NOT NULL
+        WHERE cases.X_CONTACT_NUM = ${personIcm}
+          AND NULLIF(TRIM(icm_plc.X_END_DATE), '') IS NOT NULL
+      `)
+    }
 
-        UNION ALL
-
-        SELECT mis_plc.END_DATE AS end_date
+    if (personMis) {
+      branches.push(Prisma.sql`
+        SELECT mis_plc.end_date AS end_date
         FROM stg_mis_placements mis_plc
-        WHERE ${personMis} IS NOT NULL
-          AND mis_plc.person_id_mis = ${personMis}
-          AND mis_plc.END_DATE IS NOT NULL
+        WHERE mis_plc.person_id_mis = ${personMis}
+          AND NULLIF(TRIM(mis_plc.end_date), '') IS NOT NULL
+      `)
+    }
+
+    const rows = await this.prisma.$queryRaw<{ maxEndDate: unknown }[]>`
+      WITH placement_end_dates AS (
+        ${Prisma.join(branches, ' UNION ALL ')}
       )
       SELECT MAX(end_date) AS "maxEndDate"
       FROM placement_end_dates
     `
 
-    const maxEndDate = rows?.[0]?.maxEndDate
-    return maxEndDate ? new Date(maxEndDate) : null
+    return this.parseStagingPlacementEndDate(rows?.[0]?.maxEndDate)
   }
 
   async forceUpdateCsaStatus(
@@ -475,7 +519,7 @@ export class ContactsService {
         where,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        orderBy: buildStableOrderBy([{ lastName: 'asc' }, { firstName: 'asc' }]),
       }),
       this.prisma.contact.count({ where }),
     ])
@@ -1182,18 +1226,6 @@ export class ContactsService {
 
     if (userProfile !== USER_PROFILE.DATA_QUALITY_STEWARD) {
       throw new ForbiddenException('Only Data Quality Stewards can perform this action')
-    }
-
-    // Cross-validate against ICM (prevents privilege escalation)
-    const icmProfile = await this.adminService.getUserProfile(userId)
-
-    if (icmProfile !== USER_PROFILE.DATA_QUALITY_STEWARD) {
-      this.logger.warn(
-        `User ${userId} attempted privileged action with profile '${userProfile}' but ICM shows '${icmProfile}'`,
-      )
-      throw new ForbiddenException(
-        'User profile verification failed. You do not have Data Quality Steward permissions in ICM.',
-      )
     }
   }
 }

@@ -69,8 +69,13 @@ describe('step8_UpdateEligibleTbd', () => {
     expect(result.newStatus).toBe(CSA_STATUS.ELIGIBLE)
   })
 
-  it('should return in_pay when current status is not_eligible_in_pay', () => {
+  it('should keep not_eligible_in_pay unchanged', () => {
     const result = step8_UpdateEligibleTbd(CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
+    expect(result.newStatus).toBe(CSA_STATUS.NOT_ELIGIBLE_IN_PAY)
+  })
+
+  it('should return in_pay for Section 54 when status is not_eligible_in_pay', () => {
+    const result = step8_UpdateEligibleTbd(CSA_STATUS.NOT_ELIGIBLE_IN_PAY, { section54: true })
     expect(result).toEqual({
       step: 8,
       newStatus: CSA_STATUS.IN_PAY,
@@ -79,8 +84,8 @@ describe('step8_UpdateEligibleTbd', () => {
     })
   })
 
-  it('should return in_pay when current status is not_eligible_ip_tbd', () => {
-    const result = step8_UpdateEligibleTbd(CSA_STATUS.NOT_ELIGIBLE_IP_TBD)
+  it('should return in_pay for Section 54 when status is not_eligible_ip_tbd', () => {
+    const result = step8_UpdateEligibleTbd(CSA_STATUS.NOT_ELIGIBLE_IP_TBD, { section54: true })
     expect(result.newStatus).toBe(CSA_STATUS.IN_PAY)
   })
 })

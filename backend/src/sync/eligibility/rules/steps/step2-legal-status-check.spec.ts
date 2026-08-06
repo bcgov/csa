@@ -75,6 +75,16 @@ describe('step2_LegalStatusCheck', () => {
       expect(result!.step).toBe(8)
     })
 
+    it('should keep not_eligible_in_pay unchanged when enrollForCsa is TBD', () => {
+      const ctx = makeCtx({
+        enrollForCsa: 'TBD',
+        legalExpiryDate: null,
+        csaStatus: 'not_eligible_in_pay',
+      })
+      const result = step2_LegalStatusCheck.evaluate(ctx)
+      expect(result!.newStatus).toBe('not_eligible_in_pay')
+    })
+
     it('should route to step 9 when enrollForCsa is No', () => {
       const ctx = makeCtx({ enrollForCsa: 'No', legalExpiryDate: null })
       const result = step2_LegalStatusCheck.evaluate(ctx)

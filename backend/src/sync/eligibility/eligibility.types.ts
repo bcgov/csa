@@ -26,6 +26,7 @@ export interface ContactProfile {
 
   csaStatus: CsaStatus | null
   csaStatusEffectiveDate: Date | null
+  lastEligibilityEvaluatedAt: Date | null
   existingContactId: number | null
   lastUpdatedBy: string | null
   din: string | null

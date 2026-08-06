@@ -21,6 +21,7 @@ export function makeContact(overrides: Partial<ContactProfile> = {}): ContactPro
     assignedTo: null,
     csaStatus: null,
     csaStatusEffectiveDate: null,
+    lastEligibilityEvaluatedAt: null,
     existingContactId: null,
     lastUpdatedBy: null,
     din: null,

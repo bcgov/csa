@@ -588,11 +588,12 @@ const UPSERT_SQL = `
   INSERT INTO contacts (
     ${COL_LIST},
     icm_integration_status,
-    created_at, created_by, last_updated_at, last_updated_by, needs_review
+    created_at, created_by, last_updated_at, last_updated_by, needs_review,
+    last_eligibility_evaluated_at
   )
   SELECT
     ${SELECT_LIST},
-    true, NOW(), 'SYSTEM', NOW(), 'SYSTEM', false
+    true, NOW(), 'SYSTEM', NOW(), 'SYSTEM', false, NOW()
   FROM unnest(${UNNEST_PARAMS})
   AS t(${COL_LIST})
   ON CONFLICT (person_id_icm) DO UPDATE SET
@@ -601,6 +602,7 @@ const UPSERT_SQL = `
       WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN NOW()
       ELSE contacts.csa_status_effective_date
     END,
+    last_eligibility_evaluated_at = NOW(),
     icm_integration_status = CASE
       WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN true
       ELSE contacts.icm_integration_status
@@ -722,8 +724,8 @@ export class EligibilityService {
 
       // User-set status (BL-14B): skip rules and upsert when staging eligibility data is unchanged.
       if (isUserSetCsaStatus(profile.lastUpdatedBy)) {
-        if (!profile.csaStatusEffectiveDate) {
-          this.warnUserSetWithoutEffectiveDate(profile)
+        if (!profile.lastEligibilityEvaluatedAt) {
+          this.warnUserSetWithoutEligibilityEvaluatedAt(profile)
         }
         if (
           await this.shouldSkipUpsertForUnchangedStaging(profile, {
@@ -778,27 +780,27 @@ export class EligibilityService {
     return stats
   }
 
-  private warnUserSetWithoutEffectiveDate(profile: ContactProfile): void {
+  private warnUserSetWithoutEligibilityEvaluatedAt(profile: ContactProfile): void {
     this.logger.warn(
-      `User-set CSA status for ${profile.personIdIcm} (last_updated_by=${profile.lastUpdatedBy}) but no csa_status_effective_date on master or ICM; running eligibility without BL-14B/14C skip`,
+      `User-set CSA status for ${profile.personIdIcm} (last_updated_by=${profile.lastUpdatedBy}) but no last_eligibility_evaluated_at; running eligibility without BL-14C skip`,
       {
         activityType: JobActivityType.DATA_QUALITY,
         aggregate: true,
-        aggregateKey: 'user-set-missing-effective-date',
-        related: 'User-set CSA status without effective date',
+        aggregateKey: 'user-set-missing-eligibility-evaluated-at',
+        related: 'User-set CSA status without last eligibility evaluation timestamp',
       },
     )
   }
 
   /**
-   * Skip upsert when staging eligibility data is unchanged since csa_status_effective_date.
+   * Skip upsert when staging eligibility data is unchanged since last_eligibility_evaluated_at (BL-14C).
    * Age-out contacts are still processed when referenceDate/agedOutIds are provided.
    */
   private async shouldSkipUpsertForUnchangedStaging(
     profile: ContactProfile,
     options?: { referenceDate?: Date; agedOutIds?: string[] },
   ): Promise<boolean> {
-    const since = profile.csaStatusEffectiveDate
+    const since = profile.lastEligibilityEvaluatedAt
     if (!since) {
       return false
     }
@@ -814,7 +816,7 @@ export class EligibilityService {
     const unchanged = !(await this.hasStagingDataChanged(profile.personIdIcm, since))
     if (unchanged) {
       this.logger.log(
-        `Skipping upsert for ${profile.personIdIcm}: no staging data changes since ${since.toISOString()}`,
+        `Skipping upsert for ${profile.personIdIcm}: no staging data changes since last eligibility evaluation at ${since.toISOString()}`,
       )
     }
     return unchanged
@@ -868,8 +870,8 @@ export class EligibilityService {
 
     // BL-14C: user-set status is kept unless staging eligibility data changed.
     if (isUserSetCsaStatus(profile.lastUpdatedBy)) {
-      if (!profile.csaStatusEffectiveDate) {
-        this.warnUserSetWithoutEffectiveDate(profile)
+      if (!profile.lastEligibilityEvaluatedAt) {
+        this.warnUserSetWithoutEligibilityEvaluatedAt(profile)
       }
       if (await this.shouldSkipUpsertForUnchangedStaging(profile, { referenceDate })) {
         const status = previousStatus ?? profile.csaStatus
@@ -1052,6 +1054,9 @@ export class EligibilityService {
         csaStatus: raw.csaStatus ?? null,
         csaStatusEffectiveDate: raw.csaStatusEffectiveDate
           ? new Date(raw.csaStatusEffectiveDate)
+          : null,
+        lastEligibilityEvaluatedAt: raw.lastEligibilityEvaluatedAt
+          ? new Date(raw.lastEligibilityEvaluatedAt)
           : null,
         existingContactId: raw.existingContactId,
         lastUpdatedBy: raw.lastUpdatedBy ?? null,

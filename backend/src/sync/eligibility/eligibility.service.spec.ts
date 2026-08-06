@@ -244,7 +244,7 @@ describe('EligibilityService', () => {
   })
 
   it('should skip upsert for protected contact when staging data unchanged', async () => {
-    const statusEffectiveAt = new Date('2026-05-06T10:00:00Z')
+    const lastEvaluatedAt = new Date('2026-05-06T10:00:00Z')
     mockPrisma.$queryRawUnsafe
       .mockReset()
       .mockResolvedValueOnce(allTablesPopulated)
@@ -253,7 +253,7 @@ describe('EligibilityService', () => {
           personIdIcm: 'ICM-HOLD',
           csaStatus: 'on_hold',
           existingContactId: 99,
-          csaStatusEffectiveDate: statusEffectiveAt,
+          lastEligibilityEvaluatedAt: lastEvaluatedAt,
         }),
       ])
       .mockResolvedValueOnce([{ hasChanges: false }])
@@ -266,7 +266,7 @@ describe('EligibilityService', () => {
   })
 
   it('should upsert protected contact when staging data changed', async () => {
-    const statusEffectiveAt = new Date('2026-05-06T10:00:00Z')
+    const lastEvaluatedAt = new Date('2026-05-06T10:00:00Z')
     mockPrisma.$queryRawUnsafe
       .mockReset()
       .mockResolvedValueOnce(allTablesPopulated)
@@ -275,7 +275,7 @@ describe('EligibilityService', () => {
           personIdIcm: 'ICM-HOLD',
           csaStatus: 'on_hold',
           existingContactId: 99,
-          csaStatusEffectiveDate: statusEffectiveAt,
+          lastEligibilityEvaluatedAt: lastEvaluatedAt,
         }),
       ])
       .mockResolvedValueOnce([{ hasChanges: true }])
@@ -299,7 +299,7 @@ describe('EligibilityService', () => {
     expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
   })
 
-  it('should upsert contacts with no status transition when effective date is missing', async () => {
+  it('should upsert contacts with no status transition when last eligibility evaluation is missing', async () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([
       makeEligibleContact({ csaStatus: 'eligible', existingContactId: 10 }),
     ])
@@ -313,7 +313,7 @@ describe('EligibilityService', () => {
   })
 
   it('should skip upsert when status unchanged and staging data unchanged', async () => {
-    const statusEffectiveAt = new Date('2026-05-06T10:00:00Z')
+    const lastEvaluatedAt = new Date('2026-05-06T10:00:00Z')
     mockPrisma.$queryRawUnsafe
       .mockReset()
       .mockResolvedValueOnce(allTablesPopulated)
@@ -322,7 +322,7 @@ describe('EligibilityService', () => {
           csaStatus: 'eligible',
           existingContactId: 10,
           lastUpdatedBy: 'SYSTEM',
-          csaStatusEffectiveDate: statusEffectiveAt,
+          lastEligibilityEvaluatedAt: lastEvaluatedAt,
         }),
       ])
       .mockResolvedValueOnce([{ hasChanges: false }])
@@ -719,8 +719,8 @@ describe('EligibilityService', () => {
     expect(result.statusChanges).toBe(0)
   })
 
-  it('should skip user-set contact on full load when staging data unchanged since user update', async () => {
-    const userSetAt = new Date('2026-05-06T10:00:00Z')
+  it('should skip user-set contact on full load when staging data unchanged since last evaluation', async () => {
+    const lastEvaluatedAt = new Date('2026-05-06T10:00:00Z')
     mockPrisma.$queryRawUnsafe
       .mockReset()
       .mockResolvedValueOnce(allTablesPopulated)
@@ -729,7 +729,7 @@ describe('EligibilityService', () => {
           csaStatus: 'not_eligible_out_of_pay',
           existingContactId: 99,
           lastUpdatedBy: 'john.doe',
-          csaStatusEffectiveDate: userSetAt,
+          lastEligibilityEvaluatedAt: lastEvaluatedAt,
         }),
       ])
       .mockResolvedValueOnce([{ hasChanges: false }])
@@ -782,7 +782,7 @@ describe('EligibilityService', () => {
   })
 
   it('should skip runForContact when user-set and staging data unchanged', async () => {
-    const userSetAt = new Date('2026-05-06T10:00:00Z')
+    const lastEvaluatedAt = new Date('2026-05-06T10:00:00Z')
     mockPrisma.$queryRawUnsafe
       .mockReset()
       .mockResolvedValueOnce([
@@ -790,7 +790,7 @@ describe('EligibilityService', () => {
           csaStatus: 'not_eligible_out_of_pay',
           existingContactId: 99,
           lastUpdatedBy: 'jane.doe',
-          csaStatusEffectiveDate: userSetAt,
+          lastEligibilityEvaluatedAt: lastEvaluatedAt,
         }),
       ])
       .mockResolvedValueOnce([{ hasChanges: false }])
@@ -803,7 +803,7 @@ describe('EligibilityService', () => {
   })
 
   it('should skip runForContact for protected status when staging data unchanged', async () => {
-    const statusEffectiveAt = new Date('2026-05-06T10:00:00Z')
+    const lastEvaluatedAt = new Date('2026-05-06T10:00:00Z')
     mockPrisma.$queryRawUnsafe
       .mockReset()
       .mockResolvedValueOnce([
@@ -811,7 +811,7 @@ describe('EligibilityService', () => {
           personIdIcm: 'ICM-HOLD',
           csaStatus: 'on_hold',
           existingContactId: 99,
-          csaStatusEffectiveDate: statusEffectiveAt,
+          lastEligibilityEvaluatedAt: lastEvaluatedAt,
         }),
       ])
       .mockResolvedValueOnce([{ hasChanges: false }])
@@ -822,14 +822,14 @@ describe('EligibilityService', () => {
     expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled()
   })
 
-  it('should warn when user-set but csa_status_effective_date is missing', async () => {
+  it('should warn when user-set but last_eligibility_evaluated_at is missing', async () => {
     const warnSpy = vi.spyOn(AppLogger.prototype, 'warn').mockImplementation(() => undefined)
     mockPrisma.$queryRawUnsafe.mockReset().mockResolvedValueOnce([
       makeEligibleContact({
         csaStatus: 'not_eligible_out_of_pay',
         existingContactId: 99,
         lastUpdatedBy: 'jane.doe',
-        csaStatusEffectiveDate: null,
+        lastEligibilityEvaluatedAt: null,
       }),
     ])
 
@@ -839,18 +839,18 @@ describe('EligibilityService', () => {
       expect.stringContaining('ICM-ELIG'),
       expect.objectContaining({
         activityType: 'DATA_QUALITY',
-        aggregateKey: 'user-set-missing-effective-date',
+        aggregateKey: 'user-set-missing-eligibility-evaluated-at',
       }),
     )
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('BL-14B/14C skip'),
+      expect.stringContaining('BL-14C skip'),
       expect.any(Object),
     )
     warnSpy.mockRestore()
   })
 
   it('should skip runForContact upsert when status unchanged and staging data unchanged', async () => {
-    const statusEffectiveAt = new Date('2026-05-06T10:00:00Z')
+    const lastEvaluatedAt = new Date('2026-05-06T10:00:00Z')
     mockPrisma.$queryRawUnsafe
       .mockReset()
       .mockResolvedValueOnce([
@@ -858,7 +858,7 @@ describe('EligibilityService', () => {
           csaStatus: 'eligible',
           existingContactId: 10,
           lastUpdatedBy: 'SYSTEM',
-          csaStatusEffectiveDate: statusEffectiveAt,
+          lastEligibilityEvaluatedAt: lastEvaluatedAt,
         }),
       ])
       .mockResolvedValueOnce([{ hasChanges: false }])
@@ -870,7 +870,7 @@ describe('EligibilityService', () => {
   })
 
   it('should recalculate runForContact when user-set but staging data changed', async () => {
-    const userSetAt = new Date('2026-05-06T10:00:00Z')
+    const lastEvaluatedAt = new Date('2026-05-06T10:00:00Z')
     mockPrisma.$queryRawUnsafe
       .mockReset()
       .mockResolvedValueOnce([
@@ -878,7 +878,7 @@ describe('EligibilityService', () => {
           csaStatus: 'not_eligible_out_of_pay',
           existingContactId: 99,
           lastUpdatedBy: 'jane.doe',
-          csaStatusEffectiveDate: userSetAt,
+          lastEligibilityEvaluatedAt: lastEvaluatedAt,
         }),
       ])
       .mockResolvedValueOnce([{ hasChanges: true }])
@@ -887,6 +887,31 @@ describe('EligibilityService', () => {
 
     expect(result.previousStatus).toBe('not_eligible_out_of_pay')
     expect(result.newStatus).toBe('eligible')
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
+  })
+
+  it('should upsert resumed contact when staging changed since last eligibility evaluation', async () => {
+    const lastEvaluatedAt = new Date('2026-07-20T09:00:00Z')
+    const resumeStatusEffectiveAt = new Date('2026-07-20T14:00:00Z')
+
+    mockPrisma.$queryRawUnsafe
+      .mockReset()
+      .mockResolvedValueOnce([
+        makeEligibleContact({
+          csaStatus: 'eligible_tbd',
+          existingContactId: 99,
+          lastUpdatedBy: 'jane.doe',
+          csaStatusEffectiveDate: resumeStatusEffectiveAt,
+          lastEligibilityEvaluatedAt: lastEvaluatedAt,
+          birthCountry: 'Canada',
+        }),
+      ])
+      .mockResolvedValueOnce([{ hasChanges: true }])
+
+    const result = await service.runForContact('ICM-ELIG')
+
+    expect(result.previousStatus).toBe('eligible_tbd')
+    // Staging data is applied even though csa_status_effective_date (resume) is after the fetch.
     expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
   })
 

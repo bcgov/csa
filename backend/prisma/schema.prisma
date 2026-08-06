@@ -42,6 +42,7 @@ model Contact {
   assignedTo                 String?   @map("assigned_to")
   csaStatus                  String?   @map("csa_status")
   csaStatusEffectiveDate     DateTime? @map("csa_status_effective_date") @db.Timestamptz()
+  lastEligibilityEvaluatedAt DateTime? @map("last_eligibility_evaluated_at") @db.Timestamptz()
   csaSentDate                DateTime? @map("csa_sent_date") @db.Timestamptz()
   din                        String?   @map("din")
   effectiveLegalStatus       String?   @map("effective_legal_status")

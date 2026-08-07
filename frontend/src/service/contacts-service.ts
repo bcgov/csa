@@ -789,6 +789,45 @@ export const runSendCraFileWithPolling = async (
  * Run auto-batch job for all eligible contacts and poll until complete
  * @param onProgress - Optional callback for progress updates
  */
+export interface AutoBatchCompletionMetadata {
+  application?: number
+  cancellation?: number
+  onHold?: number
+  incomplete?: Array<{ id: number; missingFields: string[] }>
+}
+
+export const formatAutoBatchCompletionMessage = (
+  metadata: AutoBatchCompletionMetadata | null | undefined,
+): { message: string; severity: 'success' | 'info' } => {
+  const application = metadata?.application ?? 0
+  const cancellation = metadata?.cancellation ?? 0
+  const onHold = metadata?.onHold ?? metadata?.incomplete?.length ?? 0
+  const added = application + cancellation
+  const onHoldSuffix =
+    onHold > 0
+      ? `${added > 0 ? '; ' : ''}${onHold} contacts auto-held due to missing CRA mandatory fields`
+      : ''
+
+  if (added > 0) {
+    return {
+      message: `Auto-batch complete: ${application} application, ${cancellation} cancellation contacts added to batch${onHoldSuffix}`,
+      severity: 'success',
+    }
+  }
+
+  if (onHold > 0) {
+    return {
+      message: `Auto-batch complete: ${onHold} contacts auto-held due to missing CRA mandatory fields`,
+      severity: 'info',
+    }
+  }
+
+  return {
+    message: 'Auto-batch complete: No eligible contacts found to batch',
+    severity: 'info',
+  }
+}
+
 export const runAutoBatchWithPolling = async (
   onProgress?: (job: JobRun) => void,
 ): Promise<JobRun> => {

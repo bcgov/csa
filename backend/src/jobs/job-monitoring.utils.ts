@@ -128,8 +128,13 @@ export function formatJobSummary(
     case JobType.AUTO_BATCH: {
       const application = metadata.application
       const cancellation = metadata.cancellation
+      const onHold = metadata.onHold
       if (application !== undefined && cancellation !== undefined) {
-        return `${application} application, ${cancellation} cancellation`
+        const parts = [`${application} application`, `${cancellation} cancellation`]
+        if (typeof onHold === 'number' && onHold > 0) {
+          parts.push(`${onHold} on hold`)
+        }
+        return parts.join(', ')
       }
       break
     }

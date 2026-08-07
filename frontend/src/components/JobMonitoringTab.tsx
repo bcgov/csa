@@ -176,22 +176,18 @@ function SortableHeaderCell({
       }}
       onClick={sortable ? () => onSort(field) : undefined}
     >
-      <Box
-        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.5 }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          {label}
-          {sortable &&
-            (isActive ? (
-              currentSortOrder === 'asc' ? (
-                <ArrowUpwardIcon sx={{ fontSize: '0.875rem' }} />
-              ) : (
-                <ArrowDownwardIcon sx={{ fontSize: '0.875rem' }} />
-              )
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        {label}
+        {sortable &&
+          (isActive ? (
+            currentSortOrder === 'asc' ? (
+              <ArrowUpwardIcon sx={{ fontSize: '0.875rem' }} />
             ) : (
-              <UnfoldMoreIcon sx={{ fontSize: '0.875rem', opacity: 0.4 }} />
-            ))}
-        </Box>
+              <ArrowDownwardIcon sx={{ fontSize: '0.875rem' }} />
+            )
+          ) : (
+            <UnfoldMoreIcon sx={{ fontSize: '0.875rem', opacity: 0.4 }} />
+          ))}
         {onFilterClick && (
           <IconButton
             size="small"

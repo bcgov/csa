@@ -46,18 +46,6 @@ const BATCH_NUMBER_ADVISORY_LOCK_OBJECT = 0
 const PENDING_BATCH_ADVISORY_LOCK_OBJECT = 1
 const WKL_UNMATCHED_BATCH_ADVISORY_LOCK_OBJECT = 2
 
-/**
- * CSA statuses that represent a Cancellation transaction when added to a batch.
- * Used to determine transactionType before the state-machine transition fires
- * so that CRA mandatory-field validation knows which conditional fields to check.
- */
-const CANCELLATION_STATUSES = new Set<string>([
-  CSA_STATUS.NOT_ELIGIBLE_IN_PAY,
-  CSA_STATUS.NOT_ELIGIBLE_IP_TBD,
-  CSA_STATUS.CANCELLATION_REFUSED_CRA,
-  CSA_STATUS.CRA_ERROR_CANCELLATION,
-])
-
 class TransitionSkipError extends Error {
   constructor(public readonly reason: string) {
     super(reason)
@@ -481,13 +469,8 @@ export class BatchesService {
         continue
       }
 
-      // --- CRA mandatory-field validation (US-40101) ---
-      // Determine the transaction type from the current status before the state
-      // machine fires so we know which conditional fields to validate.
-      const preValidationTxType = CANCELLATION_STATUSES.has(contact.csaStatus ?? '')
-        ? TRANSACTION_TYPES.CANCELLATION
-        : TRANSACTION_TYPES.APPLICATION
-      const craValidation = validateCraRequiredFields(contact, preValidationTxType)
+      // --- CRA mandatory-field validation (user-sourced fields only) ---
+      const craValidation = validateCraRequiredFields(contact)
       if (!craValidation.isValid) {
         this.logger.log(
           `Contact ${contactId}: skipped — missing CRA mandatory fields: ${craValidation.missingFields.join(', ')}`,
@@ -542,8 +525,9 @@ export class BatchesService {
           if (transactionType === TRANSACTION_TYPES.CANCELLATION) {
             const updates: Record<string, unknown> = {}
             if (!contact.careEndDate) {
-              updates.careEndDate = pacificToday()
-              contact.careEndDate = pacificToday()
+              const today = pacificToday()
+              updates.careEndDate = today
+              contact.careEndDate = today
             }
             if (!contact.cancelReasonCode) {
               updates.cancelReasonCode = CANCEL_REASON.CHILD_LEFT

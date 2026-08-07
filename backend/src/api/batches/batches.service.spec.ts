@@ -699,7 +699,7 @@ describe('BatchesService', () => {
       })
     })
 
-    it('should apply default values for cancellation when blank and capture them', async () => {
+    it('should default cancellation fields when blank and capture them', async () => {
       const contact = {
         id: 3,
         caseNumber: 'CASE-3',
@@ -712,8 +712,8 @@ describe('BatchesService', () => {
         birthCountry: 'Canada',
         birthProvince: 'AB',
         effectiveDate: new Date('2024-01-01'),
-        careEndDate: new Date('2025-02-20'),
-        cancelReasonCode: '21', // CHILD_LEFT
+        careEndDate: null,
+        cancelReasonCode: null,
       }
 
       mockPrisma.batch.findFirst.mockResolvedValue({ id: 1, status: 'pending' })
@@ -726,16 +726,20 @@ describe('BatchesService', () => {
       mockPrisma.contactBatchDetail.create.mockResolvedValue({ id: 12 })
       mockPrisma.contactBatchDetail.update.mockResolvedValue({})
       mockPrisma.batch.update.mockResolvedValue({})
+      mockPrisma.contact.update.mockResolvedValue({})
 
       const result = await service.addContactsToPendingBatch([3], 'user@test.com')
 
-      // Verify contact was successfully added (passes CRA validation)
       expect(result.success).toContain(3)
-
-      // Verify batch detail captured the cancellation fields
+      expect(mockPrisma.contact.update).toHaveBeenCalledWith({
+        where: { id: 3 },
+        data: expect.objectContaining({
+          careEndDate: expect.any(Date),
+          cancelReasonCode: '21',
+        }),
+      })
       expect(mockPrisma.contactBatchDetail.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          effectiveDate: new Date('2025-02-20'),
           cancelReasonCode: '21',
           transactionType: 'cancellation',
         }),
@@ -837,7 +841,7 @@ describe('BatchesService', () => {
       expect(mockContactsService.updateCsaStatus).not.toHaveBeenCalled()
     })
 
-    it('should require effectiveDate for application transaction type', async () => {
+    it('should add application records without effectiveDate when user fields are complete', async () => {
       const applicationNoEffectiveDate = makeContact({
         id: 103,
         caseNumber: 'CASE-103',
@@ -850,13 +854,22 @@ describe('BatchesService', () => {
       })
 
       setupCommonMocks([applicationNoEffectiveDate])
+      setupSuccessfulTransitionMock()
 
       const result = await service.addContactsToPendingBatch([103], 'user@test.com')
 
-      expectIncomplete(result, 103, ['Application Start Date'])
+      expect(result.success).toContain(103)
+      expect(result.incomplete).toHaveLength(0)
+      expect(mockPrisma.contact.update).not.toHaveBeenCalled()
+      expect(mockPrisma.contactBatchDetail.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          effectiveDate: null,
+          transactionType: 'application',
+        }),
+      })
     })
 
-    it('should require careEndDate and cancelReasonCode for cancellation transaction type', async () => {
+    it('should add cancellation records without careEndDate or cancelReasonCode and default them', async () => {
       const cancellationMissingFields = makeContact({
         id: 104,
         caseNumber: 'CASE-104',
@@ -872,10 +885,25 @@ describe('BatchesService', () => {
       })
 
       setupCommonMocks([cancellationMissingFields])
+      mockContactsService.updateCsaStatus.mockResolvedValue({
+        success: true,
+        to: 'in_batch_cancellation',
+      })
+      mockPrisma.contactBatchDetail.create.mockResolvedValue({ id: 104 })
+      mockPrisma.contactBatchDetail.update.mockResolvedValue({})
+      mockPrisma.contact.update.mockResolvedValue({})
 
       const result = await service.addContactsToPendingBatch([104], 'user@test.com')
 
-      expectIncomplete(result, 104, ['Cancellation End Date', 'Cancellation Reason Code'])
+      expect(result.success).toContain(104)
+      expect(result.incomplete).toHaveLength(0)
+      expect(mockPrisma.contact.update).toHaveBeenCalledWith({
+        where: { id: 104 },
+        data: expect.objectContaining({
+          careEndDate: expect.any(Date),
+          cancelReasonCode: '21',
+        }),
+      })
     })
 
     it('should tag manual add incomplete validation with BATCH warn metadata', async () => {

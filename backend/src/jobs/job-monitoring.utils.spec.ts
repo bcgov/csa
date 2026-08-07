@@ -101,6 +101,16 @@ describe('job-monitoring.utils', () => {
     ).toBe('4 application, 2 cancellation')
   })
 
+  it('includes on-hold count in auto-batch summary when present', () => {
+    expect(
+      formatJobSummary({
+        jobType: JobType.AUTO_BATCH,
+        status: JobStatus.SUCCESS,
+        metadata: { application: 4, cancellation: 2, onHold: 3 },
+      }),
+    ).toBe('4 application, 2 cancellation, 3 on hold')
+  })
+
   it('formats weekly response summary from metadata', () => {
     expect(
       formatJobSummary({

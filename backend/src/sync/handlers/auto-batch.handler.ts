@@ -5,7 +5,7 @@ import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { IcmSyncBackService, SyncBackResult } from '../icm/icm-sync-back.service'
-import { AutoBatchService } from '../eligibility/auto-batch.service'
+import { AutoBatchService, formatAutoBatchSummary } from '../eligibility/auto-batch.service'
 
 /*
  * Finds eligible contacts, adds them via BatchesService (same as UI), then syncs
@@ -39,7 +39,7 @@ export class AutoBatchHandler extends BaseJob {
 
     return {
       success: true,
-      message: `Auto-batch complete: ${result.application} application, ${result.cancellation} cancellation`,
+      message: formatAutoBatchSummary(result),
       metadata: { ...result, syncResult } as unknown as Record<string, unknown>,
     }
   }

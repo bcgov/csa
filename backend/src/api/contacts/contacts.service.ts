@@ -1130,8 +1130,8 @@ export class ContactsService {
 
     // 4. Delete in transaction (BL-37)
     // Delete from UI, database tables AND staging tables (per user story)
-    // IMPORTANT: Delete in reverse dependency order (children first, then parents)
-    // DB-level cascade exists for contact_audit_trail; batch details and WKL rows are removed explicitly.
+    // IMPORTANT: Delete in reverse dependency order (children first, then parents).
+    // All child rows are removed explicitly; contact FK uses ON DELETE RESTRICT.
     await this.prisma.$transaction(async (tx) => {
       // Step 1: Delete ICM orders (depends on agreements)
       await tx.$executeRaw`
@@ -1207,7 +1207,13 @@ export class ContactsService {
         WHERE contact_id = ${contactId}
       `
 
-      // Step 12: Delete contact (contact_audit_trail cascades via FK)
+      // Step 12: Delete audit trail rows for this contact
+      await tx.$executeRaw`
+        DELETE FROM csa.contact_audit_trail
+        WHERE contact_id = ${contactId}
+      `
+
+      // Step 13: Delete contact (FK RESTRICT — all child rows must be removed first)
       await tx.contact.delete({
         where: { id: contactId },
       })

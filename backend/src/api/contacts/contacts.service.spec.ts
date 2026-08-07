@@ -2227,9 +2227,12 @@ describe('ContactsService', () => {
       const batchDetailIndex = executeRawCalls.findIndex((q) =>
         q.includes('contact_batch_details'),
       )
+      const auditTrailIndex = executeRawCalls.findIndex((q) => q.includes('contact_audit_trail'))
       expect(wklIndex).toBeGreaterThan(-1)
       expect(batchDetailIndex).toBeGreaterThan(-1)
+      expect(auditTrailIndex).toBeGreaterThan(-1)
       expect(wklIndex).toBeLessThan(batchDetailIndex)
+      expect(batchDetailIndex).toBeLessThan(auditTrailIndex)
     })
 
     it('should not trigger ICM sync-back on delete', async () => {

@@ -293,6 +293,30 @@ describe('ContactsService', () => {
       })
     })
 
+    it('should allow filtering and sorting on akaLastName and akaFirstName', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(
+        1,
+        10,
+        '[{"akaLastName":"asc"},{"akaFirstName":"desc"}]',
+        '[{"OR":[{"key":"akaLastName","op":"eq","value":"Smith"}]},{"OR":[{"key":"akaFirstName","op":"eq","value":"Jane"}]}]',
+      )
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: [{ akaLastName: 'asc' }, { akaFirstName: 'desc' }, { id: 'asc' }],
+        where: {
+          AND: [
+            { OR: [{ akaLastName: { equals: 'Smith' } }] },
+            { OR: [{ akaFirstName: { equals: 'Jane' } }] },
+          ],
+        },
+      })
+    })
+
     it('should throw error on invalid sort field', async () => {
       await expect(service.findAll(1, 10, '[{"invalidField":"asc"}]')).rejects.toThrow(
         'Invalid sort field: invalidField',
@@ -432,6 +456,59 @@ describe('ContactsService', () => {
           ],
         },
       })
+    })
+
+    it('should reject unsupported operation for birthPlace filter', async () => {
+      await expect(
+        service.findAll(
+          1,
+          10,
+          undefined,
+          JSON.stringify([
+            {
+              key: 'birthPlace',
+              op: 'like',
+              value: JSON.stringify({ birthCity: 'Toronto' }),
+            },
+          ]),
+        ),
+      ).rejects.toThrow('Unsupported operation for birthPlace filter')
+    })
+
+    it('should map a partial birthPlace filter to its own field, not by position', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(
+        1,
+        10,
+        undefined,
+        JSON.stringify([
+          {
+            key: 'birthPlace',
+            op: 'eq',
+            value: JSON.stringify({ birthCountry: 'Canada' }),
+          },
+        ]),
+      )
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: [{ id: 'asc' }],
+        where: { AND: [{ birthCountry: { equals: 'Canada' } }] },
+      })
+    })
+
+    it('should throw error for non-JSON birthPlace filter value', async () => {
+      await expect(
+        service.findAll(
+          1,
+          10,
+          undefined,
+          JSON.stringify([{ key: 'birthPlace', op: 'eq', value: 'Toronto, Ontario, Canada' }]),
+        ),
+      ).rejects.toThrow('Invalid birthPlace filter value')
     })
 
     it('should handle eq operation', async () => {

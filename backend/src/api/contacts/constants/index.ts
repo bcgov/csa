@@ -6,6 +6,8 @@ export const ALLOWED_FILTER_SORT_FIELDS = [
   'dateOfBirth',
   'age',
   'din',
+  'akaLastName',
+  'akaFirstName',
   'csaStatus',
   'csaStatusLabel',
   'csaStatusEffectiveDate',

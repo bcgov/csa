@@ -109,22 +109,6 @@ const CHILD_SEARCH_COLUMNS: ChildSearchColumn[] = [
   'birthPlace',
 ]
 
-const CHILD_SEARCH_BACKEND_SORT_COLUMNS = new Set<ChildSearchColumn>([
-  'din',
-  'firstName',
-  'lastName',
-  'middleName',
-  'gender',
-  'dateOfBirth',
-  'akaLastName',
-  'akaFirstName',
-  'personIdIcm',
-  'personIdMis',
-  'caseNumber',
-  'legacyFileNumber',
-  'birthPlace',
-])
-
 const CHILD_SEARCH_COLUMN_LABELS: Record<ChildSearchColumn, string> = {
   din: 'DIN',
   firstName: 'First Name',
@@ -300,7 +284,7 @@ const filterAndSortRows = <T, C extends string>(
 const toChildSearchBackendSort = (
   sortConfig: SortConfig<ChildSearchColumn> | null,
 ): Array<{ [key: string]: SortDirection }> | undefined => {
-  if (!sortConfig || !CHILD_SEARCH_BACKEND_SORT_COLUMNS.has(sortConfig.column)) {
+  if (!sortConfig) {
     return undefined
   }
 
@@ -468,6 +452,8 @@ export default function WeeklyFileProcessingTab() {
 
     setChildSearchColumnFilters(emptyFilters)
     setChildSearchSortConfig(null)
+    childSearchColumnFiltersRef.current = emptyFilters
+    childSearchSortConfigRef.current = null
     childSearchBirthPlaceFilterValuesRef.current = {}
     setChildSearchTerm('')
     setChildSearchFilterSearchTerm('')
@@ -706,11 +692,6 @@ export default function WeeklyFileProcessingTab() {
     return weeklyFiles
   }, [weeklyFiles])
 
-  const childSearchLocalSortConfig =
-    childSearchSortConfig && !CHILD_SEARCH_BACKEND_SORT_COLUMNS.has(childSearchSortConfig.column)
-      ? childSearchSortConfig
-      : null
-
   const filteredRecords = useMemo(() => {
     // csaMatchFound, transactionType, and craStatus are filtered server-side; omit them from
     // the client-side pass so they don't double-filter the already-narrowed page of records.
@@ -742,20 +723,6 @@ export default function WeeklyFileProcessingTab() {
 
     return recordsAfterSearchFilterSort.filter((record) => record.id === selectedRecordId)
   }, [records, detailsColumnFilters, detailsShowSelectedOnly, selectedRecordId])
-
-  const filteredSearchedChildren = useMemo(() => {
-    if (!childSearchLocalSortConfig) {
-      return searchedChildren
-    }
-
-    return [...searchedChildren].sort((left, right) => {
-      const comparison = compareStrings(
-        getChildSearchFieldValue(left, childSearchLocalSortConfig.column),
-        getChildSearchFieldValue(right, childSearchLocalSortConfig.column),
-      )
-      return childSearchLocalSortConfig.direction === 'asc' ? comparison : -comparison
-    })
-  }, [searchedChildren, childSearchLocalSortConfig, getChildSearchFieldValue])
 
   const handleWeeklyReportSortClick = (
     event: React.MouseEvent<HTMLElement>,
@@ -1001,6 +968,7 @@ export default function WeeklyFileProcessingTab() {
   const handleChildSearchSort = (column: ChildSearchColumn, direction: SortDirection) => {
     const nextSort = { column, direction }
     setChildSearchSortConfig(nextSort)
+    childSearchSortConfigRef.current = nextSort
     handleChildSearchSortClose()
     void runChildSearch(
       childSearchPage,
@@ -1013,6 +981,7 @@ export default function WeeklyFileProcessingTab() {
   const handleChildSearchFilterChange = (column: ChildSearchColumn, value: string) => {
     const nextFilters = toggleColumnFilterValue(childSearchColumnFiltersRef.current, column, value)
     setChildSearchColumnFilters(nextFilters)
+    childSearchColumnFiltersRef.current = nextFilters
     if (column === 'birthPlace') {
       const matchingChild = searchedChildren.find((child) => getBirthPlace(child) === value)
       if (matchingChild) {
@@ -1038,10 +1007,12 @@ export default function WeeklyFileProcessingTab() {
   }
 
   const clearChildSearchColumnFilter = (column: ChildSearchColumn) => {
+    const previousBirthPlaceValues = childSearchColumnFiltersRef.current.birthPlace
     const nextFilters = { ...childSearchColumnFiltersRef.current, [column]: [] }
     setChildSearchColumnFilters(nextFilters)
+    childSearchColumnFiltersRef.current = nextFilters
     if (column === 'birthPlace') {
-      for (const value of childSearchColumnFiltersRef.current.birthPlace) {
+      for (const value of previousBirthPlaceValues) {
         delete childSearchBirthPlaceFilterValuesRef.current[value]
       }
     }
@@ -1735,6 +1706,8 @@ export default function WeeklyFileProcessingTab() {
 
                     setChildSearchColumnFilters(emptyFilters)
                     setChildSearchSortConfig(null)
+                    childSearchColumnFiltersRef.current = emptyFilters
+                    childSearchSortConfigRef.current = null
                     childSearchBirthPlaceFilterValuesRef.current = {}
                     setChildSearchFilterSearchTerm('')
 
@@ -1822,7 +1795,7 @@ export default function WeeklyFileProcessingTab() {
                       </Typography>
                     </TableCell>
                   </TableRow>
-                ) : filteredSearchedChildren.length === 0 ? (
+                ) : searchedChildren.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={14} align="center" sx={{ py: 4 }}>
                       <Typography variant="body2" color="text.secondary">
@@ -1833,7 +1806,7 @@ export default function WeeklyFileProcessingTab() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredSearchedChildren.map((child) => (
+                  searchedChildren.map((child) => (
                     <TableRow
                       key={child.id}
                       hover
@@ -1896,7 +1869,7 @@ export default function WeeklyFileProcessingTab() {
             <Typography variant="body2" color="text.secondary">
               {loadingChildSearch
                 ? 'Loading...'
-                : `Showing ${filteredSearchedChildren.length} of ${childSearchTotalRecords} records`}
+                : `Showing ${searchedChildren.length} of ${childSearchTotalRecords} records`}
             </Typography>
             {searchedChildren.length > 0 ? (
               <Pagination

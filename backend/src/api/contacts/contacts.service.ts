@@ -1,29 +1,29 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-  UnprocessableEntityException,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
+    UnprocessableEntityException,
 } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { AppLogger } from 'src/common/logger/app-logger'
 import {
-  CRA_FILE_REJECTED_TARGET,
-  CSA_EVENT,
-  CSA_STATUS,
-  CSA_STATUS_LABELS,
-  REMOVE_FROM_BATCH_TARGET,
+    CRA_FILE_REJECTED_TARGET,
+    CSA_EVENT,
+    CSA_STATUS,
+    CSA_STATUS_LABELS,
+    REMOVE_FROM_BATCH_TARGET,
 } from 'src/common/state-machine/constants'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import {
-  buildStableOrderBy,
-  enrichLabels,
-  isEligibleAge,
-  pacificToday,
-  parseISODatePacific,
-  parseWklDate,
+    buildStableOrderBy,
+    enrichLabels,
+    isEligibleAge,
+    pacificToday,
+    parseISODatePacific,
+    parseWklDate,
 } from 'src/common/utils'
 import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { getCancelReasonLabel } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
@@ -31,16 +31,16 @@ import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
 import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import {
-  ALLOWED_FILTER_SORT_FIELDS,
-  BULK_OPERATION_SKIP_REASONS,
-  TRANSACTION_TYPES,
+    ALLOWED_FILTER_SORT_FIELDS,
+    BULK_OPERATION_SKIP_REASONS,
+    TRANSACTION_TYPES,
 } from './constants'
 import { ContactDto } from './dto/contact.dto'
 import type {
-  BulkOperationResponse,
-  FilterCondition,
-  FilterItem,
-  UpdateCsaStatusOptions,
+    BulkOperationResponse,
+    FilterCondition,
+    FilterItem,
+    UpdateCsaStatusOptions,
 } from './interfaces'
 
 @Injectable()
@@ -259,9 +259,9 @@ export class ContactsService {
   }
 
   private convertBirthPlaceFilter(op: string, value: unknown): Record<string, unknown> {
-    if (op !== 'eq' && op !== 'like') {
+    if (op !== 'eq') {
       throw new BadRequestException(
-        `Unsupported operation for birthPlace filter: ${op}. Allowed values: eq, like`,
+        `Unsupported operation for birthPlace filter: ${op}. Allowed values: eq`,
       )
     }
 
@@ -269,41 +269,32 @@ export class ContactsService {
       throw new BadRequestException('Invalid birthPlace filter value')
     }
 
-    let parts: string[] = []
-
+    let parsed: Partial<{ birthCity: string; birthProvince: string; birthCountry: string }>
     try {
-      const parsed = JSON.parse(value) as Partial<{
-        birthCity: string
-        birthProvince: string
-        birthCountry: string
-      }>
-
-      if (parsed && typeof parsed === 'object') {
-        parts = [parsed.birthCity, parsed.birthProvince, parsed.birthCountry]
-          .filter((part): part is string => typeof part === 'string')
-          .map((part) => part.trim())
-          .filter((part) => part.length > 0)
-      }
+      parsed = JSON.parse(value) as typeof parsed
     } catch {
-      parts = value
-        .split(',')
-        .map((part) => part.trim())
-        .filter((part) => part.length > 0)
+      throw new BadRequestException(
+        'Invalid birthPlace filter value: expected JSON with birthCity, birthProvince, and/or birthCountry',
+      )
     }
 
-    if (parts.length === 0) {
+    if (!parsed || typeof parsed !== 'object') {
+      throw new BadRequestException(
+        'Invalid birthPlace filter value: expected JSON with birthCity, birthProvince, and/or birthCountry',
+      )
+    }
+
+    // Map by field name (not array position) so partial locations never bind to the wrong field
+    const birthPlaceFields = ['birthCity', 'birthProvince', 'birthCountry'] as const
+    const conditions = birthPlaceFields
+      .filter((field) => typeof parsed[field] === 'string' && parsed[field]!.trim().length > 0)
+      .map((field) => ({ [field]: { equals: parsed[field]!.trim() } }))
+
+    if (conditions.length === 0) {
       return {}
     }
 
-    const birthPlaceFields = ['birthCity', 'birthProvince', 'birthCountry'] as const
-
-    return {
-      AND: parts.map((part, index) => ({
-        [birthPlaceFields[index]]: {
-          equals: part,
-        },
-      })),
-    }
+    return { AND: conditions }
   }
 
   async findOne(id: number): Promise<ContactDto> {

@@ -373,6 +373,7 @@ function App() {
     statusEffective: '',
   })
   const [confirmDqUpdateDialogOpen, setConfirmDqUpdateDialogOpen] = useState(false)
+  const [confirmDqDeleteDialogOpen, setConfirmDqDeleteDialogOpen] = useState(false)
 
   // Pre-defined filter state
   const [preDefinedFilter, setPreDefinedFilter] = useState('Pending User review/action')
@@ -3304,10 +3305,21 @@ function App() {
 
   const handleDqDeleteClick = () => {
     if (!canDqModifySelected) return
+    setConfirmDqDeleteDialogOpen(true)
+  }
+
+  const handleDqConfirmDelete = () => {
+    if (selected.length !== 1) return
+
+    // TODO: replace with a real delete endpoint once one exists
+    console.log('Delete contact', selected[0])
+
+    setConfirmDqDeleteDialogOpen(false)
+    setDqEditableRecordId(null)
     setSnackbar({
       open: true,
-      message: 'Delete action placeholder.',
-      severity: 'info',
+      message: 'Record deleted successfully (placeholder).',
+      severity: 'success',
     })
   }
 
@@ -8795,6 +8807,29 @@ function App() {
           </Button>
           <Button onClick={handleDqConfirmUpdate} variant="contained" autoFocus>
             Confirm Update
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirmation Dialog for DQ Steward record delete */}
+      <Dialog
+        open={confirmDqDeleteDialogOpen}
+        onClose={() => setConfirmDqDeleteDialogOpen(false)}
+        aria-labelledby="confirm-dq-delete-dialog-title"
+        aria-describedby="confirm-dq-delete-dialog-description"
+      >
+        <DialogTitle id="confirm-dq-delete-dialog-title">Confirm Delete</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="confirm-dq-delete-dialog-description">
+            Are you sure you want to delete this record? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDqDeleteDialogOpen(false)} color="inherit">
+            Cancel
+          </Button>
+          <Button onClick={handleDqConfirmDelete} variant="contained" color="error" autoFocus>
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

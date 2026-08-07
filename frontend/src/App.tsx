@@ -4723,6 +4723,7 @@ function App() {
                                     }))
                                   }
                                   maxDate={new Date()}
+                                  views={['year', 'month', 'day']}
                                   slotProps={{
                                     textField: {
                                       size: 'small',

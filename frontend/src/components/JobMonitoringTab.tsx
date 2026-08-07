@@ -5,6 +5,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import ClearIcon from '@mui/icons-material/Clear'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import FilterListIcon from '@mui/icons-material/FilterList'
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import {
@@ -432,7 +433,7 @@ export default function JobMonitoringTab() {
       setActivitiesData(result.data)
       setActivitiesTotal(result.total)
     } catch {
-      setActivitiesError('Failed to load activities. Please try again.')
+      setActivitiesError('Failed to load alerts. Please try again.')
     } finally {
       setActivitiesLoading(false)
     }
@@ -1207,17 +1208,24 @@ export default function JobMonitoringTab() {
         </Box>
       </Box>
 
-      {/* ── Activities ── */}
+      {/* ── Alerts ── */}
       <Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 500 }}>
-            Activities
-            {selectedJobHistoryId && (
-              <Typography component="span" variant="body2" color="primary" sx={{ ml: 1 }}>
-                — Filtered by Job #{selectedJobHistoryId}
-              </Typography>
-            )}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="h6" sx={{ fontWeight: 500 }}>
+              Alerts
+              {selectedJobHistoryId && (
+                <Typography component="span" variant="body2" color="primary" sx={{ ml: 1 }}>
+                  — Filtered by Job #{selectedJobHistoryId}
+                </Typography>
+              )}
+            </Typography>
+            <Tooltip title="Warnings and errors recorded during jobs and processes" arrow>
+              <IconButton size="small" sx={{ padding: 0.5 }}>
+                <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
           <Button
             size="small"
             startIcon={<ClearIcon />}
@@ -1293,7 +1301,7 @@ export default function JobMonitoringTab() {
               ) : activitiesData.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                    No activities found
+                    No alerts found
                   </TableCell>
                 </TableRow>
               ) : (

@@ -60,11 +60,6 @@ type WeeklyDetailsColumn =
   | 'craStatus'
   | 'matchedBy'
 type DetailsTextFilterColumn = 'matchedBy' | 'batchNumber' | 'transactionSource'
-type BirthPlaceFilterValue = {
-  birthCity?: string
-  birthProvince?: string
-  birthCountry?: string
-}
 type ChildSearchColumn =
   | 'din'
   | 'firstName'
@@ -134,6 +129,10 @@ const CHILD_SEARCH_FILTER_FIELDS = [
   'birthCountry',
 ] as const
 
+// Only gender uses exact-match selection; every other column is a free-text contains search
+const CHILD_SEARCH_DROPDOWN_COLUMNS: ReadonlySet<ChildSearchColumn> = new Set(['gender'])
+const BIRTH_PLACE_LIKE_FIELDS = ['birthCity', 'birthProvince', 'birthCountry'] as const
+
 const WEEKLY_DETAILS_COLUMN_LABELS: Record<WeeklyDetailsColumn, string> = {
   csaMatchFound: 'CSA Match Found?',
   matchedBy: 'Matched By',
@@ -193,7 +192,6 @@ const buildEmptyChildSearchColumnFilters = (): Record<ChildSearchColumn, string[
 const buildChildSearchBackendFilters = (
   searchTerm: string,
   columnFilters: Record<ChildSearchColumn, string[]>,
-  birthPlaceFilterValues: Record<string, BirthPlaceFilterValue>,
 ): Array<Record<string, unknown>> | undefined => {
   const trimmedSearchTerm = searchTerm.trim()
   const filters: Array<Record<string, unknown>> = []
@@ -215,14 +213,22 @@ const buildChildSearchBackendFilters = (
       continue
     }
 
+    if (column === 'birthPlace') {
+      filters.push({
+        OR: BIRTH_PLACE_LIKE_FIELDS.map((field) => ({
+          key: field,
+          op: 'like',
+          value: values[0],
+        })),
+      })
+      continue
+    }
+
     filters.push({
       OR: values.map((value) => ({
         key: column,
-        op: 'eq',
-        value:
-          column === 'birthPlace' && birthPlaceFilterValues[value]
-            ? JSON.stringify(birthPlaceFilterValues[value])
-            : value,
+        op: column === 'gender' ? 'eq' : 'like',
+        value,
       })),
     })
   }
@@ -431,7 +437,6 @@ export default function WeeklyFileProcessingTab() {
   const childSearchColumnFiltersRef = useRef<Record<ChildSearchColumn, string[]>>(
     buildEmptyChildSearchColumnFilters(),
   )
-  const childSearchBirthPlaceFilterValuesRef = useRef<Record<string, BirthPlaceFilterValue>>({})
 
   useEffect(() => {
     childSearchSortConfigRef.current = childSearchSortConfig
@@ -454,7 +459,6 @@ export default function WeeklyFileProcessingTab() {
     setChildSearchSortConfig(null)
     childSearchColumnFiltersRef.current = emptyFilters
     childSearchSortConfigRef.current = null
-    childSearchBirthPlaceFilterValuesRef.current = {}
     setChildSearchTerm('')
     setChildSearchFilterSearchTerm('')
     setLoadingChildSearch(false)
@@ -848,7 +852,11 @@ export default function WeeklyFileProcessingTab() {
     column: ChildSearchColumn,
   ) => {
     setChildSearchFilterAnchor({ element: event.currentTarget, column })
-    setChildSearchFilterSearchTerm('')
+    setChildSearchFilterSearchTerm(
+      CHILD_SEARCH_DROPDOWN_COLUMNS.has(column)
+        ? ''
+        : (childSearchColumnFiltersRef.current[column][0] ?? ''),
+    )
   }
 
   const handleChildSearchFilterClose = () => {
@@ -869,7 +877,6 @@ export default function WeeklyFileProcessingTab() {
       page = 1,
       sortConfig: SortConfig<ChildSearchColumn> | null,
       columnFilters: Record<ChildSearchColumn, string[]>,
-      birthPlaceFilterValues: Record<string, BirthPlaceFilterValue>,
     ) => {
       const requestId = ++childSearchRequestIdRef.current
       const trimmedSearchTerm = childSearchTerm.trim()
@@ -895,7 +902,7 @@ export default function WeeklyFileProcessingTab() {
         const filteredData = await getAllContacts(
           page,
           SEARCH_PAGE_SIZE,
-          buildChildSearchBackendFilters(trimmedSearchTerm, columnFilters, birthPlaceFilterValues),
+          buildChildSearchBackendFilters(trimmedSearchTerm, columnFilters),
           toChildSearchBackendSort(sortConfig),
         )
 
@@ -943,12 +950,7 @@ export default function WeeklyFileProcessingTab() {
 
     const searchTimer = window.setTimeout(() => {
       setChildSearchPage(1)
-      void runChildSearch(
-        1,
-        childSearchSortConfigRef.current,
-        childSearchColumnFiltersRef.current,
-        childSearchBirthPlaceFilterValuesRef.current,
-      )
+      void runChildSearch(1, childSearchSortConfigRef.current, childSearchColumnFiltersRef.current)
     }, 400)
 
     return () => window.clearTimeout(searchTimer)
@@ -970,60 +972,40 @@ export default function WeeklyFileProcessingTab() {
     setChildSearchSortConfig(nextSort)
     childSearchSortConfigRef.current = nextSort
     handleChildSearchSortClose()
-    void runChildSearch(
-      childSearchPage,
-      nextSort,
-      childSearchColumnFiltersRef.current,
-      childSearchBirthPlaceFilterValuesRef.current,
-    )
+    void runChildSearch(childSearchPage, nextSort, childSearchColumnFiltersRef.current)
   }
 
   const handleChildSearchFilterChange = (column: ChildSearchColumn, value: string) => {
     const nextFilters = toggleColumnFilterValue(childSearchColumnFiltersRef.current, column, value)
     setChildSearchColumnFilters(nextFilters)
     childSearchColumnFiltersRef.current = nextFilters
-    if (column === 'birthPlace') {
-      const matchingChild = searchedChildren.find((child) => getBirthPlace(child) === value)
-      if (matchingChild) {
-        childSearchBirthPlaceFilterValuesRef.current[value] = {
-          birthCity: matchingChild.birthCity ?? undefined,
-          birthProvince: matchingChild.birthProvince ?? undefined,
-          birthCountry: matchingChild.birthCountry ?? undefined,
-        }
-      }
-      if (!nextFilters.birthPlace.includes(value)) {
-        delete childSearchBirthPlaceFilterValuesRef.current[value]
-      }
-    }
     if (childSearchTerm.trim().length >= CHILD_SEARCH_MIN_LENGTH) {
       setChildSearchPage(1)
-      void runChildSearch(
-        1,
-        childSearchSortConfigRef.current,
-        nextFilters,
-        childSearchBirthPlaceFilterValuesRef.current,
-      )
+      void runChildSearch(1, childSearchSortConfigRef.current, nextFilters)
+    }
+  }
+
+  const applyChildSearchColumnTextFilter = (column: ChildSearchColumn, value: string) => {
+    const trimmedValue = value.trim()
+    const nextFilters = {
+      ...childSearchColumnFiltersRef.current,
+      [column]: trimmedValue ? [trimmedValue] : [],
+    }
+    setChildSearchColumnFilters(nextFilters)
+    childSearchColumnFiltersRef.current = nextFilters
+    if (childSearchTerm.trim().length >= CHILD_SEARCH_MIN_LENGTH) {
+      setChildSearchPage(1)
+      void runChildSearch(1, childSearchSortConfigRef.current, nextFilters)
     }
   }
 
   const clearChildSearchColumnFilter = (column: ChildSearchColumn) => {
-    const previousBirthPlaceValues = childSearchColumnFiltersRef.current.birthPlace
     const nextFilters = { ...childSearchColumnFiltersRef.current, [column]: [] }
     setChildSearchColumnFilters(nextFilters)
     childSearchColumnFiltersRef.current = nextFilters
-    if (column === 'birthPlace') {
-      for (const value of previousBirthPlaceValues) {
-        delete childSearchBirthPlaceFilterValuesRef.current[value]
-      }
-    }
     if (childSearchTerm.trim().length >= CHILD_SEARCH_MIN_LENGTH) {
       setChildSearchPage(1)
-      void runChildSearch(
-        1,
-        childSearchSortConfigRef.current,
-        nextFilters,
-        childSearchBirthPlaceFilterValuesRef.current,
-      )
+      void runChildSearch(1, childSearchSortConfigRef.current, nextFilters)
     }
     setChildSearchFilterSearchTerm('')
   }
@@ -1678,12 +1660,7 @@ export default function WeeklyFileProcessingTab() {
               variant="outlined"
               onClick={() => {
                 setChildSearchPage(1)
-                void runChildSearch(
-                  1,
-                  childSearchSortConfig,
-                  childSearchColumnFilters,
-                  childSearchBirthPlaceFilterValuesRef.current,
-                )
+                void runChildSearch(1, childSearchSortConfig, childSearchColumnFilters)
               }}
               disabled={
                 childSearchTerm.trim().length < CHILD_SEARCH_MIN_LENGTH || loadingChildSearch
@@ -1708,12 +1685,11 @@ export default function WeeklyFileProcessingTab() {
                     setChildSearchSortConfig(null)
                     childSearchColumnFiltersRef.current = emptyFilters
                     childSearchSortConfigRef.current = null
-                    childSearchBirthPlaceFilterValuesRef.current = {}
                     setChildSearchFilterSearchTerm('')
 
                     if (childSearchTerm.trim().length >= CHILD_SEARCH_MIN_LENGTH) {
                       setChildSearchPage(1)
-                      void runChildSearch(1, null, emptyFilters, {})
+                      void runChildSearch(1, null, emptyFilters)
                     }
                   }}
                   sx={{
@@ -1877,12 +1853,7 @@ export default function WeeklyFileProcessingTab() {
                 page={childSearchPage}
                 onChange={(_, page) => {
                   setChildSearchPage(page)
-                  void runChildSearch(
-                    page,
-                    childSearchSortConfig,
-                    childSearchColumnFilters,
-                    childSearchBirthPlaceFilterValuesRef.current,
-                  )
+                  void runChildSearch(page, childSearchSortConfig, childSearchColumnFilters)
                 }}
                 color="primary"
                 showFirstButton
@@ -2129,6 +2100,26 @@ export default function WeeklyFileProcessingTab() {
             placeholder="Search"
             value={childSearchFilterSearchTerm}
             onChange={(e) => setChildSearchFilterSearchTerm(e.target.value)}
+            onKeyDown={(e) => {
+              if (
+                e.key === 'Enter' &&
+                !CHILD_SEARCH_DROPDOWN_COLUMNS.has(childSearchFilterAnchor.column)
+              ) {
+                applyChildSearchColumnTextFilter(
+                  childSearchFilterAnchor.column,
+                  childSearchFilterSearchTerm,
+                )
+                handleChildSearchFilterClose()
+              }
+            }}
+            onBlur={() => {
+              if (!CHILD_SEARCH_DROPDOWN_COLUMNS.has(childSearchFilterAnchor.column)) {
+                applyChildSearchColumnTextFilter(
+                  childSearchFilterAnchor.column,
+                  childSearchFilterSearchTerm,
+                )
+              }
+            }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -2140,27 +2131,29 @@ export default function WeeklyFileProcessingTab() {
             }}
             sx={{ mb: 1 }}
           />
-          <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-            {getChildSearchUniqueValues(childSearchFilterAnchor.column)
-              .filter((value) =>
-                value.toLowerCase().includes(childSearchFilterSearchTerm.toLowerCase()),
-              )
-              .map((value) => (
-                <Box key={value} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
-                  <Checkbox
-                    size="small"
-                    checked={
-                      childSearchColumnFilters[childSearchFilterAnchor.column]?.includes(value) ||
-                      false
-                    }
-                    onChange={() =>
-                      handleChildSearchFilterChange(childSearchFilterAnchor.column, value)
-                    }
-                  />
-                  <Typography variant="body2">{value}</Typography>
-                </Box>
-              ))}
-          </Box>
+          {CHILD_SEARCH_DROPDOWN_COLUMNS.has(childSearchFilterAnchor.column) && (
+            <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+              {getChildSearchUniqueValues(childSearchFilterAnchor.column)
+                .filter((value) =>
+                  value.toLowerCase().includes(childSearchFilterSearchTerm.toLowerCase()),
+                )
+                .map((value) => (
+                  <Box key={value} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
+                    <Checkbox
+                      size="small"
+                      checked={
+                        childSearchColumnFilters[childSearchFilterAnchor.column]?.includes(value) ||
+                        false
+                      }
+                      onChange={() =>
+                        handleChildSearchFilterChange(childSearchFilterAnchor.column, value)
+                      }
+                    />
+                    <Typography variant="body2">{value}</Typography>
+                  </Box>
+                ))}
+            </Box>
+          )}
         </Box>
       </Menu>
     </Box>

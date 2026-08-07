@@ -13,6 +13,10 @@ import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
 import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { ContactsService } from './contacts.service'
+import {
+  CONTACT_DELETE_APPLICATION_TABLES,
+  CONTACT_DELETE_STAGING_TABLES,
+} from './constants'
 
 describe('ContactsService', () => {
   let service: ContactsService
@@ -2145,6 +2149,9 @@ describe('ContactsService', () => {
       const transactionSpy = vi.fn(async (callback) => {
         return callback({
           $executeRaw: vi.fn(),
+          $queryRaw: vi.fn().mockResolvedValue([
+            { batchDetails: 0n, auditTrail: 0n, wklRecords: 0n },
+          ]),
           contact: { delete: vi.fn() },
         })
       })
@@ -2209,6 +2216,9 @@ describe('ContactsService', () => {
             executeRawCalls.push(query[0])
             return Promise.resolve()
           }),
+          $queryRaw: vi.fn().mockResolvedValue([
+            { batchDetails: 0n, auditTrail: 0n, wklRecords: 0n },
+          ]),
           contact: { delete: vi.fn() },
         })
       })
@@ -2218,21 +2228,61 @@ describe('ContactsService', () => {
 
       // Verify correct deletion order (children before parents)
       expect(executeRawCalls.length).toBeGreaterThan(0)
-      expect(executeRawCalls.some((q) => q.includes('stg_icm_orders'))).toBe(true)
-      expect(executeRawCalls.some((q) => q.includes('stg_icm_agreement'))).toBe(true)
-      expect(executeRawCalls.some((q) => q.includes('stg_icm_placements'))).toBe(true)
-      expect(executeRawCalls.some((q) => q.includes('stg_icm_cases'))).toBe(true)
+      for (const table of CONTACT_DELETE_STAGING_TABLES) {
+        expect(executeRawCalls.some((q) => q.includes(table))).toBe(true)
+      }
+      for (const table of CONTACT_DELETE_APPLICATION_TABLES) {
+        expect(executeRawCalls.some((q) => q.includes(table))).toBe(true)
+      }
 
-      const wklIndex = executeRawCalls.findIndex((q) => q.includes('wkl_file_records'))
-      const batchDetailIndex = executeRawCalls.findIndex((q) =>
-        q.includes('contact_batch_details'),
+      const wklIndex = executeRawCalls.findIndex((q) =>
+        q.includes('DELETE FROM csa.wkl_file_records'),
       )
-      const auditTrailIndex = executeRawCalls.findIndex((q) => q.includes('contact_audit_trail'))
+      const batchDetailIndex = executeRawCalls.findIndex((q) =>
+        q.includes('DELETE FROM csa.contact_batch_details'),
+      )
+      const auditTrailIndex = executeRawCalls.findIndex((q) =>
+        q.includes('DELETE FROM csa.contact_audit_trail'),
+      )
+      const casesIndex = executeRawCalls.findIndex((q) =>
+        q.includes('DELETE FROM csa.stg_icm_cases'),
+      )
+      const misPlacementsIndex = executeRawCalls.findIndex((q) =>
+        q.includes('DELETE FROM csa.stg_mis_placements'),
+      )
+
       expect(wklIndex).toBeGreaterThan(-1)
       expect(batchDetailIndex).toBeGreaterThan(-1)
       expect(auditTrailIndex).toBeGreaterThan(-1)
       expect(wklIndex).toBeLessThan(batchDetailIndex)
       expect(batchDetailIndex).toBeLessThan(auditTrailIndex)
+      expect(misPlacementsIndex).toBeLessThan(casesIndex)
+    })
+
+    it('should fail when FK child rows remain after dependency cleanup', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        personIdIcm: 'ICM-123',
+        contactIdIcm: 'CONTACT-123',
+        personIdMis: 'MIS-123',
+        firstName: 'John',
+        lastName: 'Doe',
+      } as any)
+
+      vi.spyOn(prisma, '$transaction').mockImplementation(async (callback) => {
+        return callback({
+          $executeRaw: vi.fn(),
+          $queryRaw: vi.fn().mockResolvedValue([
+            { batchDetails: 1n, auditTrail: 0n, wklRecords: 0n },
+          ]),
+          contact: { delete: vi.fn() },
+        })
+      })
+
+      await expect(
+        service.deleteContact(1, 'dq.steward', USER_PROFILE.DATA_QUALITY_STEWARD),
+      ).rejects.toThrow('dependent rows remain')
     })
 
     it('should not trigger ICM sync-back on delete', async () => {
@@ -2249,6 +2299,9 @@ describe('ContactsService', () => {
       const transactionSpy = vi.fn(async (callback) => {
         return callback({
           $executeRaw: vi.fn(),
+          $queryRaw: vi.fn().mockResolvedValue([
+            { batchDetails: 0n, auditTrail: 0n, wklRecords: 0n },
+          ]),
           contact: { delete: vi.fn() },
         })
       })

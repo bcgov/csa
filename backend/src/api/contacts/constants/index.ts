@@ -89,3 +89,29 @@ export const AUDITABLE_FIELDS = {
   CSA_STATUS_EFFECTIVE_DATE: 'csaStatusEffectiveDate',
   CSA_SENT_DATE: 'csaSentDate',
 } as const
+
+/**
+ * Application tables with FK to contacts.id — must be cleared before contact delete (BL-37).
+ * Shared entities (batches, transfer_files) are intentionally excluded.
+ */
+export const CONTACT_DELETE_APPLICATION_TABLES = [
+  'wkl_file_records',
+  'contact_batch_details',
+  'contact_audit_trail',
+] as const
+
+/**
+ * Staging tables keyed by person_id_icm / person_id_mis — cleared on DQ hard-delete (BL-37).
+ * stg_icm_legal_authority_admin is a shared lookup table and is not contact-scoped.
+ */
+export const CONTACT_DELETE_STAGING_TABLES = [
+  'stg_icm_orders',
+  'stg_icm_agreement',
+  'stg_icm_placements',
+  'stg_icm_legal_authority',
+  'stg_icm_agreement_line',
+  'stg_icm_cases',
+  'stg_mis_contracts',
+  'stg_mis_payments',
+  'stg_mis_placements',
+] as const

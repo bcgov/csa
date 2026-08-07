@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
@@ -1128,92 +1129,15 @@ export class ContactsService {
       )
     }
 
-    // 4. Delete in transaction (BL-37)
-    // Delete from UI, database tables AND staging tables (per user story)
-    // IMPORTANT: Delete in reverse dependency order (children first, then parents).
-    // All child rows are removed explicitly; contact FK uses ON DELETE RESTRICT.
+    // 4. Delete in transaction (BL-37) — all dependencies explicit; contact FK is RESTRICT.
     await this.prisma.$transaction(async (tx) => {
-      // Step 1: Delete ICM orders (depends on agreements)
-      await tx.$executeRaw`
-        DELETE FROM csa.stg_icm_orders 
-        WHERE "AGREEMENT_ROW_ID" IN (
-          SELECT DISTINCT "AGREEMENT_ROW_ID" FROM csa.stg_icm_placements 
-          WHERE "CASE_ROW_ID" IN (
-            SELECT "ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${contact.personIdIcm}
-          )
-        )
-      `
+      await this.deleteAllContactDependencies(tx, {
+        contactId,
+        personIdIcm: contact.personIdIcm,
+        contactIdIcm: contact.contactIdIcm,
+        personIdMis: contact.personIdMis,
+      })
 
-      // Step 2: Delete ICM agreements (depends on placements)
-      await tx.$executeRaw`
-        DELETE FROM csa.stg_icm_agreement 
-        WHERE "ROW_ID" IN (
-          SELECT DISTINCT "AGREEMENT_ROW_ID" FROM csa.stg_icm_placements 
-          WHERE "CASE_ROW_ID" IN (
-            SELECT "ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${contact.personIdIcm}
-          )
-        )
-      `
-
-      // Step 3: Delete ICM placements (depends on cases)
-      await tx.$executeRaw`
-        DELETE FROM csa.stg_icm_placements 
-        WHERE "CASE_ROW_ID" IN (
-          SELECT "ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${contact.personIdIcm}
-        )
-      `
-
-      // Step 4: Delete ICM legal authority (direct link)
-      if (contact.contactIdIcm) {
-        await tx.$executeRaw`DELETE FROM csa.stg_icm_legal_authority WHERE "PAR_ROW_ID" = ${contact.contactIdIcm}`
-      }
-
-      // Step 5: Delete ICM agreement lines (direct link)
-      await tx.$executeRaw`DELETE FROM csa.stg_icm_agreement_line WHERE "X_CONTACT_NUM" = ${contact.personIdIcm}`
-
-      // Step 6: Delete ICM cases (parent table)
-      await tx.$executeRaw`DELETE FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${contact.personIdIcm}`
-
-      // MIS staging tables
-      if (contact.personIdMis) {
-        // Step 7: Delete MIS contracts (must be before placements)
-        await tx.$executeRaw`
-          DELETE FROM csa.stg_mis_contracts 
-          WHERE contract_number IN (
-            SELECT DISTINCT contract_number FROM csa.stg_mis_placements 
-            WHERE person_id_mis = ${contact.personIdMis}
-          )
-        `
-
-        // Step 8: Delete MIS payments (direct link)
-        await tx.$executeRaw`DELETE FROM csa.stg_mis_payments WHERE person_id_mis = ${contact.personIdMis}`
-
-        // Step 9: Delete MIS placements (direct link)
-        await tx.$executeRaw`DELETE FROM csa.stg_mis_placements WHERE person_id_mis = ${contact.personIdMis}`
-      }
-
-      // Step 10: Delete WKL rows referencing this contact or its batch details
-      await tx.$executeRaw`
-        DELETE FROM csa.wkl_file_records
-        WHERE contact_id = ${contactId}
-           OR batch_detail_id IN (
-             SELECT id FROM csa.contact_batch_details WHERE contact_id = ${contactId}
-           )
-      `
-
-      // Step 11: Delete contact batch details for this contact
-      await tx.$executeRaw`
-        DELETE FROM csa.contact_batch_details
-        WHERE contact_id = ${contactId}
-      `
-
-      // Step 12: Delete audit trail rows for this contact
-      await tx.$executeRaw`
-        DELETE FROM csa.contact_audit_trail
-        WHERE contact_id = ${contactId}
-      `
-
-      // Step 13: Delete contact (FK RESTRICT — all child rows must be removed first)
       await tx.contact.delete({
         where: { id: contactId },
       })
@@ -1227,6 +1151,193 @@ export class ContactsService {
       success: true,
       message:
         'The child record and all associated CSA data have been permanently deleted successfully.',
+    }
+  }
+
+  /**
+   * Delete all rows tied to a contact across staging and application tables (BL-37).
+   * Order: deepest ICM/MIS staging children first, then WKL/batch/audit, then contact.
+   */
+  private async deleteAllContactDependencies(
+    tx: Prisma.TransactionClient,
+    ids: {
+      contactId: number
+      personIdIcm: string | null
+      contactIdIcm: string | null
+      personIdMis: string | null
+    },
+  ): Promise<void> {
+    const { contactId, personIdIcm, contactIdIcm, personIdMis } = ids
+    const personIcm = personIdIcm?.trim() || null
+    const personMis = personIdMis?.trim() || null
+
+    if (personIcm) {
+      // ICM staging — reverse dependency order
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_icm_orders
+        WHERE "AGREEMENT_ROW_ID" IN (
+          SELECT DISTINCT "AGREEMENT_ROW_ID" FROM csa.stg_icm_placements
+          WHERE "CASE_ROW_ID" IN (
+            SELECT "ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+          )
+        )
+      `
+
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_icm_agreement
+        WHERE "ROW_ID" IN (
+          SELECT DISTINCT "AGREEMENT_ROW_ID" FROM csa.stg_icm_placements
+          WHERE "CASE_ROW_ID" IN (
+            SELECT "ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+          )
+        )
+      `
+
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_icm_placements
+        WHERE "CASE_ROW_ID" IN (
+          SELECT "ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+        )
+      `
+
+      // All case row IDs for this person (multi-case) plus master contact_id_icm fallback
+      if (contactIdIcm?.trim()) {
+        await tx.$executeRaw`
+          DELETE FROM csa.stg_icm_legal_authority
+          WHERE "PAR_ROW_ID" IN (
+            SELECT "CONTACT_ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+          )
+          OR "PAR_ROW_ID" = ${contactIdIcm}
+        `
+      } else {
+        await tx.$executeRaw`
+          DELETE FROM csa.stg_icm_legal_authority
+          WHERE "PAR_ROW_ID" IN (
+            SELECT "CONTACT_ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+          )
+        `
+      }
+
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_icm_agreement_line WHERE "X_CONTACT_NUM" = ${personIcm}
+      `
+
+      if (personMis || personIcm) {
+        // MIS staging — before stg_icm_cases delete (subquery uses PERSON_ID_MIS on cases)
+        await tx.$executeRaw`
+          DELETE FROM csa.stg_mis_contracts
+          WHERE contract_number IN (
+            SELECT DISTINCT contract_number FROM csa.stg_mis_placements
+            WHERE person_id_mis = ${personMis}
+               OR (
+                 person_id_mis IN (
+                   SELECT DISTINCT "PERSON_ID_MIS" FROM csa.stg_icm_cases
+                   WHERE "X_CONTACT_NUM" = ${personIcm}
+                     AND NULLIF(TRIM("PERSON_ID_MIS"), '') IS NOT NULL
+                 )
+               )
+          )
+        `
+
+        await tx.$executeRaw`
+          DELETE FROM csa.stg_mis_payments
+          WHERE person_id_mis = ${personMis}
+             OR person_id_mis IN (
+               SELECT DISTINCT "PERSON_ID_MIS" FROM csa.stg_icm_cases
+               WHERE "X_CONTACT_NUM" = ${personIcm}
+                 AND NULLIF(TRIM("PERSON_ID_MIS"), '') IS NOT NULL
+             )
+        `
+
+        await tx.$executeRaw`
+          DELETE FROM csa.stg_mis_placements
+          WHERE person_id_mis = ${personMis}
+             OR person_id_mis IN (
+               SELECT DISTINCT "PERSON_ID_MIS" FROM csa.stg_icm_cases
+               WHERE "X_CONTACT_NUM" = ${personIcm}
+                 AND NULLIF(TRIM("PERSON_ID_MIS"), '') IS NOT NULL
+             )
+        `
+      }
+
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+      `
+    } else if (contactIdIcm?.trim()) {
+      // Staging case rows missing — still remove legal authority tied to master ICM contact id
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_icm_legal_authority WHERE "PAR_ROW_ID" = ${contactIdIcm}
+      `
+    }
+
+    if (personMis && !personIcm) {
+      // MIS-only cleanup when no ICM person id on the contact
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_mis_contracts
+        WHERE contract_number IN (
+          SELECT DISTINCT contract_number FROM csa.stg_mis_placements
+          WHERE person_id_mis = ${personMis}
+        )
+      `
+
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_mis_payments WHERE person_id_mis = ${personMis}
+      `
+
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_mis_placements WHERE person_id_mis = ${personMis}
+      `
+    }
+
+    // Application tables with FK to contacts.id
+    await tx.$executeRaw`
+      DELETE FROM csa.wkl_file_records
+      WHERE contact_id = ${contactId}
+         OR batch_detail_id IN (
+           SELECT id FROM csa.contact_batch_details WHERE contact_id = ${contactId}
+         )
+    `
+
+    await tx.$executeRaw`
+      DELETE FROM csa.contact_batch_details WHERE contact_id = ${contactId}
+    `
+
+    await tx.$executeRaw`
+      DELETE FROM csa.contact_audit_trail WHERE contact_id = ${contactId}
+    `
+
+    await this.assertContactDependenciesCleared(tx, contactId)
+  }
+
+  /** Guard: no FK child rows may remain before contacts delete (RESTRICT). */
+  private async assertContactDependenciesCleared(
+    tx: Prisma.TransactionClient,
+    contactId: number,
+  ): Promise<void> {
+    const rows = await tx.$queryRaw<
+      [{ batchDetails: bigint; auditTrail: bigint; wklRecords: bigint }]
+    >`
+      SELECT
+        (SELECT COUNT(*)::bigint FROM csa.contact_batch_details WHERE contact_id = ${contactId}) AS "batchDetails",
+        (SELECT COUNT(*)::bigint FROM csa.contact_audit_trail WHERE contact_id = ${contactId}) AS "auditTrail",
+        (
+          SELECT COUNT(*)::bigint FROM csa.wkl_file_records
+          WHERE contact_id = ${contactId}
+             OR batch_detail_id IN (
+               SELECT id FROM csa.contact_batch_details WHERE contact_id = ${contactId}
+             )
+        ) AS "wklRecords"
+    `
+
+    const remaining = rows[0]
+    if (
+      Number(remaining.batchDetails) > 0 ||
+      Number(remaining.auditTrail) > 0 ||
+      Number(remaining.wklRecords) > 0
+    ) {
+      throw new InternalServerErrorException(
+        `Contact ${contactId} could not be deleted: dependent rows remain in batch, audit, or WKL tables.`,
+      )
     }
   }
 

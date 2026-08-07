@@ -13,21 +13,20 @@ export interface AutoBatchResult {
 
 export function formatAutoBatchSummary(result: AutoBatchResult): string {
   const added = result.application + result.cancellation
-  const parts: string[] = []
+  const onHoldSuffix =
+    result.onHold > 0
+      ? `${added > 0 ? '; ' : ''}${result.onHold} contacts auto-held due to missing CRA mandatory fields`
+      : ''
 
   if (added > 0) {
-    parts.push(
-      `${result.application} application, ${result.cancellation} cancellation added to batch`,
-    )
-  }
-  if (result.onHold > 0) {
-    parts.push(`${result.onHold} placed on hold due to missing CRA mandatory fields`)
-  }
-  if (parts.length === 0) {
-    return 'Auto-batch complete: No eligible contacts found to batch'
+    return `Auto-batch complete: ${result.application} application, ${result.cancellation} cancellation${onHoldSuffix}`
   }
 
-  return `Auto-batch complete: ${parts.join('; ')}`
+  if (result.onHold > 0) {
+    return `Auto-batch complete: ${result.onHold} contacts auto-held due to missing CRA mandatory fields`
+  }
+
+  return 'Auto-batch complete: No eligible contacts found to batch'
 }
 
 type AutoBatchCandidate = {

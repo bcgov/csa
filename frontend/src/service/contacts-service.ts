@@ -798,30 +798,33 @@ export interface AutoBatchCompletionMetadata {
 
 export const formatAutoBatchCompletionMessage = (
   metadata: AutoBatchCompletionMetadata | null | undefined,
-): { message: string; severity: 'success' | 'info' | 'warning' } => {
+): { message: string; severity: 'success' | 'info' } => {
   const application = metadata?.application ?? 0
   const cancellation = metadata?.cancellation ?? 0
   const onHold = metadata?.onHold ?? metadata?.incomplete?.length ?? 0
   const added = application + cancellation
-  const parts: string[] = []
+  const onHoldSuffix =
+    onHold > 0
+      ? `${added > 0 ? '; ' : ''}${onHold} contacts auto-held due to missing CRA mandatory fields`
+      : ''
 
   if (added > 0) {
-    parts.push(`${application} application, ${cancellation} cancellation contacts added to batch`)
-  }
-  if (onHold > 0) {
-    parts.push(`${onHold} placed on hold due to missing CRA mandatory fields`)
+    return {
+      message: `Auto-batch complete: ${application} application, ${cancellation} cancellation contacts added to batch${onHoldSuffix}`,
+      severity: 'success',
+    }
   }
 
-  if (parts.length === 0) {
+  if (onHold > 0) {
     return {
-      message: 'Auto-batch complete: No eligible contacts found to batch',
+      message: `Auto-batch complete: ${onHold} contacts auto-held due to missing CRA mandatory fields`,
       severity: 'info',
     }
   }
 
   return {
-    message: `Auto-batch complete: ${parts.join('; ')}`,
-    severity: onHold > 0 ? 'warning' : 'success',
+    message: 'Auto-batch complete: No eligible contacts found to batch',
+    severity: 'info',
   }
 }
 

@@ -152,7 +152,7 @@ describe('AutoBatchService', () => {
 })
 
 describe('formatAutoBatchSummary', () => {
-  it('should include on-hold count when incomplete records exist', () => {
+  it('should append auto-held count to the existing application/cancellation summary', () => {
     expect(
       formatAutoBatchSummary({
         application: 2,
@@ -161,11 +161,11 @@ describe('formatAutoBatchSummary', () => {
         incomplete: [],
       }),
     ).toBe(
-      'Auto-batch complete: 2 application, 1 cancellation added to batch; 3 placed on hold due to missing CRA mandatory fields',
+      'Auto-batch complete: 2 application, 1 cancellation; 3 contacts auto-held due to missing CRA mandatory fields',
     )
   })
 
-  it('should report only on-hold count when nothing was added', () => {
+  it('should report only auto-held count when nothing was added', () => {
     expect(
       formatAutoBatchSummary({
         application: 0,
@@ -173,6 +173,6 @@ describe('formatAutoBatchSummary', () => {
         onHold: 2,
         incomplete: [],
       }),
-    ).toBe('Auto-batch complete: 2 placed on hold due to missing CRA mandatory fields')
+    ).toBe('Auto-batch complete: 2 contacts auto-held due to missing CRA mandatory fields')
   })
 })

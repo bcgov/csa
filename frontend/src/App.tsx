@@ -368,9 +368,6 @@ function App() {
 
   // Incomplete records (CRA fields validation) dialog state
   const [incompleteRecordsDialogOpen, setIncompleteRecordsDialogOpen] = useState(false)
-  const [incompleteRecordsDialogVariant, setIncompleteRecordsDialogVariant] = useState<
-    'manual' | 'autoBatch'
-  >('manual')
   const [incompleteRecords, setIncompleteRecords] = useState<
     Array<{ id: number; missingFields: string[] }>
   >([])
@@ -2248,7 +2245,6 @@ function App() {
 
       // If there are incomplete records, show the dialog
       if (incompleteCount > 0) {
-        setIncompleteRecordsDialogVariant('manual')
         setIncompleteRecords(response.incomplete || [])
         setIncompleteRecordsDialogOpen(true)
       }
@@ -2381,9 +2377,7 @@ function App() {
         const { message, severity } = formatAutoBatchCompletionMessage(metadata)
         const application = metadata?.application ?? 0
         const cancellation = metadata?.cancellation ?? 0
-        const onHold = metadata?.onHold ?? metadata?.incomplete?.length ?? 0
         const added = application + cancellation
-        const incompleteRecords = metadata?.incomplete ?? []
 
         setSnackbar({
           open: true,
@@ -2391,30 +2385,22 @@ function App() {
           severity,
         })
 
-        if (incompleteRecords.length > 0) {
-          setIncompleteRecordsDialogVariant('autoBatch')
-          setIncompleteRecords(incompleteRecords)
-          setIncompleteRecordsDialogOpen(true)
-        }
-
-        // Refresh the contacts list and batch tables when anything changed
-        if (added > 0 || onHold > 0) {
+        // Refresh the contacts list and batch tables
+        if (added > 0) {
           if (isSearchActive && searchTerm.trim().length >= 3) {
             await performFullTextSearch(searchTerm.trim(), currentPage)
           } else {
             await fetchContacts(currentPage)
           }
 
-          if (added > 0) {
-            // Refresh Batch Requests table
-            const updatedBatches = await getAllBatches()
-            setBatches(updatedBatches)
+          // Refresh Batch Requests table
+          const updatedBatches = await getAllBatches()
+          setBatches(updatedBatches)
 
-            // Refresh Batch Details table for the currently selected batch
-            if (selectedBatch) {
-              const updatedDetails = await getBatchContacts(selectedBatch)
-              setBatchDetails(updatedDetails)
-            }
+          // Refresh Batch Details table for the currently selected batch
+          if (selectedBatch) {
+            const updatedDetails = await getBatchContacts(selectedBatch)
+            setBatchDetails(updatedDetails)
           }
         }
       } else {
@@ -8503,7 +8489,6 @@ function App() {
         onConfirm={handleIncompleteRecordsConfirm}
         incompletRecords={incompleteRecords}
         isLoading={incompleteRecordsLoading}
-        variant={incompleteRecordsDialogVariant}
       />
 
       {/* Snackbar for hold/resume feedback */}

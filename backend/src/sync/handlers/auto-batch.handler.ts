@@ -26,7 +26,7 @@ export class AutoBatchHandler extends BaseJob {
     const result = await this.autoBatchService.run()
 
     let syncResult: SyncBackResult | null = null
-    if (result.application > 0 || result.cancellation > 0 || result.onHold > 0) {
+    if (result.application > 0 || result.cancellation > 0) {
       try {
         syncResult = await this.icmSyncBackService.syncFlaggedWithRetry()
       } catch (err) {

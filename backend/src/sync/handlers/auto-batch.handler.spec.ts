@@ -50,9 +50,7 @@ describe('AutoBatchHandler', () => {
     const result = await handler.execute(mockContext)
 
     expect(result.success).toBe(true)
-    expect(result.message).toContain('5 application')
-    expect(result.message).toContain('2 cancellation')
-    expect(result.message).toContain('added to batch')
+    expect(result.message).toBe('Auto-batch complete: 5 application, 2 cancellation')
     expect(mockAutoBatchService.run).toHaveBeenCalledOnce()
     expect(mockSyncBackService.syncFlaggedWithRetry).toHaveBeenCalledOnce()
   })
@@ -87,7 +85,7 @@ describe('AutoBatchHandler', () => {
     expect(mockSyncBackService.syncFlaggedWithRetry).toHaveBeenCalledOnce()
   })
 
-  it('should run sync-back when only incomplete records were auto-held', async () => {
+  it('should skip sync-back when only incomplete records were auto-held', async () => {
     mockAutoBatchService.run.mockResolvedValue({
       application: 0,
       cancellation: 0,
@@ -98,8 +96,8 @@ describe('AutoBatchHandler', () => {
     const result = await handler.execute(mockContext)
 
     expect(result.success).toBe(true)
-    expect(result.message).toContain('2 placed on hold')
-    expect(mockSyncBackService.syncFlaggedWithRetry).toHaveBeenCalledOnce()
+    expect(result.message).toContain('2 contacts auto-held due to missing CRA mandatory fields')
+    expect(mockSyncBackService.syncFlaggedWithRetry).not.toHaveBeenCalled()
   })
 
   it('should succeed even if sync-back throws', async () => {

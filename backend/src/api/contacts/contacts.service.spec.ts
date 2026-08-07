@@ -13,10 +13,7 @@ import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
 import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { ContactsService } from './contacts.service'
-import {
-  CONTACT_DELETE_APPLICATION_TABLES,
-  CONTACT_DELETE_STAGING_TABLES,
-} from './constants'
+import { CONTACT_DELETE_APPLICATION_TABLES, CONTACT_DELETE_STAGING_TABLES } from './constants'
 
 describe('ContactsService', () => {
   let service: ContactsService
@@ -2149,11 +2146,11 @@ describe('ContactsService', () => {
       const transactionSpy = vi.fn(async (callback) => {
         return callback({
           $executeRaw: vi.fn(),
-          $queryRaw: vi.fn().mockResolvedValue([
-            { batchDetails: 0n, auditTrail: 0n, wklRecords: 0n },
-          ]),
+          $queryRaw: vi
+            .fn()
+            .mockResolvedValue([{ batchDetails: 0n, auditTrail: 0n, wklRecords: 0n }]),
           contact: { delete: vi.fn() },
-        })
+        } as any)
       })
       vi.spyOn(prisma, '$transaction').mockImplementation(transactionSpy as any)
 
@@ -2216,11 +2213,11 @@ describe('ContactsService', () => {
             executeRawCalls.push(query[0])
             return Promise.resolve()
           }),
-          $queryRaw: vi.fn().mockResolvedValue([
-            { batchDetails: 0n, auditTrail: 0n, wklRecords: 0n },
-          ]),
+          $queryRaw: vi
+            .fn()
+            .mockResolvedValue([{ batchDetails: 0n, auditTrail: 0n, wklRecords: 0n }]),
           contact: { delete: vi.fn() },
-        })
+        } as any)
       })
       vi.spyOn(prisma, '$transaction').mockImplementation(transactionSpy as any)
 
@@ -2273,11 +2270,11 @@ describe('ContactsService', () => {
       vi.spyOn(prisma, '$transaction').mockImplementation(async (callback) => {
         return callback({
           $executeRaw: vi.fn(),
-          $queryRaw: vi.fn().mockResolvedValue([
-            { batchDetails: 1n, auditTrail: 0n, wklRecords: 0n },
-          ]),
+          $queryRaw: vi
+            .fn()
+            .mockResolvedValue([{ batchDetails: 1n, auditTrail: 0n, wklRecords: 0n }]),
           contact: { delete: vi.fn() },
-        })
+        } as any)
       })
 
       await expect(
@@ -2299,11 +2296,11 @@ describe('ContactsService', () => {
       const transactionSpy = vi.fn(async (callback) => {
         return callback({
           $executeRaw: vi.fn(),
-          $queryRaw: vi.fn().mockResolvedValue([
-            { batchDetails: 0n, auditTrail: 0n, wklRecords: 0n },
-          ]),
+          $queryRaw: vi
+            .fn()
+            .mockResolvedValue([{ batchDetails: 0n, auditTrail: 0n, wklRecords: 0n }]),
           contact: { delete: vi.fn() },
-        })
+        } as any)
       })
       vi.spyOn(prisma, '$transaction').mockImplementation(transactionSpy as any)
 

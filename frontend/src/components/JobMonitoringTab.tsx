@@ -1220,10 +1220,7 @@ export default function JobMonitoringTab() {
                 </Typography>
               )}
             </Typography>
-            <Tooltip
-              title="Warnings and errors recorded during jobs and processes"
-              arrow
-            >
+            <Tooltip title="Warnings and errors recorded during jobs and processes" arrow>
               <IconButton size="small" sx={{ padding: 0.5 }}>
                 <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
               </IconButton>

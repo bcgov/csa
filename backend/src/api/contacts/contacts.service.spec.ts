@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import { AdminService } from 'src/api/admin/admin.service'
 import { USER_PROFILE } from 'src/api/admin/constants/user-profile.constants'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
@@ -80,12 +79,6 @@ describe('ContactsService', () => {
           provide: EligibilityService,
           useValue: {
             runForContact: vi.fn(),
-          },
-        },
-        {
-          provide: AdminService,
-          useValue: {
-            getUserProfile: vi.fn().mockResolvedValue(USER_PROFILE.DATA_QUALITY_STEWARD),
           },
         },
         {
@@ -2094,6 +2087,26 @@ describe('ContactsService', () => {
       expect(syncSpy).toHaveBeenCalledWith(1)
     })
 
+    it('should trigger ICM sync-back when status effective date changes', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({ id: 1 } as any)
+      vi.spyOn(service as any, 'findOne').mockResolvedValue({ id: 1 })
+      const syncSpy = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
+
+      await service.updateContact(
+        1,
+        { csaStatusEffectiveDate: new Date('2026-08-01') },
+        'dq.steward',
+        USER_PROFILE.DATA_QUALITY_STEWARD,
+      )
+
+      expect(syncSpy).toHaveBeenCalledWith(1)
+    })
+
     it('should not fail update if ICM sync-back fails', async () => {
       vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
         id: 1,
@@ -2209,6 +2222,14 @@ describe('ContactsService', () => {
       expect(executeRawCalls.some((q) => q.includes('stg_icm_agreement'))).toBe(true)
       expect(executeRawCalls.some((q) => q.includes('stg_icm_placements'))).toBe(true)
       expect(executeRawCalls.some((q) => q.includes('stg_icm_cases'))).toBe(true)
+
+      const wklIndex = executeRawCalls.findIndex((q) => q.includes('wkl_file_records'))
+      const batchDetailIndex = executeRawCalls.findIndex((q) =>
+        q.includes('contact_batch_details'),
+      )
+      expect(wklIndex).toBeGreaterThan(-1)
+      expect(batchDetailIndex).toBeGreaterThan(-1)
+      expect(wklIndex).toBeLessThan(batchDetailIndex)
     })
 
     it('should not trigger ICM sync-back on delete', async () => {

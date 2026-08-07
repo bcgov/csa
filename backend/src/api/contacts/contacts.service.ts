@@ -5,7 +5,6 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
-import { AdminService } from 'src/api/admin/admin.service'
 import { USER_PROFILE, isValidUserProfile } from 'src/api/admin/constants/user-profile.constants'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { Prisma } from '@prisma/client'
@@ -57,7 +56,6 @@ export class ContactsService {
     private stateMachine: StateMachineService,
     private icmSyncBackService: IcmSyncBackService,
     private eligibilityService: EligibilityService,
-    private adminService: AdminService,
   ) {}
 
   async findAll(
@@ -988,10 +986,10 @@ export class ContactsService {
    * BL-36: Update CSA source-of-truth fields (DQ users only)
    * - Validates user has DATA_QUALITY_STEWARD role
    * - Checks contact is not in protected status
-   * - Validates DIN format, checksum, and uniqueness
+   * - Validates DIN format (9 digits) and uniqueness
    * - Validates dates are not in future
    * - Audit trail is automatically created by DB trigger
-   * - Triggers ICM sync-back for DIN/status updates
+   * - Triggers ICM sync-back when any editable CSA field changes
    */
   async updateContact(
     contactId: number,
@@ -1015,7 +1013,7 @@ export class ContactsService {
     // 3. Check protected status (BL-35)
     if (contact.csaStatus && PROTECTED_CSA_STATUSES.has(contact.csaStatus)) {
       throw new UnprocessableEntityException(
-        `Contact is in protected status '${contact.csaStatus}'. Contact FIN team for assistance.`,
+        'Child record is in CSA protected status, contact FIN team for assistance.',
       )
     }
 
@@ -1065,9 +1063,11 @@ export class ContactsService {
       },
     })
 
-    // 7. Trigger ICM sync-back if DIN or status changed (BL-36)
+    // 7. Trigger ICM sync-back when any BL-36 editable field changes
     const shouldSyncToIcm =
-      fieldsToUpdate.din !== undefined || fieldsToUpdate.csaStatus !== undefined
+      fieldsToUpdate.din !== undefined ||
+      fieldsToUpdate.csaStatus !== undefined ||
+      fieldsToUpdate.csaStatusEffectiveDate !== undefined
 
     if (shouldSyncToIcm) {
       try {
@@ -1124,7 +1124,7 @@ export class ContactsService {
     // 3. Check protected status (BL-35)
     if (contact.csaStatus && PROTECTED_CSA_STATUSES.has(contact.csaStatus)) {
       throw new UnprocessableEntityException(
-        `Contact is in protected status '${contact.csaStatus}'. Contact FIN team for assistance.`,
+        'Child record is in CSA protected status, contact FIN team for assistance.',
       )
     }
 

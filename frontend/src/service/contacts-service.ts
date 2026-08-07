@@ -29,6 +29,7 @@ export interface Contact {
   csaStatus?: string
   csaStatusLabel?: string
   csaStatusEffectiveDate?: string
+  lastEligibilityRunAt?: string
   csaSentDate?: string
   din?: string
   effectiveLegalStatus?: string

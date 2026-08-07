@@ -85,6 +85,12 @@ export class ContactDto {
   @ApiPropertyOptional({ description: 'Effective date of the CSA status' })
   csaStatusEffectiveDate?: Date
 
+  @ApiPropertyOptional({
+    description:
+      'When eligibility last successfully ran and upserted this contact (BL-14C watermark)',
+  })
+  lastEligibilityRunAt?: Date
+
   @ApiPropertyOptional({ description: 'Date CSA was sent' })
   csaSentDate?: Date
 

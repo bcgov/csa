@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { PrismaModule } from 'src/common/database/prisma.module'
 import { StateMachineModule } from 'src/common/state-machine/state-machine.module'
+import { AdminModule } from '../admin/admin.module'
 import { AuditTrailModule } from '../audit-trail/audit-trail.module'
 import { AdminModule } from '../admin/admin.module'
 import { IcmSyncBackModule } from 'src/sync/icm/icm-sync-back.module'

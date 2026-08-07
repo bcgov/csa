@@ -311,6 +311,13 @@ const toISODateOnly = (value: Date): string => {
   return `${year}-${month}-${day}`
 }
 
+// Display labels for the DQ Steward inline-edit fields (used in the confirm-update dialog)
+const DQ_FIELD_LABELS = {
+  din: 'DIN',
+  csaStatusRaw: 'CSA Status',
+  statusEffective: 'Status Effective Date',
+} as const
+
 function App() {
   const {
     isAuthenticated: keycloakAuthenticated,
@@ -355,6 +362,17 @@ function App() {
     csaStatusRaw: '',
     statusEffective: '',
   })
+  // Snapshot taken when edit mode starts, used to detect which fields actually changed
+  const [dqOriginalValues, setDqOriginalValues] = useState<{
+    din: string
+    csaStatusRaw: string
+    statusEffective: string
+  }>({
+    din: '',
+    csaStatusRaw: '',
+    statusEffective: '',
+  })
+  const [confirmDqUpdateDialogOpen, setConfirmDqUpdateDialogOpen] = useState(false)
 
   // Pre-defined filter state
   const [preDefinedFilter, setPreDefinedFilter] = useState('Pending User review/action')
@@ -3274,17 +3292,14 @@ function App() {
       return
     }
 
-    setDqEditableRecordId(selectedRow.id)
-    setDqEditValues({
+    const initialValues = {
       din: selectedRow.din || '',
       csaStatusRaw: selectedRow.csaStatusRaw || '',
       statusEffective: toDateInputValue(selectedRow.statusEffective),
-    })
-    setSnackbar({
-      open: true,
-      message: 'Update mode enabled (placeholder).',
-      severity: 'info',
-    })
+    }
+    setDqEditableRecordId(selectedRow.id)
+    setDqEditValues(initialValues)
+    setDqOriginalValues(initialValues)
   }
 
   const handleDqDeleteClick = () => {
@@ -3293,6 +3308,61 @@ function App() {
       open: true,
       message: 'Delete action placeholder.',
       severity: 'info',
+    })
+  }
+
+  const handleDqCancelEdit = () => {
+    setDqEditableRecordId(null)
+  }
+
+  // DIN must be exactly 9 digits; only enforced against the current field value.
+  const isDqDinValid = /^\d{9}$/.test(dqEditValues.din)
+
+  // Only fields the steward actually touched are included in the update payload.
+  const dqChangedFields = useMemo(() => {
+    if (dqEditableRecordId === null) return []
+    return (Object.keys(DQ_FIELD_LABELS) as Array<keyof typeof DQ_FIELD_LABELS>)
+      .filter((field) => dqEditValues[field] !== dqOriginalValues[field])
+      .map((field) => ({
+        field,
+        oldValue: dqOriginalValues[field],
+        newValue: dqEditValues[field],
+      }))
+  }, [dqEditableRecordId, dqEditValues, dqOriginalValues])
+
+  const hasDqChanges = dqChangedFields.length > 0
+
+  const formatDqFieldValue = (field: keyof typeof DQ_FIELD_LABELS, value: string): string => {
+    if (!value) return '(none)'
+    if (field === 'csaStatusRaw') {
+      return CSA_STATUS_FILTER_OPTIONS.find((option) => option.value === value)?.label || value
+    }
+    return value
+  }
+
+  const handleDqSaveClick = () => {
+    if (!hasDqChanges || !isDqDinValid) return
+    setConfirmDqUpdateDialogOpen(true)
+  }
+
+  const handleDqConfirmUpdate = () => {
+    if (dqEditableRecordId === null || !hasDqChanges) return
+
+    // Payload only contains the fields that changed - untouched fields are left as-is.
+    const payload = dqChangedFields.reduce<Record<string, string>>((acc, change) => {
+      acc[change.field] = change.newValue
+      return acc
+    }, {})
+
+    // TODO: replace with a real update endpoint once one exists
+    console.log('Update contact', dqEditableRecordId, payload)
+
+    setConfirmDqUpdateDialogOpen(false)
+    setDqEditableRecordId(null)
+    setSnackbar({
+      open: true,
+      message: 'Record updated successfully (placeholder).',
+      severity: 'success',
     })
   }
 
@@ -3918,7 +3988,30 @@ function App() {
                         </MenuItem>
                       </Select>
                     </FormControl>
-                    {isDataQualitySteward && (
+                    {isDataQualitySteward && dqEditableRecordId !== null && (
+                      <>
+                        {hasDqChanges && (
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={handleDqSaveClick}
+                            disabled={!isDqDinValid}
+                            sx={{ textTransform: 'none' }}
+                          >
+                            OK
+                          </Button>
+                        )}
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={handleDqCancelEdit}
+                          sx={{ textTransform: 'none' }}
+                        >
+                          Cancel
+                        </Button>
+                      </>
+                    )}
+                    {isDataQualitySteward && dqEditableRecordId === null && (
                       <>
                         <Button
                           variant="outlined"
@@ -4666,8 +4759,18 @@ function App() {
                                 size="small"
                                 value={dqEditValues.din}
                                 onChange={(e) =>
-                                  setDqEditValues((prev) => ({ ...prev, din: e.target.value }))
+                                  setDqEditValues((prev) => ({
+                                    ...prev,
+                                    din: e.target.value.replace(/\D/g, '').slice(0, 9),
+                                  }))
                                 }
+                                error={dqEditValues.din.length > 0 && !isDqDinValid}
+                                helperText={
+                                  dqEditValues.din.length > 0 && !isDqDinValid
+                                    ? 'DIN must be exactly 9 digits'
+                                    : ''
+                                }
+                                slotProps={{ htmlInput: { maxLength: 9, inputMode: 'numeric' } }}
                                 sx={{ minWidth: 120 }}
                               />
                             ) : (
@@ -8659,6 +8762,39 @@ function App() {
           </Button>
           <Button onClick={handleAutoBatchAll} variant="contained" autoFocus>
             Yes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirmation Dialog for DQ Steward record update */}
+      <Dialog
+        open={confirmDqUpdateDialogOpen}
+        onClose={() => setConfirmDqUpdateDialogOpen(false)}
+        aria-labelledby="confirm-dq-update-dialog-title"
+        aria-describedby="confirm-dq-update-dialog-description"
+      >
+        <DialogTitle id="confirm-dq-update-dialog-title">Confirm Update</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="confirm-dq-update-dialog-description" sx={{ mb: 1 }}>
+            You are about to update the following field
+            {dqChangedFields.length !== 1 ? 's' : ''} for this record:
+          </DialogContentText>
+          <Box component="ul" sx={{ pl: 2, m: 0 }}>
+            {dqChangedFields.map((change) => (
+              <li key={change.field}>
+                <strong>{DQ_FIELD_LABELS[change.field]}:</strong>{' '}
+                {formatDqFieldValue(change.field, change.oldValue)} {'→'}{' '}
+                {formatDqFieldValue(change.field, change.newValue)}
+              </li>
+            ))}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDqUpdateDialogOpen(false)} color="inherit">
+            Cancel
+          </Button>
+          <Button onClick={handleDqConfirmUpdate} variant="contained" autoFocus>
+            Confirm Update
           </Button>
         </DialogActions>
       </Dialog>

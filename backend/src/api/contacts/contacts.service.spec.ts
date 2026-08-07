@@ -989,8 +989,12 @@ describe('ContactsService', () => {
 
       expect(result.success).toEqual([1, 2])
       expect(result.skipped).toEqual([])
-      // 2 calls per contact: 1 for status transition + 1 for clearing needsReview flag
-      expect(updateSpy).toHaveBeenCalledTimes(4)
+      expect(updateSpy).toHaveBeenCalledTimes(2)
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ needsReview: false }),
+        }),
+      )
     })
 
     it('should skip not found contacts', async () => {
@@ -1150,6 +1154,39 @@ describe('ContactsService', () => {
 
       expect(result.success).toBe(true)
       expect(result.to).toBe('eligible_tbd')
+    })
+
+    it('should clear needsReview when leaving on_hold via RESUME', async () => {
+      const contact = { id: 1, csaStatus: 'on_hold', resumeStatus: 'eligible_tbd' }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.updateCsaStatus(1, 'RESUME', 'USER', { userId: 'user1' })
+
+      expect(result.success).toBe(true)
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ needsReview: false }),
+        }),
+      )
+    })
+
+    it('should clear needsReview when leaving on_hold via SET_NOT_ELIGIBLE', async () => {
+      const contact = { id: 1, csaStatus: 'on_hold', resumeStatus: 'eligible_tbd' }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
+        userId: 'user1',
+      })
+
+      expect(result.success).toBe(true)
+      expect(result.to).toBe('not_eligible_out_of_pay')
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ needsReview: false }),
+        }),
+      )
     })
 
     it('should handle HOLD and save resumeStatus', async () => {
@@ -1787,6 +1824,21 @@ describe('ContactsService', () => {
 
       expect(result.success).toBe(false)
       expect(result.reason).toBe('Contact not found')
+    })
+
+    it('should clear needsReview when leaving on_hold', async () => {
+      const contact = { id: 1, csaStatus: 'on_hold', needsReview: true }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.forceUpdateCsaStatus(1, 'eligible')
+
+      expect(result.success).toBe(true)
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ needsReview: false }),
+        }),
+      )
     })
   })
 

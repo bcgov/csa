@@ -5334,12 +5334,6 @@ function App() {
                                   variant="body2"
                                   sx={{ color: '#333', fontSize: '0.75rem' }}
                                 >
-                                  Status Effective Date: {childData.statusEffective || '--'}
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  sx={{ color: '#333', fontSize: '0.75rem' }}
-                                >
                                   Last Eligibility Run: {childData.lastEligibilityRunAt || '--'}
                                 </Typography>
                               </Box>

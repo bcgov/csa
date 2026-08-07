@@ -1055,9 +1055,7 @@ export class EligibilityService {
         csaStatusEffectiveDate: raw.csaStatusEffectiveDate
           ? new Date(raw.csaStatusEffectiveDate)
           : null,
-        lastEligibilityRunAt: raw.lastEligibilityRunAt
-          ? new Date(raw.lastEligibilityRunAt)
-          : null,
+        lastEligibilityRunAt: raw.lastEligibilityRunAt ? new Date(raw.lastEligibilityRunAt) : null,
         existingContactId: raw.existingContactId,
         lastUpdatedBy: raw.lastUpdatedBy ?? null,
         din: raw.din ?? null,

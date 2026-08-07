@@ -842,10 +842,7 @@ describe('EligibilityService', () => {
         aggregateKey: 'user-set-missing-eligibility-run-at',
       }),
     )
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('BL-14C skip'),
-      expect.any(Object),
-    )
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('BL-14C skip'), expect.any(Object))
     warnSpy.mockRestore()
   })
 

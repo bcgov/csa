@@ -4697,7 +4697,17 @@ function App() {
                               row.csaStatus
                             )}
                           </TableCell>
-                          <TableCell sx={{ minWidth: 128 }}>
+                          <TableCell
+                            sx={{ minWidth: 128 }}
+                            // The DatePicker's calendar renders in a portal, but clicks inside it still
+                            // bubble to the TableRow's onClick (handleContactClick) via the React tree —
+                            // stop that here so navigating months doesn't get hijacked by a row click.
+                            onClick={
+                              isDataQualitySteward && dqEditableRecordId === row.id
+                                ? (e) => e.stopPropagation()
+                                : undefined
+                            }
+                          >
                             {isDataQualitySteward && dqEditableRecordId === row.id ? (
                               <LocalizationProvider dateAdapter={AdapterDateFns}>
                                 <DatePicker

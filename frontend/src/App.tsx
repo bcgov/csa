@@ -43,6 +43,9 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
+import { DatePicker } from '@mui/x-date-pickers/DatePicker'
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { IncompleteRecordsDialog } from './components/IncompleteRecordsDialog'
@@ -298,6 +301,13 @@ const toDateInputValue = (value: string): string => {
   const year = parsed.getFullYear()
   const month = String(parsed.getMonth() + 1).padStart(2, '0')
   const day = String(parsed.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const toISODateOnly = (value: Date): string => {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
 
@@ -4686,18 +4696,28 @@ function App() {
                           </TableCell>
                           <TableCell sx={{ minWidth: 128 }}>
                             {isDataQualitySteward && dqEditableRecordId === row.id ? (
-                              <TextField
-                                size="small"
-                                type="date"
-                                value={dqEditValues.statusEffective}
-                                onChange={(e) =>
-                                  setDqEditValues((prev) => ({
-                                    ...prev,
-                                    statusEffective: e.target.value,
-                                  }))
-                                }
-                                sx={{ minWidth: 176 }}
-                              />
+                              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                <DatePicker
+                                  value={
+                                    dqEditValues.statusEffective
+                                      ? new Date(`${dqEditValues.statusEffective}T00:00:00`)
+                                      : null
+                                  }
+                                  onChange={(value) =>
+                                    setDqEditValues((prev) => ({
+                                      ...prev,
+                                      statusEffective: value ? toISODateOnly(value) : '',
+                                    }))
+                                  }
+                                  maxDate={new Date()}
+                                  slotProps={{
+                                    textField: {
+                                      size: 'small',
+                                      sx: { minWidth: 176 },
+                                    },
+                                  }}
+                                />
+                              </LocalizationProvider>
                             ) : (
                               (() => {
                                 const [statusDateLine, statusTimeLine] = splitDateTimeIntoTwoLines(

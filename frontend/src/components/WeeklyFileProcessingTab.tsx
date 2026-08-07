@@ -1006,19 +1006,46 @@ export default function WeeklyFileProcessingTab() {
     }
   }
 
-  const applyChildSearchColumnTextFilter = (column: ChildSearchColumn, value: string) => {
-    const trimmedValue = value.trim()
-    const nextFilters = {
-      ...childSearchColumnFiltersRef.current,
-      [column]: trimmedValue ? [trimmedValue] : [],
+  const applyChildSearchColumnTextFilter = useCallback(
+    (column: ChildSearchColumn, value: string) => {
+      const trimmedValue = value.trim()
+      const nextFilters = {
+        ...childSearchColumnFiltersRef.current,
+        [column]: trimmedValue ? [trimmedValue] : [],
+      }
+      setChildSearchColumnFilters(nextFilters)
+      childSearchColumnFiltersRef.current = nextFilters
+      if (childSearchTerm.trim().length >= CHILD_SEARCH_MIN_LENGTH) {
+        setChildSearchPage(1)
+        void runChildSearch(1, childSearchSortConfigRef.current, nextFilters)
+      }
+    },
+    [childSearchTerm, runChildSearch],
+  )
+
+  // Debounced, typing-driven column search — same pattern as the Eligibility List's column filters:
+  // typing 3+ characters (or clearing the box) automatically re-runs the backend search.
+  useEffect(() => {
+    const column = childSearchFilterAnchor.column
+    if (!childSearchFilterAnchor.element || CHILD_SEARCH_DROPDOWN_COLUMNS.has(column)) {
+      return
     }
-    setChildSearchColumnFilters(nextFilters)
-    childSearchColumnFiltersRef.current = nextFilters
-    if (childSearchTerm.trim().length >= CHILD_SEARCH_MIN_LENGTH) {
-      setChildSearchPage(1)
-      void runChildSearch(1, childSearchSortConfigRef.current, nextFilters)
+
+    const trimmedValue = childSearchFilterSearchTerm.trim()
+    const currentValue = childSearchColumnFiltersRef.current[column][0] ?? ''
+    if (trimmedValue === currentValue) {
+      return
     }
-  }
+    if (trimmedValue.length > 0 && trimmedValue.length < CHILD_SEARCH_MIN_LENGTH) {
+      return
+    }
+
+    const columnSearchTimer = window.setTimeout(() => {
+      applyChildSearchColumnTextFilter(column, trimmedValue)
+    }, 400)
+
+    return () => window.clearTimeout(columnSearchTimer)
+  }, [childSearchFilterSearchTerm, childSearchFilterAnchor, applyChildSearchColumnTextFilter])
 
   const clearChildSearchColumnFilter = (column: ChildSearchColumn) => {
     const nextFilters = { ...childSearchColumnFiltersRef.current, [column]: [] }
@@ -2121,26 +2148,6 @@ export default function WeeklyFileProcessingTab() {
             placeholder="Search"
             value={childSearchFilterSearchTerm}
             onChange={(e) => setChildSearchFilterSearchTerm(e.target.value)}
-            onKeyDown={(e) => {
-              if (
-                e.key === 'Enter' &&
-                !CHILD_SEARCH_DROPDOWN_COLUMNS.has(childSearchFilterAnchor.column)
-              ) {
-                applyChildSearchColumnTextFilter(
-                  childSearchFilterAnchor.column,
-                  childSearchFilterSearchTerm,
-                )
-                handleChildSearchFilterClose()
-              }
-            }}
-            onBlur={() => {
-              if (!CHILD_SEARCH_DROPDOWN_COLUMNS.has(childSearchFilterAnchor.column)) {
-                applyChildSearchColumnTextFilter(
-                  childSearchFilterAnchor.column,
-                  childSearchFilterSearchTerm,
-                )
-              }
-            }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">

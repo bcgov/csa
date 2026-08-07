@@ -190,6 +190,22 @@ type DetailsFilterOption = { value: string; label: string }
 const compareStrings = (left: string, right: string): number =>
   left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' })
 
+const buildEmptyChildSearchColumnFilters = (): Record<ChildSearchColumn, string[]> => ({
+  din: [],
+  firstName: [],
+  lastName: [],
+  middleName: [],
+  gender: [],
+  dateOfBirth: [],
+  akaLastName: [],
+  akaFirstName: [],
+  personIdIcm: [],
+  personIdMis: [],
+  caseNumber: [],
+  legacyFileNumber: [],
+  birthPlace: [],
+})
+
 const buildChildSearchBackendFilters = (
   searchTerm: string,
   columnFilters: Record<ChildSearchColumn, string[]>,
@@ -409,21 +425,7 @@ export default function WeeklyFileProcessingTab() {
 
   const [childSearchColumnFilters, setChildSearchColumnFilters] = useState<
     Record<ChildSearchColumn, string[]>
-  >({
-    din: [],
-    firstName: [],
-    lastName: [],
-    middleName: [],
-    gender: [],
-    dateOfBirth: [],
-    akaLastName: [],
-    akaFirstName: [],
-    personIdIcm: [],
-    personIdMis: [],
-    caseNumber: [],
-    legacyFileNumber: [],
-    birthPlace: [],
-  })
+  >(buildEmptyChildSearchColumnFilters)
   const [childSearchFilterSearchTerm, setChildSearchFilterSearchTerm] = useState('')
   const [childSearchSortConfig, setChildSearchSortConfig] =
     useState<SortConfig<ChildSearchColumn>>(null)
@@ -442,21 +444,9 @@ export default function WeeklyFileProcessingTab() {
     element: null,
     column: 'din',
   })
-  const childSearchColumnFiltersRef = useRef<Record<ChildSearchColumn, string[]>>({
-    din: [],
-    firstName: [],
-    lastName: [],
-    middleName: [],
-    gender: [],
-    dateOfBirth: [],
-    akaLastName: [],
-    akaFirstName: [],
-    personIdIcm: [],
-    personIdMis: [],
-    caseNumber: [],
-    legacyFileNumber: [],
-    birthPlace: [],
-  })
+  const childSearchColumnFiltersRef = useRef<Record<ChildSearchColumn, string[]>>(
+    buildEmptyChildSearchColumnFilters(),
+  )
   const childSearchBirthPlaceFilterValuesRef = useRef<Record<string, BirthPlaceFilterValue>>({})
 
   childSearchSortConfigRef.current = childSearchSortConfig
@@ -469,7 +459,13 @@ export default function WeeklyFileProcessingTab() {
 
   const resetChildSearchState = useCallback(() => {
     childSearchRequestIdRef.current += 1
+    const emptyFilters = buildEmptyChildSearchColumnFilters()
+
+    setChildSearchColumnFilters(emptyFilters)
+    setChildSearchSortConfig(null)
+    childSearchBirthPlaceFilterValuesRef.current = {}
     setChildSearchTerm('')
+    setChildSearchFilterSearchTerm('')
     setLoadingChildSearch(false)
     setSelectedSearchContactId(null)
     setSearchedChildren([])
@@ -1730,22 +1726,17 @@ export default function WeeklyFileProcessingTab() {
                     Object.values(childSearchColumnFilters).every((arr) => arr.length === 0)
                   }
                   onClick={() => {
-                    setChildSearchColumnFilters({
-                      din: [],
-                      firstName: [],
-                      lastName: [],
-                      middleName: [],
-                      gender: [],
-                      dateOfBirth: [],
-                      akaLastName: [],
-                      akaFirstName: [],
-                      personIdIcm: [],
-                      personIdMis: [],
-                      caseNumber: [],
-                      legacyFileNumber: [],
-                      birthPlace: [],
-                    })
+                    const emptyFilters = buildEmptyChildSearchColumnFilters()
+
+                    setChildSearchColumnFilters(emptyFilters)
                     setChildSearchSortConfig(null)
+                    childSearchBirthPlaceFilterValuesRef.current = {}
+                    setChildSearchFilterSearchTerm('')
+
+                    if (childSearchTerm.trim().length >= CHILD_SEARCH_MIN_LENGTH) {
+                      setChildSearchPage(1)
+                      void runChildSearch(1, null, emptyFilters, {})
+                    }
                   }}
                   sx={{
                     textTransform: 'none',

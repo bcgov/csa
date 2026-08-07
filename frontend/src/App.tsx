@@ -2978,6 +2978,9 @@ function App() {
         statusEffective: contact.csaStatusEffectiveDate
           ? formatDateTimeYMDHMS(contact.csaStatusEffectiveDate)
           : '',
+        lastEligibilityRunAt: contact.lastEligibilityRunAt
+          ? formatDateTimeYMDHMS(contact.lastEligibilityRunAt)
+          : '',
         caseNumber: contact.caseNumber || '',
         caseType: contact.caseType || '',
         caseStatus: contact.caseStatus || '',
@@ -5287,7 +5290,11 @@ function App() {
                 </Menu>
 
                 {/* Details Section */}
-                {selectedChild !== null && (
+                {selectedChild !== null && (() => {
+                  const childData = filteredData.find((child) => child.id === selectedChild)
+                  if (!childData) return null
+
+                  return (
                   <Box sx={{ mt: 3 }}>
                     <Paper sx={{ p: 3 }}>
                       <Box
@@ -5313,19 +5320,34 @@ function App() {
                             </IconButton>
                           </Tooltip>
                         </Box>
-                        <Button
-                          variant="text"
-                          size="small"
-                          onClick={() => clearSelectedChildContext(true)}
-                          sx={{ textTransform: 'none', color: '#666' }}
-                        >
-                          Close
-                        </Button>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Box
+                            sx={{
+                              padding: '6px 12px',
+                              textAlign: 'left',
+                              border: '1px solid #666',
+                              borderRadius: '4px',
+                            }}
+                          >
+                            <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
+                              Status Effective Date: {childData.statusEffective || '--'}
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
+                              Last Eligibility Run: {childData.lastEligibilityRunAt || '--'}
+                            </Typography>
+                          </Box>
+                          <Button
+                            variant="text"
+                            size="small"
+                            onClick={() => clearSelectedChildContext(true)}
+                            sx={{ textTransform: 'none', color: '#666' }}
+                          >
+                            Close
+                          </Button>
+                        </Box>
                       </Box>
 
                       {(() => {
-                        const childData = filteredData.find((child) => child.id === selectedChild)
-                        if (!childData) return null
 
                         return (
                           <Box
@@ -6411,7 +6433,8 @@ function App() {
                       })()}
                     </Paper>
                   </Box>
-                )}
+                  )
+                })()}
 
                 {/* Batch History Section */}
                 {selectedChild !== null && (

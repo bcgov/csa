@@ -127,14 +127,6 @@ export const getAllContacts = async (
 }
 
 /**
- * Get the distinct, non-empty gender values on file (across all contacts, not just the current page)
- */
-export const getGenderValues = async (): Promise<string[]> => {
-  const response = await APIService.getAxiosInstance().get('/contacts/gender-values')
-  return response.data
-}
-
-/**
  * Get a single contact by ID
  * @param id - Contact ID
  */

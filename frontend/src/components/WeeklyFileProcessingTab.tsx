@@ -25,7 +25,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getAllContacts, getGenderValues, type Contact } from '../service/contacts-service'
+import { getAllContacts, type Contact } from '../service/contacts-service'
 import {
   associateWeeklyFileRecord,
   dissociateWeeklyFileRecord,
@@ -131,6 +131,8 @@ const CHILD_SEARCH_FILTER_FIELDS = [
 
 // Only gender uses exact-match selection; every other column is a free-text contains search
 const CHILD_SEARCH_DROPDOWN_COLUMNS: ReadonlySet<ChildSearchColumn> = new Set(['gender'])
+// The only gender values the app itself ever writes (see WeeklyContactMatcherService.mapWeeklyFileGender)
+const CHILD_SEARCH_GENDER_OPTIONS = ['Man/Boy', 'Non-Binary', 'Unknown', 'Woman/Girl']
 const BIRTH_PLACE_LIKE_FIELDS = ['birthCity', 'birthProvince', 'birthCountry'] as const
 
 const WEEKLY_DETAILS_COLUMN_LABELS: Record<WeeklyDetailsColumn, string> = {
@@ -417,8 +419,6 @@ export default function WeeklyFileProcessingTab() {
     Record<ChildSearchColumn, string[]>
   >(buildEmptyChildSearchColumnFilters)
   const [childSearchFilterSearchTerm, setChildSearchFilterSearchTerm] = useState('')
-  // Gender dropdown options come from the backend (all contacts), not just the current page
-  const [childSearchGenderOptions, setChildSearchGenderOptions] = useState<string[]>([])
   const [childSearchSortConfig, setChildSearchSortConfig] =
     useState<SortConfig<ChildSearchColumn>>(null)
   const [childSearchSortAnchor, setChildSearchSortAnchor] = useState<{
@@ -447,9 +447,6 @@ export default function WeeklyFileProcessingTab() {
   useEffect(() => {
     childSearchColumnFiltersRef.current = childSearchColumnFilters
   }, [childSearchColumnFilters])
-
-  // Only fetched once, right after the first global search returns results
-  const childSearchGenderOptionsLoadedRef = useRef(false)
 
   const [loadingFiles, setLoadingFiles] = useState(false)
   const [loadingRecords, setLoadingRecords] = useState(false)
@@ -871,7 +868,7 @@ export default function WeeklyFileProcessingTab() {
 
   const getChildSearchUniqueValues = (column: ChildSearchColumn): string[] => {
     if (column === 'gender') {
-      return childSearchGenderOptions
+      return CHILD_SEARCH_GENDER_OPTIONS
     }
     return Array.from(
       new Set(searchedChildren.map((child) => getChildSearchFieldValue(child, column))),
@@ -921,16 +918,6 @@ export default function WeeklyFileProcessingTab() {
         setSearchedChildren(filteredData.data)
         setChildSearchTotalPages(Math.max(filteredData.totalPages, 1))
         setChildSearchTotalRecords(filteredData.total)
-
-        if (!childSearchGenderOptionsLoadedRef.current) {
-          childSearchGenderOptionsLoadedRef.current = true
-          getGenderValues()
-            .then((values) => setChildSearchGenderOptions(values))
-            .catch((err) => {
-              childSearchGenderOptionsLoadedRef.current = false
-              console.error('Failed to load gender filter options:', err)
-            })
-        }
       } catch (err) {
         if (requestId !== childSearchRequestIdRef.current) {
           return

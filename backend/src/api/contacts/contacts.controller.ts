@@ -117,12 +117,6 @@ export class ContactsController {
     return this.contactsService.fullTextSearch(q, this.parsePage(page), this.parseLimit(limit))
   }
 
-  @Get('gender-values') // must be ahead of Get(":id") to avoid conflict
-  @ApiResponse({ status: 200, description: 'Distinct, non-empty gender values on file' })
-  getGenderValues(): Promise<string[]> {
-    return this.contactsService.getDistinctGenderValues()
-  }
-
   @Get(':id')
   async findOne(@Param('id', ParseIntPipe) id: number) {
     const user = await this.contactsService.findOne(id)

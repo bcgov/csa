@@ -21,7 +21,7 @@ describe('AutoBatchHandler', () => {
 
   beforeEach(async () => {
     mockAutoBatchService = {
-      run: vi.fn().mockResolvedValue({ application: 5, cancellation: 2 }),
+      run: vi.fn().mockResolvedValue({ application: 5, cancellation: 2, onHold: 0, incomplete: [] }),
     }
     mockSyncBackService = {
       syncFlaggedWithRetry: vi
@@ -50,27 +50,53 @@ describe('AutoBatchHandler', () => {
     expect(result.success).toBe(true)
     expect(result.message).toContain('5 application')
     expect(result.message).toContain('2 cancellation')
+    expect(result.message).toContain('added to batch')
     expect(mockAutoBatchService.run).toHaveBeenCalledOnce()
     expect(mockSyncBackService.syncFlaggedWithRetry).toHaveBeenCalledOnce()
   })
 
   it('should return zero counts when nothing to batch and skip sync-back', async () => {
-    mockAutoBatchService.run.mockResolvedValue({ application: 0, cancellation: 0 })
+    mockAutoBatchService.run.mockResolvedValue({
+      application: 0,
+      cancellation: 0,
+      onHold: 0,
+      incomplete: [],
+    })
 
     const result = await handler.execute(mockContext)
 
     expect(result.success).toBe(true)
-    expect(result.message).toContain('0 application')
+    expect(result.message).toBe('Auto-batch complete: No eligible contacts found to batch')
     expect(mockSyncBackService.syncFlaggedWithRetry).not.toHaveBeenCalled()
   })
 
   it('should run sync-back when only one side has contacts', async () => {
-    mockAutoBatchService.run.mockResolvedValue({ application: 5, cancellation: 0 })
+    mockAutoBatchService.run.mockResolvedValue({
+      application: 5,
+      cancellation: 0,
+      onHold: 0,
+      incomplete: [],
+    })
 
     const result = await handler.execute(mockContext)
 
     expect(result.success).toBe(true)
     expect(result.message).toContain('5 application')
+    expect(mockSyncBackService.syncFlaggedWithRetry).toHaveBeenCalledOnce()
+  })
+
+  it('should run sync-back when only incomplete records were auto-held', async () => {
+    mockAutoBatchService.run.mockResolvedValue({
+      application: 0,
+      cancellation: 0,
+      onHold: 2,
+      incomplete: [{ id: 11, missingFields: ['First Name'] }],
+    })
+
+    const result = await handler.execute(mockContext)
+
+    expect(result.success).toBe(true)
+    expect(result.message).toContain('2 placed on hold')
     expect(mockSyncBackService.syncFlaggedWithRetry).toHaveBeenCalledOnce()
   })
 

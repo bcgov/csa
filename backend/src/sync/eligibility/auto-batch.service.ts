@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { BatchesService } from 'src/api/batches/batches.service'
+import { BatchesService, IncompleteRecord } from 'src/api/batches/batches.service'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { AppLogger } from 'src/common/logger/app-logger'
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
@@ -7,6 +7,27 @@ import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.consta
 export interface AutoBatchResult {
   application: number
   cancellation: number
+  onHold: number
+  incomplete: IncompleteRecord[]
+}
+
+export function formatAutoBatchSummary(result: AutoBatchResult): string {
+  const added = result.application + result.cancellation
+  const parts: string[] = []
+
+  if (added > 0) {
+    parts.push(
+      `${result.application} application, ${result.cancellation} cancellation added to batch`,
+    )
+  }
+  if (result.onHold > 0) {
+    parts.push(`${result.onHold} placed on hold due to missing CRA mandatory fields`)
+  }
+  if (parts.length === 0) {
+    return 'Auto-batch complete: No eligible contacts found to batch'
+  }
+
+  return `Auto-batch complete: ${parts.join('; ')}`
 }
 
 type AutoBatchCandidate = {
@@ -52,16 +73,16 @@ export class AutoBatchService {
     )
 
     if (candidates.length === 0) {
-      return { application: 0, cancellation: 0 }
+      return { application: 0, cancellation: 0, onHold: 0, incomplete: [] }
     }
 
-    const result = await this.batchesService.addContactsToPendingBatch(
+    const batchResult = await this.batchesService.addContactsToPendingBatch(
       candidates.map((c) => c.contactId),
       'SYSTEM', // userId for audit trail
       'SYSTEM', // actor: SYSTEM for auto-batch
     )
 
-    const successIds = new Set(result.success)
+    const successIds = new Set(batchResult.success)
     let application = 0
     let cancellation = 0
     for (const candidate of candidates) {
@@ -70,10 +91,21 @@ export class AutoBatchService {
       else cancellation++
     }
 
-    this.logger.log(
-      `Auto-batched ${application} application + ${cancellation} cancellation contacts into batch ${result.batch.id}`,
-    )
+    const onHold = batchResult.incomplete.length
+    const summary = formatAutoBatchSummary({
+      application,
+      cancellation,
+      onHold,
+      incomplete: batchResult.incomplete,
+    })
 
-    return { application, cancellation }
+    this.logger.log(`${summary} (batch ${batchResult.batch.id})`)
+
+    return {
+      application,
+      cancellation,
+      onHold,
+      incomplete: batchResult.incomplete,
+    }
   }
 }

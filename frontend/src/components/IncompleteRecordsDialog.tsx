@@ -28,6 +28,7 @@ interface IncompleteRecordsDialogProps {
   onConfirm: () => void
   incompletRecords: IncompleteRecord[]
   isLoading?: boolean
+  variant?: 'manual' | 'autoBatch'
 }
 
 export function IncompleteRecordsDialog({
@@ -36,7 +37,10 @@ export function IncompleteRecordsDialog({
   onConfirm,
   incompletRecords,
   isLoading = false,
+  variant = 'manual',
 }: IncompleteRecordsDialogProps) {
+  const isAutoBatch = variant === 'autoBatch'
+
   return (
     <Dialog
       open={open}
@@ -51,13 +55,24 @@ export function IncompleteRecordsDialog({
         sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
       >
         <WarningAmberIcon sx={{ color: 'warning.main' }} />
-        Missing Required CRA Fields
+        {isAutoBatch ? 'Records Placed On Hold' : 'Missing Required CRA Fields'}
       </DialogTitle>
       <DialogContent>
         <DialogContentText id="incomplete-records-dialog-description" sx={{ mb: 2 }}>
-          The following {incompletRecords.length} record{incompletRecords.length !== 1 ? 's' : ''}{' '}
-          have missing required CRA field{incompletRecords.length !== 1 ? 's' : ''} and cannot be
-          added to the batch:
+          {isAutoBatch ? (
+            <>
+              The following {incompletRecords.length} record
+              {incompletRecords.length !== 1 ? 's were' : ' was'} excluded from the batch and
+              placed on hold due to missing required CRA field
+              {incompletRecords.length !== 1 ? 's' : ''}:
+            </>
+          ) : (
+            <>
+              The following {incompletRecords.length} record{incompletRecords.length !== 1 ? 's' : ''}{' '}
+              have missing required CRA field{incompletRecords.length !== 1 ? 's' : ''} and cannot be
+              added to the batch:
+            </>
+          )}
         </DialogContentText>
         <TableContainer component={Paper} sx={{ mb: 2, maxHeight: '400px', overflow: 'auto' }}>
           <Table size="small" stickyHeader>
@@ -97,18 +112,35 @@ export function IncompleteRecordsDialog({
         </TableContainer>
         <Box sx={{ backgroundColor: '#e3f2fd', p: 2, borderRadius: 1, mb: 2 }}>
           <Typography variant="body2" sx={{ color: '#1565c0' }}>
-            <strong>What happens next:</strong> If you click OK, these records will be placed on
-            hold with the reason &quot;Missing: [field names]&quot; so you can update them later.
-            Successfully added records (if any) will remain in the batch.
+            {isAutoBatch ? (
+              <>
+                <strong>What happens next:</strong> These records were automatically placed on hold.
+                Update the missing data in ICM, wait for the next data fetch, then resume from hold
+                and add to batch again.
+              </>
+            ) : (
+              <>
+                <strong>What happens next:</strong> If you click OK, these records will be placed on
+                hold with the reason &quot;Missing: [field names]&quot; so you can update them later.
+                Successfully added records (if any) will remain in the batch.
+              </>
+            )}
           </Typography>
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} color="inherit" disabled={isLoading}>
-          Cancel
-        </Button>
-        <Button onClick={onConfirm} variant="contained" color="warning" disabled={isLoading}>
-          OK, Put on Hold
+        {!isAutoBatch && (
+          <Button onClick={onClose} color="inherit" disabled={isLoading}>
+            Cancel
+          </Button>
+        )}
+        <Button
+          onClick={isAutoBatch ? onClose : onConfirm}
+          variant="contained"
+          color={isAutoBatch ? 'primary' : 'warning'}
+          disabled={isLoading}
+        >
+          {isAutoBatch ? 'OK' : 'OK, Put on Hold'}
         </Button>
       </DialogActions>
     </Dialog>

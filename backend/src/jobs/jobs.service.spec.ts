@@ -110,7 +110,7 @@ describe('JobsService', () => {
 
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: { parentJobId: null },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: 0,
         take: 20,
       })
@@ -130,7 +130,7 @@ describe('JobsService', () => {
 
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: { parentJobId: null },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: 50,
         take: 25,
       })
@@ -141,7 +141,7 @@ describe('JobsService', () => {
 
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: { parentJobId: null, jobType: JobType.RUN_ELIGIBILITY },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: 0,
         take: 20,
       })
@@ -152,7 +152,7 @@ describe('JobsService', () => {
 
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: { parentJobId: null, status: JobStatus.FAILED },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: 0,
         take: 20,
       })
@@ -173,7 +173,7 @@ describe('JobsService', () => {
       }
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: expectedWhere,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: 10,
         take: 10,
       })
@@ -302,18 +302,6 @@ describe('JobsService', () => {
       )
     })
 
-    it('should filter monitoring history by USER using jobTrigger', async () => {
-      await service.getJobHistory({ triggeredBy: 'USER' })
-
-      expect(prisma.jobRun.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            jobTrigger: JobTrigger.END_USER,
-          }),
-        }),
-      )
-    })
-
     it('should query history for monitored types including ICM/MIS child runs', async () => {
       await service.getJobHistory()
 
@@ -326,7 +314,7 @@ describe('JobsService', () => {
               { parentJobId: null },
             ],
           }),
-          orderBy: { startedAt: 'desc' },
+          orderBy: [{ startedAt: 'desc' }, { id: 'asc' }],
         }),
       )
     })
@@ -342,6 +330,31 @@ describe('JobsService', () => {
           }),
         }),
       )
+    })
+
+    it('should return distinct trigger values for full monitoring scope', async () => {
+      vi.spyOn(prisma.jobRun, 'findMany').mockResolvedValue([
+        { jobTrigger: JobTrigger.CRON, triggeredByUser: null },
+        { jobTrigger: JobTrigger.END_USER, triggeredByUser: 'jsmith' },
+        { jobTrigger: JobTrigger.END_USER, triggeredByUser: 'adoe' },
+        { jobTrigger: JobTrigger.END_USER, triggeredByUser: 'JSMITH' },
+      ] as any)
+
+      const result = await service.getMonitoringTriggeredByValues()
+
+      expect(prisma.jobRun.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            startedAt: { gte: expect.any(Date) },
+          }),
+          select: {
+            jobTrigger: true,
+            triggeredByUser: true,
+          },
+          distinct: ['jobTrigger', 'triggeredByUser'],
+        }),
+      )
+      expect(result).toEqual(['SYSTEM', 'ADOE', 'JSMITH'])
     })
 
     it('should apply recent activity time window', async () => {

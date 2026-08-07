@@ -9,6 +9,7 @@ export const ALLOWED_FILTER_SORT_FIELDS = [
   'csaStatus',
   'csaStatusLabel',
   'csaStatusEffectiveDate',
+  'lastEligibilityRunAt',
   'legacyFileNumber',
   'lastUpdatedAt',
   'lastUpdatedBy',

@@ -7,7 +7,7 @@ import { step9_UpdateNotEligible } from './step9-update-not-eligible'
 
 /**
  * STEP 2: Check Latest Legal Status
- * - MIS Legal Auth Code = OPC/OPO/OPT -> Step 8
+ * - MIS Legal Auth Code = OPC/OPO/OPT -> Step 8 (Section 54 transition path)
  * - Legal Authority Expiry >= today OR null:
  *   - Enroll for CSA = Yes -> Step 3 (continue chain)
  *   - Enroll for CSA = TBD -> Step 8
@@ -24,7 +24,7 @@ export const step2_LegalStatusCheck: EligibilityRule = {
       misLegalAuthCode &&
       ELIGIBILITY_CONFIG.STEP8_LEGAL_AUTH_CODES.includes(normalize(misLegalAuthCode)!)
     ) {
-      return step8_UpdateEligibleTbd(csaStatus)
+      return step8_UpdateEligibleTbd(csaStatus, { section54: true })
     }
 
     const isNotExpired = legalExpiryDate === null || legalExpiryDate >= ctx.referenceDate

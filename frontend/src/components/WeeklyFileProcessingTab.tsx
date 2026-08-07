@@ -376,6 +376,17 @@ export default function WeeklyFileProcessingTab() {
   const [error, setError] = useState<string | null>(null)
   const childSearchRequestIdRef = useRef(0)
 
+  const resetChildSearchState = useCallback(() => {
+    childSearchRequestIdRef.current += 1
+    setChildSearchTerm('')
+    setLoadingChildSearch(false)
+    setSelectedSearchContactId(null)
+    setSearchedChildren([])
+    setChildSearchPage(1)
+    setChildSearchTotalPages(1)
+    setChildSearchTotalRecords(0)
+  }, [])
+
   useEffect(() => {
     const abortController = new AbortController()
 
@@ -507,21 +518,14 @@ export default function WeeklyFileProcessingTab() {
   ])
 
   useEffect(() => {
-    childSearchRequestIdRef.current += 1
-
     const timerId = window.setTimeout(() => {
-      setLoadingChildSearch(false)
-      setSelectedSearchContactId(null)
-      setSearchedChildren([])
-      setChildSearchPage(1)
-      setChildSearchTotalPages(1)
-      setChildSearchTotalRecords(0)
+      resetChildSearchState()
       setActionError(null)
       setActionMessage(null)
     }, 0)
 
     return () => window.clearTimeout(timerId)
-  }, [selectedRecordId])
+  }, [selectedRecordId, resetChildSearchState])
 
   const selectedRecord = useMemo(
     () => records.find((record) => record.id === selectedRecordId) ?? null,
@@ -947,6 +951,9 @@ export default function WeeklyFileProcessingTab() {
     try {
       await reprocessWeeklyFileRecord(selectedFileId, selectedRecordId)
       await Promise.all([refreshWeeklyFiles(), refreshSelectedFileRecords()])
+
+      // Clear prior child-search context so the next matching workflow starts clean.
+      resetChildSearchState()
 
       setActionMessage(`Reprocess complete for record ${selectedRecordId}.`)
     } catch (err: any) {

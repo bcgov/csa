@@ -197,6 +197,34 @@ export function isEligibleAge(dateOfBirth: Date, referenceDate: Date = pacificTo
   return dateOfBirth.toISOString().slice(0, 10) >= cutoff.toISOString().slice(0, 10)
 }
 
+export type PrismaSortDirection = 'asc' | 'desc'
+export type PrismaOrderByItem = Record<string, PrismaSortDirection>
+
+/**
+ * Ensures paginated Prisma queries use deterministic ordering so rows do not
+ * shift between pages when sort keys tie or no sort is provided.
+ */
+export function buildStableOrderBy(
+  orderBy?: PrismaOrderByItem | PrismaOrderByItem[],
+  options?: { tieBreakerField?: string; tieBreakerDirection?: PrismaSortDirection },
+): PrismaOrderByItem[] {
+  const tieBreakerField = options?.tieBreakerField ?? 'id'
+  const tieBreakerDirection = options?.tieBreakerDirection ?? 'asc'
+
+  if (!orderBy || (Array.isArray(orderBy) && orderBy.length === 0)) {
+    return [{ [tieBreakerField]: tieBreakerDirection }]
+  }
+
+  const items = Array.isArray(orderBy) ? [...orderBy] : [orderBy]
+  const hasTieBreaker = items.some((item) => Object.keys(item)[0] === tieBreakerField)
+
+  if (hasTieBreaker) {
+    return items
+  }
+
+  return [...items, { [tieBreakerField]: tieBreakerDirection }]
+}
+
 export interface S3ConnectionParams {
   endPoint: string
   port: number | undefined

@@ -7,6 +7,7 @@ import {
 import { AppLogger } from 'src/common/logger/app-logger'
 import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from 'src/common/database/prisma.service'
 import {
   CRA_FILE_REJECTED_TARGET,
@@ -17,7 +18,14 @@ import {
 } from 'src/common/state-machine/constants'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
-import { enrichLabels, isEligibleAge, pacificToday } from 'src/common/utils'
+import {
+  buildStableOrderBy,
+  enrichLabels,
+  isEligibleAge,
+  pacificToday,
+  parseISODatePacific,
+  parseWklDate,
+} from 'src/common/utils'
 import { getCancelReasonLabel } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
 import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
@@ -106,11 +114,13 @@ export class ContactsService {
       }
     }
 
+    const stableOrderBy = buildStableOrderBy(orderBy)
+
     const [data, total] = await Promise.all([
       this.prisma.contact.findMany({
         skip: (page - 1) * limit,
         take: limit,
-        orderBy,
+        orderBy: stableOrderBy,
         where,
       }),
       this.prisma.contact.count({ where }),
@@ -330,16 +340,18 @@ export class ContactsService {
       if (!contact.cancelReasonCode) {
         updateData.cancelReasonCode = '21'
       }
-      const placementCareEndDate = await this.findLatestPlacementEndDateFromStaging(
-        contact.personIdIcm,
-        contact.personIdMis,
+      updateData.careEndDate = this.resolveCareEndDateForCancellation(
+        await this.findLatestPlacementEndDateFromStaging(contact.personIdIcm, contact.personIdMis),
       )
-      updateData.careEndDate = placementCareEndDate ?? pacificToday()
     }
 
     if (event === CSA_EVENT.SET_ELIGIBLE_TBD || event === CSA_EVENT.BECOME_ELIGIBLE) {
       updateData.cancelReasonCode = null
       updateData.careEndDate = null
+    }
+
+    if (currentState === CSA_STATUS.ON_HOLD && nextState !== CSA_STATUS.ON_HOLD) {
+      updateData.needsReview = false
     }
 
     await db.contact.update({
@@ -363,6 +375,31 @@ export class ContactsService {
     return { success: true, from: currentState, to: nextState }
   }
 
+  /** Fallback when staging has no usable placement end date (BL-08 manual not-eligible). */
+  private resolveCareEndDateForCancellation(placementEndDate: Date | null): Date {
+    if (placementEndDate && !Number.isNaN(placementEndDate.getTime())) {
+      return placementEndDate
+    }
+    return pacificToday()
+  }
+
+  private parseStagingPlacementEndDate(value: unknown): Date | null {
+    if (value == null) return null
+
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value
+    }
+
+    const trimmed = String(value).trim()
+    if (!trimmed) return null
+
+    const wklDate = parseWklDate(trimmed)
+    if (wklDate) return wklDate
+
+    const isoDate = parseISODatePacific(trimmed)
+    return Number.isNaN(isoDate.getTime()) ? null : isoDate
+  }
+
   private async findLatestPlacementEndDateFromStaging(
     personIdIcm: string | null | undefined,
     personIdMis: string | null | undefined,
@@ -370,29 +407,40 @@ export class ContactsService {
     const personIcm = personIdIcm?.trim() || null
     const personMis = personIdMis?.trim() || null
 
-    const rows = await this.prisma.$queryRaw<{ maxEndDate: Date | null }[]>`
-      WITH placement_end_dates AS (
+    if (!personIcm && !personMis) {
+      return null
+    }
+
+    const branches: Prisma.Sql[] = []
+
+    if (personIcm) {
+      branches.push(Prisma.sql`
         SELECT icm_plc.X_END_DATE AS end_date
         FROM stg_icm_cases cases
         INNER JOIN stg_icm_placements icm_plc ON icm_plc.CASE_ROW_ID = cases.ROW_ID
-        WHERE ${personIcm} IS NOT NULL
-          AND cases.X_CONTACT_NUM = ${personIcm}
-          AND icm_plc.X_END_DATE IS NOT NULL
+        WHERE cases.X_CONTACT_NUM = ${personIcm}
+          AND NULLIF(TRIM(icm_plc.X_END_DATE), '') IS NOT NULL
+      `)
+    }
 
-        UNION ALL
-
-        SELECT mis_plc.END_DATE AS end_date
+    if (personMis) {
+      branches.push(Prisma.sql`
+        SELECT mis_plc.end_date AS end_date
         FROM stg_mis_placements mis_plc
-        WHERE ${personMis} IS NOT NULL
-          AND mis_plc.person_id_mis = ${personMis}
-          AND mis_plc.END_DATE IS NOT NULL
+        WHERE mis_plc.person_id_mis = ${personMis}
+          AND NULLIF(TRIM(mis_plc.end_date), '') IS NOT NULL
+      `)
+    }
+
+    const rows = await this.prisma.$queryRaw<{ maxEndDate: unknown }[]>`
+      WITH placement_end_dates AS (
+        ${Prisma.join(branches, ' UNION ALL ')}
       )
       SELECT MAX(end_date) AS "maxEndDate"
       FROM placement_end_dates
     `
 
-    const maxEndDate = rows?.[0]?.maxEndDate
-    return maxEndDate ? new Date(maxEndDate) : null
+    return this.parseStagingPlacementEndDate(rows?.[0]?.maxEndDate)
   }
 
   async forceUpdateCsaStatus(
@@ -429,6 +477,10 @@ export class ContactsService {
     if (statusChanged) {
       updateData.csaStatus = nextState
       updateData.csaStatusEffectiveDate = new Date()
+    }
+
+    if (currentState === CSA_STATUS.ON_HOLD && nextState !== CSA_STATUS.ON_HOLD) {
+      updateData.needsReview = false
     }
 
     await this.prisma.contact.update({
@@ -469,7 +521,7 @@ export class ContactsService {
         where,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        orderBy: buildStableOrderBy([{ lastName: 'asc' }, { firstName: 'asc' }]),
       }),
       this.prisma.contact.count({ where }),
     ])
@@ -536,11 +588,6 @@ export class ContactsService {
         additionalData: Object.keys(additionalData).length > 0 ? additionalData : undefined,
       })
       if (transitionResult.success) {
-        // Clear the review flag when resuming from hold
-        await this.prisma.contact.update({
-          where: { id },
-          data: { needsReview: false },
-        })
         result.success.push(id)
       } else {
         const skipReason =

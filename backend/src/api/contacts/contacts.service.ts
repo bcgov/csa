@@ -144,6 +144,19 @@ export class ContactsService {
     }
   }
 
+  async getDistinctGenderValues(): Promise<string[]> {
+    const rows = await this.prisma.contact.findMany({
+      where: { gender: { not: null } },
+      distinct: ['gender'],
+      select: { gender: true },
+    })
+
+    return rows
+      .map((row) => row.gender?.trim() ?? '')
+      .filter((value) => value.length > 0)
+      .sort((a, b) => a.localeCompare(b))
+  }
+
   private convertFiltersToPrismaFormat(filters: FilterCondition[]): Record<string, unknown> {
     const andConditions: Array<Record<string, unknown>> = []
 

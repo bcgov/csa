@@ -25,7 +25,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getAllContacts, type Contact } from '../service/contacts-service'
+import { getAllContacts, getGenderValues, type Contact } from '../service/contacts-service'
 import {
   associateWeeklyFileRecord,
   dissociateWeeklyFileRecord,
@@ -417,6 +417,8 @@ export default function WeeklyFileProcessingTab() {
     Record<ChildSearchColumn, string[]>
   >(buildEmptyChildSearchColumnFilters)
   const [childSearchFilterSearchTerm, setChildSearchFilterSearchTerm] = useState('')
+  // Gender dropdown options come from the backend (all contacts), not just the current page
+  const [childSearchGenderOptions, setChildSearchGenderOptions] = useState<string[]>([])
   const [childSearchSortConfig, setChildSearchSortConfig] =
     useState<SortConfig<ChildSearchColumn>>(null)
   const [childSearchSortAnchor, setChildSearchSortAnchor] = useState<{
@@ -441,6 +443,22 @@ export default function WeeklyFileProcessingTab() {
   useEffect(() => {
     childSearchSortConfigRef.current = childSearchSortConfig
   }, [childSearchSortConfig])
+
+  useEffect(() => {
+    let cancelled = false
+    getGenderValues()
+      .then((values) => {
+        if (!cancelled) {
+          setChildSearchGenderOptions(values)
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load gender filter options:', err)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     childSearchColumnFiltersRef.current = childSearchColumnFilters
@@ -865,6 +883,9 @@ export default function WeeklyFileProcessingTab() {
   }
 
   const getChildSearchUniqueValues = (column: ChildSearchColumn): string[] => {
+    if (column === 'gender') {
+      return childSearchGenderOptions
+    }
     return Array.from(
       new Set(searchedChildren.map((child) => getChildSearchFieldValue(child, column))),
     )

@@ -741,6 +741,25 @@ describe('ContactsService', () => {
     })
   })
 
+  describe('getDistinctGenderValues', () => {
+    it('should query distinct, non-null genders and return trimmed, sorted, non-empty values', async () => {
+      vi.mocked(prisma.contact.findMany).mockResolvedValueOnce([
+        { gender: 'Male' },
+        { gender: ' Female ' },
+        { gender: '' },
+        { gender: null },
+      ] as any)
+
+      await expect(service.getDistinctGenderValues()).resolves.toEqual(['Female', 'Male'])
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        where: { gender: { not: null } },
+        distinct: ['gender'],
+        select: { gender: true },
+      })
+    })
+  })
+
   describe('fullTextSearch', () => {
     it('should search using searchText column', async () => {
       const mockData = [

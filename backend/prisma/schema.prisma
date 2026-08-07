@@ -109,7 +109,7 @@ model ContactAuditTrail {
   oldValue    String?  @map("old_value")
   newValue    String?  @map("new_value")
 
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact Contact @relation(fields: [contactId], references: [id])
 
   @@index([contactId, actionedAt(sort: Desc)])
   @@map("contact_audit_trail")

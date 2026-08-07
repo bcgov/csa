@@ -806,9 +806,7 @@ export const formatAutoBatchCompletionMessage = (
   const parts: string[] = []
 
   if (added > 0) {
-    parts.push(
-      `${application} application, ${cancellation} cancellation contacts added to batch`,
-    )
+    parts.push(`${application} application, ${cancellation} cancellation contacts added to batch`)
   }
   if (onHold > 0) {
     parts.push(`${onHold} placed on hold due to missing CRA mandatory fields`)

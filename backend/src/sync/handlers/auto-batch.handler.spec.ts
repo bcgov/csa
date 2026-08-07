@@ -21,7 +21,9 @@ describe('AutoBatchHandler', () => {
 
   beforeEach(async () => {
     mockAutoBatchService = {
-      run: vi.fn().mockResolvedValue({ application: 5, cancellation: 2, onHold: 0, incomplete: [] }),
+      run: vi
+        .fn()
+        .mockResolvedValue({ application: 5, cancellation: 2, onHold: 0, incomplete: [] }),
     }
     mockSyncBackService = {
       syncFlaggedWithRetry: vi

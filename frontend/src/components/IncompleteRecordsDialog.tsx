@@ -62,15 +62,15 @@ export function IncompleteRecordsDialog({
           {isAutoBatch ? (
             <>
               The following {incompletRecords.length} record
-              {incompletRecords.length !== 1 ? 's were' : ' was'} excluded from the batch and
-              placed on hold due to missing required CRA field
+              {incompletRecords.length !== 1 ? 's were' : ' was'} excluded from the batch and placed
+              on hold due to missing required CRA field
               {incompletRecords.length !== 1 ? 's' : ''}:
             </>
           ) : (
             <>
-              The following {incompletRecords.length} record{incompletRecords.length !== 1 ? 's' : ''}{' '}
-              have missing required CRA field{incompletRecords.length !== 1 ? 's' : ''} and cannot be
-              added to the batch:
+              The following {incompletRecords.length} record
+              {incompletRecords.length !== 1 ? 's' : ''} have missing required CRA field
+              {incompletRecords.length !== 1 ? 's' : ''} and cannot be added to the batch:
             </>
           )}
         </DialogContentText>
@@ -121,8 +121,8 @@ export function IncompleteRecordsDialog({
             ) : (
               <>
                 <strong>What happens next:</strong> If you click OK, these records will be placed on
-                hold with the reason &quot;Missing: [field names]&quot; so you can update them later.
-                Successfully added records (if any) will remain in the batch.
+                hold with the reason &quot;Missing: [field names]&quot; so you can update them
+                later. Successfully added records (if any) will remain in the batch.
               </>
             )}
           </Typography>

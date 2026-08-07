@@ -445,24 +445,11 @@ export default function WeeklyFileProcessingTab() {
   }, [childSearchSortConfig])
 
   useEffect(() => {
-    let cancelled = false
-    getGenderValues()
-      .then((values) => {
-        if (!cancelled) {
-          setChildSearchGenderOptions(values)
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load gender filter options:', err)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
     childSearchColumnFiltersRef.current = childSearchColumnFilters
   }, [childSearchColumnFilters])
+
+  // Only fetched once, right after the first global search returns results
+  const childSearchGenderOptionsLoadedRef = useRef(false)
 
   const [loadingFiles, setLoadingFiles] = useState(false)
   const [loadingRecords, setLoadingRecords] = useState(false)
@@ -934,6 +921,16 @@ export default function WeeklyFileProcessingTab() {
         setSearchedChildren(filteredData.data)
         setChildSearchTotalPages(Math.max(filteredData.totalPages, 1))
         setChildSearchTotalRecords(filteredData.total)
+
+        if (!childSearchGenderOptionsLoadedRef.current) {
+          childSearchGenderOptionsLoadedRef.current = true
+          getGenderValues()
+            .then((values) => setChildSearchGenderOptions(values))
+            .catch((err) => {
+              childSearchGenderOptionsLoadedRef.current = false
+              console.error('Failed to load gender filter options:', err)
+            })
+        }
       } catch (err) {
         if (requestId !== childSearchRequestIdRef.current) {
           return

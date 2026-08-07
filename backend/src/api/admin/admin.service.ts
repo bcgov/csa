@@ -4,6 +4,12 @@ import { ConfigService } from '@nestjs/config'
 import { firstValueFrom } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { normalize } from 'src/common/utils'
+import {
+  CSA_RO_ICM_RESPONSIBILITY,
+  CSA_RW_ICM_RESPONSIBILITY,
+  DATA_STEWARD_ICM_RESPONSIBILITY,
+  USER_PROFILE,
+} from './constants/user-profile.constants'
 import { ICMEmployeeResponse } from './interfaces/icm-api.interface'
 
 @Injectable()
@@ -34,13 +40,13 @@ export class AdminService {
           ? icmData.items.Responsibility
           : [icmData.items.Responsibility]
         const rwResponsibility = responsibilities.find(
-          (r) => normalize(r.Name) === 'ICM CSA APPLICATION - RW',
+          (r) => normalize(r.Name) === CSA_RW_ICM_RESPONSIBILITY,
         )
         const roResponsibility = responsibilities.find(
-          (r) => normalize(r.Name) === 'ICM CSA APPLICATION - RO',
+          (r) => normalize(r.Name) === CSA_RO_ICM_RESPONSIBILITY,
         )
         const dataStewardResponsibility = responsibilities.find(
-          (r) => normalize(r.Name) === 'ICM DATA STEWARD',
+          (r) => normalize(r.Name) === DATA_STEWARD_ICM_RESPONSIBILITY,
         )
 
         const hasRwResponsibility = !!rwResponsibility
@@ -57,8 +63,8 @@ export class AdminService {
 
         if (hasCSAResponsibility) {
           userProfile = hasDataQualityStewardResponsibilities
-            ? 'DATA_QUALITY_STEWARD'
-            : 'CSA_STANDARD'
+            ? USER_PROFILE.DATA_QUALITY_STEWARD
+            : USER_PROFILE.CSA_STANDARD
           icmResponsibilityName = rwResponsibility?.Name || roResponsibility?.Name
         }
       }

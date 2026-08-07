@@ -449,8 +449,13 @@ export default function WeeklyFileProcessingTab() {
   )
   const childSearchBirthPlaceFilterValuesRef = useRef<Record<string, BirthPlaceFilterValue>>({})
 
-  childSearchSortConfigRef.current = childSearchSortConfig
-  childSearchColumnFiltersRef.current = childSearchColumnFilters
+  useEffect(() => {
+    childSearchSortConfigRef.current = childSearchSortConfig
+  }, [childSearchSortConfig])
+
+  useEffect(() => {
+    childSearchColumnFiltersRef.current = childSearchColumnFilters
+  }, [childSearchColumnFilters])
 
   const [loadingFiles, setLoadingFiles] = useState(false)
   const [loadingRecords, setLoadingRecords] = useState(false)

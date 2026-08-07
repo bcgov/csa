@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common'
 import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
+import { AuditTrailService } from '../audit-trail/audit-trail.service'
 import { CurrentUser } from '../common/decorators'
 import {
   ContactIdsWithActionDto,
@@ -21,7 +22,6 @@ import {
   UpdateHoldReasonDto,
 } from '../common/dto/contact-ids.dto'
 import { CSAGuard } from '../common/guards/csa.guard'
-import { AuditTrailService } from '../audit-trail/audit-trail.service'
 import { ContactsService } from './contacts.service'
 import { ContactDto } from './dto/contact.dto'
 import { BulkOperationResponse } from './interfaces'

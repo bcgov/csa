@@ -6,6 +6,8 @@ export const ALLOWED_FILTER_SORT_FIELDS = [
   'dateOfBirth',
   'age',
   'din',
+  'akaLastName',
+  'akaFirstName',
   'csaStatus',
   'csaStatusLabel',
   'csaStatusEffectiveDate',
@@ -28,6 +30,7 @@ export const ALLOWED_FILTER_SORT_FIELDS = [
   'birthCity',
   'birthProvince',
   'birthCountry',
+  'birthPlace',
 ] as const
 
 export const CSA_STATUSES = {

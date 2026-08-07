@@ -48,6 +48,8 @@ import type {
   UpdateCsaStatusOptions,
 } from './interfaces'
 
+const VALID_CSA_STATUSES = new Set<string>(Object.values(CSA_STATUS))
+
 @Injectable()
 export class ContactsService {
   private readonly logger = new AppLogger(ContactsService.name)
@@ -1021,7 +1023,15 @@ export class ContactsService {
       )
     }
 
-    // 4. Validate DIN if being updated (BL-36)
+    // 4. Validate CSA status if being updated (BL-36)
+    if (
+      fieldsToUpdate.csaStatus !== undefined &&
+      !VALID_CSA_STATUSES.has(fieldsToUpdate.csaStatus)
+    ) {
+      throw new BadRequestException('Invalid CSA Status.')
+    }
+
+    // 5. Validate DIN if being updated (BL-36)
     if (fieldsToUpdate.din !== undefined) {
       const dinValidation = validateDin(fieldsToUpdate.din)
       if (!dinValidation.isValid) {
@@ -1046,7 +1056,7 @@ export class ContactsService {
       }
     }
 
-    // 5. Validate dates are not in future (BL-36)
+    // 6. Validate dates are not in future (BL-36)
     const now = new Date()
 
     if (fieldsToUpdate.csaStatusEffectiveDate) {
@@ -1056,7 +1066,7 @@ export class ContactsService {
       }
     }
 
-    // 6. Update contact - DB trigger will create audit trail automatically
+    // 7. Update contact - DB trigger will create audit trail automatically
     await this.prisma.contact.update({
       where: { id: contactId },
       data: {
@@ -1067,7 +1077,7 @@ export class ContactsService {
       },
     })
 
-    // 7. Trigger ICM sync-back when any BL-36 editable field changes
+    // 8. Trigger ICM sync-back when any BL-36 editable field changes
     const shouldSyncToIcm =
       fieldsToUpdate.din !== undefined ||
       fieldsToUpdate.csaStatus !== undefined ||
@@ -1085,7 +1095,7 @@ export class ContactsService {
 
     this.logger.log(`Contact ${contactId} updated by ${userId} (DQ Steward)`)
 
-    // 8. Return updated contact
+    // 9. Return updated contact
     return {
       success: true,
       contact: await this.findOne(contactId),

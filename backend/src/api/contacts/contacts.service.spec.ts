@@ -2061,6 +2061,23 @@ describe('ContactsService', () => {
       ).rejects.toThrow(BadRequestException)
     })
 
+    it('should reject invalid CSA status', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+
+      await expect(
+        service.updateContact(
+          1,
+          { csaStatus: 'not_a_valid_status' },
+          'dq.steward',
+          USER_PROFILE.DATA_QUALITY_STEWARD,
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
     it('should reject duplicate DIN', async () => {
       vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
         id: 1,

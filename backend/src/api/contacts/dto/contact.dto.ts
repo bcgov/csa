@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsDateString, IsOptional, IsString, Length, Matches } from 'class-validator'
+import { IsDateString, IsIn, IsOptional, IsString, Length, Matches } from 'class-validator'
+import { CSA_STATUS } from 'src/common/state-machine/constants'
 
 export class ContactDto {
   // REQUIRED FIELDS (NOT NULL)
@@ -220,9 +221,11 @@ export class UpdateContactDto {
   @ApiPropertyOptional({
     description: 'CSA Status code',
     example: 'eligible',
+    enum: Object.values(CSA_STATUS),
   })
   @IsOptional()
   @IsString()
+  @IsIn(Object.values(CSA_STATUS), { message: 'Invalid CSA Status.' })
   csaStatus?: string
 
   @ApiPropertyOptional({

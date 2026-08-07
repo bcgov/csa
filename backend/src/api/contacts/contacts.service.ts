@@ -1,14 +1,16 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
-import { AppLogger } from 'src/common/logger/app-logger'
-import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
-import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
+import { USER_PROFILE, isValidUserProfile } from 'src/api/admin/constants/user-profile.constants'
 import { Prisma } from '@prisma/client'
+import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { AppLogger } from 'src/common/logger/app-logger'
 import {
   CRA_FILE_REJECTED_TARGET,
   CSA_EVENT,
@@ -18,6 +20,8 @@ import {
 } from 'src/common/state-machine/constants'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
+import { validateDin } from 'src/common/utils/din-validator'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import {
   buildStableOrderBy,
   enrichLabels,
@@ -33,15 +37,18 @@ import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import {
   ALLOWED_FILTER_SORT_FIELDS,
   BULK_OPERATION_SKIP_REASONS,
+  PROTECTED_CSA_STATUSES,
   TRANSACTION_TYPES,
 } from './constants'
-import { ContactDto } from './dto/contact.dto'
+import { ContactDto, UpdateContactDto } from './dto/contact.dto'
 import type {
   BulkOperationResponse,
   FilterCondition,
   FilterItem,
   UpdateCsaStatusOptions,
 } from './interfaces'
+
+const VALID_CSA_STATUSES = new Set<string>(Object.values(CSA_STATUS))
 
 @Injectable()
 export class ContactsService {
@@ -88,6 +95,15 @@ export class ContactsService {
               throw new BadRequestException(
                 `Invalid sort direction: ${direction}. Allowed values: asc, desc`,
               )
+            }
+
+            if (field === 'birthPlace') {
+              orderBy.push(
+                { birthCity: direction },
+                { birthProvince: direction },
+                { birthCountry: direction },
+              )
+              continue
             }
 
             orderBy.push({ [field]: direction })
@@ -171,6 +187,10 @@ export class ContactsService {
     let key = filterKey
     let value: unknown = filterValue
 
+    if (key === 'birthPlace') {
+      return this.convertBirthPlaceFilter(op, value)
+    }
+
     if (!ALLOWED_FILTER_SORT_FIELDS.includes(key as (typeof ALLOWED_FILTER_SORT_FIELDS)[number])) {
       throw new BadRequestException(
         `Invalid filter field: ${key}. Allowed fields: ${ALLOWED_FILTER_SORT_FIELDS.join(', ')}`,
@@ -243,6 +263,45 @@ export class ContactsService {
           `Invalid filter operation: ${op}. Allowed operations: eq, neq, like, gt, gte, lt, lte, in, notin, isnull, notnull, isblank, notblank`,
         )
     }
+  }
+
+  private convertBirthPlaceFilter(op: string, value: unknown): Record<string, unknown> {
+    if (op !== 'eq') {
+      throw new BadRequestException(
+        `Unsupported operation for birthPlace filter: ${op}. Allowed values: eq`,
+      )
+    }
+
+    if (typeof value !== 'string') {
+      throw new BadRequestException('Invalid birthPlace filter value')
+    }
+
+    let parsed: Partial<{ birthCity: string; birthProvince: string; birthCountry: string }>
+    try {
+      parsed = JSON.parse(value) as typeof parsed
+    } catch {
+      throw new BadRequestException(
+        'Invalid birthPlace filter value: expected JSON with birthCity, birthProvince, and/or birthCountry',
+      )
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+      throw new BadRequestException(
+        'Invalid birthPlace filter value: expected JSON with birthCity, birthProvince, and/or birthCountry',
+      )
+    }
+
+    // Map by field name (not array position) so partial locations never bind to the wrong field
+    const birthPlaceFields = ['birthCity', 'birthProvince', 'birthCountry'] as const
+    const conditions = birthPlaceFields
+      .filter((field) => typeof parsed[field] === 'string' && parsed[field]!.trim().length > 0)
+      .map((field) => ({ [field]: { equals: parsed[field]!.trim() } }))
+
+    if (conditions.length === 0) {
+      return {}
+    }
+
+    return { AND: conditions }
   }
 
   async findOne(id: number): Promise<ContactDto> {
@@ -979,5 +1038,391 @@ export class ContactsService {
     this.logger.log(`Review flag cleared for contact ${contactId} by ${userId}`)
 
     return { success: true }
+  }
+
+  /**
+   * BL-36: Update CSA source-of-truth fields (DQ users only)
+   * - Validates user has DATA_QUALITY_STEWARD role
+   * - Checks contact is not in protected status
+   * - Validates DIN format (9 digits) and uniqueness
+   * - Validates dates are not in future
+   * - Audit trail is automatically created by DB trigger
+   * - Triggers ICM sync-back when any editable CSA field changes
+   */
+  async updateContact(
+    contactId: number,
+    fieldsToUpdate: UpdateContactDto,
+    userId: string,
+    userProfile: string | null,
+  ): Promise<{ success: boolean; contact: ContactDto }> {
+    // 1. Validate user authorization
+    await this.validateDQAuthorization(userId, userProfile)
+
+    // 2. Fetch contact with all fields needed for validation
+    const contact = await this.prisma.contact.findUnique({
+      where: { id: contactId },
+      select: { id: true, csaStatus: true, din: true },
+    })
+
+    if (!contact) {
+      throw new NotFoundException(`Contact ${contactId} not found`)
+    }
+
+    // 3. Check protected status (BL-35)
+    if (contact.csaStatus && PROTECTED_CSA_STATUSES.has(contact.csaStatus)) {
+      throw new UnprocessableEntityException(
+        'Child record is in CSA protected status, contact FIN team for assistance.',
+      )
+    }
+
+    // 4. Validate CSA status if being updated (BL-36)
+    if (
+      fieldsToUpdate.csaStatus !== undefined &&
+      !VALID_CSA_STATUSES.has(fieldsToUpdate.csaStatus)
+    ) {
+      throw new BadRequestException('Invalid CSA Status.')
+    }
+
+    // 5. Validate DIN if being updated (BL-36)
+    if (fieldsToUpdate.din !== undefined) {
+      const dinValidation = validateDin(fieldsToUpdate.din)
+      if (!dinValidation.isValid) {
+        throw new BadRequestException(dinValidation.error)
+      }
+
+      // Check DIN uniqueness if changed
+      if (fieldsToUpdate.din !== contact.din) {
+        const existingContact = await this.prisma.contact.findFirst({
+          where: {
+            din: fieldsToUpdate.din,
+            id: { not: contactId },
+          },
+          select: { id: true },
+        })
+
+        if (existingContact) {
+          throw new BadRequestException(
+            'The DIN entered is already assigned to another child record.',
+          )
+        }
+      }
+    }
+
+    // 6. Validate dates are not in future (BL-36)
+    const now = new Date()
+
+    if (fieldsToUpdate.csaStatusEffectiveDate) {
+      const effectiveDate = new Date(fieldsToUpdate.csaStatusEffectiveDate)
+      if (effectiveDate > now) {
+        throw new BadRequestException('Status Effective Date cannot be in the future.')
+      }
+    }
+
+    // 7. Update contact - DB trigger will create audit trail automatically
+    await this.prisma.contact.update({
+      where: { id: contactId },
+      data: {
+        ...fieldsToUpdate,
+        lastUpdatedAt: new Date(),
+        lastUpdatedBy: userId, // DB trigger uses this for audit trail
+        icmIntegrationStatus: true, // Flag for ICM sync
+      },
+    })
+
+    // 8. Trigger ICM sync-back when any BL-36 editable field changes
+    const shouldSyncToIcm =
+      fieldsToUpdate.din !== undefined ||
+      fieldsToUpdate.csaStatus !== undefined ||
+      fieldsToUpdate.csaStatusEffectiveDate !== undefined
+
+    if (shouldSyncToIcm) {
+      try {
+        await this.icmSyncBackService.syncSingleContact(contactId)
+        this.logger.log(`ICM sync-back triggered for contact ${contactId}`)
+      } catch (error) {
+        this.logger.error(`ICM sync-back failed for contact ${contactId}:`, error)
+        // Don't fail the update if ICM sync fails - it will be picked up by batch job
+      }
+    }
+
+    this.logger.log(`Contact ${contactId} updated by ${userId} (DQ Steward)`)
+
+    // 9. Return updated contact
+    return {
+      success: true,
+      contact: await this.findOne(contactId),
+    }
+  }
+
+  /**
+   * BL-37: Delete CSA child record (DQ users only)
+   * - Cascade deletes from all CSA tables
+   * - Removes from staging tables
+   * - No audit trail (all data deleted)
+   * - No ICM sync-back
+   */
+  async deleteContact(
+    contactId: number,
+    userId: string,
+    userProfile: string | null,
+  ): Promise<{ success: boolean; message: string }> {
+    // 1. Validate user authorization
+    await this.validateDQAuthorization(userId, userProfile)
+
+    // 2. Fetch contact to verify it exists and check protected status
+    const contact = await this.prisma.contact.findUnique({
+      where: { id: contactId },
+      select: {
+        id: true,
+        csaStatus: true,
+        personIdIcm: true,
+        contactIdIcm: true,
+        personIdMis: true,
+        firstName: true,
+        lastName: true,
+      },
+    })
+
+    if (!contact) {
+      throw new NotFoundException(`Contact ${contactId} not found`)
+    }
+
+    // 3. Check protected status (BL-35)
+    if (contact.csaStatus && PROTECTED_CSA_STATUSES.has(contact.csaStatus)) {
+      throw new UnprocessableEntityException(
+        'Child record is in CSA protected status, contact FIN team for assistance.',
+      )
+    }
+
+    // 4. Delete in transaction (BL-37) — all dependencies explicit; contact FK is RESTRICT.
+    await this.prisma.$transaction(async (tx) => {
+      await this.deleteAllContactDependencies(tx, {
+        contactId,
+        personIdIcm: contact.personIdIcm,
+        contactIdIcm: contact.contactIdIcm,
+        personIdMis: contact.personIdMis,
+      })
+
+      await tx.contact.delete({
+        where: { id: contactId },
+      })
+    })
+
+    this.logger.log(
+      `Contact ${contactId} (${contact.firstName} ${contact.lastName}) permanently deleted by ${userId} (DQ Steward)`,
+    )
+
+    return {
+      success: true,
+      message:
+        'The child record and all associated CSA data have been permanently deleted successfully.',
+    }
+  }
+
+  /**
+   * Delete all rows tied to a contact across staging and application tables (BL-37).
+   * Order: deepest ICM/MIS staging children first, then WKL/batch/audit, then contact.
+   */
+  private async deleteAllContactDependencies(
+    tx: Prisma.TransactionClient,
+    ids: {
+      contactId: number
+      personIdIcm: string | null
+      contactIdIcm: string | null
+      personIdMis: string | null
+    },
+  ): Promise<void> {
+    const { contactId, personIdIcm, contactIdIcm, personIdMis } = ids
+    const personIcm = personIdIcm?.trim() || null
+    const personMis = personIdMis?.trim() || null
+
+    if (personIcm) {
+      // ICM staging — reverse dependency order
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_icm_orders
+        WHERE "AGREEMENT_ROW_ID" IN (
+          SELECT DISTINCT "AGREEMENT_ROW_ID" FROM csa.stg_icm_placements
+          WHERE "CASE_ROW_ID" IN (
+            SELECT "ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+          )
+        )
+      `
+
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_icm_agreement
+        WHERE "ROW_ID" IN (
+          SELECT DISTINCT "AGREEMENT_ROW_ID" FROM csa.stg_icm_placements
+          WHERE "CASE_ROW_ID" IN (
+            SELECT "ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+          )
+        )
+      `
+
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_icm_placements
+        WHERE "CASE_ROW_ID" IN (
+          SELECT "ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+        )
+      `
+
+      // All case row IDs for this person (multi-case) plus master contact_id_icm fallback
+      if (contactIdIcm?.trim()) {
+        await tx.$executeRaw`
+          DELETE FROM csa.stg_icm_legal_authority
+          WHERE "PAR_ROW_ID" IN (
+            SELECT "CONTACT_ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+          )
+          OR "PAR_ROW_ID" = ${contactIdIcm}
+        `
+      } else {
+        await tx.$executeRaw`
+          DELETE FROM csa.stg_icm_legal_authority
+          WHERE "PAR_ROW_ID" IN (
+            SELECT "CONTACT_ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+          )
+        `
+      }
+
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_icm_agreement_line WHERE "X_CONTACT_NUM" = ${personIcm}
+      `
+
+      if (personMis || personIcm) {
+        // MIS staging — before stg_icm_cases delete (subquery uses PERSON_ID_MIS on cases)
+        await tx.$executeRaw`
+          DELETE FROM csa.stg_mis_contracts
+          WHERE contract_number IN (
+            SELECT DISTINCT contract_number FROM csa.stg_mis_placements
+            WHERE person_id_mis = ${personMis}
+               OR (
+                 person_id_mis IN (
+                   SELECT DISTINCT "PERSON_ID_MIS" FROM csa.stg_icm_cases
+                   WHERE "X_CONTACT_NUM" = ${personIcm}
+                     AND NULLIF(TRIM("PERSON_ID_MIS"), '') IS NOT NULL
+                 )
+               )
+          )
+        `
+
+        await tx.$executeRaw`
+          DELETE FROM csa.stg_mis_payments
+          WHERE person_id_mis = ${personMis}
+             OR person_id_mis IN (
+               SELECT DISTINCT "PERSON_ID_MIS" FROM csa.stg_icm_cases
+               WHERE "X_CONTACT_NUM" = ${personIcm}
+                 AND NULLIF(TRIM("PERSON_ID_MIS"), '') IS NOT NULL
+             )
+        `
+
+        await tx.$executeRaw`
+          DELETE FROM csa.stg_mis_placements
+          WHERE person_id_mis = ${personMis}
+             OR person_id_mis IN (
+               SELECT DISTINCT "PERSON_ID_MIS" FROM csa.stg_icm_cases
+               WHERE "X_CONTACT_NUM" = ${personIcm}
+                 AND NULLIF(TRIM("PERSON_ID_MIS"), '') IS NOT NULL
+             )
+        `
+      }
+
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+      `
+    } else if (contactIdIcm?.trim()) {
+      // Staging case rows missing — still remove legal authority tied to master ICM contact id
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_icm_legal_authority WHERE "PAR_ROW_ID" = ${contactIdIcm}
+      `
+    }
+
+    if (personMis && !personIcm) {
+      // MIS-only cleanup when no ICM person id on the contact
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_mis_contracts
+        WHERE contract_number IN (
+          SELECT DISTINCT contract_number FROM csa.stg_mis_placements
+          WHERE person_id_mis = ${personMis}
+        )
+      `
+
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_mis_payments WHERE person_id_mis = ${personMis}
+      `
+
+      await tx.$executeRaw`
+        DELETE FROM csa.stg_mis_placements WHERE person_id_mis = ${personMis}
+      `
+    }
+
+    // Application tables with FK to contacts.id
+    await tx.$executeRaw`
+      DELETE FROM csa.wkl_file_records
+      WHERE contact_id = ${contactId}
+         OR batch_detail_id IN (
+           SELECT id FROM csa.contact_batch_details WHERE contact_id = ${contactId}
+         )
+    `
+
+    await tx.$executeRaw`
+      DELETE FROM csa.contact_batch_details WHERE contact_id = ${contactId}
+    `
+
+    await tx.$executeRaw`
+      DELETE FROM csa.contact_audit_trail WHERE contact_id = ${contactId}
+    `
+
+    await this.assertContactDependenciesCleared(tx, contactId)
+  }
+
+  /** Guard: no FK child rows may remain before contacts delete (RESTRICT). */
+  private async assertContactDependenciesCleared(
+    tx: Prisma.TransactionClient,
+    contactId: number,
+  ): Promise<void> {
+    const rows = await tx.$queryRaw<
+      [{ batchDetails: bigint; auditTrail: bigint; wklRecords: bigint }]
+    >`
+      SELECT
+        (SELECT COUNT(*)::bigint FROM csa.contact_batch_details WHERE contact_id = ${contactId}) AS "batchDetails",
+        (SELECT COUNT(*)::bigint FROM csa.contact_audit_trail WHERE contact_id = ${contactId}) AS "auditTrail",
+        (
+          SELECT COUNT(*)::bigint FROM csa.wkl_file_records
+          WHERE contact_id = ${contactId}
+             OR batch_detail_id IN (
+               SELECT id FROM csa.contact_batch_details WHERE contact_id = ${contactId}
+             )
+        ) AS "wklRecords"
+    `
+
+    const remaining = rows[0]
+    if (
+      Number(remaining.batchDetails) > 0 ||
+      Number(remaining.auditTrail) > 0 ||
+      Number(remaining.wklRecords) > 0
+    ) {
+      throw new InternalServerErrorException(
+        `Contact ${contactId} could not be deleted: dependent rows remain in batch, audit, or WKL tables.`,
+      )
+    }
+  }
+
+  /**
+   * Helper: Validate user has Data Quality Steward authorization
+   * Reusable for both update and delete operations
+   */
+  private async validateDQAuthorization(userId: string, userProfile: string | null): Promise<void> {
+    if (!userProfile) {
+      throw new ForbiddenException('User profile not available from authentication')
+    }
+
+    if (!isValidUserProfile(userProfile)) {
+      throw new BadRequestException(
+        `Invalid user profile. Allowed values: ${Object.values(USER_PROFILE).join(', ')}`,
+      )
+    }
+
+    if (userProfile !== USER_PROFILE.DATA_QUALITY_STEWARD) {
+      throw new ForbiddenException('Only Data Quality Stewards can perform this action')
+    }
   }
 }

@@ -74,6 +74,7 @@ import {
   resumeContacts,
   runAutoBatchWithPolling,
   runEligibilityForAllWithPolling,
+  formatAutoBatchCompletionMessage,
   runEligibilityForContact,
   runSendCraFileWithPolling,
   updateEligibilityStatus,
@@ -2434,24 +2435,22 @@ function App() {
         const metadata = job.metadata as {
           application?: number
           cancellation?: number
-          batchId?: number
+          onHold?: number
+          incomplete?: Array<{ id: number; missingFields: string[] }>
         } | null
+        const { message, severity } = formatAutoBatchCompletionMessage(metadata)
         const application = metadata?.application ?? 0
         const cancellation = metadata?.cancellation ?? 0
-        const total = application + cancellation
+        const added = application + cancellation
 
-        const message =
-          total > 0
-            ? `Auto-batch complete: ${application} application, ${cancellation} cancellation contacts added to batch`
-            : 'Auto-batch complete: No eligible contacts found to batch'
         setSnackbar({
           open: true,
           message,
-          severity: total > 0 ? 'success' : 'info',
+          severity,
         })
 
         // Refresh the contacts list and batch tables
-        if (total > 0) {
+        if (added > 0) {
           if (isSearchActive && searchTerm.trim().length >= 3) {
             await performFullTextSearch(searchTerm.trim(), currentPage)
           } else {

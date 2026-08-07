@@ -1128,10 +1128,10 @@ export class ContactsService {
       )
     }
 
-    // 4. Cascade delete in transaction (BL-37)
+    // 4. Delete in transaction (BL-37)
     // Delete from UI, database tables AND staging tables (per user story)
     // IMPORTANT: Delete in reverse dependency order (children first, then parents)
-    // Prisma will handle FK cascade deletes: audit trail, batch details, wkl records
+    // DB-level cascade exists for contact_audit_trail; batch details and WKL rows are removed explicitly.
     await this.prisma.$transaction(async (tx) => {
       // Step 1: Delete ICM orders (depends on agreements)
       await tx.$executeRaw`
@@ -1192,7 +1192,22 @@ export class ContactsService {
         await tx.$executeRaw`DELETE FROM csa.stg_mis_placements WHERE person_id_mis = ${contact.personIdMis}`
       }
 
-      // Step 10: Delete contact (cascades to audit_trail, contact_batch_details, wkl_file_records via FK)
+      // Step 10: Delete WKL rows referencing this contact or its batch details
+      await tx.$executeRaw`
+        DELETE FROM csa.wkl_file_records
+        WHERE contact_id = ${contactId}
+           OR batch_detail_id IN (
+             SELECT id FROM csa.contact_batch_details WHERE contact_id = ${contactId}
+           )
+      `
+
+      // Step 11: Delete contact batch details for this contact
+      await tx.$executeRaw`
+        DELETE FROM csa.contact_batch_details
+        WHERE contact_id = ${contactId}
+      `
+
+      // Step 12: Delete contact (contact_audit_trail cascades via FK)
       await tx.contact.delete({
         where: { id: contactId },
       })

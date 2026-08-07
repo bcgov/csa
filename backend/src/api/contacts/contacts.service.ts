@@ -1,29 +1,29 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
-    UnprocessableEntityException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { AppLogger } from 'src/common/logger/app-logger'
 import {
-    CRA_FILE_REJECTED_TARGET,
-    CSA_EVENT,
-    CSA_STATUS,
-    CSA_STATUS_LABELS,
-    REMOVE_FROM_BATCH_TARGET,
+  CRA_FILE_REJECTED_TARGET,
+  CSA_EVENT,
+  CSA_STATUS,
+  CSA_STATUS_LABELS,
+  REMOVE_FROM_BATCH_TARGET,
 } from 'src/common/state-machine/constants'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import {
-    buildStableOrderBy,
-    enrichLabels,
-    isEligibleAge,
-    pacificToday,
-    parseISODatePacific,
-    parseWklDate,
+  buildStableOrderBy,
+  enrichLabels,
+  isEligibleAge,
+  pacificToday,
+  parseISODatePacific,
+  parseWklDate,
 } from 'src/common/utils'
 import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { getCancelReasonLabel } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
@@ -31,16 +31,16 @@ import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
 import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import {
-    ALLOWED_FILTER_SORT_FIELDS,
-    BULK_OPERATION_SKIP_REASONS,
-    TRANSACTION_TYPES,
+  ALLOWED_FILTER_SORT_FIELDS,
+  BULK_OPERATION_SKIP_REASONS,
+  TRANSACTION_TYPES,
 } from './constants'
 import { ContactDto } from './dto/contact.dto'
 import type {
-    BulkOperationResponse,
-    FilterCondition,
-    FilterItem,
-    UpdateCsaStatusOptions,
+  BulkOperationResponse,
+  FilterCondition,
+  FilterItem,
+  UpdateCsaStatusOptions,
 } from './interfaces'
 
 @Injectable()

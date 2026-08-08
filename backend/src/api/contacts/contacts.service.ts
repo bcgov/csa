@@ -6,8 +6,8 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common'
-import { USER_PROFILE, isValidUserProfile } from 'src/api/admin/constants/user-profile.constants'
 import { Prisma } from '@prisma/client'
+import { USER_PROFILE, isValidUserProfile } from 'src/api/admin/constants/user-profile.constants'
 import { PaginatedResponse } from 'src/api/common/dto/paginated-response.dto'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { AppLogger } from 'src/common/logger/app-logger'
@@ -20,8 +20,6 @@ import {
 } from 'src/common/state-machine/constants'
 import type { Actor, TransitionResult } from 'src/common/state-machine/interfaces'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
-import { validateDin } from 'src/common/utils/din-validator'
-import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import {
   buildStableOrderBy,
   enrichLabels,
@@ -30,6 +28,8 @@ import {
   parseISODatePacific,
   parseWklDate,
 } from 'src/common/utils'
+import { validateDin } from 'src/common/utils/din-validator'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { getCancelReasonLabel } from 'src/sync/eligibility/cancellation/cancellation-reason.constants'
 import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
 import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
@@ -1110,19 +1110,22 @@ export class ContactsService {
 
     // 6. Validate dates are not in future (BL-36)
     const now = new Date()
+    let effectiveDate: Date | undefined
 
     if (fieldsToUpdate.csaStatusEffectiveDate) {
-      const effectiveDate = new Date(fieldsToUpdate.csaStatusEffectiveDate)
+      effectiveDate = new Date(fieldsToUpdate.csaStatusEffectiveDate)
       if (effectiveDate > now) {
         throw new BadRequestException('Status Effective Date cannot be in the future.')
       }
     }
 
     // 7. Update contact - DB trigger will create audit trail automatically
+    // Prisma requires a Date instance (not a bare "YYYY-MM-DD" string) for DateTime columns.
     await this.prisma.contact.update({
       where: { id: contactId },
       data: {
         ...fieldsToUpdate,
+        ...(effectiveDate !== undefined && { csaStatusEffectiveDate: effectiveDate }),
         lastUpdatedAt: new Date(),
         lastUpdatedBy: userId, // DB trigger uses this for audit trail
         icmIntegrationStatus: true, // Flag for ICM sync

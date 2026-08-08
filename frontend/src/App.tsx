@@ -3370,8 +3370,10 @@ function App() {
     setDqEditableRecordId(null)
   }
 
-  // DIN must be exactly 9 digits; only enforced against the current field value.
-  const isDqDinValid = /^\d{9}$/.test(dqEditValues.din)
+  // DIN must be exactly 9 digits, but only enforced if the steward actually edited it -
+  // an untouched (e.g. blank) DIN shouldn't block saving changes to other fields.
+  const isDqDinChanged = dqEditValues.din !== dqOriginalValues.din
+  const isDqDinValid = !isDqDinChanged || /^\d{9}$/.test(dqEditValues.din)
 
   // Only fields the steward actually touched are included in the update payload.
   const dqChangedFields = useMemo(() => {

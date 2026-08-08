@@ -757,7 +757,12 @@ function App() {
     }
 
     checkAndResumeRunningSendCraFileJob()
-  }, [isAuthenticated, capabilities.canAccessBatches, getBatchNumberLabel, refreshBatchRequestsAfterSendCra])
+  }, [
+    isAuthenticated,
+    capabilities.canAccessBatches,
+    getBatchNumberLabel,
+    refreshBatchRequestsAfterSendCra,
+  ])
 
   // Helper function to check for running Send CRA file job before new operations
   // Prevents conflicting Send CRA operations and waits for completion
@@ -1612,7 +1617,10 @@ function App() {
   // Non-standard profiles only have the Eligibility tab — reset if another tab was selected earlier
   useEffect(() => {
     if (!capabilities.canAccessBatches && selectedTab !== 0) {
-      setSelectedTab(0)
+      const timerId = window.setTimeout(() => {
+        setSelectedTab(0)
+      }, 0)
+      return () => window.clearTimeout(timerId)
     }
   }, [capabilities.canAccessBatches, selectedTab])
 
@@ -3126,7 +3134,12 @@ function App() {
   }, [selectedChild, filteredData])
 
   useEffect(() => {
-    if (!capabilities.canViewContactBatchHistory || selectedChild !== null || rememberedChildId === null) return
+    if (
+      !capabilities.canViewContactBatchHistory ||
+      selectedChild !== null ||
+      rememberedChildId === null
+    )
+      return
 
     const shouldRestore = filteredData.some((child) => child.id === rememberedChildId)
     if (!shouldRestore) return
@@ -5061,24 +5074,26 @@ function App() {
                                   </IconButton>
                                 </Tooltip>
                               )}
-                              {row.csaStatusRaw !== 'on_hold' && row.holdReason && capabilities.canManageContacts && (
-                                <Tooltip title="Clear hold reason">
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => handleClearHoldReason(row.id, e)}
-                                    sx={{
-                                      padding: 0.25,
-                                      color: '#9e9e9e',
-                                      '&:hover': {
-                                        backgroundColor: '#f5f5f5',
-                                        color: '#d32f2f',
-                                      },
-                                    }}
-                                  >
-                                    <CloseIcon sx={{ fontSize: 16 }} />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
+                              {row.csaStatusRaw !== 'on_hold' &&
+                                row.holdReason &&
+                                capabilities.canManageContacts && (
+                                  <Tooltip title="Clear hold reason">
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => handleClearHoldReason(row.id, e)}
+                                      sx={{
+                                        padding: 0.25,
+                                        color: '#9e9e9e',
+                                        '&:hover': {
+                                          backgroundColor: '#f5f5f5',
+                                          color: '#d32f2f',
+                                        },
+                                      }}
+                                    >
+                                      <CloseIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
                             </Box>
                           </TableCell>
                           <TableCell align="center">

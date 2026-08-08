@@ -1,11 +1,4 @@
-import {
-  AppBar,
-  Box,
-  Button,
-  Snackbar,
-  Toolbar,
-  Typography,
-} from '@mui/material'
+import { AppBar, Box, Button, Snackbar, Toolbar, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
 import '../App.css'
 import EligibilityListPage from '../components/eligibility/EligibilityListPage'

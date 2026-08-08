@@ -1,10 +1,7 @@
-import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
-import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import CloseIcon from '@mui/icons-material/Close'
 import EditIcon from '@mui/icons-material/Edit'
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import FilterAltOffIcon from '@mui/icons-material/FilterAltOff'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
@@ -66,10 +63,8 @@ import {
   getContactBatches,
   getJobRunProgressUpdate,
   getRunningEligibilityJob,
-  getRunningSendCraFileJob,
   holdContacts,
   removeContactFromBatch,
-  removeContactsFromBatch,
   resumeContacts,
   runAutoBatchWithPolling,
   runEligibilityForAllWithPolling,
@@ -80,21 +75,14 @@ import {
   updateNotEligibleStatusAlt,
   updateOver18Status,
   waitForEligibilityJobCompletion,
-  waitForSendCraFileJobCompletion,
   type Batch,
   type Contact,
   type ContactAuditTrailEntry,
   type ContactBatchDetail,
   type JobRun,
 } from '../../service/contacts-service'
-import {
-  formatDateTimeYMD,
-  formatDateTimeYMDHMS,
-  formatDateYMD,
-  parseFormattedDate,
-} from '../../utils/date-format'
+import { formatDateTimeYMDHMS, formatDateYMD, parseFormattedDate } from '../../utils/date-format'
 import { buildPlacementDisplayValues } from '../../utils/mock-placement'
-
 
 // Valid CSA statuses for Hold/Resume button
 // Maps to backend CSA_STATUSES constants
@@ -161,21 +149,6 @@ const BATCH_STATUS_FILTER_OPTIONS = [
   { value: 'Error', label: 'Error' },
 ]
 
-// Batch Details Status options for filter dropdown
-const BATCH_DETAILS_STATUS_FILTER_OPTIONS = [
-  { value: 'Pending', label: 'Pending' },
-  { value: 'In Progress', label: 'In Progress' },
-  { value: 'Approved', label: 'Approved' },
-  { value: 'Refused', label: 'Refused' },
-  { value: 'Error', label: 'Error' },
-]
-
-// Initiated By options for filter dropdown (used in Batch Requests)
-const INITIATED_BY_FILTER_OPTIONS = [
-  { value: 'Ministry', label: 'Ministry' },
-  { value: 'CRA', label: 'CRA' },
-]
-
 // Review flag options for filter dropdown (used in Eligibility List)
 const REVIEW_FILTER_OPTIONS = [
   { value: 'true', label: 'Needs Review' },
@@ -227,22 +200,9 @@ const COLUMN_LABELS: Record<string, string> = {
   newValue: 'New Value',
 }
 
-const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: '2-digit' }
 const HOLD_REASON_PREVIEW_LENGTH = 150
 const HOLD_REASON_COLUMN_WIDTH = 240
 const HOLD_REASON_EMPTY_COLUMN_WIDTH = 110
-
-// System comments are prepended with newest first, one entry per line.
-// Batch Requests should display only the latest entry.
-const latestSystemComment = (comments: string | null | undefined): string => {
-  if (!comments) return ''
-  return (
-    comments
-      .split('\n')
-      .find((line) => line.trim())
-      ?.trim() || ''
-  )
-}
 
 // Returns true when the reason text needs to be clamped:
 // either it exceeds the character limit OR it contains more than 2 lines (newlines).
@@ -302,7 +262,7 @@ export default function EligibilityListPage({
   const [selectedRecordsCache, setSelectedRecordsCache] = useState<
     Map<number, { csaStatusRaw: string; isOver18: boolean }>
   >(new Map())
-    const [searchTerm, setSearchTerm] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
   const [filterSearchTerm, setFilterSearchTerm] = useState('')
   const [isColumnFilterActive, setIsColumnFilterActive] = useState(false)
   // Store multiple active column filters: column name -> query value
@@ -374,11 +334,9 @@ export default function EligibilityListPage({
   const [isRunningAutoBatch, setIsRunningAutoBatch] = useState(false)
   const [confirmAutoBatchDialogOpen, setConfirmAutoBatchDialogOpen] = useState(false)
 
-  // Send CRA File job state
-  const [isRunningSendCraFile, setIsRunningSendCraFile] = useState(false)
-  const [runningSendCraBatchId, setRunningSendCraBatchId] = useState<number | null>(null)
-    'idle' | 'running' | 'success' | 'failed'
-  >('idle')
+  // Send CRA File job state (used to lock batch actions while parent shell sends to CRA)
+  const [isRunningSendCraFile] = useState(false)
+  const [runningSendCraBatchId] = useState<number | null>(null)
 
   // On Hold dialog state
   const [onHoldDialogOpen, setOnHoldDialogOpen] = useState(false)
@@ -461,35 +419,6 @@ export default function EligibilityListPage({
     }
   }
 
-  // Helper function to format date for display (matches table date format)
-  const formatJobTimestamp = (date: Date | null): string => {
-    if (!date) return '--'
-    const parts = new Intl.DateTimeFormat('en-US', {
-      ...DATE_FORMAT,
-      timeZone: 'America/Vancouver',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).formatToParts(date)
-    const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
-    return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`
-  }
-
-  const getSendCraFileJobBatchId = (
-    job: { metadata?: unknown } | null | undefined,
-  ): number | null => {
-    const metadata = job?.metadata as
-      | {
-          batch_id?: number
-          batchId?: number
-        }
-      | null
-      | undefined
-
-    return metadata?.batch_id ?? metadata?.batchId ?? null
-  }
-
   // Batch history state for selected contact
   const [contactBatchHistory, setContactBatchHistory] = useState<ContactBatchDetail[]>([])
   const [loadingBatchHistory, setLoadingBatchHistory] = useState(false)
@@ -509,87 +438,6 @@ export default function EligibilityListPage({
     },
     [batches],
   )
-
-  // Batch details state
-  // Helper function to check for running Send CRA file job before new operations
-  // Prevents conflicting Send CRA operations and waits for completion
-  // Returns true if a job is running (action should be blocked), false otherwise
-  const checkAndHandleRunningSendCraFileJob = async (): Promise<boolean> => {
-    if (mode !== 'standard') return false
-
-    try {
-      const runningJob = await getRunningSendCraFileJob()
-      if (runningJob) {
-        // Found a running job - lock the UI and wait for completion
-        setRunningSendCraBatchId(getSendCraFileJobBatchId(runningJob))
-        setIsRunningSendCraFile(true)
-        setSendCraFileJobState('running')
-        setSnackbar({
-          open: true,
-          message: 'A Send CRA file job is currently running. Please wait...',
-          severity: 'info',
-        })
-
-        // Wait for the job to complete
-        const completedJob = await waitForSendCraFileJobCompletion(runningJob.id, (job) => {
-          if (job.status === 'RUNNING') {
-            const progress = getJobRunProgressUpdate(job, 'Send CRA file job is still running...')
-            setSnackbar({
-              open: true,
-              message: progress.message,
-              severity: progress.severity,
-            })
-          }
-        })
-
-        // Handle completion
-        if (completedJob.status === 'SUCCESS') {
-          const metadata = completedJob.metadata as {
-            batch_id?: number
-            batchId?: number
-            file_path?: string
-            filePath?: string
-            record_count?: number
-            recordCount?: number
-            contacts_count?: number
-            contactsCount?: number
-          } | null
-          const updatedBatches = await getAllBatches()
-          setBatches(updatedBatches)
-          const batchId = metadata?.batch_id ?? metadata?.batchId
-          const batchNumber = getBatchNumberLabel(batchId, updatedBatches)
-
-          setSendCraFileJobState('success')
-          setSnackbar({
-            open: true,
-            message: batchNumber
-              ? `Send CRA file job completed for batch ${batchNumber}. Please try your action again.`
-              : 'Send CRA file job completed successfully. Please try your action again.',
-            severity: 'success',
-          })
-        } else {
-          await refreshBatchRequestsAfterSendCra()
-          setSendCraFileJobState('failed')
-          setSnackbar({
-            open: true,
-            message: completedJob.error || 'Send CRA file job failed',
-            severity: 'error',
-          })
-        }
-
-        setIsRunningSendCraFile(false)
-        setRunningSendCraBatchId(null)
-        return true // Job was running, action should be blocked
-      }
-      return false // No job running, can proceed
-    } catch (err) {
-      console.error('Failed to check for running Send CRA file job:', err)
-      setIsRunningSendCraFile(false)
-      setRunningSendCraBatchId(null)
-      setSendCraFileJobState('idle')
-      return false
-    }
-  }
 
   const recordsPerPage = 10
   const [isSearchActive, setIsSearchActive] = useState(false)
@@ -963,33 +811,6 @@ export default function EligibilityListPage({
     [recordsPerPage],
   )
 
-  const refetchContactsForCurrentView = useCallback(async () => {
-    if (isSearchActive && searchTerm.trim().length >= 3) {
-      await performFullTextSearch(searchTerm.trim(), currentPage)
-    } else if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
-      await performColumnFiltersSearch(activeColumnFilters, currentPage)
-    } else {
-      await fetchContacts(currentPage)
-    }
-  }, [
-    activeColumnFilters,
-    currentPage,
-    fetchContacts,
-    isColumnFilterActive,
-    isSearchActive,
-    performColumnFiltersSearch,
-    performFullTextSearch,
-    searchTerm,
-  ])
-
-  useEffect(() => {
-    if (contactsRefreshToken == null || contactsRefreshToken === 0) {
-      return
-    }
-
-    void refetchContactsForCurrentView()
-  }, [contactsRefreshToken, refetchContactsForCurrentView])
-
   // Fetch contacts from backend when pre-defined filter is 'All Records' or filter-based options
   useEffect(() => {
     const apiFilters = [
@@ -1003,7 +824,7 @@ export default function EligibilityListPage({
       'Children over 18 years (never eligible)',
     ]
 
-    if (!apiFilters.includes(preDefinedFilter) || !true) {
+    if (!apiFilters.includes(preDefinedFilter)) {
       return
     }
 
@@ -1022,7 +843,7 @@ export default function EligibilityListPage({
   }, [
     preDefinedFilter,
     currentPage,
-    true,
+    contactsRefreshToken,
     isSearchActive,
     isColumnFilterActive,
     activeColumnFilters,
@@ -1044,7 +865,7 @@ export default function EligibilityListPage({
     ]
 
     // Only trigger search for API-based filters
-    if (!apiFilters.includes(preDefinedFilter) || !true) {
+    if (!apiFilters.includes(preDefinedFilter)) {
       return
     }
 
@@ -1070,7 +891,6 @@ export default function EligibilityListPage({
     searchTerm,
     currentPage,
     preDefinedFilter,
-    true,
     isColumnFilterActive,
     activeColumnFilters,
     fetchContacts,
@@ -1094,7 +914,7 @@ export default function EligibilityListPage({
     const column = filterAnchor.column
 
     // Only trigger column filter search for API-based filters and when a column is selected
-    if (!apiFilters.includes(preDefinedFilter) || !true || !column) {
+    if (!apiFilters.includes(preDefinedFilter) || !column) {
       return
     }
 
@@ -1142,7 +962,6 @@ export default function EligibilityListPage({
     filterSearchTerm,
     filterAnchor,
     preDefinedFilter,
-    true,
     isColumnFilterActive,
     activeColumnFilters,
     fetchContacts,
@@ -1778,10 +1597,6 @@ export default function EligibilityListPage({
       })
     } finally {
       setIsRunningEligibilityAll(false)
-      // Refresh the last successful runs timestamps
-      getLastSuccessfulRuns()
-        .then(setLastSuccessfulRuns)
-        .catch((err) => console.error('Failed to refresh last successful runs:', err))
     }
   }
 
@@ -1838,10 +1653,6 @@ export default function EligibilityListPage({
       })
     } finally {
       setRunningEligibilityContactId(null)
-      // Refresh the last successful runs timestamps
-      getLastSuccessfulRuns()
-        .then(setLastSuccessfulRuns)
-        .catch((err) => console.error('Failed to refresh last successful runs:', err))
     }
   }
 
@@ -2200,6 +2011,37 @@ export default function EligibilityListPage({
         message: errorMessage,
         severity: 'error',
       })
+    }
+  }
+
+  const handleFilterClick = (event: React.MouseEvent<HTMLElement>, column: string) => {
+    setFilterAnchor({ element: event.currentTarget, column })
+    if (column === 'csaStatus' || column === 'caseStatus') {
+      setFilterSearchTerm('')
+    } else if (activeColumnFilters[column]) {
+      setFilterSearchTerm(activeColumnFilters[column])
+    } else {
+      setFilterSearchTerm('')
+    }
+  }
+
+  const handleFilterClose = () => {
+    setFilterAnchor({ element: null, column: '' })
+    setFilterSearchTerm('')
+  }
+
+  const clearColumnFilter = (column: string) => {
+    setColumnFilters((prev) => ({ ...prev, [column]: [] }))
+    const newFilters = { ...activeColumnFilters }
+    delete newFilters[column]
+    setActiveColumnFilters(newFilters)
+    setFilterSearchTerm('')
+
+    if (Object.keys(newFilters).length === 0) {
+      setIsColumnFilterActive(false)
+      fetchContacts(currentPage)
+    } else {
+      performColumnFiltersSearch(newFilters, currentPage)
     }
   }
 
@@ -2862,1372 +2704,2834 @@ export default function EligibilityListPage({
     return () => window.clearTimeout(timerId)
   }, [auditTrailSearchTerm, auditTrailColumnFilters, selectedChild])
 
-
   return (
     <>
-              <Box>
-                {/* Eligibility List Header */}
-                <Box
+      <Box>
+        {/* Eligibility List Header */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mb: 3,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="h6" sx={{ fontWeight: 500 }}>
+              Eligibility List
+            </Typography>
+            <Tooltip
+              title="This list shows the master list of records from ICM. You can filter, search, and add children to batches from this view. Please click on the individual rows of the table for more details"
+              arrow
+            >
+              <IconButton size="small" sx={{ padding: 0.5 }}>
+                <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <TextField
+              size="small"
+              placeholder="Search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Box component="span" sx={{ fontSize: '18px' }}>
+                      🔍
+                    </Box>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ width: '200px' }}
+            />
+            <FormControl size="small" sx={{ minWidth: 250 }}>
+              <Select
+                value={preDefinedFilter}
+                onChange={(e) => handlePreDefinedFilterChange(e.target.value)}
+                displayEmpty
+              >
+                <MenuItem value="All Records">All Children in CSA Master</MenuItem>
+                <MenuItem value="Pending User review/action">Pending User review/action</MenuItem>
+                <MenuItem value="All children On Hold from CSA">
+                  All children On Hold from CSA
+                </MenuItem>
+                <MenuItem value="Children In Pay">Children In Pay</MenuItem>
+                <MenuItem value="Children Out of Pay">Children Out of Pay</MenuItem>
+                <MenuItem value="CRA Refused CSA List">CRA Refused CSA List</MenuItem>
+                <MenuItem value="Children within a batch">Children within a batch</MenuItem>
+                <MenuItem value="Children over 18 years (never eligible)">
+                  Children over 18 years (never eligible)
+                </MenuItem>
+              </Select>
+            </FormControl>
+            {mode === 'dq' && dqEditableRecordId !== null && (
+              <>
+                {hasDqChanges && (
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={handleDqSaveClick}
+                    disabled={!dqDinIsValid}
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Save
+                  </Button>
+                )}
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleDqCancelEdit}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Cancel
+                </Button>
+              </>
+            )}
+            {mode === 'dq' && dqEditableRecordId === null && (
+              <>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleDqUpdateClick}
+                  disabled={!canDqModifySelected}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Edit
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="error"
+                  onClick={handleDqDeleteClick}
+                  disabled={!canDqModifySelected}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Delete
+                </Button>
+              </>
+            )}
+            {mode === 'standard' && (
+              <>
+                <Tooltip title="Clear all column filters and sorting" arrow>
+                  <span>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<FilterAltOffIcon />}
+                      disabled={
+                        !isColumnFilterActive &&
+                        !sortConfig &&
+                        Object.keys(activeColumnFilters).length === 0
+                      }
+                      onClick={() => {
+                        // Clear all column filters and sorting
+                        // Note: Don't call fetchContacts explicitly - the useEffect
+                        // watching these state variables will trigger the fetch
+                        setActiveColumnFilters({})
+                        setIsColumnFilterActive(false)
+                        setSortConfig(null)
+                        setCurrentPage(1)
+                      }}
+                      sx={{
+                        textTransform: 'none',
+                        minWidth: 'auto',
+                        '&.Mui-disabled': {
+                          opacity: 0.5,
+                        },
+                      }}
+                    >
+                      Clear Filters
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleEligibilityMenuOpen}
+                  disabled={isRunningEligibilityAll}
                   sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    mb: 3,
+                    textTransform: 'none',
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                      Eligibility List
-                    </Typography>
-                    <Tooltip
-                      title="This list shows the master list of records from ICM. You can filter, search, and add children to batches from this view. Please click on the individual rows of the table for more details"
-                      arrow
-                    >
-                      <IconButton size="small" sx={{ padding: 0.5 }}>
-                        <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                    <TextField
-                      size="small"
-                      placeholder="Search"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Box component="span" sx={{ fontSize: '18px' }}>
-                              🔍
-                            </Box>
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{ width: '200px' }}
+                  {isRunningEligibilityAll ? 'Running Eligibility...' : 'Run Eligibility Query'}
+                  <Tooltip
+                    title="Run eligibility rules against staging data to update contact CSA status"
+                    arrow
+                  >
+                    <InfoOutlinedIcon
+                      fontSize="small"
+                      sx={{ ml: 0.5, fontSize: '16px', color: 'inherit' }}
                     />
-                    <FormControl size="small" sx={{ minWidth: 250 }}>
-                      <Select
-                        value={preDefinedFilter}
-                        onChange={(e) => handlePreDefinedFilterChange(e.target.value)}
-                        displayEmpty
-                      >
-                        <MenuItem value="All Records">All Children in CSA Master</MenuItem>
-                        <MenuItem value="Pending User review/action">
-                          Pending User review/action
-                        </MenuItem>
-                        <MenuItem value="All children On Hold from CSA">
-                          All children On Hold from CSA
-                        </MenuItem>
-                        <MenuItem value="Children In Pay">Children In Pay</MenuItem>
-                        <MenuItem value="Children Out of Pay">Children Out of Pay</MenuItem>
-                        <MenuItem value="CRA Refused CSA List">CRA Refused CSA List</MenuItem>
-                        <MenuItem value="Children within a batch">Children within a batch</MenuItem>
-                        <MenuItem value="Children over 18 years (never eligible)">
-                          Children over 18 years (never eligible)
-                        </MenuItem>
-                      </Select>
-                    </FormControl>
-                    {mode === 'dq' && dqEditableRecordId !== null && (
-                      <>
-                        {hasDqChanges && (
-                          <Button
-                            variant="contained"
-                            size="small"
-                            onClick={handleDqSaveClick}
-                            disabled={!dqDinIsValid}
-                            sx={{ textTransform: 'none' }}
-                          >
-                            Save
-                          </Button>
-                        )}
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={handleDqCancelEdit}
-                          sx={{ textTransform: 'none' }}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    )}
-                    {mode === 'dq' && dqEditableRecordId === null && (
-                      <>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={handleDqUpdateClick}
-                          disabled={!canDqModifySelected}
-                          sx={{ textTransform: 'none' }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          color="error"
-                          onClick={handleDqDeleteClick}
-                          disabled={!canDqModifySelected}
-                          sx={{ textTransform: 'none' }}
-                        >
-                          Delete
-                        </Button>
-                      </>
-                    )}
-                    {mode === 'standard' && (
-                      <>
-                        <Tooltip title="Clear all column filters and sorting" arrow>
-                          <span>
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              startIcon={<FilterAltOffIcon />}
-                              disabled={
-                                !isColumnFilterActive &&
-                                !sortConfig &&
-                                Object.keys(activeColumnFilters).length === 0
+                  </Tooltip>
+                  <Box component="span" sx={{ ml: 0.5 }}>
+                    ▾
+                  </Box>
+                </Button>
+                <Menu
+                  anchorEl={eligibilityMenuAnchor}
+                  open={eligibilityMenuOpen}
+                  onClose={handleEligibilityMenuClose}
+                >
+                  <MenuItem
+                    onClick={handleRunEligibilityForAllClick}
+                    disabled={isRunningEligibilityAll}
+                    sx={{ fontSize: '0.85rem' }}
+                  >
+                    Run query on all contacts
+                  </MenuItem>
+                  {selected.length === 1 && (
+                    <MenuItem
+                      onClick={handleRunEligibilityForSelected}
+                      disabled={isRunningEligibilityAll}
+                      sx={{ fontSize: '0.85rem' }}
+                    >
+                      Run query on selected contact
+                    </MenuItem>
+                  )}
+                </Menu>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={handleAddToBatchMenuOpen}
+                  disabled={
+                    isRunningEligibilityAll || isRunningAutoBatch || isPendingBatchLockedForSendCra
+                  }
+                  sx={{
+                    textTransform: 'none',
+                    '&.Mui-disabled': {
+                      opacity: 0.5,
+                      cursor: 'not-allowed',
+                    },
+                  }}
+                >
+                  {isRunningAutoBatch ? 'Running Auto-batch...' : 'Add to Batch'}
+                  <Box component="span" sx={{ ml: 0.5 }}>
+                    ▾
+                  </Box>
+                </Button>
+                <Menu
+                  anchorEl={addToBatchMenuAnchor}
+                  open={addToBatchMenuOpen}
+                  onClose={handleAddToBatchMenuClose}
+                >
+                  <MenuItem
+                    onClick={handleAddSelectedToBatch}
+                    disabled={
+                      !canAddToBatch ||
+                      isRunningEligibilityAll ||
+                      isRunningAutoBatch ||
+                      isPendingBatchLockedForSendCra
+                    }
+                    sx={{ fontSize: '0.85rem' }}
+                  >
+                    Add selected items to batch
+                  </MenuItem>
+                  <MenuItem
+                    onClick={handleAutoBatchAllClick}
+                    disabled={
+                      isRunningEligibilityAll ||
+                      isRunningAutoBatch ||
+                      isPendingBatchLockedForSendCra
+                    }
+                    sx={{ fontSize: '0.85rem' }}
+                  >
+                    Add System determined Eligible/NE kids to Batch
+                  </MenuItem>
+                </Menu>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!canHoldResume || isRunningEligibilityAll || isRunningAutoBatch}
+                  onClick={handleHoldResume}
+                  sx={{
+                    textTransform: 'none',
+                    '&.Mui-disabled': {
+                      opacity: 0.5,
+                      cursor: 'not-allowed',
+                    },
+                  }}
+                >
+                  Hold/Resume
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  disabled={!canUpdateEligibility || isRunningEligibilityAll || isRunningAutoBatch}
+                  onClick={handleCSAEligible}
+                  sx={{
+                    textTransform: 'none',
+                    backgroundColor:
+                      canUpdateEligibility && !isRunningEligibilityAll && !isRunningAutoBatch
+                        ? '#1976d2'
+                        : undefined,
+                    '&.Mui-disabled': {
+                      opacity: 0.5,
+                      cursor: 'not-allowed',
+                    },
+                  }}
+                >
+                  CSA Eligible
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  disabled={!canUpdateNotEligible || isRunningEligibilityAll || isRunningAutoBatch}
+                  onClick={handleCSANotEligible}
+                  sx={{
+                    textTransform: 'none',
+                    backgroundColor:
+                      canUpdateNotEligible && !isRunningEligibilityAll && !isRunningAutoBatch
+                        ? '#d32f2f'
+                        : undefined,
+                    '&.Mui-disabled': {
+                      opacity: 0.5,
+                      cursor: 'not-allowed',
+                    },
+                  }}
+                >
+                  CSA Not Eligible
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  disabled={!canUpdateOver18 || isRunningEligibilityAll || isRunningAutoBatch}
+                  onClick={handleChildOver18}
+                  sx={{
+                    textTransform: 'none',
+                    backgroundColor:
+                      canUpdateOver18 && !isRunningEligibilityAll && !isRunningAutoBatch
+                        ? '#ff9800'
+                        : undefined,
+                    '&.Mui-disabled': {
+                      opacity: 0.5,
+                      cursor: 'not-allowed',
+                    },
+                  }}
+                >
+                  Child Over 18
+                </Button>
+              </>
+            )}
+          </Box>
+        </Box>
+
+        {/* Eligibility running banner */}
+        {isRunningEligibilityAll && (
+          <Box sx={{ mb: 2 }}>
+            <Alert severity="info" sx={{ mb: 1 }}>
+              Eligibility Query is running. Please do not make any manual CSA transitions while the
+              job is in progress. This banner will disappear once the job is complete.
+            </Alert>
+            <LinearProgress />
+          </Box>
+        )}
+
+        {/* Auto-batch running banner */}
+        {isRunningAutoBatch && (
+          <Box sx={{ mb: 2 }}>
+            <Alert severity="info" sx={{ mb: 1 }}>
+              Children are being added to a &apos;Pending&apos; batch. Please do not make any manual
+              CSA transitions while the job is in progress. This banner will disappear once the job
+              is complete.
+            </Alert>
+            <LinearProgress />
+          </Box>
+        )}
+
+        {/* Table */}
+        <TableContainer component={Paper} sx={{ boxShadow: 1 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableCell padding="checkbox">
+                  <Tooltip
+                    title={
+                      selected.length > 0
+                        ? `Clear all ${selected.length} selected record(s) across all pages`
+                        : 'Select all records on this page'
+                    }
+                    arrow
+                  >
+                    <Checkbox
+                      disabled={mode === 'dq' || isRunningEligibilityAll || isRunningAutoBatch}
+                      indeterminate={
+                        mode !== 'dq' &&
+                        selected.length > 0 &&
+                        selected.length < filteredData.length &&
+                        filteredData.some((row) => selected.includes(row.id))
+                      }
+                      checked={
+                        mode !== 'dq' &&
+                        filteredData.length > 0 &&
+                        filteredData.every((row) => selected.includes(row.id))
+                      }
+                      onChange={(e) => {
+                        if (mode === 'dq') return
+                        if (e.target.checked) {
+                          // Select all rows on current page
+                          setSelected((prev) => {
+                            const currentPageIds = filteredData.map((row) => row.id)
+                            const newSelected = [...prev]
+                            currentPageIds.forEach((id) => {
+                              if (!newSelected.includes(id)) {
+                                newSelected.push(id)
                               }
-                              onClick={() => {
-                                // Clear all column filters and sorting
-                                // Note: Don't call fetchContacts explicitly - the useEffect
-                                // watching these state variables will trigger the fetch
-                                setActiveColumnFilters({})
-                                setIsColumnFilterActive(false)
-                                setSortConfig(null)
-                                setCurrentPage(1)
-                              }}
-                              sx={{
-                                textTransform: 'none',
-                                minWidth: 'auto',
-                                '&.Mui-disabled': {
-                                  opacity: 0.5,
-                                },
-                              }}
-                            >
-                              Clear Filters
-                            </Button>
-                          </span>
-                        </Tooltip>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={handleEligibilityMenuOpen}
-                          disabled={isRunningEligibilityAll}
-                          sx={{
-                            textTransform: 'none',
-                          }}
+                            })
+                            return newSelected
+                          })
+                          // Update cache with current page records
+                          setSelectedRecordsCache((prev) => {
+                            const newCache = new Map(prev)
+                            filteredData.forEach((row) => {
+                              newCache.set(row.id, {
+                                csaStatusRaw: row.csaStatusRaw,
+                                isOver18: row.isOver18,
+                              })
+                            })
+                            return newCache
+                          })
+                        } else {
+                          // Clear ALL selections across ALL pages
+                          setSelected([])
+                          setSelectedRecordsCache(new Map())
+                          setDqEditableRecordId(null)
+                        }
+                      }}
+                    />
+                  </Tooltip>
+                </TableCell>
+                <TableCell
+                  sx={{
+                    minWidth: 152,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <span
+                      onClick={(e) => handleSortClick(e, 'lastName')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Last Name
+                    </span>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleFilterClick(e, 'lastName')}
+                      sx={{
+                        padding: 0.5,
+                        color:
+                          activeColumnFilters['lastName'] || columnFilters.lastName?.length > 0
+                            ? '#1976d2'
+                            : 'inherit',
+                      }}
+                    >
+                      <FilterListIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <span
+                      onClick={(e) => handleSortClick(e, 'firstName')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      First Name
+                    </span>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleFilterClick(e, 'firstName')}
+                      sx={{
+                        padding: 0.5,
+                        color:
+                          activeColumnFilters['firstName'] || columnFilters.firstName?.length > 0
+                            ? '#1976d2'
+                            : 'inherit',
+                      }}
+                    >
+                      <FilterListIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <span
+                      onClick={(e) => handleSortClick(e, 'middleName')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Middle Name(s)
+                    </span>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleFilterClick(e, 'middleName')}
+                      sx={{
+                        padding: 0.5,
+                        color:
+                          activeColumnFilters['middleName'] || columnFilters.middleName?.length > 0
+                            ? '#1976d2'
+                            : 'inherit',
+                      }}
+                    >
+                      <FilterListIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </TableCell>
+                <TableCell sx={{ width: 132, minWidth: 132, maxWidth: 132 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <span
+                      onClick={(e) => handleSortClick(e, 'dob')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Date Of
+                      <br />
+                      Birth
+                    </span>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <span
+                      onClick={(e) => handleSortClick(e, 'din')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      DIN
+                    </span>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleFilterClick(e, 'din')}
+                      sx={{
+                        padding: 0.5,
+                        color:
+                          activeColumnFilters['din'] || columnFilters.din?.length > 0
+                            ? '#1976d2'
+                            : 'inherit',
+                      }}
+                    >
+                      <FilterListIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <span
+                      onClick={(e) => handleSortClick(e, 'csaStatus')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      CSA Status
+                    </span>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleFilterClick(e, 'csaStatus')}
+                      sx={{
+                        padding: 0.5,
+                        color:
+                          activeColumnFilters['csaStatus'] || columnFilters.csaStatus?.length > 0
+                            ? '#1976d2'
+                            : 'inherit',
+                      }}
+                    >
+                      <FilterListIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </TableCell>
+                <TableCell sx={{ minWidth: 128 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <span
+                      onClick={(e) => handleSortClick(e, 'statusEffective')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Status Effective
+                      <br />
+                      Date
+                    </span>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <span
+                      onClick={(e) => handleSortClick(e, 'caseNumber')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Case Number
+                    </span>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleFilterClick(e, 'caseNumber')}
+                      sx={{
+                        padding: 0.5,
+                        color:
+                          activeColumnFilters['caseNumber'] || columnFilters.caseNumber?.length > 0
+                            ? '#1976d2'
+                            : 'inherit',
+                      }}
+                    >
+                      <FilterListIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <span
+                      onClick={(e) => handleSortClick(e, 'caseStatus')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Case Status
+                    </span>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleFilterClick(e, 'caseStatus')}
+                      sx={{
+                        padding: 0.5,
+                        color:
+                          activeColumnFilters['caseStatus'] || columnFilters.caseStatus?.length > 0
+                            ? '#1976d2'
+                            : 'inherit',
+                      }}
+                    >
+                      <FilterListIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <span
+                      onClick={(e) => handleSortClick(e, 'legacyFile')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Legacy File No.
+                    </span>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleFilterClick(e, 'legacyFile')}
+                      sx={{
+                        padding: 0.5,
+                        color:
+                          activeColumnFilters['legacyFile'] || columnFilters.legacyFile?.length > 0
+                            ? '#1976d2'
+                            : 'inherit',
+                      }}
+                    >
+                      <FilterListIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </TableCell>
+                <TableCell sx={{ minWidth: 122 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <span
+                      onClick={(e) => handleSortClick(e, 'cgwrks3')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      <span style={{ display: 'block', whiteSpace: 'nowrap' }}>Set on</span>
+                      <span style={{ display: 'block', whiteSpace: 'nowrap' }}>Hold By</span>
+                    </span>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleFilterClick(e, 'cgwrks3')}
+                      sx={{
+                        padding: 0.5,
+                        color:
+                          activeColumnFilters['cgwrks3'] || columnFilters.cgwrks3?.length > 0
+                            ? '#1976d2'
+                            : 'inherit',
+                      }}
+                    >
+                      <FilterListIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </TableCell>
+                <TableCell
+                  sx={{
+                    width: holdReasonColumnWidth,
+                    maxWidth: holdReasonColumnWidth,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <span
+                      onClick={(e) => handleSortClick(e, 'holdReason')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Reason
+                    </span>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleFilterClick(e, 'holdReason')}
+                      sx={{
+                        padding: 0.5,
+                        color:
+                          activeColumnFilters['holdReason'] || columnFilters.holdReason?.length > 0
+                            ? '#1976d2'
+                            : 'inherit',
+                      }}
+                    >
+                      <FilterListIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <span
+                      onClick={(e) => handleSortClick(e, 'needsReview')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Review
+                    </span>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleFilterClick(e, 'needsReview')}
+                      sx={{
+                        padding: 0.5,
+                        color:
+                          activeColumnFilters['needsReview'] ||
+                          columnFilters.needsReview?.length > 0
+                            ? '#1976d2'
+                            : 'inherit',
+                      }}
+                    >
+                      <FilterListIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <span
+                      onClick={(e) => handleSortClick(e, 'lastUpdated')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Last Updated Date
+                    </span>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <span
+                      onClick={(e) => handleSortClick(e, 'lastUpdatedBy')}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      Last Updated By
+                    </span>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleFilterClick(e, 'lastUpdatedBy')}
+                      sx={{
+                        padding: 0.5,
+                        color:
+                          activeColumnFilters['lastUpdatedBy'] ||
+                          columnFilters.lastUpdatedBy?.length > 0
+                            ? '#1976d2'
+                            : 'inherit',
+                      }}
+                    >
+                      <FilterListIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredData.map((row) => (
+                <TableRow
+                  key={row.id}
+                  hover
+                  onClick={() => handleContactClick(row.id)}
+                  sx={{
+                    '&:hover': { backgroundColor: '#f9f9f9' },
+                    cursor: runningEligibilityContactId === row.id ? 'wait' : 'pointer',
+                    backgroundColor:
+                      runningEligibilityContactId === row.id
+                        ? '#fff3e0'
+                        : selectedChild === row.id
+                          ? '#e0e0e0'
+                          : 'inherit',
+                    opacity: runningEligibilityContactId === row.id ? 0.7 : 1,
+                  }}
+                >
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      disabled={
+                        isRunningEligibilityAll ||
+                        isRunningAutoBatch ||
+                        runningEligibilityContactId === row.id
+                      }
+                      checked={selected.includes(row.id)}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        if (selected.includes(row.id)) {
+                          if (dqEditableRecordId === row.id) {
+                            setDqEditableRecordId(null)
+                          }
+                          setSelected((prev) => prev.filter((id) => id !== row.id))
+                          setSelectedRecordsCache((prev) => {
+                            const newCache = new Map(prev)
+                            newCache.delete(row.id)
+                            return newCache
+                          })
+                        } else {
+                          if (mode === 'dq' && dqEditableRecordId !== null) {
+                            setDqEditableRecordId(null)
+                          }
+                          setSelected((prev) => (mode === 'dq' ? [row.id] : [...prev, row.id]))
+                          setSelectedRecordsCache((prev) => {
+                            const newCache = mode === 'dq' ? new Map() : new Map(prev)
+                            newCache.set(row.id, {
+                              csaStatusRaw: row.csaStatusRaw,
+                              isOver18: row.isOver18,
+                            })
+                            return newCache
+                          })
+                        }
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell>{row.lastName}</TableCell>
+                  <TableCell>{row.firstName}</TableCell>
+                  <TableCell>{row.middleName}</TableCell>
+                  <TableCell
+                    sx={{
+                      width: 132,
+                      minWidth: 132,
+                      maxWidth: 132,
+                      whiteSpace: 'nowrap',
+                      overflowWrap: 'normal',
+                      wordBreak: 'keep-all',
+                    }}
+                  >
+                    {row.dob}
+                  </TableCell>
+                  <TableCell>
+                    {mode === 'dq' && dqEditableRecordId === row.id ? (
+                      <TextField
+                        size="small"
+                        value={dqEditValues.din}
+                        onChange={(e) =>
+                          setDqEditValues((prev) => ({
+                            ...prev,
+                            din: e.target.value.replace(/\D/g, '').slice(0, 9),
+                          }))
+                        }
+                        error={getDqDinHelperText(dqOriginalValues.din, dqEditValues.din) !== ''}
+                        helperText={getDqDinHelperText(dqOriginalValues.din, dqEditValues.din)}
+                        slotProps={{ htmlInput: { maxLength: 9, inputMode: 'numeric' } }}
+                        sx={{ minWidth: 120 }}
+                      />
+                    ) : (
+                      row.din
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {mode === 'dq' && dqEditableRecordId === row.id ? (
+                      <FormControl size="small" sx={{ minWidth: 160 }}>
+                        <Select
+                          value={dqEditValues.csaStatusRaw}
+                          onChange={(e) =>
+                            setDqEditValues((prev) => ({
+                              ...prev,
+                              csaStatusRaw: String(e.target.value),
+                            }))
+                          }
                         >
-                          {isRunningEligibilityAll
-                            ? 'Running Eligibility...'
-                            : 'Run Eligibility Query'}
-                          <Tooltip
-                            title="Run eligibility rules against staging data to update contact CSA status"
-                            arrow
-                          >
-                            <InfoOutlinedIcon
-                              fontSize="small"
-                              sx={{ ml: 0.5, fontSize: '16px', color: 'inherit' }}
-                            />
-                          </Tooltip>
-                          <Box component="span" sx={{ ml: 0.5 }}>
-                            ▾
-                          </Box>
-                        </Button>
-                        <Menu
-                          anchorEl={eligibilityMenuAnchor}
-                          open={eligibilityMenuOpen}
-                          onClose={handleEligibilityMenuClose}
-                        >
-                          <MenuItem
-                            onClick={handleRunEligibilityForAllClick}
-                            disabled={isRunningEligibilityAll}
-                            sx={{ fontSize: '0.85rem' }}
-                          >
-                            Run query on all contacts
-                          </MenuItem>
-                          {selected.length === 1 && (
-                            <MenuItem
-                              onClick={handleRunEligibilityForSelected}
-                              disabled={isRunningEligibilityAll}
-                              sx={{ fontSize: '0.85rem' }}
-                            >
-                              Run query on selected contact
+                          {CSA_STATUS_FILTER_OPTIONS.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                              {option.label}
                             </MenuItem>
-                          )}
-                        </Menu>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          onClick={handleAddToBatchMenuOpen}
-                          disabled={
-                            isRunningEligibilityAll ||
-                            isRunningAutoBatch ||
-                            isPendingBatchLockedForSendCra
-                          }
-                          sx={{
-                            textTransform: 'none',
-                            '&.Mui-disabled': {
-                              opacity: 0.5,
-                              cursor: 'not-allowed',
-                            },
-                          }}
-                        >
-                          {isRunningAutoBatch ? 'Running Auto-batch...' : 'Add to Batch'}
-                          <Box component="span" sx={{ ml: 0.5 }}>
-                            ▾
-                          </Box>
-                        </Button>
-                        <Menu
-                          anchorEl={addToBatchMenuAnchor}
-                          open={addToBatchMenuOpen}
-                          onClose={handleAddToBatchMenuClose}
-                        >
-                          <MenuItem
-                            onClick={handleAddSelectedToBatch}
-                            disabled={
-                              !canAddToBatch ||
-                              isRunningEligibilityAll ||
-                              isRunningAutoBatch ||
-                              isPendingBatchLockedForSendCra
-                            }
-                            sx={{ fontSize: '0.85rem' }}
-                          >
-                            Add selected items to batch
-                          </MenuItem>
-                          <MenuItem
-                            onClick={handleAutoBatchAllClick}
-                            disabled={
-                              isRunningEligibilityAll ||
-                              isRunningAutoBatch ||
-                              isPendingBatchLockedForSendCra
-                            }
-                            sx={{ fontSize: '0.85rem' }}
-                          >
-                            Add System determined Eligible/NE kids to Batch
-                          </MenuItem>
-                        </Menu>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          disabled={!canHoldResume || isRunningEligibilityAll || isRunningAutoBatch}
-                          onClick={handleHoldResume}
-                          sx={{
-                            textTransform: 'none',
-                            '&.Mui-disabled': {
-                              opacity: 0.5,
-                              cursor: 'not-allowed',
-                            },
-                          }}
-                        >
-                          Hold/Resume
-                        </Button>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          disabled={
-                            !canUpdateEligibility || isRunningEligibilityAll || isRunningAutoBatch
-                          }
-                          onClick={handleCSAEligible}
-                          sx={{
-                            textTransform: 'none',
-                            backgroundColor:
-                              canUpdateEligibility &&
-                              !isRunningEligibilityAll &&
-                              !isRunningAutoBatch
-                                ? '#1976d2'
-                                : undefined,
-                            '&.Mui-disabled': {
-                              opacity: 0.5,
-                              cursor: 'not-allowed',
-                            },
-                          }}
-                        >
-                          CSA Eligible
-                        </Button>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          disabled={
-                            !canUpdateNotEligible || isRunningEligibilityAll || isRunningAutoBatch
-                          }
-                          onClick={handleCSANotEligible}
-                          sx={{
-                            textTransform: 'none',
-                            backgroundColor:
-                              canUpdateNotEligible &&
-                              !isRunningEligibilityAll &&
-                              !isRunningAutoBatch
-                                ? '#d32f2f'
-                                : undefined,
-                            '&.Mui-disabled': {
-                              opacity: 0.5,
-                              cursor: 'not-allowed',
-                            },
-                          }}
-                        >
-                          CSA Not Eligible
-                        </Button>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          disabled={
-                            !canUpdateOver18 || isRunningEligibilityAll || isRunningAutoBatch
-                          }
-                          onClick={handleChildOver18}
-                          sx={{
-                            textTransform: 'none',
-                            backgroundColor:
-                              canUpdateOver18 && !isRunningEligibilityAll && !isRunningAutoBatch
-                                ? '#ff9800'
-                                : undefined,
-                            '&.Mui-disabled': {
-                              opacity: 0.5,
-                              cursor: 'not-allowed',
-                            },
-                          }}
-                        >
-                          Child Over 18
-                        </Button>
-                      </>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    ) : (
+                      row.csaStatus
                     )}
-                  </Box>
-                </Box>
-
-                {/* Eligibility running banner */}
-                {isRunningEligibilityAll && (
-                  <Box sx={{ mb: 2 }}>
-                    <Alert severity="info" sx={{ mb: 1 }}>
-                      Eligibility Query is running. Please do not make any manual CSA transitions
-                      while the job is in progress. This banner will disappear once the job is
-                      complete.
-                    </Alert>
-                    <LinearProgress />
-                  </Box>
-                )}
-
-                {/* Auto-batch running banner */}
-                {isRunningAutoBatch && (
-                  <Box sx={{ mb: 2 }}>
-                    <Alert severity="info" sx={{ mb: 1 }}>
-                      Children are being added to a &apos;Pending&apos; batch. Please do not make
-                      any manual CSA transitions while the job is in progress. This banner will
-                      disappear once the job is complete.
-                    </Alert>
-                    <LinearProgress />
-                  </Box>
-                )}
-
-                {/* Table */}
-                <TableContainer component={Paper} sx={{ boxShadow: 1 }}>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                        <TableCell padding="checkbox">
+                  </TableCell>
+                  <TableCell
+                    sx={{ minWidth: 128 }}
+                    // The DatePicker's calendar renders in a portal, but clicks inside it still
+                    // bubble to the TableRow's onClick (handleContactClick) via the React tree —
+                    // stop that here so navigating months doesn't get hijacked by a row click.
+                    onClick={
+                      mode === 'dq' && dqEditableRecordId === row.id
+                        ? (e) => e.stopPropagation()
+                        : undefined
+                    }
+                  >
+                    {mode === 'dq' && dqEditableRecordId === row.id ? (
+                      <LocalizationProvider dateAdapter={AdapterDateFns}>
+                        <DatePicker
+                          value={
+                            dqEditValues.statusEffective
+                              ? new Date(`${dqEditValues.statusEffective}T00:00:00`)
+                              : null
+                          }
+                          onChange={(value) =>
+                            setDqEditValues((prev) => ({
+                              ...prev,
+                              statusEffective: value ? toISODateOnly(value) : '',
+                            }))
+                          }
+                          maxDate={new Date()}
+                          views={['year', 'month', 'day']}
+                          slotProps={{
+                            textField: {
+                              size: 'small',
+                              sx: { minWidth: 176 },
+                            },
+                          }}
+                        />
+                      </LocalizationProvider>
+                    ) : (
+                      (() => {
+                        const [statusDateLine, statusTimeLine] = splitDateTimeIntoTwoLines(
+                          row.statusEffective,
+                        )
+                        return (
+                          <Box sx={{ lineHeight: 1.25 }}>
+                            <Box component="span" sx={{ display: 'block', whiteSpace: 'nowrap' }}>
+                              {statusDateLine}
+                            </Box>
+                            <Box component="span" sx={{ display: 'block', whiteSpace: 'nowrap' }}>
+                              {statusTimeLine}
+                            </Box>
+                          </Box>
+                        )
+                      })()
+                    )}
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      minWidth: 152,
+                      whiteSpace: 'nowrap',
+                      overflowWrap: 'normal',
+                      wordBreak: 'keep-all',
+                    }}
+                  >
+                    {row.caseNumber}
+                  </TableCell>
+                  <TableCell>{row.caseStatus}</TableCell>
+                  <TableCell>{row.legacyFile}</TableCell>
+                  <TableCell>{row.cgwrks3 || ''}</TableCell>
+                  <TableCell
+                    sx={{
+                      width: holdReasonColumnWidth,
+                      maxWidth: holdReasonColumnWidth,
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 0.5,
+                        width: '100%',
+                        minWidth: 0,
+                      }}
+                    >
+                      {row.holdReason ? (
+                        holdReasonNeedsClamp(row.holdReason) ? (
                           <Tooltip
-                            title={
-                              selected.length > 0
-                                ? `Clear all ${selected.length} selected record(s) across all pages`
-                                : 'Select all records on this page'
-                            }
+                            title={<span style={{ whiteSpace: 'pre-wrap' }}>{row.holdReason}</span>}
                             arrow
                           >
-                            <Checkbox
-                              disabled={
-                                mode === 'dq' ||
-                                isRunningEligibilityAll ||
-                                isRunningAutoBatch
-                              }
-                              indeterminate={
-                                mode !== 'dq' &&
-                                selected.length > 0 &&
-                                selected.length < filteredData.length &&
-                                filteredData.some((row) => selected.includes(row.id))
-                              }
-                              checked={
-                                mode !== 'dq' &&
-                                filteredData.length > 0 &&
-                                filteredData.every((row) => selected.includes(row.id))
-                              }
-                              onChange={(e) => {
-                                if (mode === 'dq') return
-                                if (e.target.checked) {
-                                  // Select all rows on current page
-                                  setSelected((prev) => {
-                                    const currentPageIds = filteredData.map((row) => row.id)
-                                    const newSelected = [...prev]
-                                    currentPageIds.forEach((id) => {
-                                      if (!newSelected.includes(id)) {
-                                        newSelected.push(id)
-                                      }
-                                    })
-                                    return newSelected
-                                  })
-                                  // Update cache with current page records
-                                  setSelectedRecordsCache((prev) => {
-                                    const newCache = new Map(prev)
-                                    filteredData.forEach((row) => {
-                                      newCache.set(row.id, {
-                                        csaStatusRaw: row.csaStatusRaw,
-                                        isOver18: row.isOver18,
-                                      })
-                                    })
-                                    return newCache
-                                  })
-                                } else {
-                                  // Clear ALL selections across ALL pages
-                                  setSelected([])
-                                  setSelectedRecordsCache(new Map())
-                                  setDqEditableRecordId(null)
-                                }
+                            <Typography
+                              component="span"
+                              sx={{
+                                maxWidth: '100%',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-word',
+                                fontSize: 'inherit',
+                                cursor: 'default',
                               }}
-                            />
+                            >
+                              {row.holdReason}
+                            </Typography>
                           </Tooltip>
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            minWidth: 152,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'lastName')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Last Name
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'lastName')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['lastName'] ||
-                                  columnFilters.lastName?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'firstName')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              First Name
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'firstName')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['firstName'] ||
-                                  columnFilters.firstName?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'middleName')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Middle Name(s)
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'middleName')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['middleName'] ||
-                                  columnFilters.middleName?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell sx={{ width: 132, minWidth: 132, maxWidth: 132 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'dob')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Date Of
-                              <br />
-                              Birth
-                            </span>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'din')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              DIN
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'din')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['din'] || columnFilters.din?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'csaStatus')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              CSA Status
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'csaStatus')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['csaStatus'] ||
-                                  columnFilters.csaStatus?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell sx={{ minWidth: 128 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'statusEffective')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Status Effective
-                              <br />
-                              Date
-                            </span>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'caseNumber')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Case Number
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'caseNumber')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['caseNumber'] ||
-                                  columnFilters.caseNumber?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'caseStatus')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Case Status
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'caseStatus')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['caseStatus'] ||
-                                  columnFilters.caseStatus?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'legacyFile')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Legacy File No.
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'legacyFile')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['legacyFile'] ||
-                                  columnFilters.legacyFile?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell sx={{ minWidth: 122 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'cgwrks3')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              <span style={{ display: 'block', whiteSpace: 'nowrap' }}>Set on</span>
-                              <span style={{ display: 'block', whiteSpace: 'nowrap' }}>
-                                Hold By
-                              </span>
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'cgwrks3')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['cgwrks3'] ||
-                                  columnFilters.cgwrks3?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            width: holdReasonColumnWidth,
-                            maxWidth: holdReasonColumnWidth,
-                          }}
-                        >
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'holdReason')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Reason
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'holdReason')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['holdReason'] ||
-                                  columnFilters.holdReason?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'needsReview')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Review
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'needsReview')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['needsReview'] ||
-                                  columnFilters.needsReview?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'lastUpdated')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Last Updated Date
-                            </span>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span
-                              onClick={(e) => handleSortClick(e, 'lastUpdatedBy')}
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              Last Updated By
-                            </span>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleFilterClick(e, 'lastUpdatedBy')}
-                              sx={{
-                                padding: 0.5,
-                                color:
-                                  activeColumnFilters['lastUpdatedBy'] ||
-                                  columnFilters.lastUpdatedBy?.length > 0
-                                    ? '#1976d2'
-                                    : 'inherit',
-                              }}
-                            >
-                              <FilterListIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {filteredData.map((row) => (
-                        <TableRow
-                          key={row.id}
-                          hover
-                          onClick={() => handleContactClick(row.id)}
-                          sx={{
-                            '&:hover': { backgroundColor: '#f9f9f9' },
-                            cursor: runningEligibilityContactId === row.id ? 'wait' : 'pointer',
-                            backgroundColor:
-                              runningEligibilityContactId === row.id
-                                ? '#fff3e0'
-                                : selectedChild === row.id
-                                  ? '#e0e0e0'
-                                  : 'inherit',
-                            opacity: runningEligibilityContactId === row.id ? 0.7 : 1,
-                          }}
-                        >
-                          <TableCell padding="checkbox">
-                            <Checkbox
-                              disabled={
-                                isRunningEligibilityAll ||
-                                isRunningAutoBatch ||
-                                runningEligibilityContactId === row.id
-                              }
-                              checked={selected.includes(row.id)}
-                              onChange={(e) => {
-                                e.stopPropagation()
-                                if (selected.includes(row.id)) {
-                                  if (dqEditableRecordId === row.id) {
-                                    setDqEditableRecordId(null)
-                                  }
-                                  setSelected((prev) => prev.filter((id) => id !== row.id))
-                                  setSelectedRecordsCache((prev) => {
-                                    const newCache = new Map(prev)
-                                    newCache.delete(row.id)
-                                    return newCache
-                                  })
-                                } else {
-                                  if (mode === 'dq' && dqEditableRecordId !== null) {
-                                    setDqEditableRecordId(null)
-                                  }
-                                  setSelected((prev) =>
-                                    mode === 'dq' ? [row.id] : [...prev, row.id],
-                                  )
-                                  setSelectedRecordsCache((prev) => {
-                                    const newCache = mode === 'dq'
-                                      ? new Map()
-                                      : new Map(prev)
-                                    newCache.set(row.id, {
-                                      csaStatusRaw: row.csaStatusRaw,
-                                      isOver18: row.isOver18,
-                                    })
-                                    return newCache
-                                  })
-                                }
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>{row.lastName}</TableCell>
-                          <TableCell>{row.firstName}</TableCell>
-                          <TableCell>{row.middleName}</TableCell>
-                          <TableCell
+                        ) : (
+                          <Typography
+                            component="span"
                             sx={{
-                              width: 132,
-                              minWidth: 132,
-                              maxWidth: 132,
-                              whiteSpace: 'nowrap',
-                              overflowWrap: 'normal',
-                              wordBreak: 'keep-all',
+                              whiteSpace: 'normal',
+                              wordBreak: 'break-word',
+                              fontSize: 'inherit',
                             }}
                           >
-                            {row.dob}
-                          </TableCell>
-                          <TableCell>
-                            {mode === 'dq' && dqEditableRecordId === row.id ? (
-                              <TextField
-                                size="small"
-                                value={dqEditValues.din}
-                                onChange={(e) =>
-                                  setDqEditValues((prev) => ({
-                                    ...prev,
-                                    din: e.target.value.replace(/\D/g, '').slice(0, 9),
-                                  }))
-                                }
-                                error={
-                                  getDqDinHelperText(dqOriginalValues.din, dqEditValues.din) !== ''
-                                }
-                                helperText={getDqDinHelperText(
-                                  dqOriginalValues.din,
-                                  dqEditValues.din,
-                                )}
-                                slotProps={{ htmlInput: { maxLength: 9, inputMode: 'numeric' } }}
-                                sx={{ minWidth: 120 }}
-                              />
-                            ) : (
-                              row.din
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {mode === 'dq' && dqEditableRecordId === row.id ? (
-                              <FormControl size="small" sx={{ minWidth: 160 }}>
-                                <Select
-                                  value={dqEditValues.csaStatusRaw}
-                                  onChange={(e) =>
-                                    setDqEditValues((prev) => ({
-                                      ...prev,
-                                      csaStatusRaw: String(e.target.value),
-                                    }))
-                                  }
-                                >
-                                  {CSA_STATUS_FILTER_OPTIONS.map((option) => (
-                                    <MenuItem key={option.value} value={option.value}>
-                                      {option.label}
-                                    </MenuItem>
-                                  ))}
-                                </Select>
-                              </FormControl>
-                            ) : (
-                              row.csaStatus
-                            )}
-                          </TableCell>
-                          <TableCell
-                            sx={{ minWidth: 128 }}
-                            // The DatePicker's calendar renders in a portal, but clicks inside it still
-                            // bubble to the TableRow's onClick (handleContactClick) via the React tree —
-                            // stop that here so navigating months doesn't get hijacked by a row click.
-                            onClick={
-                              mode === 'dq' && dqEditableRecordId === row.id
-                                ? (e) => e.stopPropagation()
-                                : undefined
-                            }
-                          >
-                            {mode === 'dq' && dqEditableRecordId === row.id ? (
-                              <LocalizationProvider dateAdapter={AdapterDateFns}>
-                                <DatePicker
-                                  value={
-                                    dqEditValues.statusEffective
-                                      ? new Date(`${dqEditValues.statusEffective}T00:00:00`)
-                                      : null
-                                  }
-                                  onChange={(value) =>
-                                    setDqEditValues((prev) => ({
-                                      ...prev,
-                                      statusEffective: value ? toISODateOnly(value) : '',
-                                    }))
-                                  }
-                                  maxDate={new Date()}
-                                  views={['year', 'month', 'day']}
-                                  slotProps={{
-                                    textField: {
-                                      size: 'small',
-                                      sx: { minWidth: 176 },
-                                    },
-                                  }}
-                                />
-                              </LocalizationProvider>
-                            ) : (
-                              (() => {
-                                const [statusDateLine, statusTimeLine] = splitDateTimeIntoTwoLines(
-                                  row.statusEffective,
-                                )
-                                return (
-                                  <Box sx={{ lineHeight: 1.25 }}>
-                                    <Box
-                                      component="span"
-                                      sx={{ display: 'block', whiteSpace: 'nowrap' }}
-                                    >
-                                      {statusDateLine}
-                                    </Box>
-                                    <Box
-                                      component="span"
-                                      sx={{ display: 'block', whiteSpace: 'nowrap' }}
-                                    >
-                                      {statusTimeLine}
-                                    </Box>
-                                  </Box>
-                                )
-                              })()
-                            )}
-                          </TableCell>
-                          <TableCell
+                            {row.holdReason}
+                          </Typography>
+                        )
+                      ) : (
+                        <Typography component="span" />
+                      )}
+                      {row.csaStatusRaw === 'on_hold' && mode === 'standard' && (
+                        <Tooltip title="Edit hold reason">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleEditHoldReason(row.id, row.holdReason || '')
+                            }}
                             sx={{
-                              minWidth: 152,
-                              whiteSpace: 'nowrap',
-                              overflowWrap: 'normal',
-                              wordBreak: 'keep-all',
+                              padding: 0.25,
+                              color: '#1976d2',
+                              '&:hover': {
+                                backgroundColor: '#e3f2fd',
+                              },
                             }}
                           >
-                            {row.caseNumber}
-                          </TableCell>
-                          <TableCell>{row.caseStatus}</TableCell>
-                          <TableCell>{row.legacyFile}</TableCell>
-                          <TableCell>{row.cgwrks3 || ''}</TableCell>
-                          <TableCell
+                            <EditIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      {row.csaStatusRaw !== 'on_hold' && row.holdReason && mode === 'standard' && (
+                        <Tooltip title="Clear hold reason">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleClearHoldReason(row.id, e)}
                             sx={{
-                              width: holdReasonColumnWidth,
-                              maxWidth: holdReasonColumnWidth,
+                              padding: 0.25,
+                              color: '#9e9e9e',
+                              '&:hover': {
+                                backgroundColor: '#f5f5f5',
+                                color: '#d32f2f',
+                              },
                             }}
                           >
-                            <Box
-                              sx={{
-                                display: 'flex',
-                                alignItems: 'flex-start',
-                                gap: 0.5,
-                                width: '100%',
-                                minWidth: 0,
-                              }}
-                            >
-                              {row.holdReason ? (
-                                holdReasonNeedsClamp(row.holdReason) ? (
-                                  <Tooltip
-                                    title={
-                                      <span style={{ whiteSpace: 'pre-wrap' }}>
-                                        {row.holdReason}
-                                      </span>
-                                    }
-                                    arrow
-                                  >
-                                    <Typography
-                                      component="span"
-                                      sx={{
-                                        maxWidth: '100%',
-                                        display: '-webkit-box',
-                                        WebkitLineClamp: 2,
-                                        WebkitBoxOrient: 'vertical',
-                                        overflow: 'hidden',
-                                        whiteSpace: 'pre-wrap',
-                                        wordBreak: 'break-word',
-                                        fontSize: 'inherit',
-                                        cursor: 'default',
-                                      }}
-                                    >
-                                      {row.holdReason}
-                                    </Typography>
-                                  </Tooltip>
-                                ) : (
-                                  <Typography
-                                    component="span"
-                                    sx={{
-                                      whiteSpace: 'normal',
-                                      wordBreak: 'break-word',
-                                      fontSize: 'inherit',
-                                    }}
-                                  >
-                                    {row.holdReason}
-                                  </Typography>
-                                )
-                              ) : (
-                                <Typography component="span" />
-                              )}
-                              {row.csaStatusRaw === 'on_hold' && mode === 'standard' && (
-                                <Tooltip title="Edit hold reason">
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleEditHoldReason(row.id, row.holdReason || '')
-                                    }}
-                                    sx={{
-                                      padding: 0.25,
-                                      color: '#1976d2',
-                                      '&:hover': {
-                                        backgroundColor: '#e3f2fd',
-                                      },
-                                    }}
-                                  >
-                                    <EditIcon sx={{ fontSize: 16 }} />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                              {row.csaStatusRaw !== 'on_hold' && row.holdReason && mode === 'standard' && (
-                                <Tooltip title="Clear hold reason">
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => handleClearHoldReason(row.id, e)}
-                                    sx={{
-                                      padding: 0.25,
-                                      color: '#9e9e9e',
-                                      '&:hover': {
-                                        backgroundColor: '#f5f5f5',
-                                        color: '#d32f2f',
-                                      },
-                                    }}
-                                  >
-                                    <CloseIcon sx={{ fontSize: 16 }} />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                            </Box>
-                          </TableCell>
-                          <TableCell align="center">
-                            {row.needsReview && mode === 'standard' && (
-                              <Tooltip title="Click to clear review flag">
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => handleClearReviewFlag(row.id, e)}
-                                  sx={{
-                                    padding: 0.5,
-                                    color: '#ff9800',
-                                    '&:hover': {
-                                      backgroundColor: '#fff3e0',
-                                    },
-                                  }}
-                                >
-                                  <WarningAmberIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            )}
-                          </TableCell>
-                          <TableCell sx={{ minWidth: 128 }}>
-                            {(() => {
-                              const [lastUpdatedDateLine, lastUpdatedTimeLine] =
-                                splitDateTimeIntoTwoLines(row.lastUpdated)
-                              return (
-                                <Box sx={{ lineHeight: 1.25 }}>
-                                  <Box
-                                    component="span"
-                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
-                                  >
-                                    {lastUpdatedDateLine}
-                                  </Box>
-                                  <Box
-                                    component="span"
-                                    sx={{ display: 'block', whiteSpace: 'nowrap' }}
-                                  >
-                                    {lastUpdatedTimeLine}
-                                  </Box>
-                                </Box>
-                              )
-                            })()}
-                          </TableCell>
-                          <TableCell>{row.lastUpdatedBy}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                            <CloseIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Box>
+                  </TableCell>
+                  <TableCell align="center">
+                    {row.needsReview && mode === 'standard' && (
+                      <Tooltip title="Click to clear review flag">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => handleClearReviewFlag(row.id, e)}
+                          sx={{
+                            padding: 0.5,
+                            color: '#ff9800',
+                            '&:hover': {
+                              backgroundColor: '#fff3e0',
+                            },
+                          }}
+                        >
+                          <WarningAmberIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                  <TableCell sx={{ minWidth: 128 }}>
+                    {(() => {
+                      const [lastUpdatedDateLine, lastUpdatedTimeLine] = splitDateTimeIntoTwoLines(
+                        row.lastUpdated,
+                      )
+                      return (
+                        <Box sx={{ lineHeight: 1.25 }}>
+                          <Box component="span" sx={{ display: 'block', whiteSpace: 'nowrap' }}>
+                            {lastUpdatedDateLine}
+                          </Box>
+                          <Box component="span" sx={{ display: 'block', whiteSpace: 'nowrap' }}>
+                            {lastUpdatedTimeLine}
+                          </Box>
+                        </Box>
+                      )
+                    })()}
+                  </TableCell>
+                  <TableCell>{row.lastUpdatedBy}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
 
-                {/* Pagination - Show when API-based filters are selected */}
-                {[
-                  'All Records',
-                  'Pending User review/action',
-                  'All children On Hold from CSA',
-                  'Children In Pay',
-                  'Children Out of Pay',
-                  'CRA Refused CSA List',
-                  'Children within a batch',
-                  'Children over 18 years (never eligible)',
-                ].includes(preDefinedFilter) && (
+        {/* Pagination - Show when API-based filters are selected */}
+        {[
+          'All Records',
+          'Pending User review/action',
+          'All children On Hold from CSA',
+          'Children In Pay',
+          'Children Out of Pay',
+          'CRA Refused CSA List',
+          'Children within a batch',
+          'Children over 18 years (never eligible)',
+        ].includes(preDefinedFilter) && (
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              mt: 2,
+              px: 2,
+            }}
+          >
+            <Typography variant="body2" color="text.secondary">
+              {loadingContacts
+                ? 'Loading...'
+                : `Showing ${contacts.length} of ${totalRecords} records`}
+            </Typography>
+            <Pagination
+              count={totalPages}
+              page={currentPage}
+              onChange={handlePageChange}
+              color="primary"
+              showFirstButton
+              showLastButton
+            />
+          </Box>
+        )}
+
+        {/* Error message */}
+        {contactsError && preDefinedFilter === 'All Records' && (
+          <Box sx={{ mt: 2, p: 2, backgroundColor: '#ffebee', borderRadius: 1 }}>
+            <Typography variant="body2" color="error">
+              {contactsError}
+            </Typography>
+          </Box>
+        )}
+
+        {/* Filter Menu */}
+        <Menu
+          anchorEl={filterAnchor.element}
+          open={Boolean(filterAnchor.element)}
+          onClose={handleFilterClose}
+          PaperProps={{
+            sx: {
+              maxHeight: 400,
+              width: 250,
+            },
+          }}
+        >
+          <Box sx={{ p: 2 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 1,
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                Filter by {COLUMN_LABELS[filterAnchor.column] || filterAnchor.column}
+              </Typography>
+              <Button
+                size="small"
+                onClick={() => {
+                  clearColumnFilter(filterAnchor.column)
+                  handleFilterClose()
+                }}
+                sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+              >
+                Clear
+              </Button>
+            </Box>
+            {/* Search bar for filtering items */}
+            {filterAnchor.column === 'csaStatus' ? (
+              <>
+                <TextField
+                  size="small"
+                  fullWidth
+                  placeholder="Search status..."
+                  value={filterSearchTerm}
+                  onChange={(e) => setFilterSearchTerm(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Box component="span" sx={{ fontSize: '18px' }}>
+                          🔍
+                        </Box>
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ mb: 1 }}
+                />
+                <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                  {CSA_STATUS_FILTER_OPTIONS.filter((option) =>
+                    option.label.toLowerCase().includes(filterSearchTerm.toLowerCase()),
+                  ).map((option) => (
+                    <MenuItem
+                      key={option.value}
+                      onClick={() => {
+                        const newFilters = {
+                          ...activeColumnFilters,
+                          csaStatus: option.value,
+                        }
+                        setActiveColumnFilters(newFilters)
+                        performColumnFiltersSearch(newFilters, 1)
+                        setCurrentPage(1)
+                        setIsColumnFilterActive(true)
+                        handleFilterClose()
+                      }}
+                      sx={{
+                        fontSize: '0.875rem',
+                        py: 0.75,
+                        backgroundColor:
+                          activeColumnFilters['csaStatus'] === option.value
+                            ? 'rgba(25, 118, 210, 0.08)'
+                            : 'transparent',
+                      }}
+                    >
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </Box>
+              </>
+            ) : filterAnchor.column === 'caseStatus' ? (
+              <>
+                <TextField
+                  size="small"
+                  fullWidth
+                  placeholder="Search status..."
+                  value={filterSearchTerm}
+                  onChange={(e) => setFilterSearchTerm(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Box component="span" sx={{ fontSize: '18px' }}>
+                          🔍
+                        </Box>
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ mb: 1 }}
+                />
+                <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                  {CASE_STATUS_FILTER_OPTIONS.filter((option) =>
+                    option.label.toLowerCase().includes(filterSearchTerm.toLowerCase()),
+                  ).map((option) => (
+                    <MenuItem
+                      key={option.value}
+                      onClick={() => {
+                        const newFilters = {
+                          ...activeColumnFilters,
+                          caseStatus: option.value,
+                        }
+                        setActiveColumnFilters(newFilters)
+                        performColumnFiltersSearch(newFilters, 1)
+                        setCurrentPage(1)
+                        setIsColumnFilterActive(true)
+                        handleFilterClose()
+                      }}
+                      sx={{
+                        fontSize: '0.875rem',
+                        py: 0.75,
+                        backgroundColor:
+                          activeColumnFilters['caseStatus'] === option.value
+                            ? 'rgba(25, 118, 210, 0.08)'
+                            : 'transparent',
+                      }}
+                    >
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </Box>
+              </>
+            ) : filterAnchor.column === 'holdReason' ? (
+              <>
+                <TextField
+                  size="small"
+                  fullWidth
+                  placeholder="Type reason to filter..."
+                  value={filterSearchTerm}
+                  onChange={(e) => setFilterSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && filterSearchTerm.trim()) {
+                      const newFilters = {
+                        ...activeColumnFilters,
+                        holdReason: filterSearchTerm.trim(),
+                      }
+                      setActiveColumnFilters(newFilters)
+                      performColumnFiltersSearch(newFilters, 1)
+                      setCurrentPage(1)
+                      setIsColumnFilterActive(true)
+                      handleFilterClose()
+                    }
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Box component="span" sx={{ fontSize: '18px' }}>
+                          🔍
+                        </Box>
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ mb: 1 }}
+                />
+                <Button
+                  variant="contained"
+                  size="small"
+                  fullWidth
+                  disabled={!filterSearchTerm.trim()}
+                  onClick={() => {
+                    const newFilters = {
+                      ...activeColumnFilters,
+                      holdReason: filterSearchTerm.trim(),
+                    }
+                    setActiveColumnFilters(newFilters)
+                    performColumnFiltersSearch(newFilters, 1)
+                    setCurrentPage(1)
+                    setIsColumnFilterActive(true)
+                    handleFilterClose()
+                  }}
+                >
+                  Apply Filter
+                </Button>
+              </>
+            ) : filterAnchor.column === 'needsReview' ? (
+              <>
+                <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                  {REVIEW_FILTER_OPTIONS.map((option) => (
+                    <MenuItem
+                      key={option.value}
+                      onClick={() => {
+                        const newFilters = {
+                          ...activeColumnFilters,
+                          needsReview: option.value,
+                        }
+                        setActiveColumnFilters(newFilters)
+                        performColumnFiltersSearch(newFilters, 1)
+                        setCurrentPage(1)
+                        setIsColumnFilterActive(true)
+                        handleFilterClose()
+                      }}
+                      sx={{
+                        fontSize: '0.875rem',
+                        py: 0.75,
+                        backgroundColor:
+                          activeColumnFilters['needsReview'] === option.value
+                            ? 'rgba(25, 118, 210, 0.08)'
+                            : 'transparent',
+                      }}
+                    >
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </Box>
+              </>
+            ) : (
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="Search"
+                value={filterSearchTerm}
+                onChange={(e) => setFilterSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Box component="span" sx={{ fontSize: '18px' }}>
+                        🔍
+                      </Box>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ mb: 1 }}
+              />
+            )}
+          </Box>
+        </Menu>
+
+        {/* Sort Menu */}
+        <Menu
+          anchorEl={sortAnchor.element}
+          open={Boolean(sortAnchor.element)}
+          onClose={handleSortClose}
+          PaperProps={{
+            sx: {
+              width: 200,
+            },
+          }}
+        >
+          <MenuItem onClick={() => handleSort(sortAnchor.column, 'asc')} sx={{ gap: 1.5 }}>
+            <ArrowUpwardIcon fontSize="small" />
+            <Typography variant="body2">Sort Ascending</Typography>
+          </MenuItem>
+          <MenuItem onClick={() => handleSort(sortAnchor.column, 'desc')} sx={{ gap: 1.5 }}>
+            <ArrowDownwardIcon fontSize="small" />
+            <Typography variant="body2">Sort Descending</Typography>
+          </MenuItem>
+        </Menu>
+
+        {/* Batch History Sort Menu */}
+        <Menu
+          anchorEl={batchHistorySortAnchor.element}
+          open={Boolean(batchHistorySortAnchor.element)}
+          onClose={handleBatchHistorySortClose}
+          PaperProps={{
+            sx: {
+              width: 200,
+            },
+          }}
+        >
+          <MenuItem
+            onClick={() => handleBatchHistorySort(batchHistorySortAnchor.column, 'asc')}
+            sx={{ gap: 1.5 }}
+          >
+            <ArrowUpwardIcon fontSize="small" />
+            <Typography variant="body2">Sort Ascending</Typography>
+          </MenuItem>
+          <MenuItem
+            onClick={() => handleBatchHistorySort(batchHistorySortAnchor.column, 'desc')}
+            sx={{ gap: 1.5 }}
+          >
+            <ArrowDownwardIcon fontSize="small" />
+            <Typography variant="body2">Sort Descending</Typography>
+          </MenuItem>
+        </Menu>
+
+        {/* Batch History Filter Menu */}
+        <Menu
+          anchorEl={batchHistoryFilterAnchor.element}
+          open={Boolean(batchHistoryFilterAnchor.element)}
+          onClose={handleBatchHistoryFilterClose}
+          PaperProps={{
+            sx: {
+              maxHeight: 400,
+              width: 250,
+            },
+          }}
+        >
+          <Box sx={{ p: 2 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 1,
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                Filter by{' '}
+                {COLUMN_LABELS[batchHistoryFilterAnchor.column] || batchHistoryFilterAnchor.column}
+              </Typography>
+              <Button
+                size="small"
+                onClick={() => {
+                  clearBatchHistoryColumnFilter(batchHistoryFilterAnchor.column)
+                  handleBatchHistoryFilterClose()
+                }}
+                sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+              >
+                Clear
+              </Button>
+            </Box>
+            {/* Search bar for filtering items */}
+            {batchHistoryFilterAnchor.column === 'status' ? (
+              <>
+                <TextField
+                  size="small"
+                  fullWidth
+                  placeholder="Search status..."
+                  value={batchHistoryFilterSearchTerm}
+                  onChange={(e) => setBatchHistoryFilterSearchTerm(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Box component="span" sx={{ fontSize: '18px' }}>
+                          🔍
+                        </Box>
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ mb: 1 }}
+                />
+                <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
+                  {BATCH_STATUS_FILTER_OPTIONS.filter((option) =>
+                    option.label.toLowerCase().includes(batchHistoryFilterSearchTerm.toLowerCase()),
+                  ).map((option) => (
+                    <Box key={option.value} sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}>
+                      <Checkbox
+                        size="small"
+                        checked={
+                          batchHistoryColumnFilters['status']?.includes(option.value) || false
+                        }
+                        onChange={() => handleBatchHistoryFilterChange('status', option.value)}
+                      />
+                      <Typography variant="body2">{option.label}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </>
+            ) : (
+              <>
+                <TextField
+                  size="small"
+                  fullWidth
+                  placeholder="Search"
+                  value={batchHistoryFilterSearchTerm}
+                  onChange={(e) => setBatchHistoryFilterSearchTerm(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Box component="span" sx={{ fontSize: '18px' }}>
+                          🔍
+                        </Box>
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ mb: 1 }}
+                />
+                <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                  {batchHistoryFilterAnchor.column &&
+                    getBatchHistoryUniqueValues(batchHistoryFilterAnchor.column)
+                      .sort()
+                      .filter((value) =>
+                        String(value)
+                          .toLowerCase()
+                          .includes(batchHistoryFilterSearchTerm.toLowerCase()),
+                      )
+                      .map((value) => (
+                        <Box
+                          key={String(value)}
+                          sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                        >
+                          <Checkbox
+                            size="small"
+                            checked={
+                              batchHistoryColumnFilters[batchHistoryFilterAnchor.column]?.includes(
+                                String(value),
+                              ) || false
+                            }
+                            onChange={() =>
+                              handleBatchHistoryFilterChange(
+                                batchHistoryFilterAnchor.column,
+                                String(value),
+                              )
+                            }
+                          />
+                          <Typography variant="body2">{String(value)}</Typography>
+                        </Box>
+                      ))}
+                </Box>
+              </>
+            )}
+          </Box>
+        </Menu>
+
+        {/* Audit Trail Sort Menu */}
+        <Menu
+          anchorEl={auditTrailSortAnchor.element}
+          open={Boolean(auditTrailSortAnchor.element)}
+          onClose={handleAuditTrailSortClose}
+          PaperProps={{
+            sx: {
+              width: 200,
+            },
+          }}
+        >
+          <MenuItem
+            onClick={() => handleAuditTrailSort(auditTrailSortAnchor.column, 'asc')}
+            sx={{ gap: 1.5 }}
+          >
+            <ArrowUpwardIcon fontSize="small" />
+            <Typography variant="body2">Sort Ascending</Typography>
+          </MenuItem>
+          <MenuItem
+            onClick={() => handleAuditTrailSort(auditTrailSortAnchor.column, 'desc')}
+            sx={{ gap: 1.5 }}
+          >
+            <ArrowDownwardIcon fontSize="small" />
+            <Typography variant="body2">Sort Descending</Typography>
+          </MenuItem>
+        </Menu>
+
+        {/* Audit Trail Filter Menu */}
+        <Menu
+          anchorEl={auditTrailFilterAnchor.element}
+          open={Boolean(auditTrailFilterAnchor.element)}
+          onClose={handleAuditTrailFilterClose}
+          PaperProps={{
+            sx: {
+              maxHeight: 400,
+              width: 250,
+            },
+          }}
+        >
+          <Box sx={{ p: 2 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 1,
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                Filter by{' '}
+                {COLUMN_LABELS[auditTrailFilterAnchor.column] || auditTrailFilterAnchor.column}
+              </Typography>
+              <Button
+                size="small"
+                onClick={() => {
+                  clearAuditTrailColumnFilter(auditTrailFilterAnchor.column)
+                  handleAuditTrailFilterClose()
+                }}
+                sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+              >
+                Clear
+              </Button>
+            </Box>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="Search"
+              value={auditTrailFilterSearchTerm}
+              onChange={(e) => setAuditTrailFilterSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Box component="span" sx={{ fontSize: '18px' }}>
+                      🔍
+                    </Box>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ mb: 1 }}
+            />
+            <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+              {auditTrailFilterAnchor.column &&
+                getAuditTrailUniqueValues(auditTrailFilterAnchor.column)
+                  .sort()
+                  .filter((value) =>
+                    String(value).toLowerCase().includes(auditTrailFilterSearchTerm.toLowerCase()),
+                  )
+                  .map((value) => (
+                    <Box
+                      key={String(value)}
+                      sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
+                    >
+                      <Checkbox
+                        size="small"
+                        checked={
+                          auditTrailColumnFilters[auditTrailFilterAnchor.column]?.includes(
+                            String(value),
+                          ) || false
+                        }
+                        onChange={() =>
+                          handleAuditTrailFilterChange(auditTrailFilterAnchor.column, String(value))
+                        }
+                      />
+                      <Typography variant="body2">{String(value)}</Typography>
+                    </Box>
+                  ))}
+            </Box>
+          </Box>
+        </Menu>
+
+        {/* Details Section */}
+        {selectedChild !== null &&
+          (() => {
+            const childData = filteredData.find((child) => child.id === selectedChild)
+            if (!childData) return null
+
+            return (
+              <Box sx={{ mt: 3 }}>
+                <Paper sx={{ p: 3 }}>
                   <Box
                     sx={{
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      mt: 2,
-                      px: 2,
+                      mb: 3,
+                      borderBottom: '1px solid #e0e0e0',
+                      pb: 2,
                     }}
                   >
-                    <Typography variant="body2" color="text.secondary">
-                      {loadingContacts
-                        ? 'Loading...'
-                        : `Showing ${contacts.length} of ${totalRecords} records`}
-                    </Typography>
-                    <Pagination
-                      count={totalPages}
-                      page={currentPage}
-                      onChange={handlePageChange}
-                      color="primary"
-                      showFirstButton
-                      showLastButton
-                    />
-                  </Box>
-                )}
-
-                {/* Error message */}
-                {contactsError && preDefinedFilter === 'All Records' && (
-                  <Box sx={{ mt: 2, p: 2, backgroundColor: '#ffebee', borderRadius: 1 }}>
-                    <Typography variant="body2" color="error">
-                      {contactsError}
-                    </Typography>
-                  </Box>
-                )}
-
-                {/* Filter Menu */}
-                <Menu
-                  anchorEl={filterAnchor.element}
-                  open={Boolean(filterAnchor.element)}
-                  onClose={handleFilterClose}
-                  PaperProps={{
-                    sx: {
-                      maxHeight: 400,
-                      width: 250,
-                    },
-                  }}
-                >
-                  <Box sx={{ p: 2 }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        mb: 1,
-                      }}
-                    >
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                        Filter by {COLUMN_LABELS[filterAnchor.column] || filterAnchor.column}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                        Details
                       </Typography>
-                      <Button
-                        size="small"
-                        onClick={() => {
-                          clearColumnFilter(filterAnchor.column)
-                          handleFilterClose()
-                        }}
-                        sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                      <Tooltip
+                        title="Detailed information about the selected child including basic info, case details, placement information, and service provider details."
+                        arrow
                       >
-                        Clear
+                        <IconButton size="small" sx={{ padding: 0.5 }}>
+                          <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box
+                        sx={{
+                          padding: '6px 12px',
+                          textAlign: 'left',
+                          border: '1px solid #666',
+                          borderRadius: '4px',
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
+                          Last Eligibility Run: {childData.lastEligibilityRunAt || '--'}
+                        </Typography>
+                      </Box>
+                      <Button
+                        variant="text"
+                        size="small"
+                        onClick={() => clearSelectedChildContext(true)}
+                        sx={{ textTransform: 'none', color: '#666' }}
+                      >
+                        Close
                       </Button>
                     </Box>
-                    {/* Search bar for filtering items */}
-                    {filterAnchor.column === 'csaStatus' ? (
-                      <>
-                        <TextField
-                          size="small"
-                          fullWidth
-                          placeholder="Search status..."
-                          value={filterSearchTerm}
-                          onChange={(e) => setFilterSearchTerm(e.target.value)}
-                          InputProps={{
-                            startAdornment: (
-                              <InputAdornment position="start">
-                                <Box component="span" sx={{ fontSize: '18px' }}>
-                                  🔍
-                                </Box>
-                              </InputAdornment>
-                            ),
-                          }}
-                          sx={{ mb: 1 }}
-                        />
-                        <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
-                          {CSA_STATUS_FILTER_OPTIONS.filter((option) =>
-                            option.label.toLowerCase().includes(filterSearchTerm.toLowerCase()),
-                          ).map((option) => (
-                            <MenuItem
-                              key={option.value}
-                              onClick={() => {
-                                const newFilters = {
-                                  ...activeColumnFilters,
-                                  csaStatus: option.value,
-                                }
-                                setActiveColumnFilters(newFilters)
-                                performColumnFiltersSearch(newFilters, 1)
-                                setCurrentPage(1)
-                                setIsColumnFilterActive(true)
-                                handleFilterClose()
-                              }}
+                  </Box>
+
+                  {(() => {
+                    return (
+                      <Box
+                        sx={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(4, 1fr)',
+                          gap: 3,
+                        }}
+                      >
+                        {/* Child Basic Info Section */}
+                        <Box>
+                          <Typography
+                            variant="subtitle2"
+                            sx={{ fontWeight: 600, mb: 2, color: '#333' }}
+                          >
+                            Child Basic Info
+                          </Typography>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 1.5,
+                              backgroundColor: '#f9f9f9',
+                              p: 2,
+                              borderRadius: 1,
+                            }}
+                          >
+                            <Box
                               sx={{
-                                fontSize: '0.875rem',
-                                py: 0.75,
-                                backgroundColor:
-                                  activeColumnFilters['csaStatus'] === option.value
-                                    ? 'rgba(25, 118, 210, 0.08)'
-                                    : 'transparent',
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
                               }}
                             >
-                              {option.label}
-                            </MenuItem>
-                          ))}
-                        </Box>
-                      </>
-                    ) : filterAnchor.column === 'caseStatus' ? (
-                      <>
-                        <TextField
-                          size="small"
-                          fullWidth
-                          placeholder="Search status..."
-                          value={filterSearchTerm}
-                          onChange={(e) => setFilterSearchTerm(e.target.value)}
-                          InputProps={{
-                            startAdornment: (
-                              <InputAdornment position="start">
-                                <Box component="span" sx={{ fontSize: '18px' }}>
-                                  🔍
-                                </Box>
-                              </InputAdornment>
-                            ),
-                          }}
-                          sx={{ mb: 1 }}
-                        />
-                        <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
-                          {CASE_STATUS_FILTER_OPTIONS.filter((option) =>
-                            option.label.toLowerCase().includes(filterSearchTerm.toLowerCase()),
-                          ).map((option) => (
-                            <MenuItem
-                              key={option.value}
-                              onClick={() => {
-                                const newFilters = {
-                                  ...activeColumnFilters,
-                                  caseStatus: option.value,
-                                }
-                                setActiveColumnFilters(newFilters)
-                                performColumnFiltersSearch(newFilters, 1)
-                                setCurrentPage(1)
-                                setIsColumnFilterActive(true)
-                                handleFilterClose()
-                              }}
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Child/Youth Name
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {[childData.firstName, childData.middleName, childData.lastName]
+                                  .filter(Boolean)
+                                  .join(' ') || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
                               sx={{
-                                fontSize: '0.875rem',
-                                py: 0.75,
-                                backgroundColor:
-                                  activeColumnFilters['caseStatus'] === option.value
-                                    ? 'rgba(25, 118, 210, 0.08)'
-                                    : 'transparent',
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
                               }}
                             >
-                              {option.label}
-                            </MenuItem>
-                          ))}
-                        </Box>
-                      </>
-                    ) : filterAnchor.column === 'holdReason' ? (
-                      <>
-                        <TextField
-                          size="small"
-                          fullWidth
-                          placeholder="Type reason to filter..."
-                          value={filterSearchTerm}
-                          onChange={(e) => setFilterSearchTerm(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && filterSearchTerm.trim()) {
-                              const newFilters = {
-                                ...activeColumnFilters,
-                                holdReason: filterSearchTerm.trim(),
-                              }
-                              setActiveColumnFilters(newFilters)
-                              performColumnFiltersSearch(newFilters, 1)
-                              setCurrentPage(1)
-                              setIsColumnFilterActive(true)
-                              handleFilterClose()
-                            }
-                          }}
-                          InputProps={{
-                            startAdornment: (
-                              <InputAdornment position="start">
-                                <Box component="span" sx={{ fontSize: '18px' }}>
-                                  🔍
-                                </Box>
-                              </InputAdornment>
-                            ),
-                          }}
-                          sx={{ mb: 1 }}
-                        />
-                        <Button
-                          variant="contained"
-                          size="small"
-                          fullWidth
-                          disabled={!filterSearchTerm.trim()}
-                          onClick={() => {
-                            const newFilters = {
-                              ...activeColumnFilters,
-                              holdReason: filterSearchTerm.trim(),
-                            }
-                            setActiveColumnFilters(newFilters)
-                            performColumnFiltersSearch(newFilters, 1)
-                            setCurrentPage(1)
-                            setIsColumnFilterActive(true)
-                            handleFilterClose()
-                          }}
-                        >
-                          Apply Filter
-                        </Button>
-                      </>
-                    ) : filterAnchor.column === 'needsReview' ? (
-                      <>
-                        <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
-                          {REVIEW_FILTER_OPTIONS.map((option) => (
-                            <MenuItem
-                              key={option.value}
-                              onClick={() => {
-                                const newFilters = {
-                                  ...activeColumnFilters,
-                                  needsReview: option.value,
-                                }
-                                setActiveColumnFilters(newFilters)
-                                performColumnFiltersSearch(newFilters, 1)
-                                setCurrentPage(1)
-                                setIsColumnFilterActive(true)
-                                handleFilterClose()
-                              }}
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Gender
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.gender || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
                               sx={{
-                                fontSize: '0.875rem',
-                                py: 0.75,
-                                backgroundColor:
-                                  activeColumnFilters['needsReview'] === option.value
-                                    ? 'rgba(25, 118, 210, 0.08)'
-                                    : 'transparent',
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
                               }}
                             >
-                              {option.label}
-                            </MenuItem>
-                          ))}
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Person ID ICM
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.personIdIcm || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Person ID MIS
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.personIdMis || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                DIN
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.din || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                AKA Last Name
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.akaLastName || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                AKA First Name
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.akaFirstName || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Birth Place
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {[
+                                  childData.birthCity,
+                                  childData.birthProvince,
+                                  childData.birthCountry,
+                                ]
+                                  .filter(Boolean)
+                                  .join(', ') || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Age
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.age ?? '-'}
+                              </Typography>
+                            </Box>
+                          </Box>
                         </Box>
-                      </>
-                    ) : (
+
+                        {/* Case Details Section */}
+                        <Box>
+                          <Typography
+                            variant="subtitle2"
+                            sx={{ fontWeight: 600, mb: 2, color: '#333' }}
+                          >
+                            Case Details
+                          </Typography>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 1.5,
+                              backgroundColor: '#f9f9f9',
+                              p: 2,
+                              borderRadius: 1,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Case Status
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.caseStatus || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Case Number
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.caseNumber || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Case Type
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.caseType || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Caseload
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.caseLoad || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Legacy File No.
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.legacyFile || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Service Office
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.serviceOffice || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Assigned to
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.assignedTo || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Effective Legal Status
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.effectiveLegalStatus || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Effective Date
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.effectiveDate || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Expiry Date
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.expiryDate || '-'}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+
+                        {/* Placement/Service Info Section */}
+                        <Box>
+                          <Typography
+                            variant="subtitle2"
+                            sx={{ fontWeight: 600, mb: 2, color: '#333' }}
+                          >
+                            Placement/Service Info
+                          </Typography>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 1.5,
+                              backgroundColor: '#f9f9f9',
+                              p: 2,
+                              borderRadius: 1,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Placement/Location No.
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.placementLocation || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Type
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.locationType || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Sub-type
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.locationSubType || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Status
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.placementStatus || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Actual Start Date
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.actualStartDate || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Actual End Date
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.actualEndDate || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Paid/Unpaid
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.paidUnpaid || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Source
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.sourcePlacement ? (
+                                  <Typography
+                                    component="span"
+                                    sx={{
+                                      backgroundColor: '#e3f2fd',
+                                      color: '#1976d2',
+                                      px: 1,
+                                      py: 0.5,
+                                      borderRadius: 1,
+                                      fontSize: '0.75rem',
+                                    }}
+                                  >
+                                    {childData.sourcePlacement}
+                                  </Typography>
+                                ) : (
+                                  '-'
+                                )}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+
+                        {/* Service Provider and Agreement Details Section */}
+                        <Box>
+                          <Typography
+                            variant="subtitle2"
+                            sx={{ fontWeight: 600, mb: 2, color: '#333' }}
+                          >
+                            Service Provider and Agreement Details
+                          </Typography>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 1.5,
+                              backgroundColor: '#f9f9f9',
+                              p: 2,
+                              borderRadius: 1,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Provider Name
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.serviceProviderName || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Provider ID
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.providerId || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Place of Service
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.placeOfServiceName || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Source
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.sourceAgreement ? (
+                                  <Typography
+                                    component="span"
+                                    sx={{
+                                      backgroundColor: '#e3f2fd',
+                                      color: '#1976d2',
+                                      px: 1,
+                                      py: 0.5,
+                                      borderRadius: 1,
+                                      fontSize: '0.75rem',
+                                    }}
+                                  >
+                                    {childData.sourceAgreement}
+                                  </Typography>
+                                ) : (
+                                  '-'
+                                )}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Agreement Type
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.agreementType || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Agreement Status
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.agreementStatus || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Start Date
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.agreementStartDate || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                End Date
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.agreementEndDate || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Termination Date
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.terminationDate || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                MCFD Contract No.
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.mcfdContract || '-'}
+                              </Typography>
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 2,
+                                alignItems: 'baseline',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
+                              >
+                                Product
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  textAlign: 'left',
+                                  wordBreak: 'break-word',
+                                }}
+                              >
+                                {childData.product || '-'}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+                      </Box>
+                    )
+                  })()}
+                </Paper>
+              </Box>
+            )
+          })()}
+
+        {/* Batch History Section */}
+        {mode === 'standard' && selectedChild !== null && (
+          <Box sx={{ mt: 3 }}>
+            <Paper sx={{ p: 0, overflow: 'hidden' }}>
+              <Box
+                onClick={() => setIsBatchHistoryExpanded((prev) => !prev)}
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  px: 3,
+                  py: 2,
+                  backgroundColor: '#f5f5f5',
+                  borderBottom: isBatchHistoryExpanded ? '1px solid #e0e0e0' : 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 500,
+                      ...(contactBatchHistory.length === 0 && {
+                        fontStyle: 'italic',
+                        color: '#999',
+                      }),
+                    }}
+                  >
+                    Batch History ({contactBatchHistory.length})
+                  </Typography>
+                  <Tooltip
+                    title="Complete history of all batch submissions for the selected child, including batch status and transaction types."
+                    arrow
+                  >
+                    <IconButton
+                      size="small"
+                      sx={{ padding: 0.5 }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#666' }}>
+                  <Typography variant="body2">
+                    {isBatchHistoryExpanded ? 'Collapse' : 'Expand'}
+                  </Typography>
+                  {isBatchHistoryExpanded ? (
+                    <ArrowUpwardIcon fontSize="small" />
+                  ) : (
+                    <ArrowDownwardIcon fontSize="small" />
+                  )}
+                </Box>
+              </Box>
+
+              {isBatchHistoryExpanded && (
+                <Box sx={{ p: 3 }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      alignItems: 'center',
+                      mb: 3,
+                      borderBottom: '1px solid #e0e0e0',
+                      pb: 2,
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <TextField
                         size="small"
-                        fullWidth
-                        placeholder="Search"
-                        value={filterSearchTerm}
-                        onChange={(e) => setFilterSearchTerm(e.target.value)}
+                        placeholder="Search batch history..."
+                        value={batchHistorySearchTerm}
+                        onChange={(e) => setBatchHistorySearchTerm(e.target.value)}
                         InputProps={{
                           startAdornment: (
                             <InputAdornment position="start">
@@ -4236,2249 +5540,688 @@ export default function EligibilityListPage({
                               </Box>
                             </InputAdornment>
                           ),
+                          endAdornment: batchHistorySearchTerm && (
+                            <InputAdornment position="end">
+                              <IconButton
+                                size="small"
+                                onClick={() => setBatchHistorySearchTerm('')}
+                                edge="end"
+                              >
+                                <CloseIcon fontSize="small" />
+                              </IconButton>
+                            </InputAdornment>
+                          ),
                         }}
-                        sx={{ mb: 1 }}
+                        sx={{ width: '300px' }}
                       />
-                    )}
-                  </Box>
-                </Menu>
-
-                {/* Sort Menu */}
-                <Menu
-                  anchorEl={sortAnchor.element}
-                  open={Boolean(sortAnchor.element)}
-                  onClose={handleSortClose}
-                  PaperProps={{
-                    sx: {
-                      width: 200,
-                    },
-                  }}
-                >
-                  <MenuItem onClick={() => handleSort(sortAnchor.column, 'asc')} sx={{ gap: 1.5 }}>
-                    <ArrowUpwardIcon fontSize="small" />
-                    <Typography variant="body2">Sort Ascending</Typography>
-                  </MenuItem>
-                  <MenuItem onClick={() => handleSort(sortAnchor.column, 'desc')} sx={{ gap: 1.5 }}>
-                    <ArrowDownwardIcon fontSize="small" />
-                    <Typography variant="body2">Sort Descending</Typography>
-                  </MenuItem>
-                </Menu>
-
-                {/* Batch History Sort Menu */}
-                <Menu
-                  anchorEl={batchHistorySortAnchor.element}
-                  open={Boolean(batchHistorySortAnchor.element)}
-                  onClose={handleBatchHistorySortClose}
-                  PaperProps={{
-                    sx: {
-                      width: 200,
-                    },
-                  }}
-                >
-                  <MenuItem
-                    onClick={() => handleBatchHistorySort(batchHistorySortAnchor.column, 'asc')}
-                    sx={{ gap: 1.5 }}
-                  >
-                    <ArrowUpwardIcon fontSize="small" />
-                    <Typography variant="body2">Sort Ascending</Typography>
-                  </MenuItem>
-                  <MenuItem
-                    onClick={() => handleBatchHistorySort(batchHistorySortAnchor.column, 'desc')}
-                    sx={{ gap: 1.5 }}
-                  >
-                    <ArrowDownwardIcon fontSize="small" />
-                    <Typography variant="body2">Sort Descending</Typography>
-                  </MenuItem>
-                </Menu>
-
-                {/* Batch History Filter Menu */}
-                <Menu
-                  anchorEl={batchHistoryFilterAnchor.element}
-                  open={Boolean(batchHistoryFilterAnchor.element)}
-                  onClose={handleBatchHistoryFilterClose}
-                  PaperProps={{
-                    sx: {
-                      maxHeight: 400,
-                      width: 250,
-                    },
-                  }}
-                >
-                  <Box sx={{ p: 2 }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        mb: 1,
-                      }}
-                    >
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                        Filter by{' '}
-                        {COLUMN_LABELS[batchHistoryFilterAnchor.column] ||
-                          batchHistoryFilterAnchor.column}
-                      </Typography>
-                      <Button
-                        size="small"
-                        onClick={() => {
-                          clearBatchHistoryColumnFilter(batchHistoryFilterAnchor.column)
-                          handleBatchHistoryFilterClose()
-                        }}
-                        sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-                      >
-                        Clear
-                      </Button>
-                    </Box>
-                    {/* Search bar for filtering items */}
-                    {batchHistoryFilterAnchor.column === 'status' ? (
-                      <>
-                        <TextField
-                          size="small"
-                          fullWidth
-                          placeholder="Search status..."
-                          value={batchHistoryFilterSearchTerm}
-                          onChange={(e) => setBatchHistoryFilterSearchTerm(e.target.value)}
-                          InputProps={{
-                            startAdornment: (
-                              <InputAdornment position="start">
-                                <Box component="span" sx={{ fontSize: '18px' }}>
-                                  🔍
-                                </Box>
-                              </InputAdornment>
-                            ),
-                          }}
-                          sx={{ mb: 1 }}
-                        />
-                        <Box sx={{ maxHeight: 240, overflowY: 'auto' }}>
-                          {BATCH_STATUS_FILTER_OPTIONS.filter((option) =>
-                            option.label
-                              .toLowerCase()
-                              .includes(batchHistoryFilterSearchTerm.toLowerCase()),
-                          ).map((option) => (
-                            <Box
-                              key={option.value}
-                              sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
-                            >
-                              <Checkbox
-                                size="small"
-                                checked={
-                                  batchHistoryColumnFilters['status']?.includes(option.value) ||
-                                  false
-                                }
-                                onChange={() =>
-                                  handleBatchHistoryFilterChange('status', option.value)
-                                }
-                              />
-                              <Typography variant="body2">{option.label}</Typography>
-                            </Box>
-                          ))}
-                        </Box>
-                      </>
-                    ) : (
-                      <>
-                        <TextField
-                          size="small"
-                          fullWidth
-                          placeholder="Search"
-                          value={batchHistoryFilterSearchTerm}
-                          onChange={(e) => setBatchHistoryFilterSearchTerm(e.target.value)}
-                          InputProps={{
-                            startAdornment: (
-                              <InputAdornment position="start">
-                                <Box component="span" sx={{ fontSize: '18px' }}>
-                                  🔍
-                                </Box>
-                              </InputAdornment>
-                            ),
-                          }}
-                          sx={{ mb: 1 }}
-                        />
-                        <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                          {batchHistoryFilterAnchor.column &&
-                            getBatchHistoryUniqueValues(batchHistoryFilterAnchor.column)
-                              .sort()
-                              .filter((value) =>
-                                String(value)
-                                  .toLowerCase()
-                                  .includes(batchHistoryFilterSearchTerm.toLowerCase()),
+                      <Tooltip title="Clear all filters and sorting" arrow>
+                        <span>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<FilterAltOffIcon />}
+                            disabled={
+                              !batchHistorySearchTerm &&
+                              !batchHistorySortConfig &&
+                              Object.values(batchHistoryColumnFilters).every(
+                                (arr) => arr.length === 0,
                               )
-                              .map((value) => (
-                                <Box
-                                  key={String(value)}
-                                  sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
-                                >
-                                  <Checkbox
-                                    size="small"
-                                    checked={
-                                      batchHistoryColumnFilters[
-                                        batchHistoryFilterAnchor.column
-                                      ]?.includes(String(value)) || false
-                                    }
-                                    onChange={() =>
-                                      handleBatchHistoryFilterChange(
-                                        batchHistoryFilterAnchor.column,
-                                        String(value),
-                                      )
-                                    }
-                                  />
-                                  <Typography variant="body2">{String(value)}</Typography>
-                                </Box>
-                              ))}
-                        </Box>
-                      </>
-                    )}
+                            }
+                            onClick={() => {
+                              setBatchHistorySearchTerm('')
+                              setBatchHistoryColumnFilters({
+                                batchId: [],
+                                batchDate: [],
+                                batchRequestStatus: [],
+                                transactionType: [],
+                                batchDetailStatus: [],
+                                systemComments: [],
+                              })
+                              setBatchHistorySortConfig(null)
+                              setBatchHistoryPage(1)
+                            }}
+                            sx={{
+                              textTransform: 'none',
+                              minWidth: 'auto',
+                              '&.Mui-disabled': {
+                                opacity: 0.5,
+                              },
+                            }}
+                          >
+                            Clear Filters
+                          </Button>
+                        </span>
+                      </Tooltip>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        disabled={
+                          !canRemoveFromBatch ||
+                          isRunningEligibilityAll ||
+                          isSelectedBatchHistoryLockedForSendCra
+                        }
+                        onClick={handleRemoveFromBatch}
+                        sx={{
+                          textTransform: 'none',
+                          backgroundColor: '#1976d2',
+                          '&:hover': {
+                            backgroundColor: '#1565c0',
+                          },
+                          '&.Mui-disabled': {
+                            backgroundColor: '#e0e0e0',
+                            color: '#9e9e9e',
+                          },
+                        }}
+                      >
+                        Remove from Batch
+                      </Button>
+                    </Box>
                   </Box>
-                </Menu>
 
-                {/* Audit Trail Sort Menu */}
-                <Menu
-                  anchorEl={auditTrailSortAnchor.element}
-                  open={Boolean(auditTrailSortAnchor.element)}
-                  onClose={handleAuditTrailSortClose}
-                  PaperProps={{
-                    sx: {
-                      width: 200,
-                    },
-                  }}
-                >
-                  <MenuItem
-                    onClick={() => handleAuditTrailSort(auditTrailSortAnchor.column, 'asc')}
-                    sx={{ gap: 1.5 }}
-                  >
-                    <ArrowUpwardIcon fontSize="small" />
-                    <Typography variant="body2">Sort Ascending</Typography>
-                  </MenuItem>
-                  <MenuItem
-                    onClick={() => handleAuditTrailSort(auditTrailSortAnchor.column, 'desc')}
-                    sx={{ gap: 1.5 }}
-                  >
-                    <ArrowDownwardIcon fontSize="small" />
-                    <Typography variant="body2">Sort Descending</Typography>
-                  </MenuItem>
-                </Menu>
-
-                {/* Audit Trail Filter Menu */}
-                <Menu
-                  anchorEl={auditTrailFilterAnchor.element}
-                  open={Boolean(auditTrailFilterAnchor.element)}
-                  onClose={handleAuditTrailFilterClose}
-                  PaperProps={{
-                    sx: {
-                      maxHeight: 400,
-                      width: 250,
-                    },
-                  }}
-                >
-                  <Box sx={{ p: 2 }}>
+                  {/* Batch History Table */}
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleBatchHistorySortClick(e, 'batchId')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Batch ID
+                              </span>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleBatchHistoryFilterClick(e, 'batchId')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchHistoryColumnFilters.batchId?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleBatchHistorySortClick(e, 'batchDate')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Batch Date
+                              </span>
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) =>
+                                  handleBatchHistorySortClick(e, 'batchRequestStatus')
+                                }
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Batch Request Status
+                              </span>
+                              <IconButton
+                                size="small"
+                                onClick={(e) =>
+                                  handleBatchHistoryFilterClick(e, 'batchRequestStatus')
+                                }
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchHistoryColumnFilters.batchRequestStatus?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleBatchHistorySortClick(e, 'transactionType')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Transaction Type
+                              </span>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleBatchHistoryFilterClick(e, 'transactionType')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchHistoryColumnFilters.transactionType?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleBatchHistorySortClick(e, 'effectiveDate')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Effective Date
+                              </span>
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleBatchHistorySortClick(e, 'batchDetailStatus')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Batch Detail Status
+                              </span>
+                              <IconButton
+                                size="small"
+                                onClick={(e) =>
+                                  handleBatchHistoryFilterClick(e, 'batchDetailStatus')
+                                }
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchHistoryColumnFilters.batchDetailStatus?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleBatchHistorySortClick(e, 'systemComments')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                System Comments
+                              </span>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleBatchHistoryFilterClick(e, 'systemComments')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    batchHistoryColumnFilters.systemComments?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {loadingBatchHistory ? (
+                          <TableRow>
+                            <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                              <Typography variant="body2" color="text.secondary">
+                                Loading batch history...
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ) : filteredBatchHistory.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                              <Typography variant="body2" color="text.secondary">
+                                {selectedChild
+                                  ? 'No batch history found for this contact'
+                                  : 'Select a contact to view batch history'}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          paginatedBatchHistory.map((row) => (
+                            <TableRow
+                              key={row.id}
+                              hover
+                              onClick={() => handleBatchHistoryRowClick(row.id)}
+                              selected={selectedBatchHistoryId === row.id}
+                              sx={{
+                                '&:hover': { backgroundColor: '#f9f9f9' },
+                                cursor: 'pointer',
+                                '&.Mui-selected': {
+                                  backgroundColor: '#e3f2fd !important',
+                                },
+                                '&.Mui-selected:hover': {
+                                  backgroundColor: '#bbdefb !important',
+                                },
+                              }}
+                            >
+                              <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
+                                {row.batchId}
+                              </TableCell>
+                              <TableCell
+                                sx={{
+                                  whiteSpace: 'nowrap',
+                                  overflowWrap: 'normal',
+                                  wordBreak: 'keep-all',
+                                }}
+                              >
+                                {row.batchDate}
+                              </TableCell>
+                              <TableCell>
+                                {row.batchRequestStatus === 'Pending' && (
+                                  <Box
+                                    component="span"
+                                    sx={{
+                                      backgroundColor: '#fce4ec',
+                                      color: '#c2185b',
+                                      px: 1.5,
+                                      py: 0.5,
+                                      borderRadius: 1,
+                                      fontSize: '0.75rem',
+                                      fontWeight: 500,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                  >
+                                    Pending
+                                  </Box>
+                                )}
+                                {row.batchRequestStatus !== 'Pending' && row.batchRequestStatus}
+                              </TableCell>
+                              <TableCell>{row.transactionType}</TableCell>
+                              <TableCell
+                                sx={{
+                                  whiteSpace: 'nowrap',
+                                  overflowWrap: 'normal',
+                                  wordBreak: 'keep-all',
+                                }}
+                              >
+                                {row.effectiveDate}
+                              </TableCell>
+                              <TableCell>{row.batchDetailStatus}</TableCell>
+                              <TableCell>{row.systemComments}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  {/* Batch History Pagination */}
+                  {filteredBatchHistory.length > 0 && (
                     <Box
                       sx={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        mb: 1,
+                        mt: 2,
+                        px: 2,
+                        pb: 2,
                       }}
                     >
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                        Filter by{' '}
-                        {COLUMN_LABELS[auditTrailFilterAnchor.column] ||
-                          auditTrailFilterAnchor.column}
+                      <Typography variant="body2" color="text.secondary">
+                        Showing {paginatedBatchHistory.length} of {filteredBatchHistory.length}{' '}
+                        records
                       </Typography>
-                      <Button
-                        size="small"
-                        onClick={() => {
-                          clearAuditTrailColumnFilter(auditTrailFilterAnchor.column)
-                          handleAuditTrailFilterClose()
-                        }}
-                        sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-                      >
-                        Clear
-                      </Button>
+                      <Pagination
+                        count={batchHistoryTotalPages}
+                        page={batchHistoryPage}
+                        onChange={(_, page) => setBatchHistoryPage(page)}
+                        color="primary"
+                        showFirstButton
+                        showLastButton
+                      />
                     </Box>
-                    <TextField
+                  )}
+                </Box>
+              )}
+            </Paper>
+          </Box>
+        )}
+
+        {/* Audit Trail Section */}
+        {selectedChild !== null && (
+          <Box sx={{ mt: 3 }}>
+            <Paper sx={{ p: 0, overflow: 'hidden' }}>
+              <Box
+                onClick={() => setIsAuditTrailExpanded((prev) => !prev)}
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  px: 3,
+                  py: 2,
+                  backgroundColor: '#f5f5f5',
+                  borderBottom: isAuditTrailExpanded ? '1px solid #e0e0e0' : 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 500,
+                      ...(contactAuditTrail.length === 0 && {
+                        fontStyle: 'italic',
+                        color: '#999',
+                      }),
+                    }}
+                  >
+                    CSA Audit Trail ({contactAuditTrail.length})
+                  </Typography>
+                  <Tooltip
+                    title="Audit entries for selected fields on this contact. Most recent updates appear first."
+                    arrow
+                  >
+                    <IconButton
                       size="small"
-                      fullWidth
-                      placeholder="Search"
-                      value={auditTrailFilterSearchTerm}
-                      onChange={(e) => setAuditTrailFilterSearchTerm(e.target.value)}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Box component="span" sx={{ fontSize: '18px' }}>
-                              🔍
-                            </Box>
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{ mb: 1 }}
-                    />
-                    <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                      {auditTrailFilterAnchor.column &&
-                        getAuditTrailUniqueValues(auditTrailFilterAnchor.column)
-                          .sort()
-                          .filter((value) =>
-                            String(value)
-                              .toLowerCase()
-                              .includes(auditTrailFilterSearchTerm.toLowerCase()),
-                          )
-                          .map((value) => (
-                            <Box
-                              key={String(value)}
-                              sx={{ display: 'flex', alignItems: 'center', py: 0.5 }}
-                            >
-                              <Checkbox
-                                size="small"
-                                checked={
-                                  auditTrailColumnFilters[auditTrailFilterAnchor.column]?.includes(
-                                    String(value),
-                                  ) || false
-                                }
-                                onChange={() =>
-                                  handleAuditTrailFilterChange(
-                                    auditTrailFilterAnchor.column,
-                                    String(value),
-                                  )
-                                }
-                              />
-                              <Typography variant="body2">{String(value)}</Typography>
-                            </Box>
-                          ))}
-                    </Box>
-                  </Box>
-                </Menu>
-
-                {/* Details Section */}
-                {selectedChild !== null &&
-                  (() => {
-                    const childData = filteredData.find((child) => child.id === selectedChild)
-                    if (!childData) return null
-
-                    return (
-                      <Box sx={{ mt: 3 }}>
-                        <Paper sx={{ p: 3 }}>
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              mb: 3,
-                              borderBottom: '1px solid #e0e0e0',
-                              pb: 2,
-                            }}
-                          >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                                Details
-                              </Typography>
-                              <Tooltip
-                                title="Detailed information about the selected child including basic info, case details, placement information, and service provider details."
-                                arrow
-                              >
-                                <IconButton size="small" sx={{ padding: 0.5 }}>
-                                  <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                              <Box
-                                sx={{
-                                  padding: '6px 12px',
-                                  textAlign: 'left',
-                                  border: '1px solid #666',
-                                  borderRadius: '4px',
-                                }}
-                              >
-                                <Typography
-                                  variant="body2"
-                                  sx={{ color: '#333', fontSize: '0.75rem' }}
-                                >
-                                  Last Eligibility Run: {childData.lastEligibilityRunAt || '--'}
-                                </Typography>
-                              </Box>
-                              <Button
-                                variant="text"
-                                size="small"
-                                onClick={() => clearSelectedChildContext(true)}
-                                sx={{ textTransform: 'none', color: '#666' }}
-                              >
-                                Close
-                              </Button>
-                            </Box>
-                          </Box>
-
-                          {(() => {
-                            return (
-                              <Box
-                                sx={{
-                                  display: 'grid',
-                                  gridTemplateColumns: 'repeat(4, 1fr)',
-                                  gap: 3,
-                                }}
-                              >
-                                {/* Child Basic Info Section */}
-                                <Box>
-                                  <Typography
-                                    variant="subtitle2"
-                                    sx={{ fontWeight: 600, mb: 2, color: '#333' }}
-                                  >
-                                    Child Basic Info
-                                  </Typography>
-                                  <Box
-                                    sx={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: 1.5,
-                                      backgroundColor: '#f9f9f9',
-                                      p: 2,
-                                      borderRadius: 1,
-                                    }}
-                                  >
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Child/Youth Name
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {[
-                                          childData.firstName,
-                                          childData.middleName,
-                                          childData.lastName,
-                                        ]
-                                          .filter(Boolean)
-                                          .join(' ') || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Gender
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.gender || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Person ID ICM
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.personIdIcm || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Person ID MIS
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.personIdMis || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        DIN
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.din || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        AKA Last Name
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.akaLastName || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        AKA First Name
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.akaFirstName || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Birth Place
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {[
-                                          childData.birthCity,
-                                          childData.birthProvince,
-                                          childData.birthCountry,
-                                        ]
-                                          .filter(Boolean)
-                                          .join(', ') || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Age
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.age ?? '-'}
-                                      </Typography>
-                                    </Box>
-                                  </Box>
-                                </Box>
-
-                                {/* Case Details Section */}
-                                <Box>
-                                  <Typography
-                                    variant="subtitle2"
-                                    sx={{ fontWeight: 600, mb: 2, color: '#333' }}
-                                  >
-                                    Case Details
-                                  </Typography>
-                                  <Box
-                                    sx={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: 1.5,
-                                      backgroundColor: '#f9f9f9',
-                                      p: 2,
-                                      borderRadius: 1,
-                                    }}
-                                  >
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Case Status
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.caseStatus || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Case Number
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          cursor: 'pointer',
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.caseNumber || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Case Type
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.caseType || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Caseload
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.caseLoad || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Legacy File No.
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.legacyFile || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Service Office
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          cursor: 'pointer',
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.serviceOffice || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Assigned to
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.assignedTo || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Effective Legal Status
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.effectiveLegalStatus || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Effective Date
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.effectiveDate || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Expiry Date
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.expiryDate || '-'}
-                                      </Typography>
-                                    </Box>
-                                  </Box>
-                                </Box>
-
-                                {/* Placement/Service Info Section */}
-                                <Box>
-                                  <Typography
-                                    variant="subtitle2"
-                                    sx={{ fontWeight: 600, mb: 2, color: '#333' }}
-                                  >
-                                    Placement/Service Info
-                                  </Typography>
-                                  <Box
-                                    sx={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: 1.5,
-                                      backgroundColor: '#f9f9f9',
-                                      p: 2,
-                                      borderRadius: 1,
-                                    }}
-                                  >
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Placement/Location No.
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.placementLocation || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Type
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.locationType || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Sub-type
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.locationSubType || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Status
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.placementStatus || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Actual Start Date
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.actualStartDate || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Actual End Date
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.actualEndDate || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Paid/Unpaid
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.paidUnpaid || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Source
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.sourcePlacement ? (
-                                          <Typography
-                                            component="span"
-                                            sx={{
-                                              backgroundColor: '#e3f2fd',
-                                              color: '#1976d2',
-                                              px: 1,
-                                              py: 0.5,
-                                              borderRadius: 1,
-                                              fontSize: '0.75rem',
-                                            }}
-                                          >
-                                            {childData.sourcePlacement}
-                                          </Typography>
-                                        ) : (
-                                          '-'
-                                        )}
-                                      </Typography>
-                                    </Box>
-                                  </Box>
-                                </Box>
-
-                                {/* Service Provider and Agreement Details Section */}
-                                <Box>
-                                  <Typography
-                                    variant="subtitle2"
-                                    sx={{ fontWeight: 600, mb: 2, color: '#333' }}
-                                  >
-                                    Service Provider and Agreement Details
-                                  </Typography>
-                                  <Box
-                                    sx={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: 1.5,
-                                      backgroundColor: '#f9f9f9',
-                                      p: 2,
-                                      borderRadius: 1,
-                                    }}
-                                  >
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Provider Name
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.serviceProviderName || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Provider ID
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.providerId || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Place of Service
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.placeOfServiceName || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Source
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.sourceAgreement ? (
-                                          <Typography
-                                            component="span"
-                                            sx={{
-                                              backgroundColor: '#e3f2fd',
-                                              color: '#1976d2',
-                                              px: 1,
-                                              py: 0.5,
-                                              borderRadius: 1,
-                                              fontSize: '0.75rem',
-                                            }}
-                                          >
-                                            {childData.sourceAgreement}
-                                          </Typography>
-                                        ) : (
-                                          '-'
-                                        )}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Agreement Type
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.agreementType || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Agreement Status
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.agreementStatus || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Start Date
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.agreementStartDate || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        End Date
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.agreementEndDate || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Termination Date
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.terminationDate || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        MCFD Contract No.
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.mcfdContract || '-'}
-                                      </Typography>
-                                    </Box>
-
-                                    <Box
-                                      sx={{
-                                        display: 'flex',
-                                        gap: 2,
-                                        alignItems: 'baseline',
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ color: '#666', minWidth: '140px', flexShrink: 0 }}
-                                      >
-                                        Product
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{
-                                          fontWeight: 500,
-                                          textAlign: 'left',
-                                          wordBreak: 'break-word',
-                                        }}
-                                      >
-                                        {childData.product || '-'}
-                                      </Typography>
-                                    </Box>
-                                  </Box>
-                                </Box>
-                              </Box>
-                            )
-                          })()}
-                        </Paper>
-                      </Box>
-                    )
-                  })()}
-
-                {/* Batch History Section */}
-                {mode === 'standard' && selectedChild !== null && (
-                  <Box sx={{ mt: 3 }}>
-                    <Paper sx={{ p: 0, overflow: 'hidden' }}>
-                      <Box
-                        onClick={() => setIsBatchHistoryExpanded((prev) => !prev)}
-                        sx={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          px: 3,
-                          py: 2,
-                          backgroundColor: '#f5f5f5',
-                          borderBottom: isBatchHistoryExpanded ? '1px solid #e0e0e0' : 'none',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography
-                            variant="h6"
-                            sx={{
-                              fontWeight: 500,
-                              ...(contactBatchHistory.length === 0 && {
-                                fontStyle: 'italic',
-                                color: '#999',
-                              }),
-                            }}
-                          >
-                            Batch History ({contactBatchHistory.length})
-                          </Typography>
-                          <Tooltip
-                            title="Complete history of all batch submissions for the selected child, including batch status and transaction types."
-                            arrow
-                          >
-                            <IconButton
-                              size="small"
-                              sx={{ padding: 0.5 }}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#666' }}>
-                          <Typography variant="body2">
-                            {isBatchHistoryExpanded ? 'Collapse' : 'Expand'}
-                          </Typography>
-                          {isBatchHistoryExpanded ? (
-                            <ArrowUpwardIcon fontSize="small" />
-                          ) : (
-                            <ArrowDownwardIcon fontSize="small" />
-                          )}
-                        </Box>
-                      </Box>
-
-                      {isBatchHistoryExpanded && (
-                        <Box sx={{ p: 3 }}>
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              justifyContent: 'flex-end',
-                              alignItems: 'center',
-                              mb: 3,
-                              borderBottom: '1px solid #e0e0e0',
-                              pb: 2,
-                            }}
-                          >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                              <TextField
-                                size="small"
-                                placeholder="Search batch history..."
-                                value={batchHistorySearchTerm}
-                                onChange={(e) => setBatchHistorySearchTerm(e.target.value)}
-                                InputProps={{
-                                  startAdornment: (
-                                    <InputAdornment position="start">
-                                      <Box component="span" sx={{ fontSize: '18px' }}>
-                                        🔍
-                                      </Box>
-                                    </InputAdornment>
-                                  ),
-                                  endAdornment: batchHistorySearchTerm && (
-                                    <InputAdornment position="end">
-                                      <IconButton
-                                        size="small"
-                                        onClick={() => setBatchHistorySearchTerm('')}
-                                        edge="end"
-                                      >
-                                        <CloseIcon fontSize="small" />
-                                      </IconButton>
-                                    </InputAdornment>
-                                  ),
-                                }}
-                                sx={{ width: '300px' }}
-                              />
-                              <Tooltip title="Clear all filters and sorting" arrow>
-                                <span>
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    startIcon={<FilterAltOffIcon />}
-                                    disabled={
-                                      !batchHistorySearchTerm &&
-                                      !batchHistorySortConfig &&
-                                      Object.values(batchHistoryColumnFilters).every(
-                                        (arr) => arr.length === 0,
-                                      )
-                                    }
-                                    onClick={() => {
-                                      setBatchHistorySearchTerm('')
-                                      setBatchHistoryColumnFilters({
-                                        batchId: [],
-                                        batchDate: [],
-                                        batchRequestStatus: [],
-                                        transactionType: [],
-                                        batchDetailStatus: [],
-                                        systemComments: [],
-                                      })
-                                      setBatchHistorySortConfig(null)
-                                      setBatchHistoryPage(1)
-                                    }}
-                                    sx={{
-                                      textTransform: 'none',
-                                      minWidth: 'auto',
-                                      '&.Mui-disabled': {
-                                        opacity: 0.5,
-                                      },
-                                    }}
-                                  >
-                                    Clear Filters
-                                  </Button>
-                                </span>
-                              </Tooltip>
-                              <Button
-                                variant="contained"
-                                size="small"
-                                disabled={
-                                  !canRemoveFromBatch ||
-                                  isRunningEligibilityAll ||
-                                  isSelectedBatchHistoryLockedForSendCra
-                                }
-                                onClick={handleRemoveFromBatch}
-                                sx={{
-                                  textTransform: 'none',
-                                  backgroundColor: '#1976d2',
-                                  '&:hover': {
-                                    backgroundColor: '#1565c0',
-                                  },
-                                  '&.Mui-disabled': {
-                                    backgroundColor: '#e0e0e0',
-                                    color: '#9e9e9e',
-                                  },
-                                }}
-                              >
-                                Remove from Batch
-                              </Button>
-                            </Box>
-                          </Box>
-
-                          {/* Batch History Table */}
-                          <TableContainer>
-                            <Table size="small">
-                              <TableHead>
-                                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                                  <TableCell sx={{ fontWeight: 600 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <span
-                                        onClick={(e) => handleBatchHistorySortClick(e, 'batchId')}
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                      >
-                                        Batch ID
-                                      </span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => handleBatchHistoryFilterClick(e, 'batchId')}
-                                        sx={{
-                                          padding: 0.5,
-                                          color:
-                                            batchHistoryColumnFilters.batchId?.length > 0
-                                              ? '#1976d2'
-                                              : '#666',
-                                        }}
-                                      >
-                                        <FilterListIcon fontSize="small" />
-                                      </IconButton>
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <span
-                                        onClick={(e) => handleBatchHistorySortClick(e, 'batchDate')}
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                      >
-                                        Batch Date
-                                      </span>
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <span
-                                        onClick={(e) =>
-                                          handleBatchHistorySortClick(e, 'batchRequestStatus')
-                                        }
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                      >
-                                        Batch Request Status
-                                      </span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) =>
-                                          handleBatchHistoryFilterClick(e, 'batchRequestStatus')
-                                        }
-                                        sx={{
-                                          padding: 0.5,
-                                          color:
-                                            batchHistoryColumnFilters.batchRequestStatus?.length > 0
-                                              ? '#1976d2'
-                                              : '#666',
-                                        }}
-                                      >
-                                        <FilterListIcon fontSize="small" />
-                                      </IconButton>
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <span
-                                        onClick={(e) =>
-                                          handleBatchHistorySortClick(e, 'transactionType')
-                                        }
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                      >
-                                        Transaction Type
-                                      </span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) =>
-                                          handleBatchHistoryFilterClick(e, 'transactionType')
-                                        }
-                                        sx={{
-                                          padding: 0.5,
-                                          color:
-                                            batchHistoryColumnFilters.transactionType?.length > 0
-                                              ? '#1976d2'
-                                              : '#666',
-                                        }}
-                                      >
-                                        <FilterListIcon fontSize="small" />
-                                      </IconButton>
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <span
-                                        onClick={(e) =>
-                                          handleBatchHistorySortClick(e, 'effectiveDate')
-                                        }
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                      >
-                                        Effective Date
-                                      </span>
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <span
-                                        onClick={(e) =>
-                                          handleBatchHistorySortClick(e, 'batchDetailStatus')
-                                        }
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                      >
-                                        Batch Detail Status
-                                      </span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) =>
-                                          handleBatchHistoryFilterClick(e, 'batchDetailStatus')
-                                        }
-                                        sx={{
-                                          padding: 0.5,
-                                          color:
-                                            batchHistoryColumnFilters.batchDetailStatus?.length > 0
-                                              ? '#1976d2'
-                                              : '#666',
-                                        }}
-                                      >
-                                        <FilterListIcon fontSize="small" />
-                                      </IconButton>
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <span
-                                        onClick={(e) =>
-                                          handleBatchHistorySortClick(e, 'systemComments')
-                                        }
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                      >
-                                        System Comments
-                                      </span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) =>
-                                          handleBatchHistoryFilterClick(e, 'systemComments')
-                                        }
-                                        sx={{
-                                          padding: 0.5,
-                                          color:
-                                            batchHistoryColumnFilters.systemComments?.length > 0
-                                              ? '#1976d2'
-                                              : '#666',
-                                        }}
-                                      >
-                                        <FilterListIcon fontSize="small" />
-                                      </IconButton>
-                                    </Box>
-                                  </TableCell>
-                                </TableRow>
-                              </TableHead>
-                              <TableBody>
-                                {loadingBatchHistory ? (
-                                  <TableRow>
-                                    <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                                      <Typography variant="body2" color="text.secondary">
-                                        Loading batch history...
-                                      </Typography>
-                                    </TableCell>
-                                  </TableRow>
-                                ) : filteredBatchHistory.length === 0 ? (
-                                  <TableRow>
-                                    <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                                      <Typography variant="body2" color="text.secondary">
-                                        {selectedChild
-                                          ? 'No batch history found for this contact'
-                                          : 'Select a contact to view batch history'}
-                                      </Typography>
-                                    </TableCell>
-                                  </TableRow>
-                                ) : (
-                                  paginatedBatchHistory.map((row) => (
-                                    <TableRow
-                                      key={row.id}
-                                      hover
-                                      onClick={() => handleBatchHistoryRowClick(row.id)}
-                                      selected={selectedBatchHistoryId === row.id}
-                                      sx={{
-                                        '&:hover': { backgroundColor: '#f9f9f9' },
-                                        cursor: 'pointer',
-                                        '&.Mui-selected': {
-                                          backgroundColor: '#e3f2fd !important',
-                                        },
-                                        '&.Mui-selected:hover': {
-                                          backgroundColor: '#bbdefb !important',
-                                        },
-                                      }}
-                                    >
-                                      <TableCell sx={{ color: '#1976d2', cursor: 'pointer' }}>
-                                        {row.batchId}
-                                      </TableCell>
-                                      <TableCell
-                                        sx={{
-                                          whiteSpace: 'nowrap',
-                                          overflowWrap: 'normal',
-                                          wordBreak: 'keep-all',
-                                        }}
-                                      >
-                                        {row.batchDate}
-                                      </TableCell>
-                                      <TableCell>
-                                        {row.batchRequestStatus === 'Pending' && (
-                                          <Box
-                                            component="span"
-                                            sx={{
-                                              backgroundColor: '#fce4ec',
-                                              color: '#c2185b',
-                                              px: 1.5,
-                                              py: 0.5,
-                                              borderRadius: 1,
-                                              fontSize: '0.75rem',
-                                              fontWeight: 500,
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                            }}
-                                          >
-                                            Pending
-                                          </Box>
-                                        )}
-                                        {row.batchRequestStatus !== 'Pending' &&
-                                          row.batchRequestStatus}
-                                      </TableCell>
-                                      <TableCell>{row.transactionType}</TableCell>
-                                      <TableCell
-                                        sx={{
-                                          whiteSpace: 'nowrap',
-                                          overflowWrap: 'normal',
-                                          wordBreak: 'keep-all',
-                                        }}
-                                      >
-                                        {row.effectiveDate}
-                                      </TableCell>
-                                      <TableCell>{row.batchDetailStatus}</TableCell>
-                                      <TableCell>{row.systemComments}</TableCell>
-                                    </TableRow>
-                                  ))
-                                )}
-                              </TableBody>
-                            </Table>
-                          </TableContainer>
-                          {/* Batch History Pagination */}
-                          {filteredBatchHistory.length > 0 && (
-                            <Box
-                              sx={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                mt: 2,
-                                px: 2,
-                                pb: 2,
-                              }}
-                            >
-                              <Typography variant="body2" color="text.secondary">
-                                Showing {paginatedBatchHistory.length} of{' '}
-                                {filteredBatchHistory.length} records
-                              </Typography>
-                              <Pagination
-                                count={batchHistoryTotalPages}
-                                page={batchHistoryPage}
-                                onChange={(_, page) => setBatchHistoryPage(page)}
-                                color="primary"
-                                showFirstButton
-                                showLastButton
-                              />
-                            </Box>
-                          )}
-                        </Box>
-                      )}
-                    </Paper>
-                  </Box>
-                )}
-
-                {/* Audit Trail Section */}
-                {selectedChild !== null && (
-                  <Box sx={{ mt: 3 }}>
-                    <Paper sx={{ p: 0, overflow: 'hidden' }}>
-                      <Box
-                        onClick={() => setIsAuditTrailExpanded((prev) => !prev)}
-                        sx={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          px: 3,
-                          py: 2,
-                          backgroundColor: '#f5f5f5',
-                          borderBottom: isAuditTrailExpanded ? '1px solid #e0e0e0' : 'none',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography
-                            variant="h6"
-                            sx={{
-                              fontWeight: 500,
-                              ...(contactAuditTrail.length === 0 && {
-                                fontStyle: 'italic',
-                                color: '#999',
-                              }),
-                            }}
-                          >
-                            CSA Audit Trail ({contactAuditTrail.length})
-                          </Typography>
-                          <Tooltip
-                            title="Audit entries for selected fields on this contact. Most recent updates appear first."
-                            arrow
-                          >
-                            <IconButton
-                              size="small"
-                              sx={{ padding: 0.5 }}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#666' }}>
-                          <Typography variant="body2">
-                            {isAuditTrailExpanded ? 'Collapse' : 'Expand'}
-                          </Typography>
-                          {isAuditTrailExpanded ? (
-                            <ArrowUpwardIcon fontSize="small" />
-                          ) : (
-                            <ArrowDownwardIcon fontSize="small" />
-                          )}
-                        </Box>
-                      </Box>
-
-                      {isAuditTrailExpanded && (
-                        <Box sx={{ p: 3 }}>
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              justifyContent: 'flex-end',
-                              alignItems: 'center',
-                              mb: 3,
-                              borderBottom: '1px solid #e0e0e0',
-                              pb: 2,
-                            }}
-                          >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                              <TextField
-                                size="small"
-                                placeholder="Search audit trail..."
-                                value={auditTrailSearchTerm}
-                                onChange={(e) => setAuditTrailSearchTerm(e.target.value)}
-                                InputProps={{
-                                  startAdornment: (
-                                    <InputAdornment position="start">
-                                      <Box component="span" sx={{ fontSize: '18px' }}>
-                                        🔍
-                                      </Box>
-                                    </InputAdornment>
-                                  ),
-                                  endAdornment: auditTrailSearchTerm && (
-                                    <InputAdornment position="end">
-                                      <IconButton
-                                        size="small"
-                                        onClick={() => setAuditTrailSearchTerm('')}
-                                        edge="end"
-                                      >
-                                        <CloseIcon fontSize="small" />
-                                      </IconButton>
-                                    </InputAdornment>
-                                  ),
-                                }}
-                                sx={{ width: '300px' }}
-                              />
-                              <Tooltip title="Clear all filters and sorting" arrow>
-                                <span>
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    startIcon={<FilterAltOffIcon />}
-                                    disabled={
-                                      !auditTrailSearchTerm &&
-                                      !auditTrailSortConfig &&
-                                      Object.values(auditTrailColumnFilters).every(
-                                        (arr) => arr.length === 0,
-                                      )
-                                    }
-                                    onClick={() => {
-                                      setAuditTrailSearchTerm('')
-                                      setAuditTrailColumnFilters({
-                                        actionedBy: [],
-                                        operation: [],
-                                        field: [],
-                                        oldValue: [],
-                                        newValue: [],
-                                      })
-                                      setAuditTrailSortConfig(null)
-                                      setAuditTrailPage(1)
-                                    }}
-                                    sx={{
-                                      textTransform: 'none',
-                                      minWidth: 'auto',
-                                      '&.Mui-disabled': {
-                                        opacity: 0.5,
-                                      },
-                                    }}
-                                  >
-                                    Clear Filters
-                                  </Button>
-                                </span>
-                              </Tooltip>
-                            </Box>
-                          </Box>
-
-                          {/* Audit Trail Table */}
-                          <TableContainer>
-                            <Table size="small">
-                              <TableHead>
-                                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                                  <TableCell sx={{ fontWeight: 600 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <span
-                                        onClick={(e) => handleAuditTrailSortClick(e, 'date')}
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                      >
-                                        Date
-                                      </span>
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <span
-                                        onClick={(e) => handleAuditTrailSortClick(e, 'actionedBy')}
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                      >
-                                        Actioned By
-                                      </span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) =>
-                                          handleAuditTrailFilterClick(e, 'actionedBy')
-                                        }
-                                        sx={{
-                                          padding: 0.5,
-                                          color:
-                                            auditTrailColumnFilters.actionedBy?.length > 0
-                                              ? '#1976d2'
-                                              : '#666',
-                                        }}
-                                      >
-                                        <FilterListIcon fontSize="small" />
-                                      </IconButton>
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <span
-                                        onClick={(e) => handleAuditTrailSortClick(e, 'operation')}
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                      >
-                                        Operation
-                                      </span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => handleAuditTrailFilterClick(e, 'operation')}
-                                        sx={{
-                                          padding: 0.5,
-                                          color:
-                                            auditTrailColumnFilters.operation?.length > 0
-                                              ? '#1976d2'
-                                              : '#666',
-                                        }}
-                                      >
-                                        <FilterListIcon fontSize="small" />
-                                      </IconButton>
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <span
-                                        onClick={(e) => handleAuditTrailSortClick(e, 'field')}
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                      >
-                                        Field
-                                      </span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => handleAuditTrailFilterClick(e, 'field')}
-                                        sx={{
-                                          padding: 0.5,
-                                          color:
-                                            auditTrailColumnFilters.field?.length > 0
-                                              ? '#1976d2'
-                                              : '#666',
-                                        }}
-                                      >
-                                        <FilterListIcon fontSize="small" />
-                                      </IconButton>
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <span
-                                        onClick={(e) => handleAuditTrailSortClick(e, 'oldValue')}
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                      >
-                                        Old Value
-                                      </span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => handleAuditTrailFilterClick(e, 'oldValue')}
-                                        sx={{
-                                          padding: 0.5,
-                                          color:
-                                            auditTrailColumnFilters.oldValue?.length > 0
-                                              ? '#1976d2'
-                                              : '#666',
-                                        }}
-                                      >
-                                        <FilterListIcon fontSize="small" />
-                                      </IconButton>
-                                    </Box>
-                                  </TableCell>
-                                  <TableCell sx={{ fontWeight: 600 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <span
-                                        onClick={(e) => handleAuditTrailSortClick(e, 'newValue')}
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                      >
-                                        New Value
-                                      </span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => handleAuditTrailFilterClick(e, 'newValue')}
-                                        sx={{
-                                          padding: 0.5,
-                                          color:
-                                            auditTrailColumnFilters.newValue?.length > 0
-                                              ? '#1976d2'
-                                              : '#666',
-                                        }}
-                                      >
-                                        <FilterListIcon fontSize="small" />
-                                      </IconButton>
-                                    </Box>
-                                  </TableCell>
-                                </TableRow>
-                              </TableHead>
-                              <TableBody>
-                                {loadingAuditTrail ? (
-                                  <TableRow>
-                                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                                      <Typography variant="body2" color="text.secondary">
-                                        Loading audit trail...
-                                      </Typography>
-                                    </TableCell>
-                                  </TableRow>
-                                ) : filteredAuditTrail.length === 0 ? (
-                                  <TableRow>
-                                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                                      <Typography variant="body2" color="text.secondary">
-                                        {selectedChild
-                                          ? 'No audit trail found for this contact'
-                                          : 'Select a contact to view audit trail'}
-                                      </Typography>
-                                    </TableCell>
-                                  </TableRow>
-                                ) : (
-                                  paginatedAuditTrail.map((row) => (
-                                    <TableRow
-                                      key={row.id}
-                                      hover
-                                      sx={{ '&:hover': { backgroundColor: '#f9f9f9' } }}
-                                    >
-                                      <TableCell>{row.date}</TableCell>
-                                      <TableCell>{row.actionedBy}</TableCell>
-                                      <TableCell>{row.operation}</TableCell>
-                                      <TableCell>{row.field}</TableCell>
-                                      <TableCell>{row.oldValue}</TableCell>
-                                      <TableCell>{row.newValue}</TableCell>
-                                    </TableRow>
-                                  ))
-                                )}
-                              </TableBody>
-                            </Table>
-                          </TableContainer>
-
-                          {/* Audit Trail Pagination */}
-                          {filteredAuditTrail.length > 0 && (
-                            <Box
-                              sx={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                mt: 2,
-                                px: 2,
-                                pb: 2,
-                              }}
-                            >
-                              <Typography variant="body2" color="text.secondary">
-                                Showing {paginatedAuditTrail.length} of {filteredAuditTrail.length}{' '}
-                                records
-                              </Typography>
-                              <Pagination
-                                count={auditTrailTotalPages}
-                                page={auditTrailPage}
-                                onChange={(_, page) => setAuditTrailPage(page)}
-                                color="primary"
-                                showFirstButton
-                                showLastButton
-                              />
-                            </Box>
-                          )}
-                        </Box>
-                      )}
-                    </Paper>
-                  </Box>
-                )}
+                      sx={{ padding: 0.5 }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#666' }}>
+                  <Typography variant="body2">
+                    {isAuditTrailExpanded ? 'Collapse' : 'Expand'}
+                  </Typography>
+                  {isAuditTrailExpanded ? (
+                    <ArrowUpwardIcon fontSize="small" />
+                  ) : (
+                    <ArrowDownwardIcon fontSize="small" />
+                  )}
+                </Box>
               </Box>
 
+              {isAuditTrailExpanded && (
+                <Box sx={{ p: 3 }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      alignItems: 'center',
+                      mb: 3,
+                      borderBottom: '1px solid #e0e0e0',
+                      pb: 2,
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <TextField
+                        size="small"
+                        placeholder="Search audit trail..."
+                        value={auditTrailSearchTerm}
+                        onChange={(e) => setAuditTrailSearchTerm(e.target.value)}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Box component="span" sx={{ fontSize: '18px' }}>
+                                🔍
+                              </Box>
+                            </InputAdornment>
+                          ),
+                          endAdornment: auditTrailSearchTerm && (
+                            <InputAdornment position="end">
+                              <IconButton
+                                size="small"
+                                onClick={() => setAuditTrailSearchTerm('')}
+                                edge="end"
+                              >
+                                <CloseIcon fontSize="small" />
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{ width: '300px' }}
+                      />
+                      <Tooltip title="Clear all filters and sorting" arrow>
+                        <span>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<FilterAltOffIcon />}
+                            disabled={
+                              !auditTrailSearchTerm &&
+                              !auditTrailSortConfig &&
+                              Object.values(auditTrailColumnFilters).every(
+                                (arr) => arr.length === 0,
+                              )
+                            }
+                            onClick={() => {
+                              setAuditTrailSearchTerm('')
+                              setAuditTrailColumnFilters({
+                                actionedBy: [],
+                                operation: [],
+                                field: [],
+                                oldValue: [],
+                                newValue: [],
+                              })
+                              setAuditTrailSortConfig(null)
+                              setAuditTrailPage(1)
+                            }}
+                            sx={{
+                              textTransform: 'none',
+                              minWidth: 'auto',
+                              '&.Mui-disabled': {
+                                opacity: 0.5,
+                              },
+                            }}
+                          >
+                            Clear Filters
+                          </Button>
+                        </span>
+                      </Tooltip>
+                    </Box>
+                  </Box>
 
+                  {/* Audit Trail Table */}
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleAuditTrailSortClick(e, 'date')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Date
+                              </span>
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleAuditTrailSortClick(e, 'actionedBy')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Actioned By
+                              </span>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleAuditTrailFilterClick(e, 'actionedBy')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    auditTrailColumnFilters.actionedBy?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleAuditTrailSortClick(e, 'operation')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Operation
+                              </span>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleAuditTrailFilterClick(e, 'operation')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    auditTrailColumnFilters.operation?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleAuditTrailSortClick(e, 'field')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Field
+                              </span>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleAuditTrailFilterClick(e, 'field')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    auditTrailColumnFilters.field?.length > 0 ? '#1976d2' : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleAuditTrailSortClick(e, 'oldValue')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Old Value
+                              </span>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleAuditTrailFilterClick(e, 'oldValue')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    auditTrailColumnFilters.oldValue?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <span
+                                onClick={(e) => handleAuditTrailSortClick(e, 'newValue')}
+                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                New Value
+                              </span>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleAuditTrailFilterClick(e, 'newValue')}
+                                sx={{
+                                  padding: 0.5,
+                                  color:
+                                    auditTrailColumnFilters.newValue?.length > 0
+                                      ? '#1976d2'
+                                      : '#666',
+                                }}
+                              >
+                                <FilterListIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {loadingAuditTrail ? (
+                          <TableRow>
+                            <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                              <Typography variant="body2" color="text.secondary">
+                                Loading audit trail...
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ) : filteredAuditTrail.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                              <Typography variant="body2" color="text.secondary">
+                                {selectedChild
+                                  ? 'No audit trail found for this contact'
+                                  : 'Select a contact to view audit trail'}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          paginatedAuditTrail.map((row) => (
+                            <TableRow
+                              key={row.id}
+                              hover
+                              sx={{ '&:hover': { backgroundColor: '#f9f9f9' } }}
+                            >
+                              <TableCell>{row.date}</TableCell>
+                              <TableCell>{row.actionedBy}</TableCell>
+                              <TableCell>{row.operation}</TableCell>
+                              <TableCell>{row.field}</TableCell>
+                              <TableCell>{row.oldValue}</TableCell>
+                              <TableCell>{row.newValue}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+
+                  {/* Audit Trail Pagination */}
+                  {filteredAuditTrail.length > 0 && (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mt: 2,
+                        px: 2,
+                        pb: 2,
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        Showing {paginatedAuditTrail.length} of {filteredAuditTrail.length} records
+                      </Typography>
+                      <Pagination
+                        count={auditTrailTotalPages}
+                        page={auditTrailPage}
+                        onChange={(_, page) => setAuditTrailPage(page)}
+                        color="primary"
+                        showFirstButton
+                        showLastButton
+                      />
+                    </Box>
+                  )}
+                </Box>
+              )}
+            </Paper>
+          </Box>
+        )}
+      </Box>
 
       {/* Confirmation Dialog for Run Eligibility on All Contacts */}
       {/* Confirmation Dialog for Run Eligibility on All Contacts */}

@@ -63,6 +63,7 @@ import {
 } from './utils/dq-contact'
 import { getRuntimeConfig } from './config/keycloak.config'
 import { useAuth } from './context/AuthContext'
+import { useCsaCapabilities } from './hooks/useCsaCapabilities'
 import logo from './icons/image.png'
 import {
   addContactsToBatch,
@@ -331,7 +332,7 @@ function App() {
 
   // User is authenticated when Keycloak auth is complete and has CSA access
   const isAuthenticated = !isLoading && keycloakAuthenticated && hasCSAAccess === true
-  const isDataQualitySteward = user?.userProfile === 'DATA_QUALITY_STEWARD'
+  const capabilities = useCsaCapabilities()
 
   const [selectedTab, setSelectedTab] = useState(0)
   const [selected, setSelected] = useState<number[]>([])
@@ -461,16 +462,16 @@ function App() {
 
   // Fetch last successful job runs on mount
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && capabilities.canViewJobRunSummary) {
       getLastSuccessfulRuns()
         .then(setLastSuccessfulRuns)
         .catch((err) => console.error('Failed to fetch last successful runs:', err))
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, capabilities.canViewJobRunSummary])
 
   // Check for running eligibility job on page load and resume monitoring
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated || !capabilities.canMonitorBackgroundJobs) return
 
     const checkAndResumeRunningJob = async () => {
       try {
@@ -541,11 +542,13 @@ function App() {
     }
 
     checkAndResumeRunningJob()
-  }, [isAuthenticated])
+  }, [isAuthenticated, capabilities.canMonitorBackgroundJobs])
 
   // Helper function to check for running eligibility job before data modifications
   // Returns true if a job is running (action should be blocked), false otherwise
   const checkAndHandleRunningEligibilityJob = async (): Promise<boolean> => {
+    if (!capabilities.canMonitorBackgroundJobs) return false
+
     try {
       const runningJob = await getRunningEligibilityJob()
       if (runningJob) {
@@ -678,7 +681,7 @@ function App() {
   }, [selectedBatch])
 
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated || !capabilities.canAccessBatches) return
 
     const checkAndResumeRunningSendCraFileJob = async () => {
       try {
@@ -754,12 +757,14 @@ function App() {
     }
 
     checkAndResumeRunningSendCraFileJob()
-  }, [isAuthenticated, getBatchNumberLabel, refreshBatchRequestsAfterSendCra])
+  }, [isAuthenticated, capabilities.canAccessBatches, getBatchNumberLabel, refreshBatchRequestsAfterSendCra])
 
   // Helper function to check for running Send CRA file job before new operations
   // Prevents conflicting Send CRA operations and waits for completion
   // Returns true if a job is running (action should be blocked), false otherwise
   const checkAndHandleRunningSendCraFileJob = async (): Promise<boolean> => {
+    if (!capabilities.canAccessBatches) return false
+
     try {
       const runningJob = await getRunningSendCraFileJob()
       if (runningJob) {
@@ -1527,7 +1532,7 @@ function App() {
   // Fetch batches when component mounts
   useEffect(() => {
     const fetchBatches = async () => {
-      if (!isAuthenticated) return
+      if (!isAuthenticated || !capabilities.canAccessBatches) return
 
       setLoadingBatches(true)
       try {
@@ -1564,7 +1569,7 @@ function App() {
     }
 
     fetchBatches()
-  }, [isAuthenticated])
+  }, [isAuthenticated, capabilities.canAccessBatches])
 
   const clearSelectedChildContext = (forgetRememberedSelection: boolean = false) => {
     setSelectedChild(null)
@@ -1600,8 +1605,16 @@ function App() {
   }
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    if (!capabilities.canAccessBatches && newValue !== 0) return
     setSelectedTab(newValue)
   }
+
+  // Non-standard profiles only have the Eligibility tab — reset if another tab was selected earlier
+  useEffect(() => {
+    if (!capabilities.canAccessBatches && selectedTab !== 0) {
+      setSelectedTab(0)
+    }
+  }, [capabilities.canAccessBatches, selectedTab])
 
   // Logout handler
   const handleLogout = () => {
@@ -2498,17 +2511,26 @@ function App() {
     setIsBatchHistoryExpanded(false)
     setIsAuditTrailExpanded(false)
     setRememberedChildId(contactId)
-    setLoadingBatchHistory(true)
     setLoadingAuditTrail(true)
     setSelectedBatchHistoryId(null) // Clear batch history selection when changing contacts
 
+    if (capabilities.canViewContactBatchHistory) {
+      setLoadingBatchHistory(true)
+    }
+
     try {
-      const [batchHistory, auditTrailResponse] = await Promise.all([
-        getContactBatches(contactId),
-        getContactAuditTrail(contactId),
-      ])
-      setContactBatchHistory(batchHistory)
-      setContactAuditTrail(auditTrailResponse.data)
+      if (!capabilities.canViewContactBatchHistory) {
+        const auditTrailResponse = await getContactAuditTrail(contactId)
+        setContactBatchHistory([])
+        setContactAuditTrail(auditTrailResponse.data)
+      } else {
+        const [batchHistory, auditTrailResponse] = await Promise.all([
+          getContactBatches(contactId),
+          getContactAuditTrail(contactId),
+        ])
+        setContactBatchHistory(batchHistory)
+        setContactAuditTrail(auditTrailResponse.data)
+      }
     } catch (error) {
       console.error('Failed to fetch contact history data:', error)
       setContactBatchHistory([])
@@ -3104,7 +3126,7 @@ function App() {
   }, [selectedChild, filteredData])
 
   useEffect(() => {
-    if (selectedChild !== null || rememberedChildId === null) return
+    if (!capabilities.canViewContactBatchHistory || selectedChild !== null || rememberedChildId === null) return
 
     const shouldRestore = filteredData.some((child) => child.id === rememberedChildId)
     if (!shouldRestore) return
@@ -3133,7 +3155,7 @@ function App() {
     }
 
     restoreSelectedChildContext()
-  }, [selectedChild, rememberedChildId, filteredData])
+  }, [capabilities.canViewContactBatchHistory, selectedChild, rememberedChildId, filteredData])
 
   // Check if all selected records have valid CSA status for Hold/Resume
   const canHoldResume = useMemo(() => {
@@ -3272,11 +3294,11 @@ function App() {
 
   // DQ update/delete is enabled only for a single selected, non-protected record.
   const canDqModifySelected = useMemo(() => {
-    if (!isDataQualitySteward || selected.length !== 1) return false
+    if (!capabilities.canEditContacts || selected.length !== 1) return false
     const cached = selectedRecordsCache.get(selected[0])
     if (!cached) return false
-    return canDqModifyRecord(isDataQualitySteward, selected.length, cached.csaStatusRaw)
-  }, [isDataQualitySteward, selected, selectedRecordsCache])
+    return canDqModifyRecord(capabilities.canEditContacts, selected.length, cached.csaStatusRaw)
+  }, [capabilities.canEditContacts, selected, selectedRecordsCache])
 
   const handleDqUpdateClick = () => {
     if (!canDqModifySelected) return
@@ -3979,28 +4001,30 @@ function App() {
               }}
             >
               <Tab label="Eligibility List" />
-              {!isDataQualitySteward && <Tab label="Batch Requests" />}
-              {!isDataQualitySteward && <Tab label="Weekly File Processing" />}
-              {!isDataQualitySteward && <Tab label="Job Monitoring" />}
+              {capabilities.canAccessBatches && <Tab label="Batch Requests" />}
+              {capabilities.canAccessWeeklyFiles && <Tab label="Weekly File Processing" />}
+              {capabilities.canAccessJobMonitoring && <Tab label="Job Monitoring" />}
             </Tabs>
 
             {/* Last Successful Runs Info */}
-            <Box
-              sx={{
-                padding: '6px 12px',
-                mr: 2,
-                textAlign: 'left',
-                border: '1px solid #666',
-                borderRadius: '4px',
-              }}
-            >
-              <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
-                Last Data Fetch: {formatJobTimestamp(lastSuccessfulRuns.lastDataIngestion)}
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
-                Last Eligibility Run: {formatJobTimestamp(lastSuccessfulRuns.lastEligibilityRun)}
-              </Typography>
-            </Box>
+            {capabilities.canViewJobRunSummary && (
+              <Box
+                sx={{
+                  padding: '6px 12px',
+                  mr: 2,
+                  textAlign: 'left',
+                  border: '1px solid #666',
+                  borderRadius: '4px',
+                }}
+              >
+                <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
+                  Last Data Fetch: {formatJobTimestamp(lastSuccessfulRuns.lastDataIngestion)}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
+                  Last Eligibility Run: {formatJobTimestamp(lastSuccessfulRuns.lastEligibilityRun)}
+                </Typography>
+              </Box>
+            )}
           </Box>
 
           {/* Content Section */}
@@ -4075,7 +4099,7 @@ function App() {
                         </MenuItem>
                       </Select>
                     </FormControl>
-                    {isDataQualitySteward && dqEditableRecordId !== null && (
+                    {capabilities.canEditContacts && dqEditableRecordId !== null && (
                       <>
                         {hasDqChanges && (
                           <Button
@@ -4098,7 +4122,7 @@ function App() {
                         </Button>
                       </>
                     )}
-                    {isDataQualitySteward && dqEditableRecordId === null && (
+                    {capabilities.canEditContacts && dqEditableRecordId === null && (
                       <>
                         <Button
                           variant="outlined"
@@ -4121,7 +4145,7 @@ function App() {
                         </Button>
                       </>
                     )}
-                    {!isDataQualitySteward && (
+                    {capabilities.canManageContacts && (
                       <>
                         <Tooltip title="Clear all column filters and sorting" arrow>
                           <span>
@@ -4380,23 +4404,23 @@ function App() {
                           >
                             <Checkbox
                               disabled={
-                                isDataQualitySteward ||
+                                capabilities.canEditContacts ||
                                 isRunningEligibilityAll ||
                                 isRunningAutoBatch
                               }
                               indeterminate={
-                                !isDataQualitySteward &&
+                                !capabilities.canEditContacts &&
                                 selected.length > 0 &&
                                 selected.length < filteredData.length &&
                                 filteredData.some((row) => selected.includes(row.id))
                               }
                               checked={
-                                !isDataQualitySteward &&
+                                !capabilities.canEditContacts &&
                                 filteredData.length > 0 &&
                                 filteredData.every((row) => selected.includes(row.id))
                               }
                               onChange={(e) => {
-                                if (isDataQualitySteward) return
+                                if (capabilities.canEditContacts) return
                                 if (e.target.checked) {
                                   // Select all rows on current page
                                   setSelected((prev) => {
@@ -4805,14 +4829,14 @@ function App() {
                                     return newCache
                                   })
                                 } else {
-                                  if (isDataQualitySteward && dqEditableRecordId !== null) {
+                                  if (capabilities.canEditContacts && dqEditableRecordId !== null) {
                                     setDqEditableRecordId(null)
                                   }
                                   setSelected((prev) =>
-                                    isDataQualitySteward ? [row.id] : [...prev, row.id],
+                                    capabilities.canEditContacts ? [row.id] : [...prev, row.id],
                                   )
                                   setSelectedRecordsCache((prev) => {
-                                    const newCache = isDataQualitySteward
+                                    const newCache = capabilities.canEditContacts
                                       ? new Map()
                                       : new Map(prev)
                                     newCache.set(row.id, {
@@ -4841,7 +4865,7 @@ function App() {
                             {row.dob}
                           </TableCell>
                           <TableCell>
-                            {isDataQualitySteward && dqEditableRecordId === row.id ? (
+                            {capabilities.canEditContacts && dqEditableRecordId === row.id ? (
                               <TextField
                                 size="small"
                                 value={dqEditValues.din}
@@ -4866,7 +4890,7 @@ function App() {
                             )}
                           </TableCell>
                           <TableCell>
-                            {isDataQualitySteward && dqEditableRecordId === row.id ? (
+                            {capabilities.canEditContacts && dqEditableRecordId === row.id ? (
                               <FormControl size="small" sx={{ minWidth: 160 }}>
                                 <Select
                                   value={dqEditValues.csaStatusRaw}
@@ -4894,12 +4918,12 @@ function App() {
                             // bubble to the TableRow's onClick (handleContactClick) via the React tree —
                             // stop that here so navigating months doesn't get hijacked by a row click.
                             onClick={
-                              isDataQualitySteward && dqEditableRecordId === row.id
+                              capabilities.canEditContacts && dqEditableRecordId === row.id
                                 ? (e) => e.stopPropagation()
                                 : undefined
                             }
                           >
-                            {isDataQualitySteward && dqEditableRecordId === row.id ? (
+                            {capabilities.canEditContacts && dqEditableRecordId === row.id ? (
                               <LocalizationProvider dateAdapter={AdapterDateFns}>
                                 <DatePicker
                                   value={
@@ -5017,7 +5041,7 @@ function App() {
                               ) : (
                                 <Typography component="span" />
                               )}
-                              {row.csaStatusRaw === 'on_hold' && (
+                              {row.csaStatusRaw === 'on_hold' && capabilities.canManageContacts && (
                                 <Tooltip title="Edit hold reason">
                                   <IconButton
                                     size="small"
@@ -5037,7 +5061,7 @@ function App() {
                                   </IconButton>
                                 </Tooltip>
                               )}
-                              {row.csaStatusRaw !== 'on_hold' && row.holdReason && (
+                              {row.csaStatusRaw !== 'on_hold' && row.holdReason && capabilities.canManageContacts && (
                                 <Tooltip title="Clear hold reason">
                                   <IconButton
                                     size="small"
@@ -5058,7 +5082,7 @@ function App() {
                             </Box>
                           </TableCell>
                           <TableCell align="center">
-                            {row.needsReview && (
+                            {row.needsReview && capabilities.canManageContacts && (
                               <Tooltip title="Click to clear review flag">
                                 <IconButton
                                   size="small"
@@ -6845,7 +6869,7 @@ function App() {
                   })()}
 
                 {/* Batch History Section */}
-                {!isDataQualitySteward && selectedChild !== null && (
+                {capabilities.canViewContactBatchHistory && selectedChild !== null && (
                   <Box sx={{ mt: 3 }}>
                     <Paper sx={{ p: 0, overflow: 'hidden' }}>
                       <Box
@@ -7626,7 +7650,7 @@ function App() {
                 )}
               </Box>
             )}
-            {!isDataQualitySteward && selectedTab === 1 && (
+            {capabilities.canAccessBatches && selectedTab === 1 && (
               <Box>
                 {/* Batch Requests Header */}
                 <Box
@@ -8406,8 +8430,8 @@ function App() {
               </Box>
             )}
 
-            {!isDataQualitySteward && selectedTab === 2 && <WeeklyFileProcessingTab />}
-            {!isDataQualitySteward && selectedTab === 3 && <JobMonitoringTab />}
+            {capabilities.canAccessWeeklyFiles && selectedTab === 2 && <WeeklyFileProcessingTab />}
+            {capabilities.canAccessJobMonitoring && selectedTab === 3 && <JobMonitoringTab />}
           </Box>
 
           {/* Sort and Filter Menus - Outside tabs so they're always available */}

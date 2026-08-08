@@ -31,13 +31,13 @@ export function isDqProtectedStatus(csaStatusRaw: string | undefined | null): bo
   return csaStatusRaw != null && DQ_PROTECTED_STATUSES.has(csaStatusRaw)
 }
 
-/** DQ update/delete requires steward role, exactly one selection, and a non-protected status. */
+/** DQ update/delete requires edit capability, exactly one selection, and a non-protected status. */
 export function canDqModifyRecord(
-  isDataQualitySteward: boolean,
+  canEditContacts: boolean,
   selectedCount: number,
   csaStatusRaw: string | undefined,
 ): boolean {
-  if (!isDataQualitySteward || selectedCount !== 1 || csaStatusRaw === undefined) {
+  if (!canEditContacts || selectedCount !== 1 || csaStatusRaw === undefined) {
     return false
   }
   return !isDqProtectedStatus(csaStatusRaw)

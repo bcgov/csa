@@ -17,6 +17,7 @@ From the repo root:
 
 ```bash
 make env      # copy .env.example files (first time only)
+make install  # npm install in backend + frontend
 make db       # Postgres, migrations, fixtures, seed
 make dev      # backend + frontend
 ```
@@ -27,21 +28,16 @@ With `DEPLOY_ENV=local`, ICM/MIS/CRA integrations read from `.local/storage/` (p
 
 **Local pipeline test (after `make db`):**
 
-1. App starts with **5 contacts** + matching **staging baseline** (last ingest/eligibility simulated Feb 2026)
-2. Run **Data Fetch** (Job Monitoring or `npm run job:data-ingestion`) → loads **5 new** ICM/MIS records (Aug 2026 fixtures)
-3. Run **Run Eligibility** → inserts the **5 new contacts**
+1. App starts with **32 contacts** + matching staging baseline
+2. `make data-fetch` → loads **10 new** ICM/MIS records
+3. `make run-eligibility` → **42 contacts** total
+4. Create a batch in the UI, send to CRA, then use `make generate-cra-response`, `make poll-cra-response`, `make generate-cra-wkl`, `make poll-cra-response` for the full flow
+
+See [backend/README.md](backend/README.md) and [frontend/README.md](frontend/README.md) for module layout and setup detail.
 
 ### Quick start (Windows)
 
-PowerShell from the repo root:
-
-```powershell
-.\scripts\local-dev.ps1 env
-.\scripts\local-dev.ps1 db
-.\scripts\local-dev.ps1 dev
-```
-
-Requires Docker Desktop and Node.js 24. See [frontend/README.md](frontend/README.md) and [backend/README.md](backend/README.md) for details.
+Use WSL or Git Bash with the same `make` targets above, or run steps manually — see [backend/README.md](backend/README.md) and [frontend/README.md](frontend/README.md).
 
 ### Environment summary
 
@@ -54,7 +50,7 @@ Requires Docker Desktop and Node.js 24. See [frontend/README.md](frontend/README
 | Frontend | `PORT` | `5173` | Vite dev server port |
 | Frontend | `BACKEND_URL` | `http://localhost:3000` | Vite proxy target |
 
-Copy `backend/.env.example` → `backend/.env` and `frontend/.env.example` → `frontend/.env` before first run (`make env` or `local-dev.ps1 env`).
+Copy `backend/.env.example` → `backend/.env` and `frontend/.env.example` → `frontend/.env` before first run (`make env`).
 
 ### More detail
 

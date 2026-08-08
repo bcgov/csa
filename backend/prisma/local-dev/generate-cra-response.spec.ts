@@ -18,7 +18,7 @@ describe('generateCraResponseFromOutbound', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cra-response-'))
     tempDirs.push(tempDir)
 
-    const outboundPath = path.join(tempDir, 'II.ACSAIN.TST0016.AAPL0001')
+    const outboundPath = path.join(tempDir, 'II.ACSAIN.TESTUSERID1.AAPL0001')
     fs.writeFileSync(
       outboundPath,
       [
@@ -36,7 +36,7 @@ describe('generateCraResponseFromOutbound', () => {
       outcome: 'accepted',
     })
 
-    expect(result.responseFile).toBe('TST0016.ARSP0001')
+    expect(result.responseFile).toBe('TESTUSERID1.ARSP0001')
     expect(result.detailCount).toBe(1)
 
     const parsed = new InboundResponseService().parseFile(result.responsePath)
@@ -50,7 +50,7 @@ describe('generateCraResponseFromOutbound', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cra-response-mixed-'))
     tempDirs.push(tempDir)
 
-    const outboundPath = path.join(tempDir, 'II.ACSAIN.TST0016.AAPL0001')
+    const outboundPath = path.join(tempDir, 'II.ACSAIN.TESTUSERID1.AAPL0001')
     fs.writeFileSync(
       outboundPath,
       [

@@ -26,6 +26,10 @@ describe('SyncModule', () => {
     process.env.ICM_TOKEN_URL = 'http://test-keycloak/token'
     process.env.ICM_CLIENT_ID = 'test-client'
     process.env.ICM_CLIENT_SECRET = 'test-secret'
+    process.env.ICM_CURSOR_LOOKBACK_DAYS = '2'
+    process.env.ELIGIBILITY_LOOKBACK_DAYS = '2'
+    process.env.ICM_REQUEST_TIMEOUT_MS = '30000'
+    process.env.MIS_S3_PREFIX = 'csas3/'
 
     module = await Test.createTestingModule({
       imports: [JobsModule, SyncModule],

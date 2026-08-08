@@ -19,7 +19,7 @@ describe('generateCraWklFromOutbound', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cra-wkl-'))
     tempDirs.push(tempDir)
 
-    const outboundPath = path.join(tempDir, 'II.ACSAIN.TST0016.AAPL0001')
+    const outboundPath = path.join(tempDir, 'II.ACSAIN.TESTUSERID1.AAPL0001')
     fs.writeFileSync(
       outboundPath,
       [
@@ -37,7 +37,7 @@ describe('generateCraWklFromOutbound', () => {
       outcome: 'approved',
     })
 
-    expect(result.weeklyFile).toBe('TST0016.AWKL0001')
+    expect(result.weeklyFile).toBe('TESTUSERID1.AWKL0001')
     expect(result.detailCount).toBe(1)
 
     const parsed = new InboundWeeklyResponseService().parseWeeklyResponseFile(result.weeklyPath)
@@ -54,7 +54,7 @@ describe('generateCraWklFromOutbound', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cra-wkl-rsp-'))
     tempDirs.push(tempDir)
 
-    const outboundPath = path.join(tempDir, 'II.ACSAIN.TST0016.AAPL0001')
+    const outboundPath = path.join(tempDir, 'II.ACSAIN.TESTUSERID1.AAPL0001')
     fs.writeFileSync(
       outboundPath,
       [
@@ -72,7 +72,7 @@ describe('generateCraWklFromOutbound', () => {
       outcome: 'accepted',
     })
 
-    const rspPath = path.join(inboundDir, 'TST0016.ARSP0001')
+    const rspPath = path.join(inboundDir, 'TESTUSERID1.ARSP0001')
     const rspContent = fs.readFileSync(rspPath, 'utf8')
     const rspDin = rspContent.split('\n')[1].slice(318, 327).trim()
 
@@ -90,7 +90,7 @@ describe('generateCraWklFromOutbound', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cra-wkl-mixed-'))
     tempDirs.push(tempDir)
 
-    const outboundPath = path.join(tempDir, 'II.ACSAIN.TST0016.AAPL0001')
+    const outboundPath = path.join(tempDir, 'II.ACSAIN.TESTUSERID1.AAPL0001')
     fs.writeFileSync(
       outboundPath,
       [

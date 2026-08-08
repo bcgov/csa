@@ -5,24 +5,27 @@ import { IcmApiConfig } from '../icm.config'
 import { IcmApiRecord, IcmContactUpdatePayload, IcmDataSource } from './icm-data-source'
 
 @Injectable()
-export class MockIcmDataSource extends IcmDataSource {
-  private readonly logger = new Logger(MockIcmDataSource.name)
+export class LocalIcmDataSource extends IcmDataSource {
+  private readonly logger = new Logger(LocalIcmDataSource.name)
+
+  constructor(private readonly basePath: string) {
+    super()
+  }
 
   async fetchAll(config: IcmApiConfig, lastUpdated?: Date): Promise<IcmApiRecord[]> {
-    const mockDir = path.join(__dirname, '..', '..', 'mock-data', 'icm')
-    const mockFile = path.join(mockDir, `${config.name}.json`)
+    const fixtureFile = path.join(this.basePath, `${config.name}.json`)
 
-    if (!fs.existsSync(mockFile)) {
-      this.logger.log(`Mock file not found for ${config.name}: ${mockFile}`)
+    if (!fs.existsSync(fixtureFile)) {
+      this.logger.log(`ICM fixture not found for ${config.name}: ${fixtureFile}`)
       return []
     }
 
-    const raw = fs.readFileSync(mockFile, 'utf-8')
+    const raw = fs.readFileSync(fixtureFile, 'utf-8')
     const parsed = JSON.parse(raw)
     const items: IcmApiRecord[] = parsed?.items ?? []
 
     if (!lastUpdated) {
-      this.logger.log(`Loaded ${items.length} mock records for ${config.name}`)
+      this.logger.log(`Loaded ${items.length} local ICM records for ${config.name}`)
       return items
     }
 
@@ -40,13 +43,13 @@ export class MockIcmDataSource extends IcmDataSource {
     })
 
     this.logger.log(
-      `Loaded ${filtered.length}/${items.length} mock records for ${config.name} (after ${lastUpdated.toISOString()})`,
+      `Loaded ${filtered.length}/${items.length} local ICM records for ${config.name} (after ${lastUpdated.toISOString()})`,
     )
     return filtered
   }
 
   async updateContacts(contacts: IcmContactUpdatePayload[]): Promise<void> {
-    this.logger.log(`Mock: would sync ${contacts.length} contacts to ICM`)
+    this.logger.log(`Local dev: would sync ${contacts.length} contacts to ICM`)
   }
 
   private parseIcmDate(dateStr: string): Date | null {

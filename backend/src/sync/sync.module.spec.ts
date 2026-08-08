@@ -18,7 +18,8 @@ describe('SyncModule', () => {
   let registry: JobRegistry
 
   beforeEach(async () => {
-    process.env.USE_MOCK_DATA = 'true'
+    process.env.DEPLOY_ENV = 'local'
+    process.env.FILE_STORAGE_PATH = '/tmp'
     process.env.ICM_API_URL = 'http://test-icm'
     process.env.ICM_TRUSTED_USERNAME = 'test-user'
     process.env.ICM_API_USERNAME = 'test-user'

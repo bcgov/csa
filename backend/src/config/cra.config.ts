@@ -1,23 +1,26 @@
 import { registerAs } from '@nestjs/config'
 
 export const craConfig = registerAs('cra', () => {
-  const craEnvironment = process.env.CRA_ENVIRONMENT
+  const deployEnv = process.env.DEPLOY_ENV || 'local'
+  const isLocal = deployEnv === 'local'
+
+  const craEnvironment = process.env.CRA_ENVIRONMENT || (isLocal ? 'test' : undefined)
   if (!craEnvironment) {
     throw new Error('CRA_ENVIRONMENT is required (set to "production" or "test")')
   }
 
-  const craUserId = process.env.CRA_USER_ID
+  const craUserId = process.env.CRA_USER_ID || (isLocal ? 'TST0016' : undefined)
   if (!craUserId) {
     throw new Error('CRA_USER_ID is required')
   }
 
-  const businessNum = process.env.CRA_BUSINESS_NUM
+  const businessNum = process.env.CRA_BUSINESS_NUM || (isLocal ? 'TESTBN000000001' : undefined)
   if (!businessNum) {
     throw new Error('CRA_BUSINESS_NUM is required')
   }
 
-  const lastSequenceNumber = process.env.CRA_LAST_SEQUENCE_NUMBER
-  if (!lastSequenceNumber && lastSequenceNumber !== '0') {
+  const lastSequenceNumber = process.env.CRA_LAST_SEQUENCE_NUMBER ?? (isLocal ? '0' : undefined)
+  if (lastSequenceNumber === undefined) {
     throw new Error('CRA_LAST_SEQUENCE_NUMBER is required')
   }
   const parsedSequenceNumber = parseInt(lastSequenceNumber, 10)

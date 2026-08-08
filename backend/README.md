@@ -29,11 +29,13 @@ NestJS Backend for the Child Special Allowance application.
    ```
 2. **Install dependencies:** `npm install`
 3. **Configure environment:** `cp .env.example .env`
-   - `DEPLOY_ENV=local` skips SSO/JWT verification for local development
+   - `DEPLOY_ENV=local` skips SSO/JWT and uses `.local/storage` for ICM/MIS/CRA integrations
    - `POSTGRES_PASSWORD=default` must match `docker-compose.yml`
 4. **Generate Prisma client:** `npx prisma generate`
-5. **Seed the database:** `make seed` (included automatically in `make db` and `make dev`)
+5. **Seed the database:** `make seed` (included in `make db`) — loads baseline staging via ingest, 5 linked contacts, batches, and incremental fixtures for the next data fetch
 6. **Start the development server:** `npm run start:dev`
+
+After seed, run **Data Fetch** then **Run Eligibility** from the UI (or `npm run job:data-ingestion` / `npm run job:run-eligibility`) to insert 5 new test contacts.
 
 Start the frontend separately from `frontend/` with `VITE_APP_ENV=LOCAL` in `frontend/.env`.
 

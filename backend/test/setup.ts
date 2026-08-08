@@ -1,9 +1,9 @@
 import { ConsoleLogger } from '@nestjs/common'
 import { winstonInstance } from 'src/common/logger/logger.config'
 
+process.env.DEPLOY_ENV = 'local'
 process.env.FILE_TRANSFER_SERVICE_URL = 'http://localhost:4000'
 process.env.FILE_STORAGE_PATH = '/tmp'
-process.env.USE_MOCK_DATA = 'true'
 process.env.CRA_ENVIRONMENT = 'test'
 process.env.CRA_USER_ID = 'TST0016'
 process.env.CRA_BUSINESS_NUM = 'TESTBN000000001'

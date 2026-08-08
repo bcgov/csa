@@ -17,11 +17,19 @@ From the repo root:
 
 ```bash
 make env      # copy .env.example files (first time only)
-make db       # Postgres, migrations, seed
+make db       # Postgres, migrations, fixtures, seed
 make dev      # backend + frontend
 ```
 
 Open **http://localhost:5173** (frontend). API: **http://localhost:3000/api**.
+
+With `DEPLOY_ENV=local`, ICM/MIS/CRA integrations read from `.local/storage/` (populated during `make db` seed). No MinIO or real ICM required for laptop dev.
+
+**Local pipeline test (after `make db`):**
+
+1. App starts with **5 contacts** + matching **staging baseline** (last ingest/eligibility simulated Feb 2026)
+2. Run **Data Fetch** (Job Monitoring or `npm run job:data-ingestion`) → loads **5 new** ICM/MIS records (Aug 2026 fixtures)
+3. Run **Run Eligibility** → inserts the **5 new contacts**
 
 ### Quick start (Windows)
 
@@ -39,7 +47,8 @@ Requires Docker Desktop and Node.js 24. See [frontend/README.md](frontend/README
 
 | App | Variable | Local value | Purpose |
 |-----|----------|-------------|---------|
-| Backend | `DEPLOY_ENV` | `local` | Skip SSO/JWT; accept local dev token |
+| Backend | `DEPLOY_ENV` | `local` | Skip SSO/JWT; local ICM/MIS/CRA file integrations |
+| Backend | `FILE_STORAGE_PATH` | `../.local/storage` | CRA + ICM/MIS fixture directory |
 | Backend | `NODE_ENV` | `development` | Node runtime mode |
 | Frontend | `VITE_APP_ENV` | `LOCAL` | Toolbar + skip Keycloak |
 | Frontend | `PORT` | `5173` | Vite dev server port |

@@ -17,7 +17,7 @@ import { HealthController } from './health/health.controller'
 import { MockModule } from './mock/mock.module'
 import { WeeklyFilesModule } from './weekly-files/weekly-files.module'
 
-const enableMockApi = process.env.USE_MOCK_DATA === 'true'
+const enableMockApi = (process.env.DEPLOY_ENV || 'local') === 'local'
 @Module({
   imports: [
     ConfigModule.forRoot({

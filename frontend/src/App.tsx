@@ -4107,7 +4107,7 @@ function App() {
                           disabled={!canDqModifySelected}
                           sx={{ textTransform: 'none' }}
                         >
-                          Update
+                          Edit
                         </Button>
                         <Button
                           variant="outlined"

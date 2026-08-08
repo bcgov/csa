@@ -3,7 +3,7 @@
  * These profiles determine what actions a user can perform.
  */
 export const USER_PROFILE = {
-  /** Standard CSA user - read-only access */
+  /** Finance/caseworker — standard CSA workflows (hold, eligibility, batches); not DQ update/delete */
   CSA_STANDARD: 'CSA_STANDARD',
 
   /** Data Quality Steward - can update and delete contact records */
@@ -18,11 +18,17 @@ export type UserProfile = (typeof USER_PROFILE)[keyof typeof USER_PROFILE]
 export const DATA_STEWARD_ICM_RESPONSIBILITY = 'ICM DATA STEWARD'
 
 /**
+ * ICM responsibility names that grant CSA access (read-write and read-only)
+ */
+export const CSA_RW_ICM_RESPONSIBILITY = 'ICM CSA APPLICATION - RW'
+export const CSA_RO_ICM_RESPONSIBILITY = 'ICM CSA APPLICATION - RO'
+
+/**
  * ICM responsibilities that grant CSA access
  */
 export const CSA_ACCESS_ICM_RESPONSIBILITIES = [
-  'ICM CSA APPLICATION - RW',
-  'ICM CSA APPLICATION - RO',
+  CSA_RW_ICM_RESPONSIBILITY,
+  CSA_RO_ICM_RESPONSIBILITY,
 ]
 
 /**

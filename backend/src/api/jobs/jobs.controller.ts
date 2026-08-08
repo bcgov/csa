@@ -35,6 +35,7 @@ import {
 } from 'src/jobs/jobs.service'
 import { OpenshiftJobLauncher } from 'src/jobs/openshift-job-launcher.service'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
+import { BlockDqStewardGuard } from '../common/guards/block-dq-steward.guard'
 import { CSAGuard } from '../common/guards/csa.guard'
 import { canRunBulkJobInApiProcess } from './bulk-job-deploy-env'
 import { getJobRunWarning } from './job-openshift-advisory'
@@ -107,7 +108,7 @@ function toJobRunResponse(
 
 @ApiTags('jobs')
 @Controller('jobs')
-@UseGuards(CSAGuard)
+@UseGuards(CSAGuard, BlockDqStewardGuard)
 export class JobsController {
   private readonly logger = new Logger(JobsController.name)
 

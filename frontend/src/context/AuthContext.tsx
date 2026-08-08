@@ -89,16 +89,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     csaAccessResponse.message === 'User has CSA access'
 
                   if (hasValidAccess) {
+                    const normalizedUserProfile =
+                      csaAccessResponse.userProfile?.trim().toUpperCase() === 'DATA_QUALITY_STEWARD'
+                        ? 'DATA_QUALITY_STEWARD'
+                        : 'CSA_STANDARD'
+
                     // Clear any previous access denied flag
                     sessionStorage.removeItem('csaAccessDenied')
-                    if (csaAccessResponse.userProfile) {
-                      sessionStorage.setItem('userProfile', csaAccessResponse.userProfile)
-                    }
+                    sessionStorage.setItem('userProfile', normalizedUserProfile)
                     if (csaAccessResponse.icmResponsibility) {
                       sessionStorage.setItem(
                         'icmResponsibility',
                         csaAccessResponse.icmResponsibility,
                       )
+                    } else {
+                      sessionStorage.removeItem('icmResponsibility')
                     }
                     setIsAuthenticated(true)
                     setHasCSAAccess(true)
@@ -108,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                       username: keycloakInstance.tokenParsed.preferred_username,
                       idirUsername: keycloakInstance.tokenParsed.idir_username?.toUpperCase(),
                       roles: keycloakInstance.tokenParsed.realm_access?.roles || [],
-                      userProfile: csaAccessResponse.userProfile,
+                      userProfile: normalizedUserProfile,
                     })
                     setIsLoading(false)
 

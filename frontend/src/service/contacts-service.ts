@@ -483,6 +483,40 @@ export const clearReviewFlag = async (contactId: number): Promise<{ success: boo
 }
 
 /**
+ * Fields a Data Quality Steward can update on a contact (BL-36).
+ * Only the fields that changed should be included.
+ */
+export interface UpdateContactFields {
+  din?: string
+  csaStatus?: string
+  csaStatusEffectiveDate?: string
+}
+
+/**
+ * Update CSA source-of-truth fields on a contact (Data Quality Steward only)
+ * @param contactId - Contact ID
+ * @param fields - Only the fields that changed
+ */
+export const updateContact = async (
+  contactId: number,
+  fields: UpdateContactFields,
+): Promise<{ success: boolean; contact: Contact }> => {
+  const response = await APIService.getAxiosInstance().put(`/contacts/${contactId}/update`, fields)
+  return response.data
+}
+
+/**
+ * Permanently delete a contact record (Data Quality Steward only)
+ * @param contactId - Contact ID
+ */
+export const deleteContact = async (
+  contactId: number,
+): Promise<{ success: boolean; message: string }> => {
+  const response = await APIService.getAxiosInstance().delete(`/contacts/${contactId}`)
+  return response.data
+}
+
+/**
  * Eligibility run result
  */
 export interface EligibilityRunResult {

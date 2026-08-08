@@ -58,6 +58,8 @@ import logo from './icons/image.png'
 import {
   addContactsToBatch,
   clearReviewFlag,
+  deleteContact,
+  formatAutoBatchCompletionMessage,
   fullTextSearchContacts,
   getAllBatches,
   getAllContacts,
@@ -74,9 +76,9 @@ import {
   resumeContacts,
   runAutoBatchWithPolling,
   runEligibilityForAllWithPolling,
-  formatAutoBatchCompletionMessage,
   runEligibilityForContact,
   runSendCraFileWithPolling,
+  updateContact,
   updateEligibilityStatus,
   updateHoldReason,
   updateNotEligibleStatusAlt,
@@ -319,6 +321,13 @@ const DQ_FIELD_LABELS = {
   statusEffective: 'Status Effective Date',
 } as const
 
+// Maps the DQ Steward edit-field keys to the UpdateContactDto field names expected by the API
+const DQ_FIELD_TO_DTO_KEY: Record<keyof typeof DQ_FIELD_LABELS, string> = {
+  din: 'din',
+  csaStatusRaw: 'csaStatus',
+  statusEffective: 'csaStatusEffectiveDate',
+}
+
 function App() {
   const {
     isAuthenticated: keycloakAuthenticated,
@@ -375,6 +384,8 @@ function App() {
   })
   const [confirmDqUpdateDialogOpen, setConfirmDqUpdateDialogOpen] = useState(false)
   const [confirmDqDeleteDialogOpen, setConfirmDqDeleteDialogOpen] = useState(false)
+  const [isDqSaving, setIsDqSaving] = useState(false)
+  const [isDqDeleting, setIsDqDeleting] = useState(false)
 
   // Pre-defined filter state
   const [preDefinedFilter, setPreDefinedFilter] = useState('Pending User review/action')
@@ -3307,19 +3318,52 @@ function App() {
     setConfirmDqDeleteDialogOpen(true)
   }
 
-  const handleDqConfirmDelete = () => {
+  const handleDqConfirmDelete = async () => {
     if (selected.length !== 1) return
 
-    // TODO: replace with a real delete endpoint once one exists
-    console.log('Delete contact', selected[0])
+    setIsDqDeleting(true)
+    try {
+      await deleteContact(selected[0])
 
-    setConfirmDqDeleteDialogOpen(false)
-    setDqEditableRecordId(null)
-    setSnackbar({
-      open: true,
-      message: 'Record deleted successfully (placeholder).',
-      severity: 'success',
-    })
+      setConfirmDqDeleteDialogOpen(false)
+      setDqEditableRecordId(null)
+      setSelected([])
+      setSelectedRecordsCache(new Map())
+      setSnackbar({
+        open: true,
+        message: 'Record deleted successfully.',
+        severity: 'success',
+      })
+
+      const apiFilters = [
+        'All Records',
+        'Pending User review/action',
+        'All children On Hold from CSA',
+        'Children In Pay',
+        'Children Out of Pay',
+        'CRA Refused CSA List',
+        'Children within a batch',
+        'Children over 18 years (never eligible)',
+      ]
+      if (apiFilters.includes(preDefinedFilter)) {
+        if (isSearchActive && searchTerm.trim().length >= 3) {
+          await performFullTextSearch(searchTerm.trim(), currentPage)
+        } else if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+          await performColumnFiltersSearch(activeColumnFilters, currentPage)
+        } else {
+          await fetchContacts(currentPage)
+        }
+      }
+    } catch (error: any) {
+      console.error('Failed to delete contact:', error)
+      setSnackbar({
+        open: true,
+        message: error?.response?.data?.message || error?.message || 'Failed to delete record.',
+        severity: 'error',
+      })
+    } finally {
+      setIsDqDeleting(false)
+    }
   }
 
   const handleDqCancelEdit = () => {
@@ -3356,25 +3400,56 @@ function App() {
     setConfirmDqUpdateDialogOpen(true)
   }
 
-  const handleDqConfirmUpdate = () => {
+  const handleDqConfirmUpdate = async () => {
     if (dqEditableRecordId === null || !hasDqChanges) return
 
     // Payload only contains the fields that changed - untouched fields are left as-is.
     const payload = dqChangedFields.reduce<Record<string, string>>((acc, change) => {
-      acc[change.field] = change.newValue
+      acc[DQ_FIELD_TO_DTO_KEY[change.field]] = change.newValue
       return acc
     }, {})
 
-    // TODO: replace with a real update endpoint once one exists
-    console.log('Update contact', dqEditableRecordId, payload)
+    setIsDqSaving(true)
+    try {
+      await updateContact(dqEditableRecordId, payload)
 
-    setConfirmDqUpdateDialogOpen(false)
-    setDqEditableRecordId(null)
-    setSnackbar({
-      open: true,
-      message: 'Record updated successfully (placeholder).',
-      severity: 'success',
-    })
+      setConfirmDqUpdateDialogOpen(false)
+      setDqEditableRecordId(null)
+      setSnackbar({
+        open: true,
+        message: 'Record updated successfully.',
+        severity: 'success',
+      })
+
+      const apiFilters = [
+        'All Records',
+        'Pending User review/action',
+        'All children On Hold from CSA',
+        'Children In Pay',
+        'Children Out of Pay',
+        'CRA Refused CSA List',
+        'Children within a batch',
+        'Children over 18 years (never eligible)',
+      ]
+      if (apiFilters.includes(preDefinedFilter)) {
+        if (isSearchActive && searchTerm.trim().length >= 3) {
+          await performFullTextSearch(searchTerm.trim(), currentPage)
+        } else if (isColumnFilterActive && Object.keys(activeColumnFilters).length > 0) {
+          await performColumnFiltersSearch(activeColumnFilters, currentPage)
+        } else {
+          await fetchContacts(currentPage)
+        }
+      }
+    } catch (error: any) {
+      console.error('Failed to update contact:', error)
+      setSnackbar({
+        open: true,
+        message: error?.response?.data?.message || error?.message || 'Failed to update record.',
+        severity: 'error',
+      })
+    } finally {
+      setIsDqSaving(false)
+    }
   }
 
   // Filter batch history data (frontend-only filtering)
@@ -8801,10 +8876,19 @@ function App() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDqUpdateDialogOpen(false)} color="inherit">
+          <Button
+            onClick={() => setConfirmDqUpdateDialogOpen(false)}
+            color="inherit"
+            disabled={isDqSaving}
+          >
             Cancel
           </Button>
-          <Button onClick={handleDqConfirmUpdate} variant="contained" autoFocus>
+          <Button
+            onClick={handleDqConfirmUpdate}
+            variant="contained"
+            autoFocus
+            disabled={isDqSaving}
+          >
             Confirm Update
           </Button>
         </DialogActions>
@@ -8824,10 +8908,20 @@ function App() {
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDqDeleteDialogOpen(false)} color="inherit">
+          <Button
+            onClick={() => setConfirmDqDeleteDialogOpen(false)}
+            color="inherit"
+            disabled={isDqDeleting}
+          >
             Cancel
           </Button>
-          <Button onClick={handleDqConfirmDelete} variant="contained" color="error" autoFocus>
+          <Button
+            onClick={handleDqConfirmDelete}
+            variant="contained"
+            color="error"
+            autoFocus
+            disabled={isDqDeleting}
+          >
             Delete
           </Button>
         </DialogActions>

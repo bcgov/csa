@@ -3,7 +3,13 @@ import { buildOutcomePlan, formatOutcomeSummary } from './outcome-plan'
 
 describe('buildOutcomePlan', () => {
   it('uses a single outcome for all records', () => {
-    const plan = buildOutcomePlan(3, 'accepted', 'accepted', ['accepted', 'rejected'], ['accepted', 'rejected'])
+    const plan = buildOutcomePlan(
+      3,
+      'accepted',
+      'accepted',
+      ['accepted', 'rejected'],
+      ['accepted', 'rejected'],
+    )
 
     expect(plan.outcomes).toEqual(['accepted', 'accepted', 'accepted'])
     expect(formatOutcomeSummary(plan)).toBe('accepted')

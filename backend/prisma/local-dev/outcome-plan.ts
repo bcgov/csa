@@ -24,28 +24,41 @@ export function buildOutcomePlan<T extends string>(
     if (mixedPattern.length === 0) {
       throw new Error('Mixed outcome pattern must not be empty')
     }
-    outcomes = Array.from({ length: count }, (_, index) => mixedPattern[index % mixedPattern.length]!)
+    outcomes = Array.from(
+      { length: count },
+      (_, index) => mixedPattern[index % mixedPattern.length]!,
+    )
   } else if (normalizedSpec.includes(',')) {
-    const tokens = normalizedSpec.split(',').map((token) => token.trim()).filter(Boolean)
+    const tokens = normalizedSpec
+      .split(',')
+      .map((token) => token.trim())
+      .filter(Boolean)
     if (tokens.length === 0) {
       throw new Error('Outcome list must include at least one value')
     }
 
     for (const token of tokens) {
       if (!validSet.has(token as T)) {
-        throw new Error(`Invalid outcome "${token}". Expected one of: ${validOutcomes.join(', ')}, mixed`)
+        throw new Error(
+          `Invalid outcome "${token}". Expected one of: ${validOutcomes.join(', ')}, mixed`,
+        )
       }
     }
 
     outcomes = Array.from({ length: count }, (_, index) => tokens[index % tokens.length]! as T)
   } else {
     if (!validSet.has(normalizedSpec as T)) {
-      throw new Error(`Invalid outcome "${normalizedSpec}". Expected one of: ${validOutcomes.join(', ')}, mixed`)
+      throw new Error(
+        `Invalid outcome "${normalizedSpec}". Expected one of: ${validOutcomes.join(', ')}, mixed`,
+      )
     }
     outcomes = Array.from({ length: count }, () => normalizedSpec as T)
   }
 
-  const counts = Object.fromEntries(validOutcomes.map((outcome) => [outcome, 0])) as Record<T, number>
+  const counts = Object.fromEntries(validOutcomes.map((outcome) => [outcome, 0])) as Record<
+    T,
+    number
+  >
   for (const outcome of outcomes) {
     counts[outcome] += 1
   }

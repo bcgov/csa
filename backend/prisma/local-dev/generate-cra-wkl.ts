@@ -89,7 +89,10 @@ function readDinsFromRspFile(rspFilePath: string, detailCount: number): string[]
     return null
   }
 
-  const lines = fs.readFileSync(rspFilePath, 'utf8').split('\n').filter((line) => line.trim().length > 0)
+  const lines = fs
+    .readFileSync(rspFilePath, 'utf8')
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
   if (lines.length < 3) {
     return null
   }
@@ -188,8 +191,7 @@ export function generateCraWklFromOutbound(options: GenerateCraWklOptions): Gene
   const storageRoot = process.env.FILE_STORAGE_PATH
     ? path.resolve(process.env.FILE_STORAGE_PATH)
     : DEFAULT_STORAGE
-  const inboundDir =
-    options.inboundDir ?? path.join(storageRoot, 'cra-mock', 'inbound')
+  const inboundDir = options.inboundDir ?? path.join(storageRoot, 'cra-mock', 'inbound')
   const responseEnvFlag =
     options.responseEnvFlag ?? (process.env.CRA_ENVIRONMENT === 'production' ? 'P' : 'A')
 

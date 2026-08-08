@@ -81,12 +81,16 @@ export function parseOutboundLines(content: string): {
     throw new Error(`Expected outbound header ${REQUEST_FILE.HEADER_TRAN_CODE}, got ${headerCode}`)
   }
   if (trailerCode !== String(REQUEST_FILE.TRAILER_TRAN_CODE)) {
-    throw new Error(`Expected outbound trailer ${REQUEST_FILE.TRAILER_TRAN_CODE}, got ${trailerCode}`)
+    throw new Error(
+      `Expected outbound trailer ${REQUEST_FILE.TRAILER_TRAN_CODE}, got ${trailerCode}`,
+    )
   }
 
   for (const detailLine of detailLines) {
     if (detailLine.slice(0, 4) !== String(REQUEST_FILE.DETAIL_TRAN_CODE)) {
-      throw new Error(`Expected outbound detail ${REQUEST_FILE.DETAIL_TRAN_CODE}, got ${detailLine.slice(0, 4)}`)
+      throw new Error(
+        `Expected outbound detail ${REQUEST_FILE.DETAIL_TRAN_CODE}, got ${detailLine.slice(0, 4)}`,
+      )
     }
   }
 
@@ -159,7 +163,11 @@ function buildResponseDetailLine(
   return line
 }
 
-function buildResponseHeader(processDate: string, businessNum: string, detailCount: number): string {
+function buildResponseHeader(
+  processDate: string,
+  businessNum: string,
+  detailCount: number,
+): string {
   return (
     padRight(RESPONSE_FILE.HEADER_TRAN_CODE, 4) +
     padRight(REQUEST_FILE.VERSION_NUM, 5) +
@@ -169,7 +177,11 @@ function buildResponseHeader(processDate: string, businessNum: string, detailCou
   )
 }
 
-function buildResponseTrailer(processDate: string, businessNum: string, detailCount: number): string {
+function buildResponseTrailer(
+  processDate: string,
+  businessNum: string,
+  detailCount: number,
+): string {
   return (
     padRight(RESPONSE_FILE.TRAILER_TRAN_CODE, 4) +
     padRight(REQUEST_FILE.VERSION_NUM, 5) +
@@ -190,8 +202,7 @@ export function generateCraResponseFromOutbound(
   const storageRoot = process.env.FILE_STORAGE_PATH
     ? path.resolve(process.env.FILE_STORAGE_PATH)
     : DEFAULT_STORAGE
-  const inboundDir =
-    options.inboundDir ?? path.join(storageRoot, 'cra-mock', 'inbound')
+  const inboundDir = options.inboundDir ?? path.join(storageRoot, 'cra-mock', 'inbound')
   const responseEnvFlag =
     options.responseEnvFlag ?? (process.env.CRA_ENVIRONMENT === 'production' ? 'P' : 'A')
 
@@ -240,7 +251,11 @@ export function findLatestOutboundFile(outboundDir: string): string {
   const files = fs
     .readdirSync(outboundDir)
     .filter((name) => fs.statSync(path.join(outboundDir, name)).isFile())
-    .sort((a, b) => fs.statSync(path.join(outboundDir, b)).mtimeMs - fs.statSync(path.join(outboundDir, a)).mtimeMs)
+    .sort(
+      (a, b) =>
+        fs.statSync(path.join(outboundDir, b)).mtimeMs -
+        fs.statSync(path.join(outboundDir, a)).mtimeMs,
+    )
 
   if (files.length === 0) {
     throw new Error(`No outbound CRA files found in ${outboundDir}`)

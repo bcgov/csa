@@ -1,4 +1,7 @@
-import { CSA_STATUS, CSA_STATUS_LABELS } from '../../src/common/state-machine/constants/csa-status.constants'
+import {
+  CSA_STATUS,
+  CSA_STATUS_LABELS,
+} from '../../src/common/state-machine/constants/csa-status.constants'
 
 type JsonItem = Record<string, string>
 

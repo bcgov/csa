@@ -9,7 +9,10 @@ const LOCAL_STORAGE = path.resolve(BACKEND_ROOT, '..', '.local', 'storage')
 function writeIcmFixtures(targetDir: string, fixtures: LocalDevFixtures): void {
   fs.mkdirSync(path.join(targetDir, 'icm'), { recursive: true })
   for (const [name, items] of Object.entries(fixtures.icm)) {
-    fs.writeFileSync(path.join(targetDir, 'icm', `${name}.json`), JSON.stringify({ items }, null, 2))
+    fs.writeFileSync(
+      path.join(targetDir, 'icm', `${name}.json`),
+      JSON.stringify({ items }, null, 2),
+    )
   }
 }
 
@@ -23,8 +26,7 @@ function csvEscape(value: string): string {
 function writeMisFixtures(targetDir: string, fixtures: LocalDevFixtures): void {
   fs.mkdirSync(path.join(targetDir, 'mis'), { recursive: true })
   for (const [name, rows] of Object.entries(fixtures.mis)) {
-    const csv =
-      rows.map((row) => row.map((cell) => csvEscape(cell)).join(',')).join('\n') + '\n'
+    const csv = rows.map((row) => row.map((cell) => csvEscape(cell)).join(',')).join('\n') + '\n'
     fs.writeFileSync(path.join(targetDir, 'mis', `${name}.csv`), csv)
   }
 }

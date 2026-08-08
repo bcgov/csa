@@ -28,8 +28,10 @@ export function mapCaseToContact(caseItem: CaseItem, now: Date) {
     lastName: caseItem['Subject Contact Last Name'] || 'Unknown',
     firstName: caseItem['Subject Contact First Name'] || 'Unknown',
     middleName: caseItem['Middle Name'] || '',
-    akaLastName: caseItem['Key Player AKA Last Name'] || caseItem['Subject Contact Last Name'] || '',
-    akaFirstName: caseItem['Key Player AKA First Name'] || caseItem['Subject Contact First Name'] || '',
+    akaLastName:
+      caseItem['Key Player AKA Last Name'] || caseItem['Subject Contact Last Name'] || '',
+    akaFirstName:
+      caseItem['Key Player AKA First Name'] || caseItem['Subject Contact First Name'] || '',
     personIdIcm: caseItem['Key Player Contact Row Num'],
     contactIdIcm: caseItem['Key Player Id'] || null,
     personIdMis: caseItem['Key Player Integration Id'] || 'UNKNOWN',

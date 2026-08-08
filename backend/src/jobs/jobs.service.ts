@@ -29,7 +29,7 @@ const RETRYABLE_FAILED_JOB_WHERE = {
       jobType: { in: RETRYABLE_END_USER_JOB_TYPES },
     },
   ],
-} as const
+} satisfies Prisma.JobRunWhereInput
 
 export interface MonitoringHistoryFilters {
   page?: number

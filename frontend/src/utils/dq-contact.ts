@@ -33,11 +33,11 @@ export function isDqProtectedStatus(csaStatusRaw: string | undefined | null): bo
 
 /** DQ update/delete requires edit capability, exactly one selection, and a non-protected status. */
 export function canDqModifyRecord(
-  canEditContacts: boolean,
+  canEditContactRecords: boolean,
   selectedCount: number,
   csaStatusRaw: string | undefined,
 ): boolean {
-  if (!canEditContacts || selectedCount !== 1 || csaStatusRaw === undefined) {
+  if (!canEditContactRecords || selectedCount !== 1 || csaStatusRaw === undefined) {
     return false
   }
   return !isDqProtectedStatus(csaStatusRaw)

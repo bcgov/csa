@@ -1,8 +1,7 @@
 /**
  * DIN (Document Identification Number) Validation Utilities
  *
- * DIN Format: 9-digit number per CSA DIN specification
- * TODO: Confirm CSA-specific checksum algorithm with business before re-enabling checksum validation
+ * DIN format: exactly 9 numeric digits per CSA specification (no checksum).
  */
 
 /**
@@ -17,7 +16,7 @@ export function isValidDinFormat(din: string | null | undefined): boolean {
 }
 
 /**
- * Complete DIN validation (format only until CSA checksum algorithm is confirmed)
+ * Validates DIN format (exactly 9 numeric digits).
  */
 export function validateDin(din: string | null | undefined): {
   isValid: boolean

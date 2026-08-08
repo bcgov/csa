@@ -52,6 +52,15 @@ import { IncompleteRecordsDialog } from './components/IncompleteRecordsDialog'
 import JobMonitoringTab from './components/JobMonitoringTab'
 import { OnHoldDialog } from './components/OnHoldDialog'
 import WeeklyFileProcessingTab from './components/WeeklyFileProcessingTab'
+import {
+  buildDqUpdatePayload,
+  canDqModifyRecord,
+  DQ_DELETE_CONFIRM_MESSAGE,
+  DQ_DELETE_SUCCESS_FALLBACK_MESSAGE,
+  getApiErrorMessage,
+  getDqDinHelperText,
+  isDqDinValid,
+} from './utils/dq-contact'
 import { getRuntimeConfig } from './config/keycloak.config'
 import { useAuth } from './context/AuthContext'
 import logo from './icons/image.png'
@@ -143,19 +152,6 @@ const VALID_BATCH_STATUSES = [
   'cancellation_refused_cra', // Cancellation Refused - CRA
   'cra_error_cancellation', // CRA Error - Cancellation
 ]
-
-// Protected statuses for DQ update/delete actions (intentionally excludes over_18)
-const DQ_PROTECTED_STATUSES = new Set([
-  'on_hold',
-  'in_batch_application',
-  'batch_sent_application',
-  'in_batch_cancellation',
-  'batch_sent_cancellation',
-  'application_refused_cra',
-  'cancellation_refused_cra',
-  'cra_error_application',
-  'cra_error_cancellation',
-])
 
 // CSA Status options for filter dropdown
 const CSA_STATUS_FILTER_OPTIONS = [
@@ -320,13 +316,6 @@ const DQ_FIELD_LABELS = {
   csaStatusRaw: 'CSA Status',
   statusEffective: 'Status Effective Date',
 } as const
-
-// Maps the DQ Steward edit-field keys to the UpdateContactDto field names expected by the API
-const DQ_FIELD_TO_DTO_KEY: Record<keyof typeof DQ_FIELD_LABELS, string> = {
-  din: 'din',
-  csaStatusRaw: 'csaStatus',
-  statusEffective: 'csaStatusEffectiveDate',
-}
 
 function App() {
   const {
@@ -3286,7 +3275,7 @@ function App() {
     if (!isDataQualitySteward || selected.length !== 1) return false
     const cached = selectedRecordsCache.get(selected[0])
     if (!cached) return false
-    return !DQ_PROTECTED_STATUSES.has(cached.csaStatusRaw)
+    return canDqModifyRecord(isDataQualitySteward, selected.length, cached.csaStatusRaw)
   }, [isDataQualitySteward, selected, selectedRecordsCache])
 
   const handleDqUpdateClick = () => {
@@ -3331,9 +3320,7 @@ function App() {
       setSelectedRecordsCache(new Map())
       setSnackbar({
         open: true,
-        message:
-          result.message ||
-          'The child record and all associated CSA data have been permanently deleted successfully.',
+        message: result.message || DQ_DELETE_SUCCESS_FALLBACK_MESSAGE,
         severity: 'success',
       })
 
@@ -3360,7 +3347,7 @@ function App() {
       console.error('Failed to delete contact:', error)
       setSnackbar({
         open: true,
-        message: error?.response?.data?.message || error?.message || 'Failed to delete record.',
+        message: getApiErrorMessage(error, 'Failed to delete record.'),
         severity: 'error',
       })
     } finally {
@@ -3372,10 +3359,9 @@ function App() {
     setDqEditableRecordId(null)
   }
 
-  // DIN must be exactly 9 digits, but only enforced if the steward actually edited it -
+  // Invalid DIN format is only enforced if the steward actually edited it —
   // an untouched (e.g. blank) DIN shouldn't block saving changes to other fields.
-  const isDqDinChanged = dqEditValues.din !== dqOriginalValues.din
-  const isDqDinValid = !isDqDinChanged || /^\d{9}$/.test(dqEditValues.din)
+  const dqDinIsValid = isDqDinValid(dqOriginalValues.din, dqEditValues.din)
 
   // Only fields the steward actually touched are included in the update payload.
   const dqChangedFields = useMemo(() => {
@@ -3400,22 +3386,21 @@ function App() {
   }
 
   const handleDqSaveClick = () => {
-    if (!hasDqChanges || !isDqDinValid) return
+    if (!hasDqChanges || !dqDinIsValid) return
     setConfirmDqUpdateDialogOpen(true)
   }
 
   const handleDqConfirmUpdate = async () => {
     if (dqEditableRecordId === null || !hasDqChanges) return
 
+    const updatedContactId = dqEditableRecordId
+
     // Payload only contains the fields that changed - untouched fields are left as-is.
-    const payload = dqChangedFields.reduce<Record<string, string>>((acc, change) => {
-      acc[DQ_FIELD_TO_DTO_KEY[change.field]] = change.newValue
-      return acc
-    }, {})
+    const payload = buildDqUpdatePayload(dqOriginalValues, dqEditValues)
 
     setIsDqSaving(true)
     try {
-      await updateContact(dqEditableRecordId, payload)
+      await updateContact(updatedContactId, payload)
 
       setConfirmDqUpdateDialogOpen(false)
       setDqEditableRecordId(null)
@@ -3444,11 +3429,23 @@ function App() {
           await fetchContacts(currentPage)
         }
       }
+
+      if (selectedChild === updatedContactId) {
+        setLoadingAuditTrail(true)
+        try {
+          const auditTrailResponse = await getContactAuditTrail(updatedContactId)
+          setContactAuditTrail(auditTrailResponse.data)
+        } catch (error) {
+          console.error('Failed to refresh audit trail:', error)
+        } finally {
+          setLoadingAuditTrail(false)
+        }
+      }
     } catch (error: any) {
       console.error('Failed to update contact:', error)
       setSnackbar({
         open: true,
-        message: error?.response?.data?.message || error?.message || 'Failed to update record.',
+        message: getApiErrorMessage(error, 'Failed to update record.'),
         severity: 'error',
       })
     } finally {
@@ -4085,10 +4082,10 @@ function App() {
                             variant="contained"
                             size="small"
                             onClick={handleDqSaveClick}
-                            disabled={!isDqDinValid}
+                            disabled={!dqDinIsValid}
                             sx={{ textTransform: 'none' }}
                           >
-                            OK
+                            Save
                           </Button>
                         )}
                         <Button
@@ -4854,12 +4851,13 @@ function App() {
                                     din: e.target.value.replace(/\D/g, '').slice(0, 9),
                                   }))
                                 }
-                                error={dqEditValues.din.length > 0 && !isDqDinValid}
-                                helperText={
-                                  dqEditValues.din.length > 0 && !isDqDinValid
-                                    ? 'DIN must be exactly 9 digits'
-                                    : ''
+                                error={
+                                  getDqDinHelperText(dqOriginalValues.din, dqEditValues.din) !== ''
                                 }
+                                helperText={getDqDinHelperText(
+                                  dqOriginalValues.din,
+                                  dqEditValues.din,
+                                )}
                                 slotProps={{ htmlInput: { maxLength: 9, inputMode: 'numeric' } }}
                                 sx={{ minWidth: 120 }}
                               />
@@ -8908,8 +8906,7 @@ function App() {
         <DialogTitle id="confirm-dq-delete-dialog-title">Confirm Delete</DialogTitle>
         <DialogContent>
           <DialogContentText id="confirm-dq-delete-dialog-description">
-            This action will permanently delete the child record and all associated CSA data. This
-            action cannot be undone. Do you wish to continue?
+            {DQ_DELETE_CONFIRM_MESSAGE}
           </DialogContentText>
         </DialogContent>
         <DialogActions>

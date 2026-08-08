@@ -208,7 +208,7 @@ export class ContactDto {
 export class UpdateContactDto {
   @ApiPropertyOptional({
     description:
-      'DIN (Document Identification Number) - exactly 9 numeric digits (checksum validation deferred pending business confirmation)',
+      'DIN (Document Identification Number) - exactly 9 numeric digits',
     example: '123456782',
     pattern: '^\\d{9}$',
   })

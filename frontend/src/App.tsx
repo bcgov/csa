@@ -462,16 +462,16 @@ function App() {
 
   // Fetch last successful job runs on mount
   useEffect(() => {
-    if (isAuthenticated && capabilities.isStandardUser) {
+    if (isAuthenticated && capabilities.canViewJobRunSummary) {
       getLastSuccessfulRuns()
         .then(setLastSuccessfulRuns)
         .catch((err) => console.error('Failed to fetch last successful runs:', err))
     }
-  }, [isAuthenticated, capabilities.isStandardUser])
+  }, [isAuthenticated, capabilities.canViewJobRunSummary])
 
   // Check for running eligibility job on page load and resume monitoring
   useEffect(() => {
-    if (!isAuthenticated || !capabilities.isStandardUser) return
+    if (!isAuthenticated || !capabilities.canMonitorBackgroundJobs) return
 
     const checkAndResumeRunningJob = async () => {
       try {
@@ -542,12 +542,12 @@ function App() {
     }
 
     checkAndResumeRunningJob()
-  }, [isAuthenticated, capabilities.isStandardUser])
+  }, [isAuthenticated, capabilities.canMonitorBackgroundJobs])
 
   // Helper function to check for running eligibility job before data modifications
   // Returns true if a job is running (action should be blocked), false otherwise
   const checkAndHandleRunningEligibilityJob = async (): Promise<boolean> => {
-    if (!capabilities.isStandardUser) return false
+    if (!capabilities.canMonitorBackgroundJobs) return false
 
     try {
       const runningJob = await getRunningEligibilityJob()
@@ -681,7 +681,7 @@ function App() {
   }, [selectedBatch])
 
   useEffect(() => {
-    if (!isAuthenticated || !capabilities.isStandardUser) return
+    if (!isAuthenticated || !capabilities.canMonitorBackgroundJobs) return
 
     const checkAndResumeRunningSendCraFileJob = async () => {
       try {
@@ -759,7 +759,7 @@ function App() {
     checkAndResumeRunningSendCraFileJob()
   }, [
     isAuthenticated,
-    capabilities.isStandardUser,
+    capabilities.canMonitorBackgroundJobs,
     getBatchNumberLabel,
     refreshBatchRequestsAfterSendCra,
   ])
@@ -768,7 +768,7 @@ function App() {
   // Prevents conflicting Send CRA operations and waits for completion
   // Returns true if a job is running (action should be blocked), false otherwise
   const checkAndHandleRunningSendCraFileJob = async (): Promise<boolean> => {
-    if (!capabilities.isStandardUser) return false
+    if (!capabilities.canMonitorBackgroundJobs) return false
 
     try {
       const runningJob = await getRunningSendCraFileJob()
@@ -1537,7 +1537,7 @@ function App() {
   // Fetch batches when component mounts
   useEffect(() => {
     const fetchBatches = async () => {
-      if (!isAuthenticated || !capabilities.isStandardUser) return
+      if (!isAuthenticated || !capabilities.canAccessBatches) return
 
       setLoadingBatches(true)
       try {
@@ -1574,7 +1574,7 @@ function App() {
     }
 
     fetchBatches()
-  }, [isAuthenticated, capabilities.isStandardUser])
+  }, [isAuthenticated, capabilities.canAccessBatches])
 
   const clearSelectedChildContext = (forgetRememberedSelection: boolean = false) => {
     setSelectedChild(null)
@@ -1610,19 +1610,19 @@ function App() {
   }
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    if (!capabilities.isStandardUser && newValue !== 0) return
+    if (!capabilities.canAccessBatches && newValue !== 0) return
     setSelectedTab(newValue)
   }
 
   // Non-standard profiles only have the Eligibility tab — reset if another tab was selected earlier
   useEffect(() => {
-    if (!capabilities.isStandardUser && selectedTab !== 0) {
+    if (!capabilities.canAccessBatches && selectedTab !== 0) {
       const timerId = window.setTimeout(() => {
         setSelectedTab(0)
       }, 0)
       return () => window.clearTimeout(timerId)
     }
-  }, [capabilities.isStandardUser, selectedTab])
+  }, [capabilities.canAccessBatches, selectedTab])
 
   // Logout handler
   const handleLogout = () => {
@@ -2522,12 +2522,12 @@ function App() {
     setLoadingAuditTrail(true)
     setSelectedBatchHistoryId(null) // Clear batch history selection when changing contacts
 
-    if (capabilities.isStandardUser) {
+    if (capabilities.canViewContactBatchHistory) {
       setLoadingBatchHistory(true)
     }
 
     try {
-      if (!capabilities.isStandardUser) {
+      if (!capabilities.canViewContactBatchHistory) {
         const auditTrailResponse = await getContactAuditTrail(contactId)
         setContactBatchHistory([])
         setContactAuditTrail(auditTrailResponse.data)
@@ -3134,7 +3134,12 @@ function App() {
   }, [selectedChild, filteredData])
 
   useEffect(() => {
-    if (!capabilities.isStandardUser || selectedChild !== null || rememberedChildId === null) return
+    if (
+      !capabilities.canViewContactBatchHistory ||
+      selectedChild !== null ||
+      rememberedChildId === null
+    )
+      return
 
     const shouldRestore = filteredData.some((child) => child.id === rememberedChildId)
     if (!shouldRestore) return
@@ -3163,7 +3168,7 @@ function App() {
     }
 
     restoreSelectedChildContext()
-  }, [capabilities.isStandardUser, selectedChild, rememberedChildId, filteredData])
+  }, [capabilities.canViewContactBatchHistory, selectedChild, rememberedChildId, filteredData])
 
   // Check if all selected records have valid CSA status for Hold/Resume
   const canHoldResume = useMemo(() => {
@@ -4013,13 +4018,13 @@ function App() {
               }}
             >
               <Tab label="Eligibility List" />
-              {capabilities.isStandardUser && <Tab label="Batch Requests" />}
-              {capabilities.isStandardUser && <Tab label="Weekly File Processing" />}
-              {capabilities.isStandardUser && <Tab label="Job Monitoring" />}
+              {capabilities.canAccessBatches && <Tab label="Batch Requests" />}
+              {capabilities.canAccessWeeklyFiles && <Tab label="Weekly File Processing" />}
+              {capabilities.canAccessJobMonitoring && <Tab label="Job Monitoring" />}
             </Tabs>
 
             {/* Last Successful Runs Info */}
-            {capabilities.isStandardUser && (
+            {capabilities.canViewJobRunSummary && (
               <Box
                 sx={{
                   padding: '6px 12px',
@@ -4157,7 +4162,7 @@ function App() {
                         </Button>
                       </>
                     )}
-                    {capabilities.isStandardUser && (
+                    {capabilities.canManageContacts && (
                       <>
                         <Tooltip title="Clear all column filters and sorting" arrow>
                           <span>
@@ -5058,7 +5063,7 @@ function App() {
                               ) : (
                                 <Typography component="span" />
                               )}
-                              {row.csaStatusRaw === 'on_hold' && capabilities.isStandardUser && (
+                              {row.csaStatusRaw === 'on_hold' && capabilities.canManageContacts && (
                                 <Tooltip title="Edit hold reason">
                                   <IconButton
                                     size="small"
@@ -5080,7 +5085,7 @@ function App() {
                               )}
                               {row.csaStatusRaw !== 'on_hold' &&
                                 row.holdReason &&
-                                capabilities.isStandardUser && (
+                                capabilities.canManageContacts && (
                                   <Tooltip title="Clear hold reason">
                                     <IconButton
                                       size="small"
@@ -5101,7 +5106,7 @@ function App() {
                             </Box>
                           </TableCell>
                           <TableCell align="center">
-                            {row.needsReview && capabilities.isStandardUser && (
+                            {row.needsReview && capabilities.canManageContacts && (
                               <Tooltip title="Click to clear review flag">
                                 <IconButton
                                   size="small"
@@ -6888,7 +6893,7 @@ function App() {
                   })()}
 
                 {/* Batch History Section */}
-                {capabilities.isStandardUser && selectedChild !== null && (
+                {capabilities.canViewContactBatchHistory && selectedChild !== null && (
                   <Box sx={{ mt: 3 }}>
                     <Paper sx={{ p: 0, overflow: 'hidden' }}>
                       <Box
@@ -7669,7 +7674,7 @@ function App() {
                 )}
               </Box>
             )}
-            {capabilities.isStandardUser && selectedTab === 1 && (
+            {capabilities.canAccessBatches && selectedTab === 1 && (
               <Box>
                 {/* Batch Requests Header */}
                 <Box
@@ -8449,8 +8454,8 @@ function App() {
               </Box>
             )}
 
-            {capabilities.isStandardUser && selectedTab === 2 && <WeeklyFileProcessingTab />}
-            {capabilities.isStandardUser && selectedTab === 3 && <JobMonitoringTab />}
+            {capabilities.canAccessWeeklyFiles && selectedTab === 2 && <WeeklyFileProcessingTab />}
+            {capabilities.canAccessJobMonitoring && selectedTab === 3 && <JobMonitoringTab />}
           </Box>
 
           {/* Sort and Filter Menus - Outside tabs so they're always available */}

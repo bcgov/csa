@@ -8,27 +8,40 @@ export interface CsaCapabilities {
   isStandardUser: boolean
   /** DQ inline update/delete on the eligibility list (BL-36/37) */
   canEditContactRecords: boolean
+  /** Batch Requests tab and batch APIs */
+  canAccessBatches: boolean
+  /** Weekly File Processing tab and weekly-files APIs */
+  canAccessWeeklyFiles: boolean
+  /** Job Monitoring tab and jobs list/history APIs */
+  canAccessJobMonitoring: boolean
+  /** Hold, resume, eligibility runs, add to batch, review-flag, hold-reason edits */
+  canManageContacts: boolean
+  /** Contact batch history panel and GET /contacts/:id/batches */
+  canViewContactBatchHistory: boolean
+  /** Header job timestamps and last-successful-run fetches */
+  canViewJobRunSummary: boolean
+  /** Resume/monitor RUN_ELIGIBILITY and SEND_CRA_FILE jobs on load or before actions */
+  canMonitorBackgroundJobs: boolean
 }
 
-const NO_ACCESS: CsaCapabilities = {
-  userProfile: null,
-  isDataQualitySteward: false,
-  isStandardUser: false,
-  canEditContactRecords: false,
-}
-
-const STANDARD_CAPABILITIES: CsaCapabilities = {
-  userProfile: 'CSA_STANDARD',
-  isDataQualitySteward: false,
-  isStandardUser: true,
-  canEditContactRecords: false,
-}
-
-const DQ_CAPABILITIES: CsaCapabilities = {
-  userProfile: 'DATA_QUALITY_STEWARD',
-  isDataQualitySteward: true,
-  isStandardUser: false,
-  canEditContactRecords: true,
+function buildCapabilities(
+  userProfile: CsaUserProfile | null,
+  isStandardUser: boolean,
+  isDataQualitySteward: boolean,
+): CsaCapabilities {
+  return {
+    userProfile,
+    isStandardUser,
+    isDataQualitySteward,
+    canEditContactRecords: isDataQualitySteward,
+    canAccessBatches: isStandardUser,
+    canAccessWeeklyFiles: isStandardUser,
+    canAccessJobMonitoring: isStandardUser,
+    canManageContacts: isStandardUser,
+    canViewContactBatchHistory: isStandardUser,
+    canViewJobRunSummary: isStandardUser,
+    canMonitorBackgroundJobs: isStandardUser,
+  }
 }
 
 /** Derive UI access from the authenticated user profile (BL-34). */
@@ -36,10 +49,10 @@ export function getCsaCapabilities(
   userProfile: CsaUserProfile | null | undefined,
 ): CsaCapabilities {
   if (userProfile === 'DATA_QUALITY_STEWARD') {
-    return DQ_CAPABILITIES
+    return buildCapabilities('DATA_QUALITY_STEWARD', false, true)
   }
   if (userProfile === 'CSA_STANDARD') {
-    return STANDARD_CAPABILITIES
+    return buildCapabilities('CSA_STANDARD', true, false)
   }
-  return NO_ACCESS
+  return buildCapabilities(null, false, false)
 }

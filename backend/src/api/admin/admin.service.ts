@@ -3,6 +3,7 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { firstValueFrom } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
+import { LOCAL_DEV_USER_PROFILE } from 'src/common/auth/local-dev.constants'
 import { normalize } from 'src/common/utils'
 import { ICMEmployeeResponse } from './interfaces/icm-api.interface'
 
@@ -22,6 +23,16 @@ export class AdminService {
     userProfile?: string
     icmResponsibility?: string
   }> {
+    const deployEnv = this.configService.get<string>('app.deployEnv')
+    if (deployEnv === 'local') {
+      return {
+        hasAccess: true,
+        message: 'User has CSA access',
+        userProfile: LOCAL_DEV_USER_PROFILE,
+        icmResponsibility: 'ICM CSA Application - RW',
+      }
+    }
+
     try {
       const icmData = await this.fetchUserFromICM(username)
 

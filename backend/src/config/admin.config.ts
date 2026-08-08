@@ -31,7 +31,8 @@ export const adminConfig = registerAs('admin', () => {
   if (!keycloakClientSecret) {
     throw new Error('KEYCLOAK_CLIENT_SECRET is required')
   }
-  if (!ssoKeycloakJwksUrl) {
+  const deployEnv = process.env.DEPLOY_ENV || 'local'
+  if (!ssoKeycloakJwksUrl && deployEnv !== 'local') {
     throw new Error('SSO_KEYCLOAK_URL and SSO_KEYCLOAK_REALM are required')
   }
 

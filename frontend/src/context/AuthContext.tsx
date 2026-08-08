@@ -1,6 +1,7 @@
 import type Keycloak from 'keycloak-js'
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { getRuntimeConfig, initializeKeycloak } from '../config/keycloak.config'
+import { isLocalDev, LOCAL_DEV_TOKEN } from '../config/local-dev.config'
 import { verifyCSAAccess } from '../service/admin-service'
 
 interface AuthContextType {
@@ -39,8 +40,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [])
 
   useEffect(() => {
-    // Initialize Keycloak with runtime config
     const initAuth = async () => {
+      if (isLocalDev()) {
+        getRuntimeConfig()
+        sessionStorage.setItem('authToken', LOCAL_DEV_TOKEN)
+        sessionStorage.setItem('userProfile', 'CSA_STANDARD')
+        sessionStorage.setItem('icmResponsibility', 'ICM CSA Application - RW')
+        setIsAuthenticated(true)
+        setHasCSAAccess(true)
+        setUser({
+          name: 'Local Dev User',
+          email: 'local.dev@example.com',
+          username: 'local.dev',
+          idirUsername: 'LOCAL.DEV',
+          roles: ['local-dev'],
+          userProfile: 'CSA_STANDARD',
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // Initialize Keycloak with runtime config
       try {
         const keycloakInstance = await initializeKeycloak()
         setKeycloak(keycloakInstance)
@@ -195,6 +215,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionStorage.removeItem('authToken')
     sessionStorage.removeItem('userProfile')
     sessionStorage.removeItem('icmResponsibility')
+    if (isLocalDev()) {
+      setIsAuthenticated(false)
+      setHasCSAAccess(null)
+      setUser(null)
+      window.location.href = window.location.origin
+      return
+    }
     keycloak?.logout({
       redirectUri: window.location.origin,
     })

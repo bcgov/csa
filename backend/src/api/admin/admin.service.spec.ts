@@ -71,6 +71,20 @@ describe('AdminService', () => {
   })
 
   describe('verifyCSAAccess', () => {
+    it('should bypass ICM when DEPLOY_ENV is local', async () => {
+      mockConfigService.get.mockImplementationOnce((key: string) => {
+        if (key === 'app.deployEnv') return 'local'
+        return undefined
+      })
+
+      const result = await service.verifyCSAAccess('any.user')
+
+      expect(result.hasAccess).toBe(true)
+      expect(result.message).toBe('User has CSA access')
+      expect(result.userProfile).toBe('CSA_STANDARD')
+      expect(mockHttpService.get).not.toHaveBeenCalled()
+    })
+
     it('should return hasAccess true for users with RW responsibility', async () => {
       mockHttpService.get.mockReturnValue(
         of(createICMApiResponse([{ Name: 'ICM CSA Application - RW' }])),

@@ -242,14 +242,13 @@ async function seedContacts() {
 
 async function cleanupDatabase() {
   console.log('Cleaning up existing data...')
+  await prisma.wklFileRecord.deleteMany()
   await prisma.contactBatchDetail.deleteMany()
-  console.log('Cleared existing contact batch details')
-
+  await prisma.transferFile.deleteMany()
+  await prisma.contactAuditTrail.deleteMany()
   await prisma.contact.deleteMany()
-  console.log('Cleared existing contacts')
-
   await prisma.batch.deleteMany()
-  console.log('Cleared existing batches')
+  console.log('Cleared existing seed data')
 }
 
 async function seedBatches() {

@@ -14,17 +14,28 @@ NestJS Backend for the Child Special Allowance application.
 
 ## Prerequisites
 - Node.js 24+ (use `nvm use` to load from `.nvmrc`)
-- PostgreSQL database running (via Docker or local)
+- [Colima](https://github.com/abiosoft/colima) or Docker Desktop for PostgreSQL
 
 ## Setup
 
-1. **Install dependencies:** `npm install`
-2. **Configure environment:** `cp .env.example .env` 
-3. **Generate Prisma client:** `npx prisma generate`
-4. **Start the database (if not already running):**
-   from root directory: `docker compose up -d database migrations`
-5. **Seed the database(optional):** `npx prisma db seed`
+1. **Start Colima and the database** (from repo root):
+   ```bash
+   make db
+   ```
+   Or manually:
+   ```bash
+   colima start
+   docker compose up -d database migrations
+   ```
+2. **Install dependencies:** `npm install`
+3. **Configure environment:** `cp .env.example .env`
+   - `DEPLOY_ENV=local` skips SSO/JWT verification for local development
+   - `POSTGRES_PASSWORD=default` must match `docker-compose.yml`
+4. **Generate Prisma client:** `npx prisma generate`
+5. **Seed the database:** `make seed` (included automatically in `make db` and `make dev`)
 6. **Start the development server:** `npm run start:dev`
+
+Start the frontend separately from `frontend/` with `VITE_APP_ENV=LOCAL` in `frontend/.env`.
 
 ### API Documentation
 Swagger documentation is available at http://localhost:3000/api when the server is running.

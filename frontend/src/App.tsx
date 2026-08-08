@@ -101,6 +101,8 @@ import { buildPlacementDisplayValues } from './utils/mock-placement'
 // Environment-based toolbar background colors
 const getEnvBackgroundColor = (env?: AppEnvironment): string => {
   switch (env) {
+    case 'LOCAL':
+      return '#d8dde3' // Neutral grey (local laptop)
     case 'DEV':
       return '#f5e6c8' // Light yellow/tan
     case 'TEST':

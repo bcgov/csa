@@ -1,10 +1,13 @@
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+
+  return {
   plugins: [
     TanStackRouterVite({
       target: 'react',
@@ -13,7 +16,7 @@ export default defineConfig({
     react(),
   ],
   server: {
-    port: parseInt(process.env.PORT),
+    port: parseInt(env.PORT),
     fs: {
       // Allow serving files from one level up to the project root
       allow: ['..'],
@@ -21,7 +24,7 @@ export default defineConfig({
     proxy: {
       // Proxy API requests to the backend
       '/api': {
-        target: process.env.BACKEND_URL || 'http://localhost:3001',
+        target: env.BACKEND_URL || 'http://localhost:3000',
         changeOrigin: true,
       },
     },
@@ -74,4 +77,5 @@ export default defineConfig({
       },
     },
   },
+}
 })

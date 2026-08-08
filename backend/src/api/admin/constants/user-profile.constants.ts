@@ -3,7 +3,7 @@
  * These profiles determine what actions a user can perform.
  */
 export const USER_PROFILE = {
-  /** Standard CSA user - read-only access */
+  /** Finance/caseworker — standard CSA workflows (hold, eligibility, batches); not DQ update/delete */
   CSA_STANDARD: 'CSA_STANDARD',
 
   /** Data Quality Steward - can update and delete contact records */

@@ -1240,31 +1240,34 @@ export class ContactsService {
     const personMis = personIdMis?.trim() || null
 
     if (personIcm) {
-      // ICM staging — reverse dependency order
+      // ICM staging — reverse dependency order.
+      // Column identifiers are unquoted: the DDL created them unquoted too, so Postgres
+      // folded them to lowercase in storage — quoting "LIKE_THIS" would look for a
+      // literal-case column that doesn't exist and error with "column ... does not exist".
       await tx.$executeRaw`
         DELETE FROM csa.stg_icm_orders
-        WHERE "AGREEMENT_ROW_ID" IN (
-          SELECT DISTINCT "AGREEMENT_ROW_ID" FROM csa.stg_icm_placements
-          WHERE "CASE_ROW_ID" IN (
-            SELECT "ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+        WHERE AGREEMENT_ROW_ID IN (
+          SELECT DISTINCT AGREEMENT_ROW_ID FROM csa.stg_icm_placements
+          WHERE CASE_ROW_ID IN (
+            SELECT ROW_ID FROM csa.stg_icm_cases WHERE X_CONTACT_NUM = ${personIcm}
           )
         )
       `
 
       await tx.$executeRaw`
         DELETE FROM csa.stg_icm_agreement
-        WHERE "ROW_ID" IN (
-          SELECT DISTINCT "AGREEMENT_ROW_ID" FROM csa.stg_icm_placements
-          WHERE "CASE_ROW_ID" IN (
-            SELECT "ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+        WHERE ROW_ID IN (
+          SELECT DISTINCT AGREEMENT_ROW_ID FROM csa.stg_icm_placements
+          WHERE CASE_ROW_ID IN (
+            SELECT ROW_ID FROM csa.stg_icm_cases WHERE X_CONTACT_NUM = ${personIcm}
           )
         )
       `
 
       await tx.$executeRaw`
         DELETE FROM csa.stg_icm_placements
-        WHERE "CASE_ROW_ID" IN (
-          SELECT "ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+        WHERE CASE_ROW_ID IN (
+          SELECT ROW_ID FROM csa.stg_icm_cases WHERE X_CONTACT_NUM = ${personIcm}
         )
       `
 
@@ -1272,22 +1275,22 @@ export class ContactsService {
       if (contactIdIcm?.trim()) {
         await tx.$executeRaw`
           DELETE FROM csa.stg_icm_legal_authority
-          WHERE "PAR_ROW_ID" IN (
-            SELECT "CONTACT_ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+          WHERE PAR_ROW_ID IN (
+            SELECT CONTACT_ROW_ID FROM csa.stg_icm_cases WHERE X_CONTACT_NUM = ${personIcm}
           )
-          OR "PAR_ROW_ID" = ${contactIdIcm}
+          OR PAR_ROW_ID = ${contactIdIcm}
         `
       } else {
         await tx.$executeRaw`
           DELETE FROM csa.stg_icm_legal_authority
-          WHERE "PAR_ROW_ID" IN (
-            SELECT "CONTACT_ROW_ID" FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+          WHERE PAR_ROW_ID IN (
+            SELECT CONTACT_ROW_ID FROM csa.stg_icm_cases WHERE X_CONTACT_NUM = ${personIcm}
           )
         `
       }
 
       await tx.$executeRaw`
-        DELETE FROM csa.stg_icm_agreement_line WHERE "X_CONTACT_NUM" = ${personIcm}
+        DELETE FROM csa.stg_icm_agreement_line WHERE X_CONTACT_NUM = ${personIcm}
       `
 
       if (personMis || personIcm) {
@@ -1299,9 +1302,9 @@ export class ContactsService {
             WHERE person_id_mis = ${personMis}
                OR (
                  person_id_mis IN (
-                   SELECT DISTINCT "PERSON_ID_MIS" FROM csa.stg_icm_cases
-                   WHERE "X_CONTACT_NUM" = ${personIcm}
-                     AND NULLIF(TRIM("PERSON_ID_MIS"), '') IS NOT NULL
+                   SELECT DISTINCT PERSON_ID_MIS FROM csa.stg_icm_cases
+                   WHERE X_CONTACT_NUM = ${personIcm}
+                     AND NULLIF(TRIM(PERSON_ID_MIS), '') IS NOT NULL
                  )
                )
           )
@@ -1311,9 +1314,9 @@ export class ContactsService {
           DELETE FROM csa.stg_mis_payments
           WHERE person_id_mis = ${personMis}
              OR person_id_mis IN (
-               SELECT DISTINCT "PERSON_ID_MIS" FROM csa.stg_icm_cases
-               WHERE "X_CONTACT_NUM" = ${personIcm}
-                 AND NULLIF(TRIM("PERSON_ID_MIS"), '') IS NOT NULL
+               SELECT DISTINCT PERSON_ID_MIS FROM csa.stg_icm_cases
+               WHERE X_CONTACT_NUM = ${personIcm}
+                 AND NULLIF(TRIM(PERSON_ID_MIS), '') IS NOT NULL
              )
         `
 
@@ -1321,20 +1324,20 @@ export class ContactsService {
           DELETE FROM csa.stg_mis_placements
           WHERE person_id_mis = ${personMis}
              OR person_id_mis IN (
-               SELECT DISTINCT "PERSON_ID_MIS" FROM csa.stg_icm_cases
-               WHERE "X_CONTACT_NUM" = ${personIcm}
-                 AND NULLIF(TRIM("PERSON_ID_MIS"), '') IS NOT NULL
+               SELECT DISTINCT PERSON_ID_MIS FROM csa.stg_icm_cases
+               WHERE X_CONTACT_NUM = ${personIcm}
+                 AND NULLIF(TRIM(PERSON_ID_MIS), '') IS NOT NULL
              )
         `
       }
 
       await tx.$executeRaw`
-        DELETE FROM csa.stg_icm_cases WHERE "X_CONTACT_NUM" = ${personIcm}
+        DELETE FROM csa.stg_icm_cases WHERE X_CONTACT_NUM = ${personIcm}
       `
     } else if (contactIdIcm?.trim()) {
       // Staging case rows missing — still remove legal authority tied to master ICM contact id
       await tx.$executeRaw`
-        DELETE FROM csa.stg_icm_legal_authority WHERE "PAR_ROW_ID" = ${contactIdIcm}
+        DELETE FROM csa.stg_icm_legal_authority WHERE PAR_ROW_ID = ${contactIdIcm}
       `
     }
 

@@ -23,6 +23,7 @@ import {
   ResumeContactsDto,
   UpdateHoldReasonDto,
 } from '../common/dto/contact-ids.dto'
+import { BlockDqStewardGuard } from '../common/guards/block-dq-steward.guard'
 import { CSAGuard } from '../common/guards/csa.guard'
 import { ContactsService } from './contacts.service'
 import { ContactDto, UpdateContactDto } from './dto/contact.dto'
@@ -129,6 +130,7 @@ export class ContactsController {
   }
 
   @Post('hold')
+  @UseGuards(BlockDqStewardGuard)
   @ApiResponse({ status: 200, description: 'Bulk hold result with success and failed arrays' })
   async holdContacts(
     @Body() dto: HoldContactsDto,
@@ -138,6 +140,7 @@ export class ContactsController {
   }
 
   @Post('resume')
+  @UseGuards(BlockDqStewardGuard)
   @ApiResponse({ status: 200, description: 'Bulk resume result with success and failed arrays' })
   async resumeContacts(
     @Body() dto: ResumeContactsDto,
@@ -147,6 +150,7 @@ export class ContactsController {
   }
 
   @Patch(':id/hold-reason')
+  @UseGuards(BlockDqStewardGuard)
   @ApiResponse({ status: 200, description: 'Updated or cleared hold reason' })
   @ApiResponse({ status: 400, description: 'Reason required when contact is ON_HOLD' })
   @ApiResponse({ status: 404, description: 'Contact not found' })
@@ -159,6 +163,7 @@ export class ContactsController {
   }
 
   @Post('set-eligible')
+  @UseGuards(BlockDqStewardGuard)
   @ApiResponse({
     status: 200,
     description: 'Bulk eligibility status update result with success and failed arrays',
@@ -171,6 +176,7 @@ export class ContactsController {
   }
 
   @Post('set-not-eligible')
+  @UseGuards(BlockDqStewardGuard)
   @ApiResponse({
     status: 200,
     description: 'Bulk not eligible status update result with success and failed arrays',
@@ -183,6 +189,7 @@ export class ContactsController {
   }
 
   @Post('age-out')
+  @UseGuards(BlockDqStewardGuard)
   @ApiResponse({
     status: 200,
     description: 'Bulk child over 18 status update result with success and failed arrays',
@@ -195,6 +202,7 @@ export class ContactsController {
   }
 
   @Get(':id/batches')
+  @UseGuards(BlockDqStewardGuard)
   @ApiResponse({ status: 200, description: 'List of batch details for this contact' })
   @ApiResponse({ status: 404, description: 'Contact not found' })
   async findContactBatches(@Param('id', ParseIntPipe) id: number) {
@@ -225,6 +233,7 @@ export class ContactsController {
   }
 
   @Post(':id/run-eligibility')
+  @UseGuards(BlockDqStewardGuard)
   @HttpCode(200)
   @ApiResponse({ status: 200, description: 'Eligibility result with previous and new status' })
   @ApiResponse({ status: 404, description: 'Contact not found' })
@@ -234,6 +243,7 @@ export class ContactsController {
   }
 
   @Patch(':id/review-flag')
+  @UseGuards(BlockDqStewardGuard)
   @HttpCode(200)
   @ApiResponse({ status: 200, description: 'Review flag cleared successfully' })
   @ApiResponse({ status: 404, description: 'Contact not found' })

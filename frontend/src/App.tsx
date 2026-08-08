@@ -3323,7 +3323,7 @@ function App() {
 
     setIsDqDeleting(true)
     try {
-      await deleteContact(selected[0])
+      const result = await deleteContact(selected[0])
 
       setConfirmDqDeleteDialogOpen(false)
       setDqEditableRecordId(null)
@@ -3331,7 +3331,9 @@ function App() {
       setSelectedRecordsCache(new Map())
       setSnackbar({
         open: true,
-        message: 'Record deleted successfully.',
+        message:
+          result.message ||
+          'The child record and all associated CSA data have been permanently deleted successfully.',
         severity: 'success',
       })
 
@@ -8906,7 +8908,8 @@ function App() {
         <DialogTitle id="confirm-dq-delete-dialog-title">Confirm Delete</DialogTitle>
         <DialogContent>
           <DialogContentText id="confirm-dq-delete-dialog-description">
-            Are you sure you want to delete this record? This action cannot be undone.
+            This action will permanently delete the child record and all associated CSA data. This
+            action cannot be undone. Do you wish to continue?
           </DialogContentText>
         </DialogContent>
         <DialogActions>

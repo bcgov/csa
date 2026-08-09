@@ -1,7 +1,12 @@
 import type Keycloak from 'keycloak-js'
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { getRuntimeConfig, initializeKeycloak } from '../config/keycloak.config'
-import { isLocalDev, LOCAL_DEV_TOKEN } from '../config/local-dev.config'
+import {
+  getStoredLocalDevProfile,
+  isLocalDev,
+  LOCAL_DEV_TOKEN,
+  setStoredLocalDevProfile,
+} from '../config/local-dev.config'
 import { verifyCSAAccess } from '../service/admin-service'
 
 interface AuthContextType {
@@ -44,8 +49,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (isLocalDev()) {
         getRuntimeConfig()
         sessionStorage.setItem('authToken', LOCAL_DEV_TOKEN)
-        sessionStorage.setItem('userProfile', 'CSA_STANDARD')
-        sessionStorage.setItem('icmResponsibility', 'ICM CSA Application - RW')
+        const userProfile = getStoredLocalDevProfile()
+        setStoredLocalDevProfile(userProfile)
         setIsAuthenticated(true)
         setHasCSAAccess(true)
         setUser({
@@ -54,7 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           username: 'local.dev',
           idirUsername: 'LOCAL.DEV',
           roles: ['local-dev'],
-          userProfile: 'CSA_STANDARD',
+          userProfile,
         })
         setIsLoading(false)
         return

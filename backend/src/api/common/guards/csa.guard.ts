@@ -10,9 +10,10 @@ import { Reflector } from '@nestjs/core'
 import { Request } from 'express'
 import { JwtVerificationService } from 'src/common/auth/jwt-verification.service'
 import {
+  LOCAL_DEV_PROFILE_HEADER,
   LOCAL_DEV_TOKEN,
   LOCAL_DEV_USER,
-  LOCAL_DEV_USER_PROFILE,
+  resolveLocalDevProfile,
 } from 'src/common/auth/local-dev.constants'
 import { extractUsernameFromPayload } from 'src/common/auth/token-utils'
 import { AdminService } from '../../admin/admin.service'
@@ -77,9 +78,13 @@ export class CSAGuard implements CanActivate {
     const deployEnv = this.configService.get<string>('app.deployEnv')
 
     if (deployEnv === 'local' && token === LOCAL_DEV_TOKEN) {
+      const profileHint = request.headers[LOCAL_DEV_PROFILE_HEADER]
+      const userProfile = resolveLocalDevProfile(
+        typeof profileHint === 'string' ? profileHint : profileHint?.[0],
+      )
       ;(request as any).user = LOCAL_DEV_USER
       ;(request as any).username = LOCAL_DEV_USER.preferred_username
-      ;(request as any).userProfile = LOCAL_DEV_USER_PROFILE
+      ;(request as any).userProfile = userProfile
       return true
     }
 

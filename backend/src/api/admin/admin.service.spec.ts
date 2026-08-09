@@ -82,7 +82,20 @@ describe('AdminService', () => {
       expect(result.hasAccess).toBe(true)
       expect(result.message).toBe('User has CSA access')
       expect(result.userProfile).toBe('CSA_STANDARD')
+      expect(result.icmResponsibility).toBe('ICM CSA Application - RW')
       expect(mockHttpService.get).not.toHaveBeenCalled()
+    })
+
+    it('should honor local dev profile hint when DEPLOY_ENV is local', async () => {
+      mockConfigService.get.mockImplementationOnce((key: string) => {
+        if (key === 'app.deployEnv') return 'local'
+        return undefined
+      })
+
+      const result = await service.verifyCSAAccess('any.user', 'DATA_QUALITY_STEWARD')
+
+      expect(result.userProfile).toBe('DATA_QUALITY_STEWARD')
+      expect(result.icmResponsibility).toBe('ICM Data Steward')
     })
 
     it('should return hasAccess true for users with RW responsibility', async () => {

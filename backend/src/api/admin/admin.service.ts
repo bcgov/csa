@@ -3,7 +3,10 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { firstValueFrom } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
-import { LOCAL_DEV_USER_PROFILE } from 'src/common/auth/local-dev.constants'
+import {
+  localDevIcmResponsibility,
+  resolveLocalDevProfile,
+} from 'src/common/auth/local-dev.constants'
 import { normalize } from 'src/common/utils'
 import {
   CSA_RO_ICM_RESPONSIBILITY,
@@ -23,7 +26,10 @@ export class AdminService {
     private readonly keycloakAuthService: KeycloakAuthService,
   ) {}
 
-  async verifyCSAAccess(username: string): Promise<{
+  async verifyCSAAccess(
+    username: string,
+    localDevProfileHint?: string | null,
+  ): Promise<{
     hasAccess: boolean
     message: string
     userProfile?: string
@@ -31,11 +37,12 @@ export class AdminService {
   }> {
     const deployEnv = this.configService.get<string>('app.deployEnv')
     if (deployEnv === 'local') {
+      const userProfile = resolveLocalDevProfile(localDevProfileHint)
       return {
         hasAccess: true,
         message: 'User has CSA access',
-        userProfile: LOCAL_DEV_USER_PROFILE,
-        icmResponsibility: 'ICM CSA Application - RW',
+        userProfile,
+        icmResponsibility: localDevIcmResponsibility(userProfile),
       }
     }
 

@@ -50,6 +50,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { IncompleteRecordsDialog } from './components/IncompleteRecordsDialog'
 import JobMonitoringTab from './components/JobMonitoringTab'
+import { LocalDevProfileSwitcher } from './components/LocalDevProfileSwitcher'
 import { OnHoldDialog } from './components/OnHoldDialog'
 import WeeklyFileProcessingTab from './components/WeeklyFileProcessingTab'
 import {
@@ -3894,18 +3895,27 @@ function App() {
       >
         <Toolbar sx={{ padding: '8px 24px', justifyContent: 'center', position: 'relative' }}>
           {getRuntimeConfig()?.VITE_APP_ENV && getRuntimeConfig()?.VITE_APP_ENV !== 'PROD' && (
-            <Typography
-              variant="body2"
+            <Box
               sx={{
                 position: 'absolute',
                 left: 24,
-                color: '#666',
-                fontWeight: 600,
-                textTransform: 'uppercase',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
               }}
             >
-              {getRuntimeConfig()?.VITE_APP_ENV}
-            </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: '#666',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                }}
+              >
+                {getRuntimeConfig()?.VITE_APP_ENV}
+              </Typography>
+              <LocalDevProfileSwitcher />
+            </Box>
           )}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <img src={logo} alt="BC Logo" style={{ height: '40px' }} />

@@ -1,4 +1,5 @@
-import { Controller, Get, UseGuards } from '@nestjs/common'
+import { Controller, Get, Req, UseGuards } from '@nestjs/common'
+import type { Request as ExpressRequest } from 'express'
 import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { toUserInfoDto } from 'src/common/auth/token-utils'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
@@ -46,6 +47,7 @@ export class AdminController {
   async verifyCSAAccess(
     @CurrentUser() username: string,
     @DecodedToken() decoded: Record<string, unknown>,
+    @Req() request: ExpressRequest,
   ): Promise<{
     hasAccess: boolean
     username: string
@@ -54,7 +56,10 @@ export class AdminController {
     userProfile?: string
     icmResponsibility?: string
   }> {
-    const result = await this.adminService.verifyCSAAccess(username)
+    const result = await this.adminService.verifyCSAAccess(
+      username,
+      (request as any).userProfile,
+    )
     return {
       ...result,
       username,

@@ -63,6 +63,7 @@ import {
 } from './utils/dq-contact'
 import { getRuntimeConfig } from './config/keycloak.config'
 import { useAuth } from './context/AuthContext'
+import { useCsaCapabilities } from './hooks/useCsaCapabilities'
 import logo from './icons/image.png'
 import {
   addContactsToBatch,
@@ -333,7 +334,7 @@ function App() {
 
   // User is authenticated when Keycloak auth is complete and has CSA access
   const isAuthenticated = !isLoading && keycloakAuthenticated && hasCSAAccess === true
-  const isDataQualitySteward = user?.userProfile === 'DATA_QUALITY_STEWARD'
+  const capabilities = useCsaCapabilities()
 
   const [selectedTab, setSelectedTab] = useState(0)
   const [selected, setSelected] = useState<number[]>([])
@@ -463,16 +464,16 @@ function App() {
 
   // Fetch last successful job runs on mount
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && capabilities.canViewJobRunSummary) {
       getLastSuccessfulRuns()
         .then(setLastSuccessfulRuns)
         .catch((err) => console.error('Failed to fetch last successful runs:', err))
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, capabilities.canViewJobRunSummary])
 
   // Check for running eligibility job on page load and resume monitoring
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated || !capabilities.canMonitorBackgroundJobs) return
 
     const checkAndResumeRunningJob = async () => {
       try {
@@ -543,11 +544,13 @@ function App() {
     }
 
     checkAndResumeRunningJob()
-  }, [isAuthenticated])
+  }, [isAuthenticated, capabilities.canMonitorBackgroundJobs])
 
   // Helper function to check for running eligibility job before data modifications
   // Returns true if a job is running (action should be blocked), false otherwise
   const checkAndHandleRunningEligibilityJob = async (): Promise<boolean> => {
+    if (!capabilities.canMonitorBackgroundJobs) return false
+
     try {
       const runningJob = await getRunningEligibilityJob()
       if (runningJob) {
@@ -680,7 +683,7 @@ function App() {
   }, [selectedBatch])
 
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated || !capabilities.canMonitorBackgroundJobs) return
 
     const checkAndResumeRunningSendCraFileJob = async () => {
       try {
@@ -756,12 +759,19 @@ function App() {
     }
 
     checkAndResumeRunningSendCraFileJob()
-  }, [isAuthenticated, getBatchNumberLabel, refreshBatchRequestsAfterSendCra])
+  }, [
+    isAuthenticated,
+    capabilities.canMonitorBackgroundJobs,
+    getBatchNumberLabel,
+    refreshBatchRequestsAfterSendCra,
+  ])
 
   // Helper function to check for running Send CRA file job before new operations
   // Prevents conflicting Send CRA operations and waits for completion
   // Returns true if a job is running (action should be blocked), false otherwise
   const checkAndHandleRunningSendCraFileJob = async (): Promise<boolean> => {
+    if (!capabilities.canMonitorBackgroundJobs) return false
+
     try {
       const runningJob = await getRunningSendCraFileJob()
       if (runningJob) {
@@ -1529,7 +1539,7 @@ function App() {
   // Fetch batches when component mounts
   useEffect(() => {
     const fetchBatches = async () => {
-      if (!isAuthenticated) return
+      if (!isAuthenticated || !capabilities.canAccessBatches) return
 
       setLoadingBatches(true)
       try {
@@ -1566,7 +1576,7 @@ function App() {
     }
 
     fetchBatches()
-  }, [isAuthenticated])
+  }, [isAuthenticated, capabilities.canAccessBatches])
 
   const clearSelectedChildContext = (forgetRememberedSelection: boolean = false) => {
     setSelectedChild(null)
@@ -1602,8 +1612,34 @@ function App() {
   }
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    if (newValue === 0 && !capabilities.canAccessEligibilityList) return
+    if (newValue === 1 && !capabilities.canAccessBatches) return
+    if (newValue === 2 && !capabilities.canAccessWeeklyFiles) return
+    if (newValue === 3 && !capabilities.canAccessJobMonitoring) return
     setSelectedTab(newValue)
   }
+
+  // Reset to Eligibility when the current tab is not allowed for this profile
+  useEffect(() => {
+    const tabAllowed =
+      (selectedTab === 0 && capabilities.canAccessEligibilityList) ||
+      (selectedTab === 1 && capabilities.canAccessBatches) ||
+      (selectedTab === 2 && capabilities.canAccessWeeklyFiles) ||
+      (selectedTab === 3 && capabilities.canAccessJobMonitoring)
+
+    if (!tabAllowed) {
+      const timerId = window.setTimeout(() => {
+        setSelectedTab(0)
+      }, 0)
+      return () => window.clearTimeout(timerId)
+    }
+  }, [
+    capabilities.canAccessEligibilityList,
+    capabilities.canAccessBatches,
+    capabilities.canAccessWeeklyFiles,
+    capabilities.canAccessJobMonitoring,
+    selectedTab,
+  ])
 
   // Logout handler
   const handleLogout = () => {
@@ -2500,17 +2536,26 @@ function App() {
     setIsBatchHistoryExpanded(false)
     setIsAuditTrailExpanded(false)
     setRememberedChildId(contactId)
-    setLoadingBatchHistory(true)
     setLoadingAuditTrail(true)
     setSelectedBatchHistoryId(null) // Clear batch history selection when changing contacts
 
+    if (capabilities.canViewContactBatchHistory) {
+      setLoadingBatchHistory(true)
+    }
+
     try {
-      const [batchHistory, auditTrailResponse] = await Promise.all([
-        getContactBatches(contactId),
-        getContactAuditTrail(contactId),
-      ])
-      setContactBatchHistory(batchHistory)
-      setContactAuditTrail(auditTrailResponse.data)
+      if (!capabilities.canViewContactBatchHistory) {
+        const auditTrailResponse = await getContactAuditTrail(contactId)
+        setContactBatchHistory([])
+        setContactAuditTrail(auditTrailResponse.data)
+      } else {
+        const [batchHistory, auditTrailResponse] = await Promise.all([
+          getContactBatches(contactId),
+          getContactAuditTrail(contactId),
+        ])
+        setContactBatchHistory(batchHistory)
+        setContactAuditTrail(auditTrailResponse.data)
+      }
     } catch (error) {
       console.error('Failed to fetch contact history data:', error)
       setContactBatchHistory([])
@@ -3106,7 +3151,12 @@ function App() {
   }, [selectedChild, filteredData])
 
   useEffect(() => {
-    if (selectedChild !== null || rememberedChildId === null) return
+    if (
+      !capabilities.canViewContactBatchHistory ||
+      selectedChild !== null ||
+      rememberedChildId === null
+    )
+      return
 
     const shouldRestore = filteredData.some((child) => child.id === rememberedChildId)
     if (!shouldRestore) return
@@ -3135,7 +3185,7 @@ function App() {
     }
 
     restoreSelectedChildContext()
-  }, [selectedChild, rememberedChildId, filteredData])
+  }, [capabilities.canViewContactBatchHistory, selectedChild, rememberedChildId, filteredData])
 
   // Check if all selected records have valid CSA status for Hold/Resume
   const canHoldResume = useMemo(() => {
@@ -3274,11 +3324,15 @@ function App() {
 
   // DQ update/delete is enabled only for a single selected, non-protected record.
   const canDqModifySelected = useMemo(() => {
-    if (!isDataQualitySteward || selected.length !== 1) return false
+    if (!capabilities.canEditContactRecords || selected.length !== 1) return false
     const cached = selectedRecordsCache.get(selected[0])
     if (!cached) return false
-    return canDqModifyRecord(isDataQualitySteward, selected.length, cached.csaStatusRaw)
-  }, [isDataQualitySteward, selected, selectedRecordsCache])
+    return canDqModifyRecord(
+      capabilities.canEditContactRecords,
+      selected.length,
+      cached.csaStatusRaw,
+    )
+  }, [capabilities.canEditContactRecords, selected, selectedRecordsCache])
 
   const handleDqUpdateClick = () => {
     if (!canDqModifySelected) return
@@ -3980,29 +4034,31 @@ function App() {
                 },
               }}
             >
-              <Tab label="Eligibility List" />
-              {!isDataQualitySteward && <Tab label="Batch Requests" />}
-              {!isDataQualitySteward && <Tab label="Weekly File Processing" />}
-              {!isDataQualitySteward && <Tab label="Job Monitoring" />}
+              {capabilities.canAccessEligibilityList && <Tab label="Eligibility List" />}
+              {capabilities.canAccessBatches && <Tab label="Batch Requests" />}
+              {capabilities.canAccessWeeklyFiles && <Tab label="Weekly File Processing" />}
+              {capabilities.canAccessJobMonitoring && <Tab label="Job Monitoring" />}
             </Tabs>
 
             {/* Last Successful Runs Info */}
-            <Box
-              sx={{
-                padding: '6px 12px',
-                mr: 2,
-                textAlign: 'left',
-                border: '1px solid #666',
-                borderRadius: '4px',
-              }}
-            >
-              <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
-                Last Data Fetch: {formatJobTimestamp(lastSuccessfulRuns.lastDataIngestion)}
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
-                Last Eligibility Run: {formatJobTimestamp(lastSuccessfulRuns.lastEligibilityRun)}
-              </Typography>
-            </Box>
+            {capabilities.canViewJobRunSummary && (
+              <Box
+                sx={{
+                  padding: '6px 12px',
+                  mr: 2,
+                  textAlign: 'left',
+                  border: '1px solid #666',
+                  borderRadius: '4px',
+                }}
+              >
+                <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
+                  Last Data Fetch: {formatJobTimestamp(lastSuccessfulRuns.lastDataIngestion)}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#333', fontSize: '0.75rem' }}>
+                  Last Eligibility Run: {formatJobTimestamp(lastSuccessfulRuns.lastEligibilityRun)}
+                </Typography>
+              </Box>
+            )}
           </Box>
 
           {/* Content Section */}
@@ -4014,7 +4070,7 @@ function App() {
               overflow: 'auto',
             }}
           >
-            {selectedTab === 0 && (
+            {capabilities.canAccessEligibilityList && selectedTab === 0 && (
               <Box>
                 {/* Eligibility List Header */}
                 <Box
@@ -4038,306 +4094,322 @@ function App() {
                       </IconButton>
                     </Tooltip>
                   </Box>
-                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                    <TextField
-                      size="small"
-                      placeholder="Search"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Box component="span" sx={{ fontSize: '18px' }}>
-                              🔍
-                            </Box>
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{ width: '200px' }}
-                    />
-                    <FormControl size="small" sx={{ minWidth: 250 }}>
-                      <Select
-                        value={preDefinedFilter}
-                        onChange={(e) => handlePreDefinedFilterChange(e.target.value)}
-                        displayEmpty
-                      >
-                        <MenuItem value="All Records">All Children in CSA Master</MenuItem>
-                        <MenuItem value="Pending User review/action">
-                          Pending User review/action
-                        </MenuItem>
-                        <MenuItem value="All children On Hold from CSA">
-                          All children On Hold from CSA
-                        </MenuItem>
-                        <MenuItem value="Children In Pay">Children In Pay</MenuItem>
-                        <MenuItem value="Children Out of Pay">Children Out of Pay</MenuItem>
-                        <MenuItem value="CRA Refused CSA List">CRA Refused CSA List</MenuItem>
-                        <MenuItem value="Children within a batch">Children within a batch</MenuItem>
-                        <MenuItem value="Children over 18 years (never eligible)">
-                          Children over 18 years (never eligible)
-                        </MenuItem>
-                      </Select>
-                    </FormControl>
-                    {isDataQualitySteward && dqEditableRecordId !== null && (
-                      <>
-                        {hasDqChanges && (
+                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Eligibility list — search & filters (canAccessEligibilityList) */}
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                      <TextField
+                        size="small"
+                        placeholder="Search"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Box component="span" sx={{ fontSize: '18px' }}>
+                                🔍
+                              </Box>
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{ width: '200px' }}
+                      />
+                      <FormControl size="small" sx={{ minWidth: 250 }}>
+                        <Select
+                          value={preDefinedFilter}
+                          onChange={(e) => handlePreDefinedFilterChange(e.target.value)}
+                          displayEmpty
+                        >
+                          <MenuItem value="All Records">All Children in CSA Master</MenuItem>
+                          <MenuItem value="Pending User review/action">
+                            Pending User review/action
+                          </MenuItem>
+                          <MenuItem value="All children On Hold from CSA">
+                            All children On Hold from CSA
+                          </MenuItem>
+                          <MenuItem value="Children In Pay">Children In Pay</MenuItem>
+                          <MenuItem value="Children Out of Pay">Children Out of Pay</MenuItem>
+                          <MenuItem value="CRA Refused CSA List">CRA Refused CSA List</MenuItem>
+                          <MenuItem value="Children within a batch">
+                            Children within a batch
+                          </MenuItem>
+                          <MenuItem value="Children over 18 years (never eligible)">
+                            Children over 18 years (never eligible)
+                          </MenuItem>
+                        </Select>
+                      </FormControl>
+                      <Tooltip title="Clear all column filters and sorting" arrow>
+                        <span>
                           <Button
-                            variant="contained"
+                            variant="outlined"
                             size="small"
-                            onClick={handleDqSaveClick}
-                            disabled={!dqDinIsValid}
-                            sx={{ textTransform: 'none' }}
+                            startIcon={<FilterAltOffIcon />}
+                            disabled={
+                              !isColumnFilterActive &&
+                              !sortConfig &&
+                              Object.keys(activeColumnFilters).length === 0
+                            }
+                            onClick={() => {
+                              // Clear all column filters and sorting
+                              // Note: Don't call fetchContacts explicitly - the useEffect
+                              // watching these state variables will trigger the fetch
+                              setActiveColumnFilters({})
+                              setIsColumnFilterActive(false)
+                              setSortConfig(null)
+                              setCurrentPage(1)
+                            }}
+                            sx={{
+                              textTransform: 'none',
+                              minWidth: 'auto',
+                              '&.Mui-disabled': {
+                                opacity: 0.5,
+                              },
+                            }}
                           >
-                            Save
+                            Clear Filters
                           </Button>
-                        )}
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={handleDqCancelEdit}
-                          sx={{ textTransform: 'none' }}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    )}
-                    {isDataQualitySteward && dqEditableRecordId === null && (
-                      <>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={handleDqUpdateClick}
-                          disabled={!canDqModifySelected}
-                          sx={{ textTransform: 'none' }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          color="error"
-                          onClick={handleDqDeleteClick}
-                          disabled={!canDqModifySelected}
-                          sx={{ textTransform: 'none' }}
-                        >
-                          Delete
-                        </Button>
-                      </>
-                    )}
-                    {!isDataQualitySteward && (
-                      <>
-                        <Tooltip title="Clear all column filters and sorting" arrow>
-                          <span>
+                        </span>
+                      </Tooltip>
+                    </Box>
+                    {/* Record & workflow actions */}
+                    {(capabilities.canEditContactRecords || capabilities.canPerformCsaActions) && (
+                      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                        {capabilities.canEditContactRecords && dqEditableRecordId !== null && (
+                          <>
+                            {hasDqChanges && (
+                              <Button
+                                variant="contained"
+                                size="small"
+                                onClick={handleDqSaveClick}
+                                disabled={!dqDinIsValid}
+                                sx={{ textTransform: 'none' }}
+                              >
+                                Save
+                              </Button>
+                            )}
                             <Button
                               variant="outlined"
                               size="small"
-                              startIcon={<FilterAltOffIcon />}
-                              disabled={
-                                !isColumnFilterActive &&
-                                !sortConfig &&
-                                Object.keys(activeColumnFilters).length === 0
-                              }
-                              onClick={() => {
-                                // Clear all column filters and sorting
-                                // Note: Don't call fetchContacts explicitly - the useEffect
-                                // watching these state variables will trigger the fetch
-                                setActiveColumnFilters({})
-                                setIsColumnFilterActive(false)
-                                setSortConfig(null)
-                                setCurrentPage(1)
-                              }}
+                              onClick={handleDqCancelEdit}
+                              sx={{ textTransform: 'none' }}
+                            >
+                              Cancel
+                            </Button>
+                          </>
+                        )}
+                        {capabilities.canEditContactRecords && dqEditableRecordId === null && (
+                          <>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={handleDqUpdateClick}
+                              disabled={!canDqModifySelected}
+                              sx={{ textTransform: 'none' }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              color="error"
+                              onClick={handleDqDeleteClick}
+                              disabled={!canDqModifySelected}
+                              sx={{ textTransform: 'none' }}
+                            >
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                        {capabilities.canPerformCsaActions && (
+                          <>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={handleEligibilityMenuOpen}
+                              disabled={isRunningEligibilityAll}
                               sx={{
                                 textTransform: 'none',
-                                minWidth: 'auto',
+                              }}
+                            >
+                              {isRunningEligibilityAll
+                                ? 'Running Eligibility...'
+                                : 'Run Eligibility Query'}
+                              <Tooltip
+                                title="Run eligibility rules against staging data to update contact CSA status"
+                                arrow
+                              >
+                                <InfoOutlinedIcon
+                                  fontSize="small"
+                                  sx={{ ml: 0.5, fontSize: '16px', color: 'inherit' }}
+                                />
+                              </Tooltip>
+                              <Box component="span" sx={{ ml: 0.5 }}>
+                                ▾
+                              </Box>
+                            </Button>
+                            <Menu
+                              anchorEl={eligibilityMenuAnchor}
+                              open={eligibilityMenuOpen}
+                              onClose={handleEligibilityMenuClose}
+                            >
+                              <MenuItem
+                                onClick={handleRunEligibilityForAllClick}
+                                disabled={isRunningEligibilityAll}
+                                sx={{ fontSize: '0.85rem' }}
+                              >
+                                Run query on all contacts
+                              </MenuItem>
+                              {selected.length === 1 && (
+                                <MenuItem
+                                  onClick={handleRunEligibilityForSelected}
+                                  disabled={isRunningEligibilityAll}
+                                  sx={{ fontSize: '0.85rem' }}
+                                >
+                                  Run query on selected contact
+                                </MenuItem>
+                              )}
+                            </Menu>
+                            <Button
+                              variant="contained"
+                              size="small"
+                              onClick={handleAddToBatchMenuOpen}
+                              disabled={
+                                isRunningEligibilityAll ||
+                                isRunningAutoBatch ||
+                                isPendingBatchLockedForSendCra
+                              }
+                              sx={{
+                                textTransform: 'none',
                                 '&.Mui-disabled': {
                                   opacity: 0.5,
+                                  cursor: 'not-allowed',
                                 },
                               }}
                             >
-                              Clear Filters
+                              {isRunningAutoBatch ? 'Running Auto-batch...' : 'Add to Batch'}
+                              <Box component="span" sx={{ ml: 0.5 }}>
+                                ▾
+                              </Box>
                             </Button>
-                          </span>
-                        </Tooltip>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={handleEligibilityMenuOpen}
-                          disabled={isRunningEligibilityAll}
-                          sx={{
-                            textTransform: 'none',
-                          }}
-                        >
-                          {isRunningEligibilityAll
-                            ? 'Running Eligibility...'
-                            : 'Run Eligibility Query'}
-                          <Tooltip
-                            title="Run eligibility rules against staging data to update contact CSA status"
-                            arrow
-                          >
-                            <InfoOutlinedIcon
-                              fontSize="small"
-                              sx={{ ml: 0.5, fontSize: '16px', color: 'inherit' }}
-                            />
-                          </Tooltip>
-                          <Box component="span" sx={{ ml: 0.5 }}>
-                            ▾
-                          </Box>
-                        </Button>
-                        <Menu
-                          anchorEl={eligibilityMenuAnchor}
-                          open={eligibilityMenuOpen}
-                          onClose={handleEligibilityMenuClose}
-                        >
-                          <MenuItem
-                            onClick={handleRunEligibilityForAllClick}
-                            disabled={isRunningEligibilityAll}
-                            sx={{ fontSize: '0.85rem' }}
-                          >
-                            Run query on all contacts
-                          </MenuItem>
-                          {selected.length === 1 && (
-                            <MenuItem
-                              onClick={handleRunEligibilityForSelected}
-                              disabled={isRunningEligibilityAll}
-                              sx={{ fontSize: '0.85rem' }}
+                            <Menu
+                              anchorEl={addToBatchMenuAnchor}
+                              open={addToBatchMenuOpen}
+                              onClose={handleAddToBatchMenuClose}
                             >
-                              Run query on selected contact
-                            </MenuItem>
-                          )}
-                        </Menu>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          onClick={handleAddToBatchMenuOpen}
-                          disabled={
-                            isRunningEligibilityAll ||
-                            isRunningAutoBatch ||
-                            isPendingBatchLockedForSendCra
-                          }
-                          sx={{
-                            textTransform: 'none',
-                            '&.Mui-disabled': {
-                              opacity: 0.5,
-                              cursor: 'not-allowed',
-                            },
-                          }}
-                        >
-                          {isRunningAutoBatch ? 'Running Auto-batch...' : 'Add to Batch'}
-                          <Box component="span" sx={{ ml: 0.5 }}>
-                            ▾
-                          </Box>
-                        </Button>
-                        <Menu
-                          anchorEl={addToBatchMenuAnchor}
-                          open={addToBatchMenuOpen}
-                          onClose={handleAddToBatchMenuClose}
-                        >
-                          <MenuItem
-                            onClick={handleAddSelectedToBatch}
-                            disabled={
-                              !canAddToBatch ||
-                              isRunningEligibilityAll ||
-                              isRunningAutoBatch ||
-                              isPendingBatchLockedForSendCra
-                            }
-                            sx={{ fontSize: '0.85rem' }}
-                          >
-                            Add selected items to batch
-                          </MenuItem>
-                          <MenuItem
-                            onClick={handleAutoBatchAllClick}
-                            disabled={
-                              isRunningEligibilityAll ||
-                              isRunningAutoBatch ||
-                              isPendingBatchLockedForSendCra
-                            }
-                            sx={{ fontSize: '0.85rem' }}
-                          >
-                            Add System determined Eligible/NE kids to Batch
-                          </MenuItem>
-                        </Menu>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          disabled={!canHoldResume || isRunningEligibilityAll || isRunningAutoBatch}
-                          onClick={handleHoldResume}
-                          sx={{
-                            textTransform: 'none',
-                            '&.Mui-disabled': {
-                              opacity: 0.5,
-                              cursor: 'not-allowed',
-                            },
-                          }}
-                        >
-                          Hold/Resume
-                        </Button>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          disabled={
-                            !canUpdateEligibility || isRunningEligibilityAll || isRunningAutoBatch
-                          }
-                          onClick={handleCSAEligible}
-                          sx={{
-                            textTransform: 'none',
-                            backgroundColor:
-                              canUpdateEligibility &&
-                              !isRunningEligibilityAll &&
-                              !isRunningAutoBatch
-                                ? '#1976d2'
-                                : undefined,
-                            '&.Mui-disabled': {
-                              opacity: 0.5,
-                              cursor: 'not-allowed',
-                            },
-                          }}
-                        >
-                          CSA Eligible
-                        </Button>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          disabled={
-                            !canUpdateNotEligible || isRunningEligibilityAll || isRunningAutoBatch
-                          }
-                          onClick={handleCSANotEligible}
-                          sx={{
-                            textTransform: 'none',
-                            backgroundColor:
-                              canUpdateNotEligible &&
-                              !isRunningEligibilityAll &&
-                              !isRunningAutoBatch
-                                ? '#d32f2f'
-                                : undefined,
-                            '&.Mui-disabled': {
-                              opacity: 0.5,
-                              cursor: 'not-allowed',
-                            },
-                          }}
-                        >
-                          CSA Not Eligible
-                        </Button>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          disabled={
-                            !canUpdateOver18 || isRunningEligibilityAll || isRunningAutoBatch
-                          }
-                          onClick={handleChildOver18}
-                          sx={{
-                            textTransform: 'none',
-                            backgroundColor:
-                              canUpdateOver18 && !isRunningEligibilityAll && !isRunningAutoBatch
-                                ? '#ff9800'
-                                : undefined,
-                            '&.Mui-disabled': {
-                              opacity: 0.5,
-                              cursor: 'not-allowed',
-                            },
-                          }}
-                        >
-                          Child Over 18
-                        </Button>
-                      </>
+                              <MenuItem
+                                onClick={handleAddSelectedToBatch}
+                                disabled={
+                                  !canAddToBatch ||
+                                  isRunningEligibilityAll ||
+                                  isRunningAutoBatch ||
+                                  isPendingBatchLockedForSendCra
+                                }
+                                sx={{ fontSize: '0.85rem' }}
+                              >
+                                Add selected items to batch
+                              </MenuItem>
+                              <MenuItem
+                                onClick={handleAutoBatchAllClick}
+                                disabled={
+                                  isRunningEligibilityAll ||
+                                  isRunningAutoBatch ||
+                                  isPendingBatchLockedForSendCra
+                                }
+                                sx={{ fontSize: '0.85rem' }}
+                              >
+                                Add System determined Eligible/NE kids to Batch
+                              </MenuItem>
+                            </Menu>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              disabled={
+                                !canHoldResume || isRunningEligibilityAll || isRunningAutoBatch
+                              }
+                              onClick={handleHoldResume}
+                              sx={{
+                                textTransform: 'none',
+                                '&.Mui-disabled': {
+                                  opacity: 0.5,
+                                  cursor: 'not-allowed',
+                                },
+                              }}
+                            >
+                              Hold/Resume
+                            </Button>
+                            <Button
+                              variant="contained"
+                              size="small"
+                              disabled={
+                                !canUpdateEligibility ||
+                                isRunningEligibilityAll ||
+                                isRunningAutoBatch
+                              }
+                              onClick={handleCSAEligible}
+                              sx={{
+                                textTransform: 'none',
+                                backgroundColor:
+                                  canUpdateEligibility &&
+                                  !isRunningEligibilityAll &&
+                                  !isRunningAutoBatch
+                                    ? '#1976d2'
+                                    : undefined,
+                                '&.Mui-disabled': {
+                                  opacity: 0.5,
+                                  cursor: 'not-allowed',
+                                },
+                              }}
+                            >
+                              CSA Eligible
+                            </Button>
+                            <Button
+                              variant="contained"
+                              size="small"
+                              disabled={
+                                !canUpdateNotEligible ||
+                                isRunningEligibilityAll ||
+                                isRunningAutoBatch
+                              }
+                              onClick={handleCSANotEligible}
+                              sx={{
+                                textTransform: 'none',
+                                backgroundColor:
+                                  canUpdateNotEligible &&
+                                  !isRunningEligibilityAll &&
+                                  !isRunningAutoBatch
+                                    ? '#d32f2f'
+                                    : undefined,
+                                '&.Mui-disabled': {
+                                  opacity: 0.5,
+                                  cursor: 'not-allowed',
+                                },
+                              }}
+                            >
+                              CSA Not Eligible
+                            </Button>
+                            <Button
+                              variant="contained"
+                              size="small"
+                              disabled={
+                                !canUpdateOver18 || isRunningEligibilityAll || isRunningAutoBatch
+                              }
+                              onClick={handleChildOver18}
+                              sx={{
+                                textTransform: 'none',
+                                backgroundColor:
+                                  canUpdateOver18 && !isRunningEligibilityAll && !isRunningAutoBatch
+                                    ? '#ff9800'
+                                    : undefined,
+                                '&.Mui-disabled': {
+                                  opacity: 0.5,
+                                  cursor: 'not-allowed',
+                                },
+                              }}
+                            >
+                              Child Over 18
+                            </Button>
+                          </>
+                        )}
+                      </Box>
                     )}
                   </Box>
                 </Box>
@@ -4382,23 +4454,23 @@ function App() {
                           >
                             <Checkbox
                               disabled={
-                                isDataQualitySteward ||
+                                capabilities.canEditContactRecords ||
                                 isRunningEligibilityAll ||
                                 isRunningAutoBatch
                               }
                               indeterminate={
-                                !isDataQualitySteward &&
+                                !capabilities.canEditContactRecords &&
                                 selected.length > 0 &&
                                 selected.length < filteredData.length &&
                                 filteredData.some((row) => selected.includes(row.id))
                               }
                               checked={
-                                !isDataQualitySteward &&
+                                !capabilities.canEditContactRecords &&
                                 filteredData.length > 0 &&
                                 filteredData.every((row) => selected.includes(row.id))
                               }
                               onChange={(e) => {
-                                if (isDataQualitySteward) return
+                                if (capabilities.canEditContactRecords) return
                                 if (e.target.checked) {
                                   // Select all rows on current page
                                   setSelected((prev) => {
@@ -4807,14 +4879,19 @@ function App() {
                                     return newCache
                                   })
                                 } else {
-                                  if (isDataQualitySteward && dqEditableRecordId !== null) {
+                                  if (
+                                    capabilities.canEditContactRecords &&
+                                    dqEditableRecordId !== null
+                                  ) {
                                     setDqEditableRecordId(null)
                                   }
                                   setSelected((prev) =>
-                                    isDataQualitySteward ? [row.id] : [...prev, row.id],
+                                    capabilities.canEditContactRecords
+                                      ? [row.id]
+                                      : [...prev, row.id],
                                   )
                                   setSelectedRecordsCache((prev) => {
-                                    const newCache = isDataQualitySteward
+                                    const newCache = capabilities.canEditContactRecords
                                       ? new Map()
                                       : new Map(prev)
                                     newCache.set(row.id, {
@@ -4843,7 +4920,7 @@ function App() {
                             {row.dob}
                           </TableCell>
                           <TableCell>
-                            {isDataQualitySteward && dqEditableRecordId === row.id ? (
+                            {capabilities.canEditContactRecords && dqEditableRecordId === row.id ? (
                               <TextField
                                 size="small"
                                 value={dqEditValues.din}
@@ -4868,7 +4945,7 @@ function App() {
                             )}
                           </TableCell>
                           <TableCell>
-                            {isDataQualitySteward && dqEditableRecordId === row.id ? (
+                            {capabilities.canEditContactRecords && dqEditableRecordId === row.id ? (
                               <FormControl size="small" sx={{ minWidth: 160 }}>
                                 <Select
                                   value={dqEditValues.csaStatusRaw}
@@ -4896,12 +4973,12 @@ function App() {
                             // bubble to the TableRow's onClick (handleContactClick) via the React tree —
                             // stop that here so navigating months doesn't get hijacked by a row click.
                             onClick={
-                              isDataQualitySteward && dqEditableRecordId === row.id
+                              capabilities.canEditContactRecords && dqEditableRecordId === row.id
                                 ? (e) => e.stopPropagation()
                                 : undefined
                             }
                           >
-                            {isDataQualitySteward && dqEditableRecordId === row.id ? (
+                            {capabilities.canEditContactRecords && dqEditableRecordId === row.id ? (
                               <LocalizationProvider dateAdapter={AdapterDateFns}>
                                 <DatePicker
                                   value={
@@ -5019,48 +5096,51 @@ function App() {
                               ) : (
                                 <Typography component="span" />
                               )}
-                              {row.csaStatusRaw === 'on_hold' && (
-                                <Tooltip title="Edit hold reason">
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleEditHoldReason(row.id, row.holdReason || '')
-                                    }}
-                                    sx={{
-                                      padding: 0.25,
-                                      color: '#1976d2',
-                                      '&:hover': {
-                                        backgroundColor: '#e3f2fd',
-                                      },
-                                    }}
-                                  >
-                                    <EditIcon sx={{ fontSize: 16 }} />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                              {row.csaStatusRaw !== 'on_hold' && row.holdReason && (
-                                <Tooltip title="Clear hold reason">
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => handleClearHoldReason(row.id, e)}
-                                    sx={{
-                                      padding: 0.25,
-                                      color: '#9e9e9e',
-                                      '&:hover': {
-                                        backgroundColor: '#f5f5f5',
-                                        color: '#d32f2f',
-                                      },
-                                    }}
-                                  >
-                                    <CloseIcon sx={{ fontSize: 16 }} />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
+                              {row.csaStatusRaw === 'on_hold' &&
+                                capabilities.canPerformCsaActions && (
+                                  <Tooltip title="Edit hold reason">
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleEditHoldReason(row.id, row.holdReason || '')
+                                      }}
+                                      sx={{
+                                        padding: 0.25,
+                                        color: '#1976d2',
+                                        '&:hover': {
+                                          backgroundColor: '#e3f2fd',
+                                        },
+                                      }}
+                                    >
+                                      <EditIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
+                              {row.csaStatusRaw !== 'on_hold' &&
+                                row.holdReason &&
+                                capabilities.canPerformCsaActions && (
+                                  <Tooltip title="Clear hold reason">
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => handleClearHoldReason(row.id, e)}
+                                      sx={{
+                                        padding: 0.25,
+                                        color: '#9e9e9e',
+                                        '&:hover': {
+                                          backgroundColor: '#f5f5f5',
+                                          color: '#d32f2f',
+                                        },
+                                      }}
+                                    >
+                                      <CloseIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
                             </Box>
                           </TableCell>
                           <TableCell align="center">
-                            {row.needsReview && (
+                            {row.needsReview && capabilities.canPerformCsaActions && (
                               <Tooltip title="Click to clear review flag">
                                 <IconButton
                                   size="small"
@@ -6847,7 +6927,7 @@ function App() {
                   })()}
 
                 {/* Batch History Section */}
-                {!isDataQualitySteward && selectedChild !== null && (
+                {capabilities.canViewContactBatchHistory && selectedChild !== null && (
                   <Box sx={{ mt: 3 }}>
                     <Paper sx={{ p: 0, overflow: 'hidden' }}>
                       <Box
@@ -7628,7 +7708,7 @@ function App() {
                 )}
               </Box>
             )}
-            {!isDataQualitySteward && selectedTab === 1 && (
+            {capabilities.canAccessBatches && selectedTab === 1 && (
               <Box>
                 {/* Batch Requests Header */}
                 <Box
@@ -8408,8 +8488,8 @@ function App() {
               </Box>
             )}
 
-            {!isDataQualitySteward && selectedTab === 2 && <WeeklyFileProcessingTab />}
-            {!isDataQualitySteward && selectedTab === 3 && <JobMonitoringTab />}
+            {capabilities.canAccessWeeklyFiles && selectedTab === 2 && <WeeklyFileProcessingTab />}
+            {capabilities.canAccessJobMonitoring && selectedTab === 3 && <JobMonitoringTab />}
           </Box>
 
           {/* Sort and Filter Menus - Outside tabs so they're always available */}

@@ -584,6 +584,12 @@ const UPDATE_SET = CONTACT_COLUMNS.filter((col) => col.conflictMode !== 'skip')
   )
   .join(',\n        ')
 
+const RECORD_ELIGIBILITY_RUN_SQL = `
+  UPDATE contacts
+  SET last_eligibility_run_at = NOW()
+  WHERE person_id_icm = ANY($1::text[])
+`
+
 const UPSERT_SQL = `
   INSERT INTO contacts (
     ${COL_LIST},
@@ -602,7 +608,6 @@ const UPSERT_SQL = `
       WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN NOW()
       ELSE contacts.csa_status_effective_date
     END,
-    last_eligibility_run_at = NOW(),
     icm_integration_status = CASE
       WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN true
       ELSE contacts.icm_integration_status
@@ -683,7 +688,12 @@ export class EligibilityService {
       stepCounts: { step7: 0, step8: 0, step9: 0, step10: 0, noChange: 0 },
     }
 
-    const updates: Array<{ profile: ContactProfile; result: EligibilityResult }> = []
+    const updates: Array<{
+      profile: ContactProfile
+      result: EligibilityResult
+      rulesRan: boolean
+    }> = []
+    const evaluatedOnlyIds: string[] = []
 
     for (const profile of profiles) {
       if (!profile.dateOfBirth) {
@@ -718,6 +728,7 @@ export class EligibilityService {
             cancelReasonCode: profile.cancelReasonCode,
             careEndDate: profile.careEndDate,
           },
+          rulesRan: false,
         })
         continue
       }
@@ -749,10 +760,11 @@ export class EligibilityService {
         }))
       ) {
         stats.stepCounts.noChange++
+        evaluatedOnlyIds.push(profile.personIdIcm)
         continue
       }
 
-      updates.push({ profile, result })
+      updates.push({ profile, result, rulesRan: true })
 
       if (result.newStatus !== profile.csaStatus) {
         const stepKey = `step${result.step}` as keyof typeof stats.stepCounts
@@ -767,6 +779,10 @@ export class EligibilityService {
     }
 
     this.logger.log(`Step counts: ${JSON.stringify(stats.stepCounts)}, updates: ${updates.length}`)
+
+    if (evaluatedOnlyIds.length > 0) {
+      await this.recordEligibilityRunAt(evaluatedOnlyIds)
+    }
 
     if (updates.length > 0) {
       const upsertResult = await this.upsertContacts(updates)
@@ -828,6 +844,14 @@ export class EligibilityService {
     return rows[0]?.hasChanges === true
   }
 
+  /** BL-14C: record that eligibility rules ran without upserting contact fields. */
+  private async recordEligibilityRunAt(personIdIcms: string[]): Promise<void> {
+    if (personIdIcms.length === 0) {
+      return
+    }
+    await this.prisma.$executeRawUnsafe(RECORD_ELIGIBILITY_RUN_SQL, personIdIcms)
+  }
+
   private async findAgedOutContactIds(referenceDate: Date): Promise<string[]> {
     const cutoff = getAgeCutoffDate(referenceDate)
     const { sql, params } = buildFindAgedOutContactIdsSql(cutoff)
@@ -863,6 +887,7 @@ export class EligibilityService {
             cancelReasonCode: profile.cancelReasonCode,
             careEndDate: profile.careEndDate,
           },
+          rulesRan: false,
         },
       ])
       return { previousStatus, newStatus: profile.csaStatus }
@@ -899,10 +924,11 @@ export class EligibilityService {
       if (!resolvedStatus) {
         throw new EligibilityInputError(`Contact ${personIdIcm} has no CSA status`)
       }
+      await this.recordEligibilityRunAt([personIdIcm])
       return { previousStatus, newStatus: resolvedStatus }
     }
 
-    await this.upsertContacts([{ profile, result }])
+    await this.upsertContacts([{ profile, result, rulesRan: true }])
     return { previousStatus, newStatus: result.newStatus }
   }
 
@@ -1083,13 +1109,18 @@ export class EligibilityService {
   }
 
   private async upsertContacts(
-    updates: Array<{ profile: ContactProfile; result: EligibilityResult }>,
+    updates: Array<{
+      profile: ContactProfile
+      result: EligibilityResult
+      rulesRan: boolean
+    }>,
   ): Promise<{ skipped: number; validRows: UpsertContext[] }> {
     const batchSize = ELIGIBILITY_CONFIG.BATCH_SIZE
     let skipped = 0
 
     const validRows: UpsertContext[] = []
-    for (const { profile, result } of updates) {
+    const rulesRanIds: string[] = []
+    for (const { profile, result, rulesRan } of updates) {
       const row: UpsertContext = {
         profile,
         result,
@@ -1105,12 +1136,19 @@ export class EligibilityService {
         continue
       }
       validRows.push(row)
+      if (rulesRan) {
+        rulesRanIds.push(profile.personIdIcm)
+      }
     }
 
     for (let i = 0; i < validRows.length; i += batchSize) {
       const batch = validRows.slice(i, i + batchSize)
       await this.batchUpsertRows(batch)
       this.logger.log(`Upserted batch ${Math.floor(i / batchSize) + 1} (${batch.length} contacts)`)
+    }
+
+    if (rulesRanIds.length > 0) {
+      await this.recordEligibilityRunAt(rulesRanIds)
     }
 
     return { skipped, validRows }

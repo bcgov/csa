@@ -88,7 +88,7 @@ export class ContactDto {
 
   @ApiPropertyOptional({
     description:
-      'When eligibility last successfully ran and upserted this contact (BL-14C watermark)',
+      'When eligibility last ran decision rules on this contact (BL-14C watermark)',
   })
   lastEligibilityRunAt?: Date
 

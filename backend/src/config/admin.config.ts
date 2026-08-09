@@ -1,4 +1,5 @@
 import { registerAs } from '@nestjs/config'
+import { getDeployEnv } from './app.config'
 
 export const adminConfig = registerAs('admin', () => {
   const icmApiUrl = process.env.ICM_API_URL?.replace(/\/Employee\/?$/, '')
@@ -31,7 +32,7 @@ export const adminConfig = registerAs('admin', () => {
   if (!keycloakClientSecret) {
     throw new Error('KEYCLOAK_CLIENT_SECRET is required')
   }
-  if (!ssoKeycloakJwksUrl) {
+  if (!ssoKeycloakJwksUrl && getDeployEnv() !== 'local') {
     throw new Error('SSO_KEYCLOAK_URL and SSO_KEYCLOAK_REALM are required')
   }
 

@@ -5,18 +5,20 @@ import { KeycloakAuthModule } from 'src/common/auth/keycloak-auth.module'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
 import { PrismaModule } from 'src/common/database/prisma.module'
 import { adminConfig } from 'src/config/admin.config'
+import { appConfig } from 'src/config/app.config'
 import { icmConfig } from 'src/config/icm.config'
 import { syncConfig } from 'src/config/sync.config'
+import path from 'path'
 import { IcmApiDataSource } from './data-source/icm-api-data-source'
 import { IcmDataSource } from './data-source/icm-data-source'
-import { MockIcmDataSource } from './data-source/mock-icm-data-source'
+import { LocalIcmDataSource } from './data-source/local-icm-data-source'
 import { IcmSyncBackService } from './icm-sync-back.service'
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [syncConfig, adminConfig, icmConfig],
+      load: [syncConfig, appConfig, adminConfig, icmConfig],
     }),
     HttpModule,
     PrismaModule,
@@ -30,9 +32,11 @@ import { IcmSyncBackService } from './icm-sync-back.service'
         httpService: HttpService,
         keycloakAuthService: KeycloakAuthService,
       ) => {
-        return configService.get<boolean>('sync.useMockData')
-          ? new MockIcmDataSource()
-          : new IcmApiDataSource(httpService, configService, keycloakAuthService)
+        if (configService.get<boolean>('sync.isLocal')) {
+          const storagePath = configService.get<string>('app.fileStoragePath')!
+          return new LocalIcmDataSource(path.join(storagePath, 'icm'))
+        }
+        return new IcmApiDataSource(httpService, configService, keycloakAuthService)
       },
       inject: [ConfigService, HttpService, KeycloakAuthService],
     },

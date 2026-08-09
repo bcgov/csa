@@ -1,7 +1,6 @@
-import { Test, TestingModule } from '@nestjs/testing'
-import { MockIcmDataSource } from './mock-icm-data-source'
 import { IcmApiConfig } from '../icm.config'
 import * as fs from 'fs'
+import { LocalIcmDataSource } from './local-icm-data-source'
 
 vi.mock('fs')
 
@@ -14,21 +13,16 @@ const testConfig: IcmApiConfig = {
   fieldMap: [],
 }
 
-describe('MockIcmDataSource', () => {
-  let service: MockIcmDataSource
+describe('LocalIcmDataSource', () => {
+  let service: LocalIcmDataSource
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks()
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [MockIcmDataSource],
-    }).compile()
-
-    service = module.get<MockIcmDataSource>(MockIcmDataSource)
+    service = new LocalIcmDataSource('/storage/icm')
   })
 
   describe('fetchAll', () => {
-    it('should read mock .json file and return items', async () => {
+    it('should read local .json file and return items', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true)
       vi.mocked(fs.readFileSync).mockReturnValue(
         JSON.stringify({ items: [{ 'Row Id': '1' }, { 'Row Id': '2' }] }),
@@ -40,7 +34,7 @@ describe('MockIcmDataSource', () => {
       expect(results[0]['Row Id']).toBe('1')
     })
 
-    it('should return empty array when mock file not found', async () => {
+    it('should return empty array when fixture file not found', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(false)
 
       const results = await service.fetchAll(testConfig)
@@ -83,7 +77,7 @@ describe('MockIcmDataSource', () => {
       expect(results).toHaveLength(2)
     })
 
-    it('should load flat ooc agreement line mock records', async () => {
+    it('should load flat ooc agreement line fixture records', async () => {
       const oocConfig: IcmApiConfig = {
         name: 'ooc_agreement_lines',
         endpoint: '/AgreementLines/AgreementLine',

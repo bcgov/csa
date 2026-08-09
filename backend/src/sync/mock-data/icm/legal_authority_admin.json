@@ -2,21 +2,280 @@
   "items": [
     {
       "Id": "LA-000002",
-      "Updated": "02/09/2026 10:00:00",
-      "Legal Auth Code": "ADO-Adoption Act-24",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
       "MIS Legal Auth Code": "SNP",
       "Enroll for CSA": "Yes"
     },
     {
       "Id": "LA-000003",
-      "Updated": "02/09/2026 10:00:00",
+      "Updated": "02/01/2026 10:00:00",
       "Legal Auth Code": "CCO-CCO-49(1)",
       "MIS Legal Auth Code": "SNP",
       "Enroll for CSA": "Yes"
     },
     {
       "Id": "LA-000004",
-      "Updated": "02/09/2026 10:00:00",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-005",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-006",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-007",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-008",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-009",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-010",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-011",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-012",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-013",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-014",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-015",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-016",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-017",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-018",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-019",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-020",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-021",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-022",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-023",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-024",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-025",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-026",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-027",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-028",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-029",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-030",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-031",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-032",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-033",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-034",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-035",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-036",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-037",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-038",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-039",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-040",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Auth Code": "CCO-CCO-49(1)",
+      "MIS Legal Auth Code": "SNP",
+      "Enroll for CSA": "Yes"
+    },
+    {
+      "Id": "LA-041",
+      "Updated": "08/08/2026 10:00:00",
       "Legal Auth Code": "CCO-CCO-49(1)",
       "MIS Legal Auth Code": "SNP",
       "Enroll for CSA": "Yes"

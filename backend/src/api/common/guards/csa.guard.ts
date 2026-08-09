@@ -5,9 +5,16 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { Reflector } from '@nestjs/core'
 import { Request } from 'express'
 import { JwtVerificationService } from 'src/common/auth/jwt-verification.service'
+import {
+  LOCAL_DEV_PROFILE_HEADER,
+  LOCAL_DEV_TOKEN,
+  LOCAL_DEV_USER,
+  resolveLocalDevProfile,
+} from 'src/common/auth/local-dev.constants'
 import { extractUsernameFromPayload } from 'src/common/auth/token-utils'
 import { AdminService } from '../../admin/admin.service'
 import { isValidUserProfile, UserProfile } from '../../admin/constants/user-profile.constants'
@@ -44,6 +51,7 @@ export class CSAGuard implements CanActivate {
     private readonly adminService: AdminService,
     private readonly reflector: Reflector,
     private readonly jwtVerificationService: JwtVerificationService,
+    private readonly configService: ConfigService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -66,8 +74,21 @@ export class CSAGuard implements CanActivate {
       throw new UnauthorizedException('Invalid token format. Expected: Bearer <token>')
     }
 
-    // Extract and verify token signature using JWKS
     const token = authHeader.slice(7)
+    const deployEnv = this.configService.get<string>('app.deployEnv')
+
+    if (deployEnv === 'local' && token === LOCAL_DEV_TOKEN) {
+      const profileHint = request.headers[LOCAL_DEV_PROFILE_HEADER]
+      const userProfile = resolveLocalDevProfile(
+        typeof profileHint === 'string' ? profileHint : profileHint?.[0],
+      )
+      ;(request as any).user = LOCAL_DEV_USER
+      ;(request as any).username = LOCAL_DEV_USER.preferred_username
+      ;(request as any).userProfile = userProfile
+      return true
+    }
+
+    // Extract and verify token signature using JWKS
     const decoded = await this.verifyAndDecodeToken(token)
 
     // Attach decoded token and extracted username to request for use in route handlers

@@ -1,6 +1,6 @@
 // Runtime configuration loaded from /config.json
 // This file is generated at container startup from environment variables
-export type AppEnvironment = 'DEV' | 'TEST' | 'PRE-PROD' | 'PROD'
+export type AppEnvironment = 'LOCAL' | 'DEV' | 'TEST' | 'PRE-PROD' | 'PROD'
 
 export interface RuntimeConfig {
   VITE_KEYCLOAK_URL: string

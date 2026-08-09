@@ -160,7 +160,7 @@ export class JobsController {
     triggeredByUser: string,
   ): Promise<{ jobRunId: number; message: string; openshiftJobName?: string }> {
     if (!this.openshiftJobLauncher.isEnabled()) {
-      const deployEnv = this.configService.get<DeployEnv>('app.deployEnv', 'local')
+      const deployEnv = this.configService.get<DeployEnv>('app.deployEnv')!
       if (canRunBulkJobInApiProcess(deployEnv)) {
         return this.startFireAndForgetJob(jobType, triggeredByUser)
       }

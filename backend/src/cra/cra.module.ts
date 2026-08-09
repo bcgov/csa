@@ -53,8 +53,7 @@ import { S3CraTransferService } from './transfer/s3-cra-transfer.service'
       provide: CraTransferService,
       useFactory: (configService: ConfigService, httpService: HttpService) => {
         const logger = new Logger('CraModule')
-        const useMock = configService.get<boolean>('sync.useMockData')
-        if (useMock) {
+        if (configService.get<boolean>('sync.isLocal')) {
           const storagePath = configService.get<string>('app.fileStoragePath')!
           return new MockCraTransferService(path.join(storagePath, 'cra-mock'))
         }

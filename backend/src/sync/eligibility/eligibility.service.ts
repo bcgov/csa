@@ -584,6 +584,12 @@ const UPDATE_SET = CONTACT_COLUMNS.filter((col) => col.conflictMode !== 'skip')
   )
   .join(',\n        ')
 
+const RECORD_ELIGIBILITY_RUN_SQL = `
+  UPDATE contacts
+  SET last_eligibility_run_at = NOW()
+  WHERE person_id_icm = ANY($1::text[])
+`
+
 const UPSERT_SQL = `
   INSERT INTO contacts (
     ${COL_LIST},
@@ -602,7 +608,6 @@ const UPSERT_SQL = `
       WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN NOW()
       ELSE contacts.csa_status_effective_date
     END,
-    last_eligibility_run_at = NOW(),
     icm_integration_status = CASE
       WHEN EXCLUDED.csa_status IS DISTINCT FROM contacts.csa_status THEN true
       ELSE contacts.icm_integration_status
@@ -684,6 +689,7 @@ export class EligibilityService {
     }
 
     const updates: Array<{ profile: ContactProfile; result: EligibilityResult }> = []
+    const rulesRanIds: string[] = []
 
     for (const profile of profiles) {
       if (!profile.dateOfBirth) {
@@ -741,6 +747,8 @@ export class EligibilityService {
       const result = runEligibility(profile, RULES, referenceDate)
       if (!result) continue
 
+      rulesRanIds.push(profile.personIdIcm)
+
       if (
         result.newStatus === profile.csaStatus &&
         (await this.shouldSkipUpsertForUnchangedStaging(profile, {
@@ -771,6 +779,16 @@ export class EligibilityService {
     if (updates.length > 0) {
       const upsertResult = await this.upsertContacts(updates)
       stats.skipped = upsertResult.skipped
+      const upsertedIds = new Set(upsertResult.validRows.map((row) => row.profile.personIdIcm))
+      const updateIds = new Set(updates.map(({ profile }) => profile.personIdIcm))
+      const recordIds = rulesRanIds.filter(
+        (personIdIcm) => !updateIds.has(personIdIcm) || upsertedIds.has(personIdIcm),
+      )
+      if (recordIds.length > 0) {
+        await this.recordEligibilityRunAt(recordIds)
+      }
+    } else if (rulesRanIds.length > 0) {
+      await this.recordEligibilityRunAt(rulesRanIds)
     }
 
     this.logger.log(
@@ -826,6 +844,14 @@ export class EligibilityService {
     const { sql, params } = buildContactHasStagingChangesSql(personIdIcm, since)
     const rows = await this.prisma.$queryRawUnsafe<{ hasChanges: boolean }[]>(sql, ...params)
     return rows[0]?.hasChanges === true
+  }
+
+  /** Record that eligibility rules ran on these contacts (after upsert when applicable). */
+  private async recordEligibilityRunAt(personIdIcms: string[]): Promise<void> {
+    if (personIdIcms.length === 0) {
+      return
+    }
+    await this.prisma.$executeRawUnsafe(RECORD_ELIGIBILITY_RUN_SQL, personIdIcms)
   }
 
   private async findAgedOutContactIds(referenceDate: Date): Promise<string[]> {
@@ -892,17 +918,24 @@ export class EligibilityService {
     }
 
     const resolvedStatus = result.newStatus ?? previousStatus ?? profile.csaStatus
-    if (
+    const skipUpsert =
       result.newStatus === profile.csaStatus &&
       (await this.shouldSkipUpsertForUnchangedStaging(profile, { referenceDate }))
-    ) {
-      if (!resolvedStatus) {
-        throw new EligibilityInputError(`Contact ${personIdIcm} has no CSA status`)
-      }
-      return { previousStatus, newStatus: resolvedStatus }
+
+    if (skipUpsert && !resolvedStatus) {
+      throw new EligibilityInputError(`Contact ${personIdIcm} has no CSA status`)
     }
 
-    await this.upsertContacts([{ profile, result }])
+    if (!skipUpsert) {
+      await this.upsertContacts([{ profile, result }])
+    }
+
+    await this.recordEligibilityRunAt([personIdIcm])
+
+    if (skipUpsert) {
+      return { previousStatus, newStatus: resolvedStatus! }
+    }
+
     return { previousStatus, newStatus: result.newStatus }
   }
 

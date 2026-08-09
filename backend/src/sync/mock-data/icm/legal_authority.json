@@ -2,16 +2,16 @@
   "items": [
     {
       "Id": "LEG-000002",
-      "Updated": "02/09/2026 10:00:00",
-      "Legal Authority Code": "ADO-Adoption Act-24",
-      "Effective Legal Status": "ICD-Interim Order-35(2)(a)",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
       "Effective Date": "06/04/2025",
       "Expiry Date": "05/30/2027",
       "Parent Contact Id": "P-000002"
     },
     {
       "Id": "LEG-000003",
-      "Updated": "02/09/2026 10:00:00",
+      "Updated": "02/01/2026 10:00:00",
       "Legal Authority Code": "CCO-CCO-49(1)",
       "Effective Legal Status": "CCO-CCO-49(1)",
       "Effective Date": "12/02/2025",
@@ -20,12 +20,345 @@
     },
     {
       "Id": "LEG-000004",
-      "Updated": "02/09/2026 10:00:00",
+      "Updated": "02/01/2026 10:00:00",
       "Legal Authority Code": "CCO-CCO-49(1)",
-      "Effective Legal Status": "SNP-SNA-Protection 7(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
       "Effective Date": "03/01/2024",
       "Expiry Date": "11/04/2027",
       "Parent Contact Id": "P-000004"
+    },
+    {
+      "Id": "LEG-005",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000005"
+    },
+    {
+      "Id": "LEG-006",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000006"
+    },
+    {
+      "Id": "LEG-007",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000007"
+    },
+    {
+      "Id": "LEG-008",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000008"
+    },
+    {
+      "Id": "LEG-009",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000009"
+    },
+    {
+      "Id": "LEG-010",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000010"
+    },
+    {
+      "Id": "LEG-011",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000011"
+    },
+    {
+      "Id": "LEG-012",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000012"
+    },
+    {
+      "Id": "LEG-013",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000013"
+    },
+    {
+      "Id": "LEG-014",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000014"
+    },
+    {
+      "Id": "LEG-015",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000015"
+    },
+    {
+      "Id": "LEG-016",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000016"
+    },
+    {
+      "Id": "LEG-017",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000017"
+    },
+    {
+      "Id": "LEG-018",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000018"
+    },
+    {
+      "Id": "LEG-019",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000019"
+    },
+    {
+      "Id": "LEG-020",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000020"
+    },
+    {
+      "Id": "LEG-021",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000021"
+    },
+    {
+      "Id": "LEG-022",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000022"
+    },
+    {
+      "Id": "LEG-023",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000023"
+    },
+    {
+      "Id": "LEG-024",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000024"
+    },
+    {
+      "Id": "LEG-025",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000025"
+    },
+    {
+      "Id": "LEG-026",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000026"
+    },
+    {
+      "Id": "LEG-027",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000027"
+    },
+    {
+      "Id": "LEG-028",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000028"
+    },
+    {
+      "Id": "LEG-029",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000029"
+    },
+    {
+      "Id": "LEG-030",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000030"
+    },
+    {
+      "Id": "LEG-031",
+      "Updated": "02/01/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000031"
+    },
+    {
+      "Id": "LEG-032",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000032"
+    },
+    {
+      "Id": "LEG-033",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000033"
+    },
+    {
+      "Id": "LEG-034",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000034"
+    },
+    {
+      "Id": "LEG-035",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000035"
+    },
+    {
+      "Id": "LEG-036",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000036"
+    },
+    {
+      "Id": "LEG-037",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000037"
+    },
+    {
+      "Id": "LEG-038",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000038"
+    },
+    {
+      "Id": "LEG-039",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000039"
+    },
+    {
+      "Id": "LEG-040",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000040"
+    },
+    {
+      "Id": "LEG-041",
+      "Updated": "08/08/2026 10:00:00",
+      "Legal Authority Code": "CCO-CCO-49(1)",
+      "Effective Legal Status": "CCO-CCO-49(1)",
+      "Effective Date": "01/01/2026",
+      "Expiry Date": "12/31/2027",
+      "Parent Contact Id": "P-000041"
     }
   ]
 }

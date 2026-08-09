@@ -10,7 +10,7 @@ import { JobRunner } from '../job-runner.service'
 /*
  * RETRY_FAILED - Retry failed jobs and sweep flagged contacts
  * 1. Marks stuck RUNNING jobs as FAILED
- * 2. Retries all FAILED jobs
+ * 2. Retries the latest actionable failure per job type (cron: not superseded by a later success)
  * 3. Syncs any remaining flagged contacts to ICM
  */
 @Injectable()

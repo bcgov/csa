@@ -4,7 +4,7 @@ import { ConfigModule } from '@nestjs/config'
 import { TerminusModule } from '@nestjs/terminus'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { StateMachineModule } from 'src/common/state-machine/state-machine.module'
-import { appConfig } from 'src/config/app.config'
+import { appConfig, getDeployEnv } from 'src/config/app.config'
 import { HTTPLoggerMiddleware } from '../common/middleware/req.res.logger'
 import { AdminModule } from './admin/admin.module'
 import { AppController } from './app.controller'
@@ -17,7 +17,7 @@ import { HealthController } from './health/health.controller'
 import { MockModule } from './mock/mock.module'
 import { WeeklyFilesModule } from './weekly-files/weekly-files.module'
 
-const enableMockApi = process.env.USE_MOCK_DATA === 'true'
+const enableMockApi = getDeployEnv() === 'local'
 @Module({
   imports: [
     ConfigModule.forRoot({

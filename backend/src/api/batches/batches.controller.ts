@@ -13,12 +13,13 @@ import { ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { AddContactsDto } from '../batches/dto/add-contact.dto'
 import { RemoveContactsDto } from '../batches/dto/remove-contacts.dto'
 import { CurrentUser } from '../common/decorators'
+import { BlockDqStewardGuard } from '../common/guards/block-dq-steward.guard'
 import { CSAGuard } from '../common/guards/csa.guard'
 import { BatchesService } from './batches.service'
 
 @ApiTags('batches')
 @Controller('batches')
-@UseGuards(CSAGuard)
+@UseGuards(CSAGuard, BlockDqStewardGuard)
 export class BatchesController {
   constructor(private readonly batchesService: BatchesService) {}
 

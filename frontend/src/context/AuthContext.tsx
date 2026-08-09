@@ -1,6 +1,12 @@
 import type Keycloak from 'keycloak-js'
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { getRuntimeConfig, initializeKeycloak } from '../config/keycloak.config'
+import {
+  getStoredLocalDevProfile,
+  isLocalDev,
+  LOCAL_DEV_TOKEN,
+  setStoredLocalDevProfile,
+} from '../config/local-dev.config'
 import { verifyCSAAccess } from '../service/admin-service'
 
 interface AuthContextType {
@@ -39,8 +45,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [])
 
   useEffect(() => {
-    // Initialize Keycloak with runtime config
     const initAuth = async () => {
+      if (isLocalDev()) {
+        getRuntimeConfig()
+        sessionStorage.setItem('authToken', LOCAL_DEV_TOKEN)
+        const userProfile = getStoredLocalDevProfile()
+        setStoredLocalDevProfile(userProfile)
+        setIsAuthenticated(true)
+        setHasCSAAccess(true)
+        setUser({
+          name: 'Local Dev User',
+          email: 'local.dev@example.com',
+          username: 'local.dev',
+          idirUsername: 'LOCAL.DEV',
+          roles: ['local-dev'],
+          userProfile,
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // Initialize Keycloak with runtime config
       try {
         const keycloakInstance = await initializeKeycloak()
         setKeycloak(keycloakInstance)
@@ -89,16 +114,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     csaAccessResponse.message === 'User has CSA access'
 
                   if (hasValidAccess) {
+                    const normalizedUserProfile =
+                      csaAccessResponse.userProfile?.trim().toUpperCase() === 'DATA_QUALITY_STEWARD'
+                        ? 'DATA_QUALITY_STEWARD'
+                        : 'CSA_STANDARD'
+
                     // Clear any previous access denied flag
                     sessionStorage.removeItem('csaAccessDenied')
-                    if (csaAccessResponse.userProfile) {
-                      sessionStorage.setItem('userProfile', csaAccessResponse.userProfile)
-                    }
+                    sessionStorage.setItem('userProfile', normalizedUserProfile)
                     if (csaAccessResponse.icmResponsibility) {
                       sessionStorage.setItem(
                         'icmResponsibility',
                         csaAccessResponse.icmResponsibility,
                       )
+                    } else {
+                      sessionStorage.removeItem('icmResponsibility')
                     }
                     setIsAuthenticated(true)
                     setHasCSAAccess(true)
@@ -108,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                       username: keycloakInstance.tokenParsed.preferred_username,
                       idirUsername: keycloakInstance.tokenParsed.idir_username?.toUpperCase(),
                       roles: keycloakInstance.tokenParsed.realm_access?.roles || [],
-                      userProfile: csaAccessResponse.userProfile,
+                      userProfile: normalizedUserProfile,
                     })
                     setIsLoading(false)
 
@@ -195,6 +225,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionStorage.removeItem('authToken')
     sessionStorage.removeItem('userProfile')
     sessionStorage.removeItem('icmResponsibility')
+    if (isLocalDev()) {
+      setIsAuthenticated(false)
+      setHasCSAAccess(null)
+      setUser(null)
+      window.location.href = window.location.origin
+      return
+    }
     keycloak?.logout({
       redirectUri: window.location.origin,
     })

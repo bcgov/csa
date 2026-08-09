@@ -195,7 +195,6 @@ export class JobRunner {
       this.logger.log(`Marked ${stuckCount} stuck jobs as FAILED`)
     }
 
-    // Only returns top-level jobs under MAX_RETRY_COUNT (child jobs excluded)
     const failedJobs = await this.jobsService.getFailedJobs()
     this.logger.log(`Found ${failedJobs.length} retryable failed jobs`)
 

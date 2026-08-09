@@ -688,12 +688,8 @@ export class EligibilityService {
       stepCounts: { step7: 0, step8: 0, step9: 0, step10: 0, noChange: 0 },
     }
 
-    const updates: Array<{
-      profile: ContactProfile
-      result: EligibilityResult
-      rulesRan: boolean
-    }> = []
-    const evaluatedOnlyIds: string[] = []
+    const updates: Array<{ profile: ContactProfile; result: EligibilityResult }> = []
+    const rulesRanIds: string[] = []
 
     for (const profile of profiles) {
       if (!profile.dateOfBirth) {
@@ -728,7 +724,6 @@ export class EligibilityService {
             cancelReasonCode: profile.cancelReasonCode,
             careEndDate: profile.careEndDate,
           },
-          rulesRan: false,
         })
         continue
       }
@@ -752,6 +747,8 @@ export class EligibilityService {
       const result = runEligibility(profile, RULES, referenceDate)
       if (!result) continue
 
+      rulesRanIds.push(profile.personIdIcm)
+
       if (
         result.newStatus === profile.csaStatus &&
         (await this.shouldSkipUpsertForUnchangedStaging(profile, {
@@ -760,11 +757,10 @@ export class EligibilityService {
         }))
       ) {
         stats.stepCounts.noChange++
-        evaluatedOnlyIds.push(profile.personIdIcm)
         continue
       }
 
-      updates.push({ profile, result, rulesRan: true })
+      updates.push({ profile, result })
 
       if (result.newStatus !== profile.csaStatus) {
         const stepKey = `step${result.step}` as keyof typeof stats.stepCounts
@@ -780,13 +776,19 @@ export class EligibilityService {
 
     this.logger.log(`Step counts: ${JSON.stringify(stats.stepCounts)}, updates: ${updates.length}`)
 
-    if (evaluatedOnlyIds.length > 0) {
-      await this.recordEligibilityRunAt(evaluatedOnlyIds)
-    }
-
     if (updates.length > 0) {
       const upsertResult = await this.upsertContacts(updates)
       stats.skipped = upsertResult.skipped
+      const upsertedIds = new Set(upsertResult.validRows.map((row) => row.profile.personIdIcm))
+      const updateIds = new Set(updates.map(({ profile }) => profile.personIdIcm))
+      const recordIds = rulesRanIds.filter(
+        (personIdIcm) => !updateIds.has(personIdIcm) || upsertedIds.has(personIdIcm),
+      )
+      if (recordIds.length > 0) {
+        await this.recordEligibilityRunAt(recordIds)
+      }
+    } else if (rulesRanIds.length > 0) {
+      await this.recordEligibilityRunAt(rulesRanIds)
     }
 
     this.logger.log(
@@ -844,7 +846,7 @@ export class EligibilityService {
     return rows[0]?.hasChanges === true
   }
 
-  /** BL-14C: record that eligibility rules ran without upserting contact fields. */
+  /** Record that eligibility rules ran on these contacts (after upsert when applicable). */
   private async recordEligibilityRunAt(personIdIcms: string[]): Promise<void> {
     if (personIdIcms.length === 0) {
       return
@@ -887,7 +889,6 @@ export class EligibilityService {
             cancelReasonCode: profile.cancelReasonCode,
             careEndDate: profile.careEndDate,
           },
-          rulesRan: false,
         },
       ])
       return { previousStatus, newStatus: profile.csaStatus }
@@ -917,18 +918,24 @@ export class EligibilityService {
     }
 
     const resolvedStatus = result.newStatus ?? previousStatus ?? profile.csaStatus
-    if (
+    const skipUpsert =
       result.newStatus === profile.csaStatus &&
       (await this.shouldSkipUpsertForUnchangedStaging(profile, { referenceDate }))
-    ) {
-      if (!resolvedStatus) {
-        throw new EligibilityInputError(`Contact ${personIdIcm} has no CSA status`)
-      }
-      await this.recordEligibilityRunAt([personIdIcm])
-      return { previousStatus, newStatus: resolvedStatus }
+
+    if (skipUpsert && !resolvedStatus) {
+      throw new EligibilityInputError(`Contact ${personIdIcm} has no CSA status`)
     }
 
-    await this.upsertContacts([{ profile, result, rulesRan: true }])
+    if (!skipUpsert) {
+      await this.upsertContacts([{ profile, result }])
+    }
+
+    await this.recordEligibilityRunAt([personIdIcm])
+
+    if (skipUpsert) {
+      return { previousStatus, newStatus: resolvedStatus! }
+    }
+
     return { previousStatus, newStatus: result.newStatus }
   }
 
@@ -1109,18 +1116,13 @@ export class EligibilityService {
   }
 
   private async upsertContacts(
-    updates: Array<{
-      profile: ContactProfile
-      result: EligibilityResult
-      rulesRan: boolean
-    }>,
+    updates: Array<{ profile: ContactProfile; result: EligibilityResult }>,
   ): Promise<{ skipped: number; validRows: UpsertContext[] }> {
     const batchSize = ELIGIBILITY_CONFIG.BATCH_SIZE
     let skipped = 0
 
     const validRows: UpsertContext[] = []
-    const rulesRanIds: string[] = []
-    for (const { profile, result, rulesRan } of updates) {
+    for (const { profile, result } of updates) {
       const row: UpsertContext = {
         profile,
         result,
@@ -1136,19 +1138,12 @@ export class EligibilityService {
         continue
       }
       validRows.push(row)
-      if (rulesRan) {
-        rulesRanIds.push(profile.personIdIcm)
-      }
     }
 
     for (let i = 0; i < validRows.length; i += batchSize) {
       const batch = validRows.slice(i, i + batchSize)
       await this.batchUpsertRows(batch)
       this.logger.log(`Upserted batch ${Math.floor(i / batchSize) + 1} (${batch.length} contacts)`)
-    }
-
-    if (rulesRanIds.length > 0) {
-      await this.recordEligibilityRunAt(rulesRanIds)
     }
 
     return { skipped, validRows }

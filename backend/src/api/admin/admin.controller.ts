@@ -56,10 +56,7 @@ export class AdminController {
     userProfile?: string
     icmResponsibility?: string
   }> {
-    const result = await this.adminService.verifyCSAAccess(
-      username,
-      (request as any).userProfile,
-    )
+    const result = await this.adminService.verifyCSAAccess(username, (request as any).userProfile)
     return {
       ...result,
       username,

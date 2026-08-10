@@ -1,13 +1,14 @@
 import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
 import { describe, expect, it } from 'vitest'
 import { EligibilityResult } from '../eligibility.types'
-import { makeContact, makePlacement } from '../test-helpers'
+import { makeContact, makeOrder, makePlacement } from '../test-helpers'
 import { runEligibility } from './rule-runner'
 import { EligibilityContext, EligibilityRule } from './rule.interface'
 import { step1B_CancellationCheck } from './steps/step1b-cancellation-determination'
 import { step2_LegalStatusCheck } from './steps/step2-legal-status-check'
 import { step3_PlacementCheck } from './steps/step3-placement-check'
 import { step4_FetchAgreementContract } from './steps/step4-fetch-agreement-contract'
+import { step6_OrderPaymentCheck } from './steps/step6-order-payment-check'
 
 const REF_DATE = new Date('2026-02-10')
 
@@ -48,7 +49,7 @@ describe('runEligibility', () => {
       name: 'enricher',
       evaluate: (ctx: EligibilityContext) => {
         ctx.hasPlacement = true
-        ctx.hasNonPlacement = false
+        ctx.contractNumbers = ['C-100']
         return null
       },
     }
@@ -57,7 +58,7 @@ describe('runEligibility', () => {
       name: 'reader',
       evaluate: (ctx: EligibilityContext) => {
         expect(ctx.hasPlacement).toBe(true)
-        expect(ctx.hasNonPlacement).toBe(false)
+        expect(ctx.contractNumbers).toEqual(['C-100'])
         return { step: 7, newStatus: 'eligible', cancelReasonCode: null, careEndDate: null }
       },
     }
@@ -66,10 +67,10 @@ describe('runEligibility', () => {
   })
 })
 
-describe('runEligibility integration: step3 → step4', () => {
-  const RULES = [step3_PlacementCheck, step4_FetchAgreementContract]
+describe('runEligibility integration: step3 → step4 → step6', () => {
+  const RULES = [step3_PlacementCheck, step4_FetchAgreementContract, step6_OrderPaymentCheck]
 
-  it('no active placement → step 8 (eligible_tbd), skips step 4', () => {
+  it('no active placement → step 8 (eligible_tbd), skips step 4 and 6', () => {
     const contact = makeContact({
       csaStatus: null,
       placements: [makePlacement({ status: 'Ended', type: 'Placement' })],
@@ -85,7 +86,7 @@ describe('runEligibility integration: step3 → step4', () => {
     })
   })
 
-  it('active placement routes directly to eligible (step 7)', () => {
+  it('active placement with matching previous-month order → eligible (step 7)', () => {
     const refDate = new Date('2026-04-15')
 
     const contact = makeContact({
@@ -95,6 +96,13 @@ describe('runEligibility integration: step3 → step4', () => {
           status: 'Active',
           contractNumber: 'C-100',
           startDate: new Date('2026-03-01'),
+        }),
+      ],
+      orders: [
+        makeOrder({
+          contractNumber: 'C-100',
+          effectiveStartDate: new Date('2026-03-15'),
+          amount: 2000,
         }),
       ],
     })
@@ -112,13 +120,13 @@ describe('runEligibility integration: step3 → step4', () => {
 
 describe('runEligibility integration: step1B → step2 → step9 (care end date passthrough)', () => {
   // Regression guard for the step-9 null-fallback fix:
-  // When a contact lands in Step 9's In-Pay branch via step 2 (i.e. without a
+  // When a contact lands in Step 9's In-Pay branch via step 2 / step 6 (i.e. without a
   // staging-derived cancellation reason), the care end date must come from
-  // determineCareEndDate(placements) — pre-computed by step 1B and stashed on
+  // determineCareEndDate(orders, placements) — pre-computed by step 1B and stashed on
   // ctx — and NOT default to the system reference date.
   const RULES = [step1B_CancellationCheck, step2_LegalStatusCheck]
   const REF = new Date('2026-04-15')
-  const PLACEMENT_END = new Date('2026-03-10')
+  const ORDER_END = new Date('2026-03-10')
 
   it('step 2 routes IN_PAY contact to step 9 with care end date from step 1B compute', () => {
     const contact = makeContact({
@@ -126,13 +134,7 @@ describe('runEligibility integration: step1B → step2 → step9 (care end date 
       deceased: null,
       enrollForCsa: 'No',
       legalExpiryDate: null,
-      placements: [
-        makePlacement({
-          status: 'Ended',
-          type: 'Placement',
-          endDate: PLACEMENT_END,
-        }),
-      ],
+      orders: [makeOrder({ orderStatus: 'Closed', effectiveEndDate: ORDER_END, source: 'ICM' })],
     })
 
     const result = runEligibility(contact, RULES, REF)
@@ -141,7 +143,7 @@ describe('runEligibility integration: step1B → step2 → step9 (care end date 
       step: 9,
       newStatus: CSA_STATUS.NOT_ELIGIBLE_IN_PAY,
       cancelReasonCode: '21',
-      careEndDate: PLACEMENT_END,
+      careEndDate: ORDER_END,
     })
   })
 })

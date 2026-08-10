@@ -24,6 +24,20 @@ export const ELIGIBILITY_CONFIG = {
   // Step 2: codes that route to Step 8 (Eligible TBD)
   STEP8_LEGAL_AUTH_CODES: ['OPC', 'OPO', 'OPT'] as readonly string[],
 
+  // Step 6: Order/Payment criteria
+  ELIGIBLE_ORDER_TYPES: [
+    'MONTHLY FAMILY CARE RATE',
+    'ADJ-MONTHLY FAMILY CARE RATE',
+    'VARIABLE',
+    'ADJ-VARIABLE',
+    'MAINTENANCE PAYMENT',
+    'FIXED RATE',
+    'VARIABLE RATE',
+    'VAR RATE',
+  ] as readonly string[],
+  ELIGIBLE_ORDER_STATUSES: ['CLOSED', 'PROCESSED'] as readonly string[],
+  MIN_ORDER_AMOUNT: 1549.2,
+
   // Step 9: Default values when cancellation fields are blank
   DEFAULT_CANCEL_REASON_CODE: '21',
 

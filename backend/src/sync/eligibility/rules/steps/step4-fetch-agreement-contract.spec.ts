@@ -4,7 +4,7 @@ import { EligibilityContext } from '../rule.interface'
 import { step4_FetchAgreementContract } from './step4-fetch-agreement-contract'
 
 describe('step4_FetchAgreementContract', () => {
-  it('should route to step 7 when step 3 has already identified eligible placements', () => {
+  it('should extract contract numbers and agreement row IDs from eligible placements', () => {
     const ctx: EligibilityContext = {
       contact: makeContact(),
       referenceDate: new Date('2026-02-10'),
@@ -16,43 +16,49 @@ describe('step4_FetchAgreementContract', () => {
 
     const result = step4_FetchAgreementContract.evaluate(ctx)
 
-    expect(result).toEqual({
-      step: 7,
-      newStatus: 'eligible',
-      cancelReasonCode: null,
-      careEndDate: null,
-    })
+    expect(result).toBeNull()
+    expect(ctx.contractNumbers).toEqual(['C-100', 'C-200'])
+    expect(ctx.agreementRowIds).toEqual(['A-1', 'A-2'])
   })
 
-  it('should preserve current status when already in eligible state', () => {
+  it('should filter out null contract numbers and agreement row IDs', () => {
     const ctx: EligibilityContext = {
-      contact: makeContact({ csaStatus: 'eligible' }),
+      contact: makeContact(),
       referenceDate: new Date('2026-02-10'),
-      eligiblePlacements: [makePlacement({ contractNumber: 'C-300', agreementRowId: null })],
+      eligiblePlacements: [
+        makePlacement({ contractNumber: null, agreementRowId: null }),
+        makePlacement({ contractNumber: 'C-300', agreementRowId: null }),
+      ],
     }
 
     const result = step4_FetchAgreementContract.evaluate(ctx)
-    expect(result).toEqual({
-      step: 7,
-      newStatus: 'eligible',
-      cancelReasonCode: null,
-      careEndDate: null,
-    })
+    expect(result).toBeNull()
+    expect(ctx.contractNumbers).toEqual(['C-300'])
+    expect(ctx.agreementRowIds).toEqual([])
   })
 
-  it('should map in-pay states through step 7 transition rules', () => {
+  it('should set empty arrays when no eligible placements in context', () => {
     const ctx: EligibilityContext = {
-      contact: makeContact({ csaStatus: 'not_eligible_in_pay' }),
+      contact: makeContact(),
       referenceDate: new Date('2026-02-10'),
-      eligiblePlacements: [makePlacement({ contractNumber: 'C-100', status: 'Active' })],
     }
 
-    const result = step4_FetchAgreementContract.evaluate(ctx)
-    expect(result).toEqual({
-      step: 7,
-      newStatus: 'in_pay',
-      cancelReasonCode: null,
-      careEndDate: null,
-    })
+    step4_FetchAgreementContract.evaluate(ctx)
+    expect(ctx.contractNumbers).toEqual([])
+    expect(ctx.agreementRowIds).toEqual([])
+  })
+
+  it('should deduplicate contract numbers', () => {
+    const ctx: EligibilityContext = {
+      contact: makeContact(),
+      referenceDate: new Date('2026-02-10'),
+      eligiblePlacements: [
+        makePlacement({ contractNumber: 'C-100', source: 'ICM', status: 'Active' }),
+        makePlacement({ contractNumber: 'C-100', source: 'MIS', status: 'Interrupted' }),
+      ],
+    }
+
+    step4_FetchAgreementContract.evaluate(ctx)
+    expect(ctx.contractNumbers).toEqual(['C-100'])
   })
 })

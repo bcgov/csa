@@ -1,5 +1,6 @@
 import type { AxiosInstance } from 'axios'
 import axios from 'axios'
+import { isLocalDev, LOCAL_DEV_PROFILE_HEADER } from '../config/local-dev.config'
 
 class APIService {
   private readonly client: AxiosInstance
@@ -25,6 +26,12 @@ class APIService {
         const token = sessionStorage.getItem('authToken')
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
+        }
+        if (isLocalDev()) {
+          const profile = sessionStorage.getItem('userProfile')
+          if (profile) {
+            config.headers[LOCAL_DEV_PROFILE_HEADER] = profile
+          }
         }
         return config
       },

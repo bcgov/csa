@@ -385,3 +385,7 @@ backend/generated/
 
 # Local npm config (for dev-specific SSL/proxy settings)
 .npmrc
+
+# Local dev file storage (CRA, ICM/MIS fixtures). See backend FILE_STORAGE_PATH and make fixtures.
+.local/storage/*
+!.local/storage/.gitkeep

@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { buildStableOrderBy } from 'src/common/utils'
 import { JobActivitySeverity } from './enums/job-activity-severity.enum'
 import { JobActivityType } from './enums/job-activity-type.enum'
 import { JobStatus } from './enums/job-status.enum'
 import { JobTrigger } from './enums/job-trigger.enum'
 import { JobType } from './enums/job-type.enum'
 import {
+  formatTriggeredBy,
   isMonitoredChildJobType,
   MONITORED_CHILD_JOB_TYPES,
   MONITORED_JOB_HISTORY_TYPES,
@@ -14,6 +16,20 @@ import {
 } from './job-monitoring.utils'
 
 const RETRYABLE_END_USER_JOB_TYPES: JobType[] = [JobType.SEND_CRA_FILE]
+
+/** Top-level failed jobs that retry-failed may re-run (excludes RETRY_FAILED to avoid recursion). */
+const RETRYABLE_FAILED_JOB_WHERE = {
+  status: JobStatus.FAILED,
+  parentJobId: null,
+  jobType: { not: JobType.RETRY_FAILED },
+  OR: [
+    { jobTrigger: JobTrigger.CRON },
+    {
+      jobTrigger: JobTrigger.END_USER,
+      jobType: { in: RETRYABLE_END_USER_JOB_TYPES },
+    },
+  ],
+} satisfies Prisma.JobRunWhereInput
 
 export interface MonitoringHistoryFilters {
   page?: number
@@ -49,6 +65,41 @@ export interface CreateJobDto {
 export class JobsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private getMonitoringHistoryScopeWhere(
+    filters: Pick<MonitoringHistoryFilters, 'jobType' | 'status' | 'jobId' | 'triggeredBy'> = {},
+  ): Prisma.JobRunWhereInput {
+    const oneMonthAgo = new Date()
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
+
+    const monitoredTypes = filters.jobType ? [filters.jobType] : MONITORED_JOB_HISTORY_TYPES
+
+    const where: Prisma.JobRunWhereInput = {
+      startedAt: { gte: oneMonthAgo },
+      jobType: { in: monitoredTypes },
+      OR: [{ jobType: { in: MONITORED_CHILD_JOB_TYPES } }, { parentJobId: null }],
+      ...(filters.status && { status: filters.status }),
+      ...(filters.jobId && { id: filters.jobId }),
+    }
+
+    if (filters.triggeredBy) {
+      if (filters.triggeredBy === 'SYSTEM') {
+        where.jobTrigger = { in: [JobTrigger.CRON, JobTrigger.SYSTEM] }
+      } else if (filters.triggeredBy === JobTrigger.END_USER) {
+        where.jobTrigger = JobTrigger.END_USER
+      } else if (
+        filters.triggeredBy === JobTrigger.CRON ||
+        filters.triggeredBy === JobTrigger.SYSTEM
+      ) {
+        where.jobTrigger = filters.triggeredBy
+      } else {
+        where.jobTrigger = JobTrigger.END_USER
+        where.triggeredByUser = { equals: filters.triggeredBy, mode: 'insensitive' }
+      }
+    }
+
+    return where
+  }
+
   async createJob(dto: CreateJobDto) {
     const now = new Date()
     const job = await this.prisma.jobRun.create({
@@ -80,7 +131,7 @@ export class JobsService {
     const [data, total] = await Promise.all([
       this.prisma.jobRun.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: buildStableOrderBy({ createdAt: 'desc' }),
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -143,19 +194,21 @@ export class JobsService {
     })
   }
 
+  /** Cron failures superseded by a later success are not worth retrying. */
+  private async isCronFailureStillActionable(job: {
+    jobType: string
+    completedAt: Date | null
+  }): Promise<boolean> {
+    if (!job.completedAt) {
+      return true
+    }
+    const lastSuccess = await this.getLastSuccessTimestamp(job.jobType as JobType)
+    return lastSuccess === null || job.completedAt > lastSuccess
+  }
+
   async getFailedJobs() {
-    return this.prisma.jobRun.findMany({
-      where: {
-        status: JobStatus.FAILED,
-        parentJobId: null, // skip child jobs, parent will recreate them
-        OR: [
-          { jobTrigger: JobTrigger.CRON },
-          {
-            jobTrigger: JobTrigger.END_USER,
-            jobType: { in: RETRYABLE_END_USER_JOB_TYPES },
-          },
-        ],
-      },
+    const failed = await this.prisma.jobRun.findMany({
+      where: RETRYABLE_FAILED_JOB_WHERE,
       select: {
         id: true,
         jobType: true,
@@ -163,11 +216,29 @@ export class JobsService {
         retryCount: true,
         metadata: true,
         parentJobId: true,
+        completedAt: true,
       },
-      orderBy: {
-        completedAt: 'asc',
-      },
+      orderBy: { completedAt: 'desc' },
     })
+
+    // One retry per job type — latest failure only (avoids replaying historical backlog).
+    const latestByType = new Map<string, (typeof failed)[number]>()
+    for (const job of failed) {
+      if (!latestByType.has(job.jobType)) {
+        latestByType.set(job.jobType, job)
+      }
+    }
+
+    const actionable: (typeof failed)[number][] = []
+    for (const job of latestByType.values()) {
+      if (job.jobTrigger !== JobTrigger.CRON || (await this.isCronFailureStillActionable(job))) {
+        actionable.push(job)
+      }
+    }
+
+    return actionable.sort(
+      (a, b) => (a.completedAt?.getTime() ?? 0) - (b.completedAt?.getTime() ?? 0),
+    )
   }
 
   //TODO: define when a job is stuck
@@ -268,21 +339,7 @@ export class JobsService {
     })
     if (stuck) return true
 
-    const failed = await this.prisma.jobRun.findFirst({
-      where: {
-        status: JobStatus.FAILED,
-        parentJobId: null,
-        OR: [
-          { jobTrigger: JobTrigger.CRON },
-          {
-            jobTrigger: JobTrigger.END_USER,
-            jobType: { in: RETRYABLE_END_USER_JOB_TYPES },
-          },
-        ],
-      },
-      select: { id: true },
-    })
-    return failed !== null
+    return (await this.getFailedJobs()).length > 0
   }
 
   async getLatestJobsPerType() {
@@ -304,34 +361,7 @@ export class JobsService {
   async getJobHistory(filters: MonitoringHistoryFilters = {}) {
     const page = filters.page ?? 1
     const limit = filters.limit ?? 10
-    const oneMonthAgo = new Date()
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
-
-    const monitoredTypes = filters.jobType ? [filters.jobType] : MONITORED_JOB_HISTORY_TYPES
-
-    const where: Prisma.JobRunWhereInput = {
-      startedAt: { gte: oneMonthAgo },
-      jobType: { in: monitoredTypes },
-      OR: [{ jobType: { in: MONITORED_CHILD_JOB_TYPES } }, { parentJobId: null }],
-      ...(filters.status && { status: filters.status }),
-      ...(filters.jobId && { id: filters.jobId }),
-    }
-
-    if (filters.triggeredBy) {
-      if (filters.triggeredBy === 'SYSTEM') {
-        where.jobTrigger = { in: [JobTrigger.CRON, JobTrigger.SYSTEM] }
-      } else if (filters.triggeredBy === 'USER' || filters.triggeredBy === JobTrigger.END_USER) {
-        where.jobTrigger = JobTrigger.END_USER
-      } else if (
-        filters.triggeredBy === JobTrigger.CRON ||
-        filters.triggeredBy === JobTrigger.SYSTEM
-      ) {
-        where.jobTrigger = filters.triggeredBy
-      } else {
-        where.jobTrigger = JobTrigger.END_USER
-        where.triggeredByUser = { equals: filters.triggeredBy, mode: 'insensitive' }
-      }
-    }
+    const where = this.getMonitoringHistoryScopeWhere(filters)
 
     const sortBy = filters.sortBy ?? 'startedAt'
     const sortOrder = filters.sortOrder ?? 'desc'
@@ -339,7 +369,7 @@ export class JobsService {
     const [data, total] = await Promise.all([
       this.prisma.jobRun.findMany({
         where,
-        orderBy: { [sortBy]: sortOrder },
+        orderBy: buildStableOrderBy({ [sortBy]: sortOrder }),
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -347,6 +377,31 @@ export class JobsService {
     ])
 
     return { data, total, page, limit }
+  }
+
+  async getMonitoringTriggeredByValues(): Promise<string[]> {
+    const rows = await this.prisma.jobRun.findMany({
+      where: this.getMonitoringHistoryScopeWhere(),
+      select: {
+        jobTrigger: true,
+        triggeredByUser: true,
+      },
+      distinct: ['jobTrigger', 'triggeredByUser'],
+    })
+
+    const values = Array.from(
+      new Set(
+        rows
+          .map((row) => formatTriggeredBy(row))
+          .map((value) => value.trim().toUpperCase())
+          .filter((value) => value.length > 0),
+      ),
+    )
+
+    const sortedIdirs = values
+      .filter((value) => value !== 'SYSTEM')
+      .sort((a, b) => a.localeCompare(b))
+    return values.includes('SYSTEM') ? ['SYSTEM', ...sortedIdirs] : sortedIdirs
   }
 
   async addActivity(
@@ -380,7 +435,7 @@ export class JobsService {
     const [data, total] = await Promise.all([
       this.prisma.jobActivity.findMany({
         where,
-        orderBy: { [sortBy]: sortOrder },
+        orderBy: buildStableOrderBy({ [sortBy]: sortOrder }),
         skip: (page - 1) * limit,
         take: limit,
       }),

@@ -10,13 +10,15 @@ import jwksClient from 'jwks-rsa'
 @Injectable()
 export class JwtVerificationService {
   private readonly logger = new Logger(JwtVerificationService.name)
-  private readonly jwksClient: jwksClient.JwksClient
+  private readonly jwksClient: jwksClient.JwksClient | null
 
   constructor(private readonly configService: ConfigService) {
     const jwksUri = this.configService.get<string>('admin.ssoKeycloakJwksUrl')
 
     if (!jwksUri) {
-      throw new Error('SSO_KEYCLOAK_JWKS_URL is required for JWT verification')
+      this.jwksClient = null
+      this.logger.warn('JWT verification disabled (no JWKS URI configured)')
+      return
     }
 
     this.jwksClient = jwksClient({
@@ -37,6 +39,10 @@ export class JwtVerificationService {
    * @throws UnauthorizedException if verification fails
    */
   async verifyToken(token: string): Promise<jwt.JwtPayload> {
+    if (!this.jwksClient) {
+      throw new UnauthorizedException('JWT verification is not configured')
+    }
+
     try {
       // First decode the header to get the key ID (kid)
       const decodedHeader = jwt.decode(token, { complete: true })

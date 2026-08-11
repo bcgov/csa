@@ -21,6 +21,12 @@ import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { JobStatus } from 'src/jobs/enums/job-status.enum'
 import { JobTrigger } from 'src/jobs/enums/job-trigger.enum'
 import { JobType } from 'src/jobs/enums/job-type.enum'
+import {
+  formatJobDisplayName,
+  formatJobSummary,
+  formatMonitoringStatus,
+  formatTriggeredBy,
+} from 'src/jobs/job-monitoring.utils'
 import { JobRunner } from 'src/jobs/job-runner.service'
 import {
   JobsService,
@@ -28,14 +34,9 @@ import {
   type MonitoringHistoryFilters,
 } from 'src/jobs/jobs.service'
 import { OpenshiftJobLauncher } from 'src/jobs/openshift-job-launcher.service'
-import {
-  formatJobDisplayName,
-  formatJobSummary,
-  formatMonitoringStatus,
-  formatTriggeredBy,
-} from 'src/jobs/job-monitoring.utils'
-import { CSAGuard } from '../common/guards/csa.guard'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
+import { BlockDqStewardGuard } from '../common/guards/block-dq-steward.guard'
+import { CSAGuard } from '../common/guards/csa.guard'
 import { canRunBulkJobInApiProcess } from './bulk-job-deploy-env'
 import { getJobRunWarning } from './job-openshift-advisory'
 
@@ -107,7 +108,7 @@ function toJobRunResponse(
 
 @ApiTags('jobs')
 @Controller('jobs')
-@UseGuards(CSAGuard)
+@UseGuards(CSAGuard, BlockDqStewardGuard)
 export class JobsController {
   private readonly logger = new Logger(JobsController.name)
 
@@ -159,7 +160,7 @@ export class JobsController {
     triggeredByUser: string,
   ): Promise<{ jobRunId: number; message: string; openshiftJobName?: string }> {
     if (!this.openshiftJobLauncher.isEnabled()) {
-      const deployEnv = this.configService.get<DeployEnv>('app.deployEnv', 'local')
+      const deployEnv = this.configService.get<DeployEnv>('app.deployEnv')!
       if (canRunBulkJobInApiProcess(deployEnv)) {
         return this.startFireAndForgetJob(jobType, triggeredByUser)
       }
@@ -314,6 +315,12 @@ export class JobsController {
       ...result,
       data,
     }
+  }
+
+  @Get('monitoring/triggered-by')
+  @ApiResponse({ status: 200, description: 'Distinct Trigger By values for monitored jobs' })
+  async getMonitoringTriggeredBy() {
+    return this.jobsService.getMonitoringTriggeredByValues()
   }
 
   @Get('monitoring/activities')

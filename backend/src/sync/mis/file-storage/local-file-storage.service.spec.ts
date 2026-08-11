@@ -1,29 +1,22 @@
-import { Test, TestingModule } from '@nestjs/testing'
-import { MockFileStorageService } from './mock-file-storage.service'
 import { Readable } from 'stream'
 import { text } from 'stream/consumers'
 import * as fs from 'fs'
+import { LocalFileStorageService } from './local-file-storage.service'
 
 vi.mock('fs')
 
-describe('MockFileStorageService', () => {
-  let service: MockFileStorageService
+describe('LocalFileStorageService', () => {
+  let service: LocalFileStorageService
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks()
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [MockFileStorageService],
-    }).compile()
-
-    service = module.get<MockFileStorageService>(MockFileStorageService)
+    service = new LocalFileStorageService('/storage/mis')
   })
 
   describe('download', () => {
-    it('should return a readable stream from mock file', async () => {
+    it('should return a readable stream from local file', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true)
       vi.mocked(fs.createReadStream).mockReturnValue(
-        // Simulate a readable stream with mock data
         new Readable({
           read() {
             this.push('header\nrow1\nrow2')
@@ -40,15 +33,15 @@ describe('MockFileStorageService', () => {
       expect(fs.createReadStream).toHaveBeenCalled()
     })
 
-    it('should throw when mock file does not exist', async () => {
+    it('should throw when local file does not exist', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(false)
 
-      await expect(service.download('csas3/nonexistent.csv')).rejects.toThrow('Mock file not found')
+      await expect(service.download('csas3/nonexistent.csv')).rejects.toThrow('MIS file not found')
     })
   })
 
   describe('exists', () => {
-    it('should return true when mock file exists', async () => {
+    it('should return true when local file exists', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true)
 
       const result = await service.exists('csas3/test.csv')
@@ -56,7 +49,7 @@ describe('MockFileStorageService', () => {
       expect(result).toBe(true)
     })
 
-    it('should return false when mock file does not exist', async () => {
+    it('should return false when local file does not exist', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(false)
 
       const result = await service.exists('csas3/nonexistent.csv')

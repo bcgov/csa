@@ -5,6 +5,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import ClearIcon from '@mui/icons-material/Clear'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import FilterListIcon from '@mui/icons-material/FilterList'
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import {
@@ -33,12 +34,14 @@ import {
   getJobActivities,
   getJobHistory,
   getLatestJobs,
+  getMonitoringTriggeredByValues,
   getRecentActivities,
   type ActivityParams,
   type JobActivityRow,
   type JobHistoryParams,
   type MonitoringJobRow,
 } from '../service/jobs-service'
+import { formatDateTimeYMDHMS } from '../utils/date-format'
 
 const ITEMS_PER_PAGE = 10
 const RUNNING_JOB_POLL_MS = 30_000
@@ -60,7 +63,6 @@ const STATUS_TO_API: Record<string, string> = {
   Running: 'RUNNING',
   Failed: 'FAILED',
 }
-const TRIGGER_OPTIONS = ['SYSTEM', 'USER']
 const ACTIVITY_SEVERITIES = ['ERROR', 'WARNING', 'CRITICAL']
 const ACTIVITY_TYPES = ['DATA_QUALITY', 'JOB', 'CRA', 'WKL', 'ICM', 'BATCH']
 const ACTIVITY_TYPE_LABELS: Record<string, string> = {
@@ -72,27 +74,10 @@ const ACTIVITY_TYPE_LABELS: Record<string, string> = {
   BATCH: 'Batch',
 }
 
-/** Format a date string to PT timezone: yyyy-Mmm-dd HH:mm:ss */
-const formatDatePT = (dateStr: string | null | undefined): string => {
+const formatMonitoringDate = (dateStr: string | null | undefined): string => {
   if (!dateStr) return '—'
-  try {
-    const date = new Date(dateStr)
-    if (isNaN(date.getTime())) return '—'
-    const tz = 'America/Vancouver'
-    const year = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric' }).format(date)
-    const month = new Intl.DateTimeFormat('en-US', { timeZone: tz, month: 'short' }).format(date)
-    const day = new Intl.DateTimeFormat('en-US', { timeZone: tz, day: '2-digit' }).format(date)
-    const time = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).format(date)
-    return `${year}-${month}-${day} ${time}`
-  } catch {
-    return '—'
-  }
+  if (Number.isNaN(new Date(dateStr).getTime())) return '—'
+  return formatDateTimeYMDHMS(dateStr)
 }
 
 const normalizeStatus = (status: string): string => {
@@ -109,8 +94,7 @@ const normalizeStatus = (status: string): string => {
 
 const matchesTriggerFilter = (triggeredBy: string, filter: string): boolean => {
   if (!filter) return true
-  if (filter === 'USER') return triggeredBy !== 'SYSTEM'
-  return triggeredBy === filter
+  return triggeredBy.toUpperCase() === filter.toUpperCase()
 }
 
 const normalizeSeverity = (severity: string): string => {
@@ -193,22 +177,18 @@ function SortableHeaderCell({
       }}
       onClick={sortable ? () => onSort(field) : undefined}
     >
-      <Box
-        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.5 }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          {label}
-          {sortable &&
-            (isActive ? (
-              currentSortOrder === 'asc' ? (
-                <ArrowUpwardIcon sx={{ fontSize: '0.875rem' }} />
-              ) : (
-                <ArrowDownwardIcon sx={{ fontSize: '0.875rem' }} />
-              )
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        {label}
+        {sortable &&
+          (isActive ? (
+            currentSortOrder === 'asc' ? (
+              <ArrowUpwardIcon sx={{ fontSize: '0.875rem' }} />
             ) : (
-              <UnfoldMoreIcon sx={{ fontSize: '0.875rem', opacity: 0.4 }} />
-            ))}
-        </Box>
+              <ArrowDownwardIcon sx={{ fontSize: '0.875rem' }} />
+            )
+          ) : (
+            <UnfoldMoreIcon sx={{ fontSize: '0.875rem', opacity: 0.4 }} />
+          ))}
         {onFilterClick && (
           <IconButton
             size="small"
@@ -373,6 +353,7 @@ export default function JobMonitoringTab() {
     element: HTMLElement | null
     column: ActivityFilterColumn | ''
   }>({ element: null, column: '' })
+  const [triggerOptions, setTriggerOptions] = useState<string[]>([])
 
   // ── Data fetching ───────────────────────────────────────────────────────
   const fetchJobList = useCallback(async () => {
@@ -448,7 +429,7 @@ export default function JobMonitoringTab() {
       setActivitiesData(result.data)
       setActivitiesTotal(result.total)
     } catch {
-      setActivitiesError('Failed to load activities. Please try again.')
+      setActivitiesError('Failed to load alerts. Please try again.')
     } finally {
       setActivitiesLoading(false)
     }
@@ -461,6 +442,15 @@ export default function JobMonitoringTab() {
     actSortField,
     actSortOrder,
   ])
+
+  const fetchTriggerOptions = useCallback(async () => {
+    try {
+      const values = await getMonitoringTriggeredByValues()
+      setTriggerOptions(values)
+    } catch {
+      setTriggerOptions([])
+    }
+  }, [])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -485,6 +475,14 @@ export default function JobMonitoringTab() {
 
     return () => window.clearTimeout(timeoutId)
   }, [fetchActivities])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void fetchTriggerOptions()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [fetchTriggerOptions])
 
   const hasRunningJobs = jobListData.some((row) => row.status.toUpperCase() === 'RUNNING')
 
@@ -619,12 +617,31 @@ export default function JobMonitoringTab() {
     actSortField !== 'when' ||
     actSortOrder !== 'desc'
 
+  const fallbackTriggerOptions = (() => {
+    const found = new Set<string>()
+    const add = (value: string | null | undefined) => {
+      const normalized = (value || '').trim().toUpperCase()
+      if (!normalized) return
+      found.add(normalized)
+    }
+
+    jobListData.forEach((row) => add(row.triggeredBy))
+    jobHistoryData.forEach((row) => add(row.triggeredBy))
+
+    const sortedIdirs = Array.from(found)
+      .filter((v) => v !== 'SYSTEM')
+      .sort((a, b) => a.localeCompare(b))
+
+    return found.has('SYSTEM') ? ['SYSTEM', ...sortedIdirs] : sortedIdirs
+  })()
+  const availableTriggerOptions =
+    triggerOptions.length > 0 ? triggerOptions : fallbackTriggerOptions
+
   // ── Job List: client-side filter + sort ──────────────────────────────────
   const filteredJobList = jobListData
     .filter((row) => {
       if (jlFilterId && !String(row.id).includes(jlFilterId)) return false
-      if (jlFilterName && !row.jobName.toLowerCase().includes(jlFilterName.toLowerCase()))
-        return false
+      if (jlFilterName && row.jobName !== jlFilterName) return false
       if (jlFilterStatus && row.status !== jlFilterStatus) return false
       if (!matchesTriggerFilter(row.triggeredBy, jlFilterTrigger)) return false
       return true
@@ -717,14 +734,14 @@ export default function JobMonitoringTab() {
                   filterActive={jlFilterTrigger.length > 0}
                 />
                 <SortableHeaderCell
-                  label="Started (PT)"
+                  label="Started"
                   field="started"
                   currentSortField={jlSortField}
                   currentSortOrder={jlSortOrder}
                   onSort={handleJlSort}
                 />
                 <SortableHeaderCell
-                  label="Finished (PT)"
+                  label="Finished"
                   field="finished"
                   currentSortField={jlSortField}
                   currentSortOrder={jlSortOrder}
@@ -759,8 +776,8 @@ export default function JobMonitoringTab() {
                       </Box>
                     </TableCell>
                     <TableCell sx={cellSx}>{row.triggeredBy || '—'}</TableCell>
-                    <TableCell sx={cellSx}>{formatDatePT(row.started)}</TableCell>
-                    <TableCell sx={cellSx}>{formatDatePT(row.finished)}</TableCell>
+                    <TableCell sx={cellSx}>{formatMonitoringDate(row.started)}</TableCell>
+                    <TableCell sx={cellSx}>{formatMonitoringDate(row.finished)}</TableCell>
                     <TableCell sx={cellSx}>{row.summary || '—'}</TableCell>
                     <TableCell sx={cellSx}>
                       {row.warning ? warningChip(row.warning) : '—'}
@@ -819,12 +836,26 @@ export default function JobMonitoringTab() {
               />
             )}
             {jlFilterAnchor.column === 'jobName' && (
-              <TextField
-                {...filterTextFieldProps}
+              <Select
+                size="small"
                 fullWidth
                 value={jlFilterName}
-                onChange={(e) => setJlFilterName(e.target.value)}
-              />
+                displayEmpty
+                onChange={(e) => {
+                  setJlFilterName(e.target.value)
+                  closeJlFilter()
+                }}
+                sx={{ ...filterSelectSx, minWidth: 140 }}
+              >
+                <MenuItem value="">
+                  <em>All</em>
+                </MenuItem>
+                {MONITORED_JOB_NAMES.map((n) => (
+                  <MenuItem key={n} value={n} sx={{ fontSize: '0.75rem' }}>
+                    {n}
+                  </MenuItem>
+                ))}
+              </Select>
             )}
             {jlFilterAnchor.column === 'status' && (
               <Select
@@ -863,7 +894,7 @@ export default function JobMonitoringTab() {
                 <MenuItem value="">
                   <em>All</em>
                 </MenuItem>
-                {TRIGGER_OPTIONS.map((t) => (
+                {availableTriggerOptions.map((t) => (
                   <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
                     {t}
                   </MenuItem>
@@ -944,14 +975,14 @@ export default function JobMonitoringTab() {
                   filterActive={jhFilterTrigger.length > 0}
                 />
                 <SortableHeaderCell
-                  label="Started (PT)"
+                  label="Started"
                   field="startedAt"
                   currentSortField={jhSortField}
                   currentSortOrder={jhSortOrder}
                   onSort={handleJhSort}
                 />
                 <SortableHeaderCell
-                  label="Finished (PT)"
+                  label="Finished"
                   field="completedAt"
                   currentSortField={jhSortField}
                   currentSortOrder={jhSortOrder}
@@ -996,8 +1027,8 @@ export default function JobMonitoringTab() {
                       </Box>
                     </TableCell>
                     <TableCell sx={cellSx}>{row.triggeredBy || '—'}</TableCell>
-                    <TableCell sx={cellSx}>{formatDatePT(row.started)}</TableCell>
-                    <TableCell sx={cellSx}>{formatDatePT(row.finished)}</TableCell>
+                    <TableCell sx={cellSx}>{formatMonitoringDate(row.started)}</TableCell>
+                    <TableCell sx={cellSx}>{formatMonitoringDate(row.finished)}</TableCell>
                     <TableCell sx={cellSx}>{row.summary || '—'}</TableCell>
                     <TableCell sx={cellSx}>
                       {row.warning ? warningChip(row.warning) : '—'}
@@ -1137,7 +1168,7 @@ export default function JobMonitoringTab() {
                 <MenuItem value="">
                   <em>All</em>
                 </MenuItem>
-                {TRIGGER_OPTIONS.map((t) => (
+                {availableTriggerOptions.map((t) => (
                   <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
                     {t}
                   </MenuItem>
@@ -1173,17 +1204,24 @@ export default function JobMonitoringTab() {
         </Box>
       </Box>
 
-      {/* ── Activities ── */}
+      {/* ── Alerts ── */}
       <Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 500 }}>
-            Activities
-            {selectedJobHistoryId && (
-              <Typography component="span" variant="body2" color="primary" sx={{ ml: 1 }}>
-                — Filtered by Job #{selectedJobHistoryId}
-              </Typography>
-            )}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="h6" sx={{ fontWeight: 500 }}>
+              Alerts
+              {selectedJobHistoryId && (
+                <Typography component="span" variant="body2" color="primary" sx={{ ml: 1 }}>
+                  — Filtered by Job #{selectedJobHistoryId}
+                </Typography>
+              )}
+            </Typography>
+            <Tooltip title="Warnings and errors recorded during jobs and processes" arrow>
+              <IconButton size="small" sx={{ padding: 0.5 }}>
+                <InfoOutlinedIcon fontSize="small" sx={{ color: '#666' }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
           <Button
             size="small"
             startIcon={<ClearIcon />}
@@ -1212,7 +1250,7 @@ export default function JobMonitoringTab() {
             <TableHead>
               <TableRow>
                 <SortableHeaderCell
-                  label="When (PT)"
+                  label="When"
                   field="when"
                   currentSortField={actSortField}
                   currentSortOrder={actSortOrder}
@@ -1259,13 +1297,13 @@ export default function JobMonitoringTab() {
               ) : activitiesData.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                    No activities found
+                    No alerts found
                   </TableCell>
                 </TableRow>
               ) : (
                 activitiesData.map((row) => (
                   <TableRow key={row.id} hover>
-                    <TableCell sx={cellSx}>{formatDatePT(row.when)}</TableCell>
+                    <TableCell sx={cellSx}>{formatMonitoringDate(row.when)}</TableCell>
                     <TableCell sx={cellSx}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {getSeverityIcon(row.severity)}
@@ -1378,7 +1416,7 @@ export default function JobMonitoringTab() {
                 </MenuItem>
                 {ACTIVITY_TYPES.map((t) => (
                   <MenuItem key={t} value={t} sx={{ fontSize: '0.75rem' }}>
-                    {t}
+                    {ACTIVITY_TYPE_LABELS[t] ?? t}
                   </MenuItem>
                 ))}
               </Select>

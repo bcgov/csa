@@ -53,15 +53,6 @@ import JobMonitoringTab from './components/JobMonitoringTab'
 import { LocalDevProfileSwitcher } from './components/LocalDevProfileSwitcher'
 import { OnHoldDialog } from './components/OnHoldDialog'
 import WeeklyFileProcessingTab from './components/WeeklyFileProcessingTab'
-import {
-  buildDqUpdatePayload,
-  canDqModifyRecord,
-  DQ_DELETE_CONFIRM_MESSAGE,
-  DQ_DELETE_SUCCESS_FALLBACK_MESSAGE,
-  getApiErrorMessage,
-  getDqDinHelperText,
-  isDqDinValid,
-} from './utils/dq-contact'
 import { getRuntimeConfig } from './config/keycloak.config'
 import { useAuth } from './context/AuthContext'
 import { useCsaCapabilities } from './hooks/useCsaCapabilities'
@@ -112,6 +103,15 @@ import {
   formatDateYMD,
   parseFormattedDate,
 } from './utils/date-format'
+import {
+  buildDqUpdatePayload,
+  canDqModifyRecord,
+  DQ_DELETE_CONFIRM_MESSAGE,
+  DQ_DELETE_SUCCESS_FALLBACK_MESSAGE,
+  getApiErrorMessage,
+  getDqDinHelperText,
+  isDqDinValid,
+} from './utils/dq-contact'
 import { buildPlacementDisplayValues } from './utils/mock-placement'
 
 // Environment-based toolbar background colors
@@ -4089,6 +4089,8 @@ function App() {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     mb: 3,
+                    overflowX: 'auto',
+                    gap: 2,
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -4104,9 +4106,9 @@ function App() {
                       </IconButton>
                     </Tooltip>
                   </Box>
-                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexShrink: 0 }}>
                     {/* Eligibility list — search & filters (canAccessEligibilityList) */}
-                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                       <TextField
                         size="small"
                         placeholder="Search"
@@ -4182,7 +4184,7 @@ function App() {
                     </Box>
                     {/* Record & workflow actions */}
                     {(capabilities.canEditContactRecords || capabilities.canPerformCsaActions) && (
-                      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                         {capabilities.canEditContactRecords && dqEditableRecordId !== null && (
                           <>
                             {hasDqChanges && (

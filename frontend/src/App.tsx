@@ -2275,13 +2275,11 @@ function App() {
         severity: statusChanged ? 'success' : 'info',
       })
 
-      // Refresh the list if there were changes
-      if (statusChanged) {
-        if (isSearchActive && searchTerm.trim().length >= 3) {
-          await performFullTextSearch(searchTerm.trim(), currentPage)
-        } else {
-          await fetchContacts(currentPage)
-        }
+      // Always refresh — demographic fields may have changed even when status is unchanged
+      if (isSearchActive && searchTerm.trim().length >= 3) {
+        await performFullTextSearch(searchTerm.trim(), currentPage)
+      } else {
+        await fetchContacts(currentPage)
       }
     } catch (error: any) {
       console.error('Run eligibility for contact error:', error)

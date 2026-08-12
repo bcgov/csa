@@ -118,9 +118,19 @@ export class AdminService {
       const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
       const deployEnv = this.configService.get<string>('app.deployEnv')
       const configUsername = this.configService.get<string>('admin.icmUsername')
+      const idirBypassList = this.configService.get<string[]>('admin.idirBypassList') ?? []
 
       let icmApiUsername = username
-      if (configUsername && deployEnv !== 'prod') {
+      if (
+        configUsername &&
+        deployEnv === 'test' &&
+        idirBypassList.includes(username.toUpperCase())
+      ) {
+        // these users have real ICM responsibilities in test — skip the override and verify against their own IDIR
+        this.logger.warn(
+          `ICM username override skipped for ${username} in test — using actual IDIR`,
+        )
+      } else if (configUsername && deployEnv !== 'prod') {
         this.logger.warn(
           `ICM username override active: using '${configUsername}' instead of '${username}'`,
         )

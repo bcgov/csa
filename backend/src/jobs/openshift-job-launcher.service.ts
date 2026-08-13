@@ -45,7 +45,7 @@ export class OpenshiftJobLauncher {
       if (!namespace) {
         this.enabled = false
         this.namespace = 'local'
-        this.logger.warn(
+        this.logger.log(
           'OpenShift job launcher disabled (in-cluster config loaded but namespace could not be read)',
         )
         return
@@ -89,7 +89,7 @@ export class OpenshiftJobLauncher {
         return readFileSync(namespacePath, 'utf8').trim()
       }
     } catch (error) {
-      this.logger.warn(`Could not read namespace from service account: ${(error as Error).message}`)
+      this.logger.log(`Could not read namespace from service account: ${(error as Error).message}`)
     }
     return null
   }

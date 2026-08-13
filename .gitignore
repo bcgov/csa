@@ -2,6 +2,9 @@
 # Created by https://www.toptal.com/developers/gitignore/api/node,java,python,go
 # Edit at https://www.toptal.com/developers/gitignore?templates=node,java,python,go
 
+### macOS ###
+.DS_Store
+
 ### Go ###
 # If you prefer the allow list template instead of the deny list, see community template:
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
@@ -385,3 +388,7 @@ backend/generated/
 
 # Local npm config (for dev-specific SSL/proxy settings)
 .npmrc
+
+# Local dev file storage (CRA, ICM/MIS fixtures). See backend FILE_STORAGE_PATH and make fixtures.
+.local/storage/*
+!.local/storage/.gitkeep

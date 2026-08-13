@@ -1,9 +1,16 @@
 import { registerAs } from '@nestjs/config'
+import { getDeployEnv } from './app.config'
 
 export const adminConfig = registerAs('admin', () => {
   const icmApiUrl = process.env.ICM_API_URL?.replace(/\/Employee\/?$/, '')
   const icmTrustedUsername = process.env.ICM_TRUSTED_USERNAME
   const icmUsername = process.env.ICM_API_USERNAME
+  // Comma-separated IDIRs that bypass ICM_API_USERNAME in test (e.g. "CODAVIDS,BBOSCHMA")
+  const idirBypassList = process.env.ICM_IDIR_BYPASS_LIST
+    ? process.env.ICM_IDIR_BYPASS_LIST.split(',')
+        .map((s) => s.trim().toUpperCase())
+        .filter(Boolean)
+    : []
   const keycloakTokenUrl = process.env.ICM_TOKEN_URL
   const keycloakClientId = process.env.ICM_CLIENT_ID
   const keycloakClientSecret = process.env.ICM_CLIENT_SECRET
@@ -31,7 +38,7 @@ export const adminConfig = registerAs('admin', () => {
   if (!keycloakClientSecret) {
     throw new Error('KEYCLOAK_CLIENT_SECRET is required')
   }
-  if (!ssoKeycloakJwksUrl) {
+  if (!ssoKeycloakJwksUrl && getDeployEnv() !== 'local') {
     throw new Error('SSO_KEYCLOAK_URL and SSO_KEYCLOAK_REALM are required')
   }
 
@@ -39,6 +46,7 @@ export const adminConfig = registerAs('admin', () => {
     icmApiUrl,
     icmTrustedUsername,
     icmUsername,
+    idirBypassList,
     keycloakTokenUrl,
     keycloakClientId,
     keycloakClientSecret,

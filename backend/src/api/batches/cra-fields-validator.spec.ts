@@ -1,0 +1,108 @@
+import { describe, expect, it } from 'vitest'
+import { validateCraRequiredFields } from './cra-fields-validator'
+
+const VALID_BASE = {
+  firstName: 'Jane',
+  lastName: 'Doe',
+  gender: 'F',
+  dateOfBirth: new Date('2010-01-01'),
+  birthCity: 'Vancouver',
+  birthCountry: 'Canada',
+  birthProvince: 'BC',
+}
+
+describe('validateCraRequiredFields', () => {
+  it('passes when all required fields are present', () => {
+    const result = validateCraRequiredFields(VALID_BASE)
+    expect(result.isValid).toBe(true)
+    expect(result.missingFields).toHaveLength(0)
+  })
+
+  it('fails when gender is missing', () => {
+    const result = validateCraRequiredFields({ ...VALID_BASE, gender: null })
+    expect(result.isValid).toBe(false)
+    expect(result.missingFields).toContain('Gender')
+  })
+
+  it('fails when dateOfBirth is missing', () => {
+    const result = validateCraRequiredFields({ ...VALID_BASE, dateOfBirth: null })
+    expect(result.isValid).toBe(false)
+    expect(result.missingFields).toContain('Date of Birth')
+  })
+
+  it('fails when birthCity is missing', () => {
+    const result = validateCraRequiredFields({ ...VALID_BASE, birthCity: null })
+    expect(result.isValid).toBe(false)
+    expect(result.missingFields).toContain('City of Birth')
+  })
+
+  it('fails when birthCountry is missing', () => {
+    const result = validateCraRequiredFields({
+      ...VALID_BASE,
+      birthCountry: null,
+      birthProvince: null,
+    })
+    expect(result.isValid).toBe(false)
+    expect(result.missingFields).toContain('Country of Birth')
+  })
+
+  it('does not require Application Start Date', () => {
+    const result = validateCraRequiredFields(VALID_BASE)
+    expect(result.missingFields).not.toContain('Application Start Date')
+  })
+
+  it('does not require cancellation end date or reason code', () => {
+    const result = validateCraRequiredFields(VALID_BASE)
+    expect(result.missingFields).not.toContain('Cancellation End Date')
+    expect(result.missingFields).not.toContain('Cancellation Reason Code')
+  })
+
+  it('reports all missing user-sourced fields at once', () => {
+    const result = validateCraRequiredFields({
+      firstName: '',
+      lastName: '',
+      gender: null,
+      dateOfBirth: null,
+      birthCity: null,
+      birthCountry: null,
+      birthProvince: null,
+    })
+    expect(result.isValid).toBe(false)
+    expect(result.missingFields).toEqual([
+      'First Name',
+      'Last Name',
+      'Gender',
+      'Date of Birth',
+      'City of Birth',
+      'Country of Birth',
+    ])
+  })
+
+  describe('Province of Birth conditional', () => {
+    it('requires birthProvince when country is Canada', () => {
+      const result = validateCraRequiredFields({ ...VALID_BASE, birthProvince: null })
+      expect(result.isValid).toBe(false)
+      expect(result.missingFields).toContain('Province of Birth')
+    })
+
+    it('does NOT require birthProvince when country is not Canada', () => {
+      const result = validateCraRequiredFields({
+        ...VALID_BASE,
+        birthCountry: 'United States',
+        birthProvince: null,
+      })
+      expect(result.isValid).toBe(true)
+    })
+
+    it('is case-insensitive for Canada check (CANADA, canada, Canada)', () => {
+      for (const country of ['CANADA', 'canada', 'Canada']) {
+        const result = validateCraRequiredFields({
+          ...VALID_BASE,
+          birthCountry: country,
+          birthProvince: null,
+        })
+        expect(result.missingFields).toContain('Province of Birth')
+      }
+    })
+  })
+})

@@ -3,7 +3,17 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { firstValueFrom } from 'rxjs'
 import { KeycloakAuthService } from 'src/common/auth/keycloak-auth.service'
+import {
+  localDevIcmResponsibility,
+  resolveLocalDevProfile,
+} from 'src/common/auth/local-dev.constants'
 import { normalize } from 'src/common/utils'
+import {
+  CSA_RO_ICM_RESPONSIBILITY,
+  CSA_RW_ICM_RESPONSIBILITY,
+  DATA_STEWARD_ICM_RESPONSIBILITY,
+  USER_PROFILE,
+} from './constants/user-profile.constants'
 import { ICMEmployeeResponse } from './interfaces/icm-api.interface'
 
 @Injectable()
@@ -16,30 +26,63 @@ export class AdminService {
     private readonly keycloakAuthService: KeycloakAuthService,
   ) {}
 
-  async verifyCSAAccess(username: string): Promise<{
+  async verifyCSAAccess(
+    username: string,
+    localDevProfileHint?: string | null,
+  ): Promise<{
     hasAccess: boolean
     message: string
+    userProfile?: string
     icmResponsibility?: string
   }> {
+    const deployEnv = this.configService.get<string>('app.deployEnv')
+    if (deployEnv === 'local') {
+      const userProfile = resolveLocalDevProfile(localDevProfileHint)
+      return {
+        hasAccess: true,
+        message: 'User has CSA access',
+        userProfile,
+        icmResponsibility: localDevIcmResponsibility(userProfile),
+      }
+    }
+
     try {
       const icmData = await this.fetchUserFromICM(username)
 
       let hasCSAResponsibility = false
       let icmResponsibilityName: string | undefined
+      let userProfile: string | undefined
 
       if (icmData?.items?.Responsibility) {
         const responsibilities = Array.isArray(icmData.items.Responsibility)
           ? icmData.items.Responsibility
           : [icmData.items.Responsibility]
         const rwResponsibility = responsibilities.find(
-          (r) => normalize(r.Name) === 'ICM CSA APPLICATION - RW',
+          (r) => normalize(r.Name) === CSA_RW_ICM_RESPONSIBILITY,
         )
         const roResponsibility = responsibilities.find(
-          (r) => normalize(r.Name) === 'ICM CSA APPLICATION - RO',
+          (r) => normalize(r.Name) === CSA_RO_ICM_RESPONSIBILITY,
+        )
+        const dataStewardResponsibility = responsibilities.find(
+          (r) => normalize(r.Name) === DATA_STEWARD_ICM_RESPONSIBILITY,
         )
 
-        if (rwResponsibility || roResponsibility) {
-          hasCSAResponsibility = true
+        const hasRwResponsibility = !!rwResponsibility
+        const hasRoResponsibility = !!roResponsibility
+        const hasDataStewardResponsibility = !!dataStewardResponsibility
+
+        const hasStandardCsaResponsibilities =
+          (hasRwResponsibility || hasRoResponsibility) && !hasDataStewardResponsibility
+        const hasDataQualityStewardResponsibilities =
+          hasRwResponsibility && hasDataStewardResponsibility
+
+        hasCSAResponsibility =
+          hasStandardCsaResponsibilities || hasDataQualityStewardResponsibilities
+
+        if (hasCSAResponsibility) {
+          userProfile = hasDataQualityStewardResponsibilities
+            ? USER_PROFILE.DATA_QUALITY_STEWARD
+            : USER_PROFILE.CSA_STANDARD
           icmResponsibilityName = rwResponsibility?.Name || roResponsibility?.Name
         }
       }
@@ -48,6 +91,7 @@ export class AdminService {
         return {
           hasAccess: true,
           message: 'User has CSA access',
+          userProfile,
           icmResponsibility: icmResponsibilityName,
         }
       }
@@ -74,9 +118,19 @@ export class AdminService {
       const icmTrustedUsername = this.configService.get<string>('admin.icmTrustedUsername')!
       const deployEnv = this.configService.get<string>('app.deployEnv')
       const configUsername = this.configService.get<string>('admin.icmUsername')
+      const idirBypassList = this.configService.get<string[]>('admin.idirBypassList') ?? []
 
       let icmApiUsername = username
-      if (configUsername && deployEnv !== 'prod') {
+      if (
+        configUsername &&
+        deployEnv === 'test' &&
+        idirBypassList.includes(username.toUpperCase())
+      ) {
+        // these users have real ICM responsibilities in test — skip the override and verify against their own IDIR
+        this.logger.warn(
+          `ICM username override skipped for ${username} in test — using actual IDIR`,
+        )
+      } else if (configUsername && deployEnv !== 'prod') {
         this.logger.warn(
           `ICM username override active: using '${configUsername}' instead of '${username}'`,
         )
@@ -96,7 +150,7 @@ export class AdminService {
           Responsibility: {
             fields: 'Name',
             searchspec:
-              "[Name] = 'ICM CSA Application - RW' OR [Name] = 'ICM CSA Application - RO'",
+              "[Name] = 'ICM CSA Application - RW' OR [Name] = 'ICM CSA Application - RO' OR [Name] ='ICM Data Steward'",
           },
         },
       }

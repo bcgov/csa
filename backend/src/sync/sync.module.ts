@@ -3,9 +3,11 @@ import { Module, OnModuleInit } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { BatchesModule } from 'src/api/batches/batches.module'
 import { PrismaModule } from 'src/common/database/prisma.module'
+import { appConfig } from 'src/config/app.config'
 import { adminConfig } from 'src/config/admin.config'
 import { icmConfig } from 'src/config/icm.config'
 import { syncConfig } from 'src/config/sync.config'
+import path from 'path'
 import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
 import { AutoBatchHandler } from './handlers/auto-batch.handler'
@@ -19,7 +21,7 @@ import { SyncIcmHandler } from './handlers/sync-icm.handler'
 import { IcmSyncBackModule } from './icm/icm-sync-back.module'
 import { IcmService } from './icm/icm.service'
 import { FileStorageService } from './mis/file-storage/file-storage.service'
-import { MockFileStorageService } from './mis/file-storage/mock-file-storage.service'
+import { LocalFileStorageService } from './mis/file-storage/local-file-storage.service'
 import { S3Service } from './mis/file-storage/s3.service'
 import { AutoBatchService } from './eligibility/auto-batch.service'
 import { EligibilityModule } from './eligibility/eligibility.module'
@@ -29,7 +31,7 @@ import { MisService } from './mis/mis.service'
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [syncConfig, adminConfig, icmConfig],
+      load: [syncConfig, appConfig, adminConfig, icmConfig],
     }),
     HttpModule,
     PrismaModule,
@@ -39,13 +41,15 @@ import { MisService } from './mis/mis.service'
     EligibilityModule,
   ],
   providers: [
-    // Factory: FileStorageService (S3 or Mock based on config)
+    // Factory: FileStorageService (local filesystem or S3 based on deploy env)
     {
       provide: FileStorageService,
       useFactory: (configService: ConfigService) => {
-        return configService.get<boolean>('sync.useMockData')
-          ? new MockFileStorageService()
-          : new S3Service(configService)
+        if (configService.get<boolean>('sync.isLocal')) {
+          const storagePath = configService.get<string>('app.fileStoragePath')!
+          return new LocalFileStorageService(path.join(storagePath, 'mis'))
+        }
+        return new S3Service(configService)
       },
       inject: [ConfigService],
     },

@@ -1,6 +1,8 @@
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { JobActivitySeverity } from './enums/job-activity-severity.enum'
+import { JobActivityType } from './enums/job-activity-type.enum'
 import { JobStatus } from './enums/job-status.enum'
 import { JobTrigger } from './enums/job-trigger.enum'
 import { JobType } from './enums/job-type.enum'
@@ -39,6 +41,11 @@ describe('JobsService', () => {
               count: vi.fn().mockResolvedValue(1),
               update: vi.fn().mockResolvedValue(mockJobRun),
               updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+            },
+            jobActivity: {
+              create: vi.fn().mockResolvedValue({ id: 1 }),
+              findMany: vi.fn().mockResolvedValue([{ id: 1 }]),
+              count: vi.fn().mockResolvedValue(1),
             },
           },
         },
@@ -103,7 +110,7 @@ describe('JobsService', () => {
 
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: { parentJobId: null },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: 0,
         take: 20,
       })
@@ -123,7 +130,7 @@ describe('JobsService', () => {
 
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: { parentJobId: null },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: 50,
         take: 25,
       })
@@ -134,7 +141,7 @@ describe('JobsService', () => {
 
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: { parentJobId: null, jobType: JobType.RUN_ELIGIBILITY },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: 0,
         take: 20,
       })
@@ -145,7 +152,7 @@ describe('JobsService', () => {
 
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: { parentJobId: null, status: JobStatus.FAILED },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: 0,
         take: 20,
       })
@@ -166,7 +173,7 @@ describe('JobsService', () => {
       }
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: expectedWhere,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: 10,
         take: 10,
       })
@@ -221,6 +228,145 @@ describe('JobsService', () => {
           completedAt: expect.any(Date),
         }),
       })
+      expect(prisma.jobActivity.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          jobRunId: 1,
+          severity: JobActivitySeverity.ERROR,
+          type: JobActivityType.JOB,
+          related: 'Connection timeout',
+        }),
+      })
+    })
+  })
+
+  describe('monitoring', () => {
+    it('should return latest run per monitored job type', async () => {
+      const latestIcm = {
+        ...mockJobRun,
+        id: 3,
+        jobType: JobType.INGEST_ICM,
+        parentJobId: 99,
+        startedAt: new Date('2026-01-02T00:00:00Z'),
+      }
+      const latestEligibility = {
+        ...mockJobRun,
+        id: 4,
+        jobType: JobType.RUN_ELIGIBILITY,
+        parentJobId: null,
+      }
+      vi.spyOn(prisma.jobRun, 'findFirst')
+        .mockResolvedValueOnce(latestIcm as any)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(latestEligibility as any)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+
+      const result = await service.getLatestJobsPerType()
+
+      expect(result).toHaveLength(2)
+      expect(result.find((x) => x.jobType === JobType.INGEST_ICM)?.id).toBe(3)
+      expect(prisma.jobRun.findFirst).toHaveBeenCalledWith({
+        where: { jobType: JobType.INGEST_ICM },
+        orderBy: { startedAt: 'desc' },
+      })
+      expect(prisma.jobRun.findFirst).toHaveBeenCalledWith({
+        where: { jobType: JobType.RUN_ELIGIBILITY, parentJobId: null },
+        orderBy: { startedAt: 'desc' },
+      })
+    })
+
+    it('should store triggeredByUser when provided', async () => {
+      await service.createJob({
+        jobType: JobType.RUN_ELIGIBILITY,
+        jobTrigger: JobTrigger.END_USER,
+        triggeredByUser: 'JSMITH',
+      })
+
+      expect(prisma.jobRun.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          triggeredByUser: 'JSMITH',
+        }),
+      })
+    })
+
+    it('should filter monitoring history by SYSTEM using jobTrigger', async () => {
+      await service.getJobHistory({ triggeredBy: 'SYSTEM' })
+
+      expect(prisma.jobRun.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            jobTrigger: { in: [JobTrigger.CRON, JobTrigger.SYSTEM] },
+          }),
+        }),
+      )
+    })
+
+    it('should query history for monitored types including ICM/MIS child runs', async () => {
+      await service.getJobHistory()
+
+      expect(prisma.jobRun.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            startedAt: { gte: expect.any(Date) },
+            OR: [
+              { jobType: { in: [JobType.INGEST_ICM, JobType.INGEST_MIS] } },
+              { parentJobId: null },
+            ],
+          }),
+          orderBy: [{ startedAt: 'desc' }, { id: 'asc' }],
+        }),
+      )
+    })
+
+    it('should filter monitoring history by user IDIR', async () => {
+      await service.getJobHistory({ triggeredBy: 'jsmith' })
+
+      expect(prisma.jobRun.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            jobTrigger: JobTrigger.END_USER,
+            triggeredByUser: { equals: 'jsmith', mode: 'insensitive' },
+          }),
+        }),
+      )
+    })
+
+    it('should return distinct trigger values for full monitoring scope', async () => {
+      vi.spyOn(prisma.jobRun, 'findMany').mockResolvedValue([
+        { jobTrigger: JobTrigger.CRON, triggeredByUser: null },
+        { jobTrigger: JobTrigger.END_USER, triggeredByUser: 'jsmith' },
+        { jobTrigger: JobTrigger.END_USER, triggeredByUser: 'adoe' },
+        { jobTrigger: JobTrigger.END_USER, triggeredByUser: 'JSMITH' },
+      ] as any)
+
+      const result = await service.getMonitoringTriggeredByValues()
+
+      expect(prisma.jobRun.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            startedAt: { gte: expect.any(Date) },
+          }),
+          select: {
+            jobTrigger: true,
+            triggeredByUser: true,
+          },
+          distinct: ['jobTrigger', 'triggeredByUser'],
+        }),
+      )
+      expect(result).toEqual(['SYSTEM', 'ADOE', 'JSMITH'])
+    })
+
+    it('should apply recent activity time window', async () => {
+      await service.getRecentActivities(1, 10)
+
+      expect(prisma.jobActivity.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            when: { gte: expect.any(Date) },
+          }),
+        }),
+      )
     })
   })
 
@@ -241,13 +387,14 @@ describe('JobsService', () => {
   })
 
   describe('getFailedJobs', () => {
-    it('should return retryable top-level failed jobs (cron + selected end-user jobs)', async () => {
+    it('should query retryable failed jobs ordered by latest completion first', async () => {
       await service.getFailedJobs()
 
       expect(prisma.jobRun.findMany).toHaveBeenCalledWith({
         where: {
           status: JobStatus.FAILED,
           parentJobId: null,
+          jobType: { not: JobType.RETRY_FAILED },
           OR: [
             { jobTrigger: JobTrigger.CRON },
             {
@@ -263,9 +410,88 @@ describe('JobsService', () => {
           retryCount: true,
           metadata: true,
           parentJobId: true,
+          completedAt: true,
         },
-        orderBy: { completedAt: 'asc' },
+        orderBy: { completedAt: 'desc' },
       })
+    })
+
+    it('should return only the latest failed job per job type', async () => {
+      vi.mocked(prisma.jobRun.findMany).mockResolvedValue([
+        {
+          id: 3,
+          jobType: JobType.INGEST_DATA,
+          jobTrigger: JobTrigger.CRON,
+          retryCount: 2,
+          metadata: {},
+          parentJobId: null,
+          completedAt: new Date('2026-07-07T20:00:00Z'),
+        },
+        {
+          id: 2,
+          jobType: JobType.INGEST_DATA,
+          jobTrigger: JobTrigger.CRON,
+          retryCount: 10,
+          metadata: {},
+          parentJobId: null,
+          completedAt: new Date('2026-07-01T10:00:00Z'),
+        },
+        {
+          id: 5,
+          jobType: JobType.RUN_ELIGIBILITY,
+          jobTrigger: JobTrigger.CRON,
+          retryCount: 1,
+          metadata: {},
+          parentJobId: null,
+          completedAt: new Date('2026-07-06T12:00:00Z'),
+        },
+      ] as any)
+
+      const result = await service.getFailedJobs()
+
+      expect(result).toHaveLength(2)
+      expect(result.map((j) => j.id)).toEqual([5, 3])
+    })
+
+    it('should skip cron failures that are older than the last success for that type', async () => {
+      vi.mocked(prisma.jobRun.findMany).mockResolvedValue([
+        {
+          id: 1,
+          jobType: JobType.INGEST_DATA,
+          jobTrigger: JobTrigger.CRON,
+          retryCount: 1,
+          metadata: {},
+          parentJobId: null,
+          completedAt: new Date('2026-07-01T10:00:00Z'),
+        },
+      ] as any)
+      vi.mocked(prisma.jobRun.findFirst).mockResolvedValue({
+        completedAt: new Date('2026-07-05T12:00:00Z'),
+      } as any)
+
+      const result = await service.getFailedJobs()
+
+      expect(result).toEqual([])
+    })
+
+    it('should still retry end-user failures even when a later success exists for that type', async () => {
+      vi.mocked(prisma.jobRun.findMany).mockResolvedValue([
+        {
+          id: 10,
+          jobType: JobType.SEND_CRA_FILE,
+          jobTrigger: JobTrigger.END_USER,
+          retryCount: 1,
+          metadata: {},
+          parentJobId: null,
+          completedAt: new Date('2026-07-01T10:00:00Z'),
+        },
+      ] as any)
+
+      const result = await service.getFailedJobs()
+
+      expect(result).toHaveLength(1)
+      expect(result[0].id).toBe(10)
+      expect(prisma.jobRun.findFirst).not.toHaveBeenCalled()
     })
   })
 
@@ -314,34 +540,37 @@ describe('JobsService', () => {
       })
     })
 
-    it('should return true when a retryable FAILED top-level job exists', async () => {
-      vi.spyOn(prisma.jobRun, 'findFirst')
-        .mockResolvedValueOnce(null) // no stuck jobs
-        .mockResolvedValueOnce({ id: 50 } as any) // failed job found
+    it('should return true when an actionable failed job exists', async () => {
+      vi.spyOn(prisma.jobRun, 'findFirst').mockResolvedValueOnce(null) // no stuck jobs
+      vi.spyOn(service, 'getFailedJobs').mockResolvedValueOnce([
+        {
+          id: 50,
+          jobType: JobType.INGEST_DATA,
+          jobTrigger: JobTrigger.CRON,
+          retryCount: 1,
+          metadata: {},
+          parentJobId: null,
+          completedAt: new Date(),
+        },
+      ])
 
       const result = await service.hasStuckOrFailedJobs()
 
       expect(result).toBe(true)
-      expect(prisma.jobRun.findFirst).toHaveBeenCalledWith({
-        where: {
-          status: JobStatus.FAILED,
-          parentJobId: null,
-          OR: [
-            { jobTrigger: JobTrigger.CRON },
-            {
-              jobTrigger: JobTrigger.END_USER,
-              jobType: { in: [JobType.SEND_CRA_FILE] },
-            },
-          ],
-        },
-        select: { id: true },
-      })
+    })
+
+    it('should return false when only stale cron failures exist', async () => {
+      vi.spyOn(prisma.jobRun, 'findFirst').mockResolvedValueOnce(null) // no stuck jobs
+      vi.spyOn(service, 'getFailedJobs').mockResolvedValueOnce([])
+
+      const result = await service.hasStuckOrFailedJobs()
+
+      expect(result).toBe(false)
     })
 
     it('should return false when no stuck or failed jobs exist', async () => {
-      vi.spyOn(prisma.jobRun, 'findFirst')
-        .mockResolvedValueOnce(null) // no stuck jobs
-        .mockResolvedValueOnce(null) // no failed jobs
+      vi.spyOn(prisma.jobRun, 'findFirst').mockResolvedValueOnce(null) // no stuck jobs
+      vi.spyOn(service, 'getFailedJobs').mockResolvedValueOnce([])
 
       const result = await service.hasStuckOrFailedJobs()
 
@@ -349,7 +578,8 @@ describe('JobsService', () => {
     })
 
     it('should use the default 40-minute threshold', async () => {
-      vi.spyOn(prisma.jobRun, 'findFirst').mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+      vi.spyOn(prisma.jobRun, 'findFirst').mockResolvedValueOnce(null)
+      vi.spyOn(service, 'getFailedJobs').mockResolvedValueOnce([])
       const before = new Date(Date.now() - 40 * 60 * 1000)
 
       await service.hasStuckOrFailedJobs()

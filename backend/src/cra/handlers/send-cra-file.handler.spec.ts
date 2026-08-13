@@ -74,6 +74,7 @@ describe('SendCraFileHandler', () => {
   let mockPrisma: any
   let mockBatchesService: any
   let mockContactsService: any
+  let mockJobsService: any
   let mockOutboundDataService: any
   let mockOutboundFileService: any
   let mockCraTransferService: any
@@ -103,6 +104,10 @@ describe('SendCraFileHandler', () => {
 
     mockContactsService = {
       updateCsaStatus: vi.fn().mockResolvedValue({ success: true }),
+    }
+
+    mockJobsService = {
+      addActivity: vi.fn().mockResolvedValue(undefined),
     }
 
     mockOutboundDataService = {
@@ -158,6 +163,7 @@ describe('SendCraFileHandler', () => {
       mockOutboundDataService,
       mockOutboundFileService,
       mockCraTransferService,
+      mockJobsService,
       mockIcmSyncBackService,
     )
   })
@@ -175,6 +181,7 @@ describe('SendCraFileHandler', () => {
 
       expect(result.success).toBe(true)
       expect(result.message).toContain('No batch to process')
+      expect(result.metadata).toEqual({ no_batch: true })
       expect(mockBatchesService.updateBatchStatus).not.toHaveBeenCalled()
       expect(mockOutboundFileService.createFile).not.toHaveBeenCalled()
     })
@@ -190,6 +197,7 @@ describe('SendCraFileHandler', () => {
 
       expect(result.success).toBe(true)
       expect(result.message).toContain('No batch to process')
+      expect(result.metadata).toEqual({ no_batch: true })
       expect(mockBatchesService.updateBatchStatus).not.toHaveBeenCalled()
       expect(mockOutboundFileService.createFile).not.toHaveBeenCalled()
     })
@@ -329,6 +337,7 @@ describe('SendCraFileHandler', () => {
       expect(result.metadata).toEqual({
         batch_id: 10,
         file_path: '/tmp/cra/testfile.txt',
+        file_name: 'testfile.txt',
         record_count: 3,
         contacts_count: 2,
       })
@@ -493,6 +502,9 @@ describe('SendCraFileHandler', () => {
 
       expect(warnSpy).toHaveBeenCalledWith(
         'Batch 10: SEND_FAILED transition failed (Invalid transition); persisted systemComments and status via direct update',
+        expect.objectContaining({
+          activityType: 'BATCH',
+        }),
       )
       expect(mockPrisma.batch.update).toHaveBeenCalledWith({
         where: { id: 10 },
@@ -524,6 +536,9 @@ describe('SendCraFileHandler', () => {
 
       expect(warnSpy).toHaveBeenCalledWith(
         'Batch 10: SEND_FAILED transition failed (Invalid transition); persisted systemComments only',
+        expect.objectContaining({
+          activityType: 'BATCH',
+        }),
       )
       expect(mockPrisma.batch.update).toHaveBeenCalledWith({
         where: { id: 10 },

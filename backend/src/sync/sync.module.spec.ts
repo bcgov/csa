@@ -18,13 +18,18 @@ describe('SyncModule', () => {
   let registry: JobRegistry
 
   beforeEach(async () => {
-    process.env.USE_MOCK_DATA = 'true'
+    process.env.DEPLOY_ENV = 'local'
+    process.env.FILE_STORAGE_PATH = '/tmp'
     process.env.ICM_API_URL = 'http://test-icm'
     process.env.ICM_TRUSTED_USERNAME = 'test-user'
     process.env.ICM_API_USERNAME = 'test-user'
     process.env.ICM_TOKEN_URL = 'http://test-keycloak/token'
     process.env.ICM_CLIENT_ID = 'test-client'
     process.env.ICM_CLIENT_SECRET = 'test-secret'
+    process.env.ICM_CURSOR_LOOKBACK_DAYS = '2'
+    process.env.ELIGIBILITY_LOOKBACK_DAYS = '2'
+    process.env.ICM_REQUEST_TIMEOUT_MS = '30000'
+    process.env.MIS_S3_PREFIX = 'csas3/'
 
     module = await Test.createTestingModule({
       imports: [JobsModule, SyncModule],

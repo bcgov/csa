@@ -1,3 +1,12 @@
+# Local development with Colima:
+#   colima start
+#   docker compose up -d database migrations          # DB only (recommended)
+#   cd backend && npm run start:dev                   # http://localhost:3000
+#   cd frontend && npm run dev                        # http://localhost:5173
+#
+# Or run app services in Docker:
+#   docker compose --profile app up                     # frontend :3000, backend :3001
+
 # Reusable vars
 x-var:
   - &POSTGRES_USER postgres
@@ -21,6 +30,8 @@ services:
     healthcheck:
       test: ["CMD", "pg_isready", "-U", *POSTGRES_USER]
     ports: ["5432:5432"]
+    volumes:
+      - ./migrations/docker/init-local-roles.sql:/docker-entrypoint-initdb.d/01-local-roles.sql:ro
 
   migrations:
     image: flyway/flyway:11-alpine
@@ -54,26 +65,35 @@ services:
       migrations:
         condition: service_started
     entrypoint: sh -c "npm i && npx prisma generate && npm run start:dev"
+    env_file:
+      - ./backend/.env
     environment:
       <<: *postgres-vars
+      POSTGRES_HOST: database
+      POSTGRES_PASSWORD: default
+      DEPLOY_ENV: local
       NODE_ENV: development
       CRA_ENVIRONMENT: test
       ENABLE_SWAGGER: "true"
+      FILE_STORAGE_PATH: /storage
     image: *node-image
     ports: ["3001:3000"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api"]
     working_dir: "/app"
-    volumes: ["./backend:/app", "/app/node_modules"]
+    volumes: ["./backend:/app", "/app/node_modules", "./.local/storage:/storage"]
 
   frontend:
     container_name: frontend
     profiles: ["app"]
     entrypoint: sh -c "npm ci --ignore-scripts && npm run dev"
+    env_file:
+      - ./frontend/.env
     environment:
       BACKEND_URL: http://backend:3000
       PORT: 3000
       NODE_ENV: development
+      VITE_APP_ENV: LOCAL
     image: *node-image
     ports: ["3000:3000"]
     volumes: ["./frontend:/app", "/app/node_modules"]
@@ -114,34 +134,3 @@ services:
     depends_on:
       backend-prod:
         condition: service_healthy
-
-  minio:
-    image: minio/minio
-    container_name: minio
-    profiles: ["storage"]
-    command: server /data --console-address ":9001"
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  minio-init:
-    image: minio/mc
-    container_name: minio-init
-    profiles: ["storage"]
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 minioadmin minioadmin;
-      mc mb --ignore-existing local/csa-bucket;
-      exit 0;
-      "

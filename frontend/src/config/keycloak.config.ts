@@ -1,8 +1,29 @@
 import Keycloak from 'keycloak-js'
+import { isLocalDev } from './local-dev.config'
 import type { RuntimeConfig } from '../types/runtime-config'
+
+function buildLocalRuntimeConfig(): RuntimeConfig {
+  const runtimeConfig: RuntimeConfig = {
+    VITE_KEYCLOAK_URL: '',
+    VITE_KEYCLOAK_REALM: '',
+    VITE_KEYCLOAK_CLIENT_ID: '',
+    VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL || '/api',
+    VITE_APP_REDIRECT: window.location.origin + '/',
+    VITE_APP_ENV: 'LOCAL',
+  }
+
+  window.__RUNTIME_CONFIG__ = runtimeConfig
+  console.log('Local development mode enabled (VITE_APP_ENV=LOCAL)')
+
+  return runtimeConfig
+}
 
 // Load runtime configuration from /config.json served by the container
 async function loadRuntimeConfig(): Promise<RuntimeConfig> {
+  if (isLocalDev()) {
+    return buildLocalRuntimeConfig()
+  }
+
   try {
     const response = await fetch('/config.json')
     if (!response.ok) {
@@ -54,7 +75,15 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
 
 // Get runtime config (use cached version if available)
 function getRuntimeConfig(): RuntimeConfig | null {
-  return window.__RUNTIME_CONFIG__ || null
+  if (window.__RUNTIME_CONFIG__) {
+    return window.__RUNTIME_CONFIG__
+  }
+
+  if (isLocalDev()) {
+    return buildLocalRuntimeConfig()
+  }
+
+  return null
 }
 
 // Initialize Keycloak with runtime configuration

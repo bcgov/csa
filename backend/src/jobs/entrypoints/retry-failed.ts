@@ -9,7 +9,7 @@ import { JobRunner } from '../job-runner.service'
 import { JobsService } from '../jobs.service'
 import { RetryModule } from '../retry.module'
 
-// Marks stuck jobs as failed and retries all failed jobs
+// Marks stuck jobs as failed and retries the latest failed job per type
 async function bootstrap() {
   const logger = new AppLogger('RetryFailedJob')
 

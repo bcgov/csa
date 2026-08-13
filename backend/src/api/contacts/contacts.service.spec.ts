@@ -2124,7 +2124,7 @@ describe('ContactsService', () => {
         {
           din: '987654329',
           csaStatus: 'in_pay',
-          csaStatusEffectiveDate: new Date('2026-08-01'),
+          csaStatusEffectiveDate: '2026-08-01',
         },
         'dq.steward',
         USER_PROFILE.DATA_QUALITY_STEWARD,
@@ -2236,13 +2236,10 @@ describe('ContactsService', () => {
         din: '123456789',
       } as any)
 
-      const futureDate = new Date()
-      futureDate.setDate(futureDate.getDate() + 1)
-
       await expect(
         service.updateContact(
           1,
-          { csaStatusEffectiveDate: futureDate },
+          { csaStatusEffectiveDate: '2099-01-01' },
           'dq.steward',
           USER_PROFILE.DATA_QUALITY_STEWARD,
         ),
@@ -2302,7 +2299,7 @@ describe('ContactsService', () => {
 
       await service.updateContact(
         1,
-        { csaStatusEffectiveDate: new Date('2026-08-01') },
+        { csaStatusEffectiveDate: '2026-08-01' },
         'dq.steward',
         USER_PROFILE.DATA_QUALITY_STEWARD,
       )

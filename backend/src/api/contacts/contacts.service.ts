@@ -1112,8 +1112,8 @@ export class ContactsService {
     const now = new Date()
     let effectiveDate: Date | undefined
 
-    if (fieldsToUpdate.csaStatusEffectiveDate) {
-      effectiveDate = parseISODatePacific(String(fieldsToUpdate.csaStatusEffectiveDate))
+    if (fieldsToUpdate.csaStatusEffectiveDate !== undefined) {
+      effectiveDate = parseISODatePacific(fieldsToUpdate.csaStatusEffectiveDate.trim())
       if (effectiveDate > now) {
         throw new BadRequestException('Status Effective Date cannot be in the future.')
       }

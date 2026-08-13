@@ -71,6 +71,7 @@ model Contact {
   agreementEndDate           DateTime? @map("agreement_end_date") @db.Date
   terminationDate            DateTime? @map("termination_date") @db.Date
   mcfdContract               String?   @map("mcfd_contract")
+  sourceAgreement            String?   @map("source_agreement")
   orderNumber                String?   @map("order_number")
   orderType                  String?   @map("order_type")
   orderStatus                String?   @map("order_status")
@@ -79,28 +80,51 @@ model Contact {
   orderEffectiveEndDate      DateTime? @db.Date @map("order_effective_end_date")
   product                    String?   @map("product")
   holdBy                     String?   @map("hold_by")
+  holdReason                 String?   @map("hold_reason")
   resumeStatus               String?   @map("resume_status")
   preBatchStatus               String?   @map("pre_batch_status")
   prevRecipientFirstName     String?   @map("prev_recipient_first_name")
   prevRecipientLastName      String?   @map("prev_recipient_last_name")
   cancelReasonCode           String?   @map("cancel_reason_code")
   careEndDate                DateTime? @db.Date @map("care_end_date")
+  needsReview                Boolean   @default(false) @map("needs_review")
 
   // Relations
   contactBatchDetails        ContactBatchDetail[]
+  auditTrailEntries          ContactAuditTrail[]
+  wklFileRecords             WklFileRecord[]
 
   @@map("contacts")
   @@schema("csa")
 }
 
+model ContactAuditTrail {
+  id          Int      @id @default(autoincrement())
+  contactId   Int      @map("contact_id")
+  actionedAt  DateTime @default(now()) @map("actioned_at") @db.Timestamptz()
+  actionedBy  String   @map("actioned_by")
+  operation   String
+  field       String?
+  oldValue    String?  @map("old_value")
+  newValue    String?  @map("new_value")
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, actionedAt(sort: Desc)])
+  @@map("contact_audit_trail")
+  @@schema("csa")
+}
+
 model Batch {
   id                  Int                  @id @default(autoincrement())
+  batchNumber         Int                  @unique @map("batch_number")
   batchDate           DateTime?            @map("batch_date") @db.Date
   status              String
   recordCount         Int                  @map("record_count")
   createdAt           DateTime             @map("created_at") @db.Timestamptz()
   updatedAt           DateTime             @map("updated_at") @db.Timestamptz() @updatedAt
   systemComments      String?              @map("system_comments")
+  initiatedBy         String               @map("initiated_by")
   contactBatchDetails ContactBatchDetail[]
   transferFiles       TransferFile[]
 
@@ -109,19 +133,26 @@ model Batch {
 }
 
 model ContactBatchDetail {
-  id              Int      @id @default(autoincrement())
-  contactId       Int      @map("contact_id")
-  batchId         Int      @map("batch_id")
-  transactionType String   @map("transaction_type")
-  referenceNumber String?  @unique @map("reference_number")
-  systemComments  String?  @map("system_comments")
-  createdAt       DateTime @map("created_at") @db.Timestamptz()
-  createdBy       String   @map("created_by")
-  lastUpdatedAt   DateTime @map("last_updated_at") @db.Timestamptz() @updatedAt
-  lastUpdatedBy   String   @map("last_updated_by")
-  status          String?
-  batch           Batch    @relation(fields: [batchId], references: [id])
-  contact         Contact  @relation(fields: [contactId], references: [id])
+  id                Int       @id @default(autoincrement())
+  contactId         Int       @map("contact_id")
+  batchId           Int       @map("batch_id")
+  transactionType   String    @map("transaction_type")
+  referenceNumber   String?   @unique @map("reference_number")
+  systemComments    String?   @map("system_comments")
+  createdAt         DateTime  @map("created_at") @db.Timestamptz()
+  createdBy         String    @map("created_by")
+  lastUpdatedAt     DateTime  @map("last_updated_at") @db.Timestamptz() @updatedAt
+  lastUpdatedBy     String    @map("last_updated_by")
+  status            String?
+  craMatchingSnapshot Json?   @map("cra_matching_snapshot") @db.JsonB
+  // Snapshot of the transaction date at batch time. Despite the name, this holds
+  // the application start date for applications and the care END date for cancellations
+  // (see outbound-data.service.ts: feeds appStartDate or cancelEndDate accordingly).
+  effectiveDate     DateTime? @db.Date @map("effective_date")
+  cancelReasonCode  String?   @map("cancel_reason_code")
+  batch             Batch     @relation(fields: [batchId], references: [id])
+  contact           Contact   @relation(fields: [contactId], references: [id])
+  wklFileRecords    WklFileRecord[]
 
   @@unique([contactId, batchId], name: "contact_batch_unique")
   @@map("contact_batch_details")
@@ -133,6 +164,7 @@ model TransferFile {
   batchId          Int?      @map("batch_id")
   destinationId    String    @map("destination_id")
   direction        String
+  fileType         String?   @map("file_type")
   fileName         String    @map("file_name")
   deliveredAt      DateTime? @map("delivered_at") @db.Timestamptz()
   downloadedAt     DateTime? @map("downloaded_at") @db.Timestamptz()
@@ -142,8 +174,40 @@ model TransferFile {
   isValid          Boolean   @default(true) @map("is_valid")
   sequenceNumber   Int?      @map("sequence_number")
   batch            Batch?    @relation(fields: [batchId], references: [id])
+  wklFileRecords   WklFileRecord[]
 
   @@map("transfer_files")
+  @@schema("csa")
+}
+
+model WklFileRecord {
+  id             Int       @id @default(autoincrement())
+  transferFileId Int       @map("transfer_file_id")
+  recordIndex    Int       @map("record_index")
+  weeklyFileDate DateTime? @map("weekly_file_date") @db.Date
+  recordData     Json      @map("record_data") @db.JsonB
+  transactionType String?  @map("transaction_type")
+  craStatus      String?   @map("cra_status")
+  transactionSource String? @map("transaction_source")
+  matchStatus    String    @map("match_status")
+  contactId      Int?      @map("contact_id")
+  batchDetailId  Int?      @map("batch_detail_id")
+  matchedBy      String?   @map("matched_by")
+  processedAt    DateTime? @map("processed_at") @db.Timestamptz()
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  transferFile TransferFile        @relation(fields: [transferFileId], references: [id])
+  contact      Contact?            @relation(fields: [contactId], references: [id])
+  batchDetail  ContactBatchDetail? @relation(fields: [batchDetailId], references: [id])
+
+  @@unique([transferFileId, recordIndex], name: "wkl_file_record_unique")
+  @@index([transferFileId])
+  @@index([matchStatus])
+  @@index([contactId])
+  @@index([transactionType])
+  @@index([craStatus])
+  @@index([transactionSource])
+  @@map("wkl_file_records")
   @@schema("csa")
 }
 

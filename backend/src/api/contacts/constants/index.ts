@@ -19,6 +19,14 @@ export const ALLOWED_FILTER_SORT_FIELDS = [
   'serviceOffice',
   'assignedTo',
   'holdBy',
+  'holdReason',
+  'needsReview',
+  'searchText',
+  'personIdIcm',
+  'personIdMis',
+  'birthCity',
+  'birthProvince',
+  'birthCountry',
 ] as const
 
 export const CSA_STATUSES = {
@@ -44,7 +52,7 @@ export const BATCH_STATUSES = {
   PENDING: 'pending',
   IN_PROGRESS: 'in_progress',
   PROCESSED: 'processed',
-  PROCESSED_WITH_ERRORS: 'processed_with_errors',
+  PARTIALLY_PROCESSED: 'partially_processed',
   ERROR: 'error',
   SYSTEM_ERROR: 'system_error',
 } as const
@@ -53,7 +61,8 @@ export type BatchStatus = (typeof BATCH_STATUSES)[keyof typeof BATCH_STATUSES]
 export const CONTACT_BATCH_STATUSES = {
   PENDING: 'pending',
   IN_PROGRESS: 'in_progress',
-  PROCESSED: 'processed',
+  APPROVED: 'approved',
+  REFUSED: 'refused',
   ERROR: 'error',
 } as const
 export type ContactBatchStatus =

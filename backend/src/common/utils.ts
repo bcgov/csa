@@ -19,7 +19,6 @@ const PACIFIC_ZONE = 'America/Vancouver'
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 const SPACE_DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/
-
 // Date-only strings ('2026-01-09') are interpreted as UTC midnight by new Date(),
 // which shifts to the previous day in Pacific time. Parse as Pacific midnight instead.
 export function parseISODatePacific(value: string): Date {
@@ -137,9 +136,35 @@ export function normalize(value: string | null | undefined): string | undefined 
   return value?.trim().toUpperCase()
 }
 
+export function parseWklDate(dateStr: string): Date | undefined {
+  if (!dateStr || dateStr.trim().length !== 8) return undefined
+  const y = dateStr.substring(0, 4)
+  const m = dateStr.substring(4, 6)
+  const d = dateStr.substring(6, 8)
+  const dt = DateTime.fromFormat(`${y}-${m}-${d}`, 'yyyy-MM-dd', { zone: PACIFIC_ZONE })
+  return dt.isValid ? dt.toJSDate() : undefined
+}
+
+export function parseEffectiveDate(date: Date | string | null): string {
+  if (!date) return ''
+  const dateValue = typeof date === 'string' ? new Date(date) : date
+  const year = dateValue.getUTCFullYear()
+  const month = String(dateValue.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(dateValue.getUTCDate()).padStart(2, '0')
+  return `${year}${month}${day}`
+}
+
 export function pacificToday(): Date {
   const isoDate = DateTime.now().setZone(PACIFIC_ZONE).toISODate()!
-  return new Date(isoDate)
+  return DateTime.fromISO(isoDate, { zone: PACIFIC_ZONE }).toJSDate()
+}
+
+/** Pacific calendar date for when CSA processed a WKL file (maps to transfer_file.delivered_at). */
+export function csaProcessingBatchDate(processedAt: Date | null | undefined): Date {
+  const isoDate = DateTime.fromJSDate(processedAt ?? new Date())
+    .setZone(PACIFIC_ZONE)
+    .toISODate()!
+  return DateTime.fromISO(isoDate, { zone: PACIFIC_ZONE }).toJSDate()
 }
 
 export function pacificTodayISO(): string {

@@ -125,7 +125,7 @@ describe('StateMachineService', () => {
     })
 
     it('should return display label for BatchDetail status', () => {
-      expect(service.getStatusLabel('batchDetail', BATCH_DETAIL_STATUS.PROCESSED)).toBe('Processed')
+      expect(service.getStatusLabel('batchDetail', BATCH_DETAIL_STATUS.APPROVED)).toBe('Approved')
     })
 
     it('should return raw value if label not found', () => {
@@ -189,13 +189,22 @@ describe('StateMachineService', () => {
     })
 
     it('should reject invalid transition', () => {
-      const result = service.transitionContact(CSA_STATUS.ELIGIBLE, CSA_EVENT.HOLD, 'USER')
+      // RESUME is not valid from ELIGIBLE state
+      const result = service.transitionContact(CSA_STATUS.ELIGIBLE, CSA_EVENT.RESUME, 'USER')
 
       expect(result.success).toBe(false)
       expect(result.reason).toBe('Invalid transition')
     })
 
-    it('should handle HOLD event', () => {
+    it('should handle HOLD event from ELIGIBLE', () => {
+      const result = service.transitionContact(CSA_STATUS.ELIGIBLE, CSA_EVENT.HOLD, 'USER')
+
+      expect(result.success).toBe(true)
+      expect(result.from).toBe(CSA_STATUS.ELIGIBLE)
+      expect(result.to).toBe(CSA_STATUS.ON_HOLD)
+    })
+
+    it('should handle HOLD event from ELIGIBLE_TBD', () => {
       const result = service.transitionContact(CSA_STATUS.ELIGIBLE_TBD, CSA_EVENT.HOLD, 'USER')
 
       expect(result.success).toBe(true)
@@ -281,8 +290,16 @@ describe('StateMachineService', () => {
       expect(result.to).toBe(BATCH_STATUS.IN_PROGRESS)
     })
 
-    it('should return error for invalid transition', () => {
+    it('should transition from pending to system_error on send failure', () => {
       const result = service.transitionBatch(BATCH_STATUS.PENDING, BATCH_EVENT.SEND_FAILED)
+
+      expect(result.success).toBe(true)
+      expect(result.from).toBe(BATCH_STATUS.PENDING)
+      expect(result.to).toBe(BATCH_STATUS.SYSTEM_ERROR)
+    })
+
+    it('should return error for invalid transition', () => {
+      const result = service.transitionBatch(BATCH_STATUS.PROCESSED, BATCH_EVENT.SEND_FAILED)
 
       expect(result.success).toBe(false)
       expect(result.reason).toBe('Invalid transition')

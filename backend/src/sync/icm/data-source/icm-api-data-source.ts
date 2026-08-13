@@ -130,6 +130,10 @@ export class IcmApiDataSource extends IcmDataSource {
       childlinks: 'None',
     })
 
+    if (config.fields) {
+      params.set('fields', config.fields)
+    }
+
     const workspace = this.configService.get<string>('icm.workspace')
     if (workspace) {
       params.set('workspace', workspace)

@@ -67,6 +67,18 @@ export class ContactBatchDetailDto {
 
   @ApiProperty({ description: 'Display label for batch detail status' })
   statusLabel: string
+
+  @ApiProperty({ nullable: true, description: 'Effective date snapshot at time of batching' })
+  effectiveDate: Date | null
+
+  @ApiProperty({
+    nullable: true,
+    description: 'Cancellation reason code snapshot at time of batching',
+  })
+  cancelReasonCode: string | null
+
+  @ApiProperty({ nullable: true, description: 'Display label for cancellation reason' })
+  cancelReasonLabel: string | null
 }
 
 export class ContactBatchDetailWithContactDto extends ContactBatchDetailDto {

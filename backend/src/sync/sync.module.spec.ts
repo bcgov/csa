@@ -3,6 +3,9 @@ import { Test } from '@nestjs/testing'
 import { JobType } from 'src/jobs/enums/job-type.enum'
 import { JobRegistry } from 'src/jobs/job-registry.service'
 import { JobsModule } from 'src/jobs/jobs.module'
+import { AutoBatchHandler } from './handlers/auto-batch.handler'
+import { BackfillIcmCaseCloseDatesHandler } from './handlers/backfill-icm-case-close-dates.handler'
+import { BackfillOocAgreementLinesHandler } from './handlers/backfill-ooc-agreement-lines.handler'
 import { IngestDataHandler } from './handlers/ingest-data.handler'
 import { IngestIcmHandler } from './handlers/ingest-icm.handler'
 import { IngestMisHandler } from './handlers/ingest-mis.handler'
@@ -40,7 +43,10 @@ describe('SyncModule', () => {
     expect(syncModule).toBeDefined()
   })
 
-  it('should register all 5 sync handlers', () => {
+  it('should register all 8 sync handlers', () => {
+    expect(registry.hasHandler(JobType.AUTO_BATCH)).toBe(true)
+    expect(registry.hasHandler(JobType.BACKFILL_ICM_CASE_CLOSE_DATES)).toBe(true)
+    expect(registry.hasHandler(JobType.BACKFILL_OOC_AGREEMENT_LINES)).toBe(true)
     expect(registry.hasHandler(JobType.INGEST_DATA)).toBe(true)
     expect(registry.hasHandler(JobType.INGEST_ICM)).toBe(true)
     expect(registry.hasHandler(JobType.INGEST_MIS)).toBe(true)
@@ -49,20 +55,24 @@ describe('SyncModule', () => {
   })
 
   it('should register handlers with correct types', () => {
-    const ingestDataHandler = registry.getHandler(JobType.INGEST_DATA)
-    const ingestIcmHandler = registry.getHandler(JobType.INGEST_ICM)
-    const ingestMisHandler = registry.getHandler(JobType.INGEST_MIS)
-    const eligibilityHandler = registry.getHandler(JobType.RUN_ELIGIBILITY)
-    const syncIcmHandler = registry.getHandler(JobType.SYNC_ICM)
-
-    expect(ingestDataHandler).toBeInstanceOf(IngestDataHandler)
-    expect(ingestIcmHandler).toBeInstanceOf(IngestIcmHandler)
-    expect(ingestMisHandler).toBeInstanceOf(IngestMisHandler)
-    expect(eligibilityHandler).toBeInstanceOf(RunEligibilityHandler)
-    expect(syncIcmHandler).toBeInstanceOf(SyncIcmHandler)
+    expect(registry.getHandler(JobType.AUTO_BATCH)).toBeInstanceOf(AutoBatchHandler)
+    expect(registry.getHandler(JobType.BACKFILL_ICM_CASE_CLOSE_DATES)).toBeInstanceOf(
+      BackfillIcmCaseCloseDatesHandler,
+    )
+    expect(registry.getHandler(JobType.BACKFILL_OOC_AGREEMENT_LINES)).toBeInstanceOf(
+      BackfillOocAgreementLinesHandler,
+    )
+    expect(registry.getHandler(JobType.INGEST_DATA)).toBeInstanceOf(IngestDataHandler)
+    expect(registry.getHandler(JobType.INGEST_ICM)).toBeInstanceOf(IngestIcmHandler)
+    expect(registry.getHandler(JobType.INGEST_MIS)).toBeInstanceOf(IngestMisHandler)
+    expect(registry.getHandler(JobType.RUN_ELIGIBILITY)).toBeInstanceOf(RunEligibilityHandler)
+    expect(registry.getHandler(JobType.SYNC_ICM)).toBeInstanceOf(SyncIcmHandler)
   })
 
   it('should export all handler providers', () => {
+    expect(module.get(AutoBatchHandler)).toBeDefined()
+    expect(module.get(BackfillIcmCaseCloseDatesHandler)).toBeDefined()
+    expect(module.get(BackfillOocAgreementLinesHandler)).toBeDefined()
     expect(module.get(IngestDataHandler)).toBeDefined()
     expect(module.get(IngestIcmHandler)).toBeDefined()
     expect(module.get(IngestMisHandler)).toBeDefined()

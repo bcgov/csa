@@ -1,9 +1,10 @@
 import type { INestApplication } from '@nestjs/common'
-import { NotFoundException } from '@nestjs/common'
+import { NotFoundException, UnprocessableEntityException } from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import { CSAGuard } from '../common/guards/csa.guard'
+import { AuditTrailService } from '../audit-trail/audit-trail.service'
 import { ContactsController } from './contacts.controller'
 import { ContactsService } from './contacts.service'
 
@@ -44,6 +45,11 @@ describe('ContactsController', () => {
     updateEligibilityStatus: vi.fn(),
     updateNotEligibleStatus: vi.fn(),
     updateChildOver18: vi.fn(),
+    runContactEligibility: vi.fn(),
+  }
+
+  const mockAuditTrailService = {
+    findByContactId: vi.fn(),
   }
 
   beforeEach(async () => {
@@ -53,6 +59,10 @@ describe('ContactsController', () => {
         {
           provide: ContactsService,
           useValue: mockContactsService,
+        },
+        {
+          provide: AuditTrailService,
+          useValue: mockAuditTrailService,
         },
       ],
     })
@@ -181,10 +191,10 @@ describe('ContactsController', () => {
 
       await request(app.getHttpServer())
         .post('/contacts/hold')
-        .send({ contactIds: [1, 2, 3] })
+        .send({ contactIds: [1, 2, 3], reason: 'Test hold reason' })
         .expect(201)
 
-      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'SYSTEM')
+      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'SYSTEM', 'Test hold reason')
     })
 
     it('should pass username from @CurrentUser when guard sets it', async () => {
@@ -194,10 +204,10 @@ describe('ContactsController', () => {
       await request(app.getHttpServer())
         .post('/contacts/hold')
         .set('X-Test-Username', 'JDOE')
-        .send({ contactIds: [1] })
+        .send({ contactIds: [1], reason: 'Hold reason' })
         .expect(201)
 
-      expect(spy).toHaveBeenCalledWith([1], 'JDOE')
+      expect(spy).toHaveBeenCalledWith([1], 'JDOE', 'Hold reason')
     })
   })
 
@@ -228,7 +238,7 @@ describe('ContactsController', () => {
         .send({ contactIds: [1, 2, 3] })
         .expect(201)
 
-      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'SYSTEM')
+      expect(spy).toHaveBeenCalledWith([1, 2, 3], 'SYSTEM', undefined)
     })
   })
 
@@ -342,6 +352,52 @@ describe('ContactsController', () => {
         .get('/contacts/1/batches')
         .expect(200)
         .expect(batchDetails)
+    })
+  })
+
+  describe('GET /contacts/:id/audit-trail', () => {
+    it('should return paginated audit trail for a contact', async () => {
+      const auditResponse = {
+        data: [{ id: 1, contactId: 1, operation: 'New' }],
+        page: 1,
+        limit: 10,
+        total: 1,
+        totalPages: 1,
+      }
+      mockAuditTrailService.findByContactId.mockResolvedValue(auditResponse)
+
+      const res = await request(app.getHttpServer()).get('/contacts/1/audit-trail').expect(200)
+
+      expect(res.body).toEqual(auditResponse)
+      expect(mockAuditTrailService.findByContactId).toHaveBeenCalledWith(1, 1, 10)
+    })
+  })
+
+  describe('POST /contacts/:id/run-eligibility', () => {
+    it('should return previous and new status', async () => {
+      const result = { previousStatus: 'eligible', newStatus: 'not_eligible_out_of_pay' }
+      vi.spyOn(service, 'runContactEligibility').mockResolvedValue(result)
+
+      const res = await request(app.getHttpServer()).post('/contacts/1/run-eligibility').expect(200)
+
+      expect(res.body).toEqual(result)
+      expect(service.runContactEligibility).toHaveBeenCalledWith(1)
+    })
+
+    it('should return 404 when contact not found', async () => {
+      vi.spyOn(service, 'runContactEligibility').mockRejectedValue(
+        new NotFoundException('Contact 999 not found'),
+      )
+
+      await request(app.getHttpServer()).post('/contacts/999/run-eligibility').expect(404)
+    })
+
+    it('should return 422 when contact not in staging', async () => {
+      vi.spyOn(service, 'runContactEligibility').mockRejectedValue(
+        new UnprocessableEntityException('Contact X not found in staging tables'),
+      )
+
+      await request(app.getHttpServer()).post('/contacts/1/run-eligibility').expect(422)
     })
   })
 })

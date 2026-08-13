@@ -3,12 +3,13 @@ name: PR Validate
 on:
   pull_request:
     types: [edited, opened, synchronize, reopened, ready_for_review]
-    branches: [dev, test, pre-prod, main]
+    branches: [dev, test, pre-prod, main, release/cra-file-transfer-enabled]
     paths:
-      - "backend/**"
-      - "frontend/**"
-      - ".github/workflows/**"
-      - "backup/**"
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/**'
+      - 'backup/**'
+      - 'migrations/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number }}

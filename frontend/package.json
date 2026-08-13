@@ -25,7 +25,7 @@
     "@mui/material": "^7.3.6",
     "@tanstack/react-router": "^1.114.12",
     "@tanstack/router-plugin": "^1.114.27",
-    "axios": "^1.7.9",
+    "axios": "^1.16.1",
     "keycloak-js": "^26.2.2",
     "react": "^19.2.0",
     "react-bootstrap": "^2.10.9",
@@ -39,7 +39,7 @@
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
-    "@vitest/coverage-v8": "^3.0.3",
+    "@vitest/coverage-v8": "^4.1.8",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
@@ -54,6 +54,10 @@
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^3.0.3"
+    "vitest": "^4.1.8"
+  },
+  "overrides": {
+    "esbuild": "0.28.1",
+    "form-data": "4.0.6"
   }
 }

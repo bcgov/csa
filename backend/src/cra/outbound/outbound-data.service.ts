@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { normalize, formatDatePacificCompact } from 'src/common/utils'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
+import { CraMatchingSnapshot } from '../inbound/cra-matching-snapshot.interface'
 import { CraDetail, CraHeader, CraTrailer } from './outbound.interface'
 
 const { REQUEST_FILE } = CRA_DATA_HANDLING_CONSTANT
@@ -19,6 +20,8 @@ export interface BatchDetailWithContact {
   id: number
   transactionType: string
   referenceNumber: string | null
+  effectiveDate: Date | null
+  cancelReasonCode: string | null
   contact: {
     id: number
     firstName: string
@@ -33,12 +36,9 @@ export interface BatchDetailWithContact {
     birthProvince: string | null
     birthCountry: string | null
     din: string | null
-    effectiveDate: Date | null
     legacyFileNumber: string | null
     prevRecipientFirstName: string | null
     prevRecipientLastName: string | null
-    cancelReasonCode: string | null
-    careEndDate: Date | null
   }
 }
 
@@ -48,6 +48,20 @@ export class OutboundDataService {
 
   constructor(private readonly configService: ConfigService) {
     this.businessNum = this.configService.get<string>('cra.businessNum')!
+  }
+
+  buildMatchingSnapshot(detail: CraDetail, middleName: string | null): CraMatchingSnapshot {
+    return {
+      childGivenName: detail.childGivenName.trim(),
+      childMiddleName: middleName?.trim() ?? '',
+      childSurName: detail.childSurName.trim(),
+      childSex: detail.childSex.trim(),
+      childBirthDate: detail.childBirthDate.trim(),
+      childBirthCity: detail.childBirthCity.trim(),
+      childBirthProv: detail.childBirthProv.trim(),
+      childBirthCountry: detail.childBirthCountry.trim(),
+      ccraDinNum: detail.ccraDinNum.trim(),
+    }
   }
 
   buildCraFileData(batchDetails: BatchDetailWithContact[]): CraFileData {
@@ -103,12 +117,14 @@ export class OutboundDataService {
       prevRecipGivenName: contact.prevRecipientFirstName ?? '',
       prevRecipSurName: contact.prevRecipientLastName ?? '',
 
-      appStartDate: isApplication ? this.formatDate(contact.effectiveDate) : '',
+      // batchDetail.effectiveDate is the snapshot transaction date: it carries the
+      // application start date here and the care END date for cancellations below.
+      appStartDate: isApplication ? this.formatDate(batchDetail.effectiveDate) : '',
       newBornCode: isApplication ? this.calculateNewBornCode(contact.dateOfBirth, contact.din) : '',
       filler2: '',
 
-      cancelEndDate: isApplication ? '' : this.formatDate(contact.careEndDate),
-      cancelReasonCode: isApplication ? '' : (contact.cancelReasonCode ?? ''),
+      cancelEndDate: isApplication ? '' : this.formatDate(batchDetail.effectiveDate),
+      cancelReasonCode: isApplication ? '' : (batchDetail.cancelReasonCode ?? ''),
 
       ccraDinNum: contact.din ?? '',
       filler3: '',

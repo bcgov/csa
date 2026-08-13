@@ -13,11 +13,11 @@ import { SyncIcmHandler } from 'src/sync/handlers/sync-icm.handler'
 import { appConfig } from '../config/app.config'
 import { craConfig } from '../config/cra.config'
 import { syncConfig } from '../config/sync.config'
+import { BackfillWklFileRecordsHandler } from './handlers/backfill-wkl-file-records.handler'
 import { PollCraResponseHandler } from './handlers/poll-cra-response.handler'
 import { SendCraFileHandler } from './handlers/send-cra-file.handler'
-import { InboundFileService } from './inbound/inbound-file.service'
 import { InboundResponseService } from './inbound/inbound-response.service'
-import { InboundWeeklyResponseService } from './inbound/inbound-weekly-response.service'
+import { CraInboundModule } from './inbound/cra-inbound.module'
 import { OutboundDataService } from './outbound/outbound-data.service'
 import { OutboundFileService } from './outbound/outbound-file.service'
 import { CraTransferService } from './transfer/cra-transfer.service'
@@ -36,6 +36,7 @@ import { S3CraTransferService } from './transfer/s3-cra-transfer.service'
     BatchesModule,
     ContactsModule,
     IcmSyncBackModule,
+    CraInboundModule,
     HttpModule.register({
       timeout: 60000,
     }),
@@ -43,11 +44,10 @@ import { S3CraTransferService } from './transfer/s3-cra-transfer.service'
   providers: [
     SendCraFileHandler,
     PollCraResponseHandler,
+    BackfillWklFileRecordsHandler,
     SyncIcmHandler,
     OutboundFileService,
-    InboundFileService,
     InboundResponseService,
-    InboundWeeklyResponseService,
     OutboundDataService,
     {
       provide: CraTransferService,
@@ -77,12 +77,17 @@ export class CraModule implements OnModuleInit {
     private readonly registry: JobRegistry,
     private readonly sendCraFileHandler: SendCraFileHandler,
     private readonly pollCraResponseHandler: PollCraResponseHandler,
+    private readonly backfillWklFileRecordsHandler: BackfillWklFileRecordsHandler,
     private readonly syncIcmHandler: SyncIcmHandler,
   ) {}
 
   onModuleInit() {
     this.registry.register(this.sendCraFileHandler.jobType, this.sendCraFileHandler)
     this.registry.register(this.pollCraResponseHandler.jobType, this.pollCraResponseHandler)
+    this.registry.register(
+      this.backfillWklFileRecordsHandler.jobType,
+      this.backfillWklFileRecordsHandler,
+    )
     this.registry.register(this.syncIcmHandler.jobType, this.syncIcmHandler)
   }
 }

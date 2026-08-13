@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { IcmService, BATCH_SIZE } from './icm.service'
 import { IcmDataSource } from './data-source/icm-data-source'
 import { PrismaService } from 'src/common/database/prisma.service'
+import { filterValidOocAgreementLineItems } from './agreement-lines'
 import { IcmApiConfig } from './icm.config'
 import { FieldMapEntry } from './field-maps'
 
@@ -59,7 +60,30 @@ describe('IcmService', () => {
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
     })
 
-    it('should build correct unnest INSERT ON CONFLICT SQL', async () => {
+    it('should apply filterItems before upsert', async () => {
+      const filteredConfig: IcmApiConfig = {
+        ...testConfig,
+        name: 'ooc_agreement_lines',
+        filterItems: filterValidOocAgreementLineItems,
+      }
+
+      mockIcmDataSource.fetchAll.mockResolvedValue([
+        {
+          Id: 'mock-line-001',
+          'Agreement Id': 'mock-agreement-001',
+          'ICM Person ID': 'mock-person-001',
+        },
+        { Id: 'mock-line-002', 'Agreement Id': 'mock-agreement-002', 'ICM Person ID': '' },
+      ])
+
+      const result = await service.ingestResource(filteredConfig)
+
+      expect(result.fetched).toBe(1)
+      expect(result.upserted).toBe(1)
+      expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledTimes(1)
+    })
+
+    it('should build correct unnest INSERT ON CONFLICT SQL with data_changed_at', async () => {
       mockIcmDataSource.fetchAll.mockResolvedValue([
         { 'Row Id': '1-ABC', 'Case Num': 'CS001' },
         { 'Row Id': '2-DEF', 'Case Num': 'CS002' },
@@ -74,6 +98,9 @@ describe('IcmService', () => {
       expect(sql).toContain('unnest(')
       expect(sql).toContain('$1::text[]')
       expect(sql).toContain('$2::text[]')
+      // New: data_changed_at in INSERT and IS DISTINCT FROM in ON CONFLICT
+      expect(sql).toContain('data_changed_at')
+      expect(sql).toContain('IS DISTINCT FROM')
     })
 
     it('should pass correct arrays per column', async () => {
@@ -171,6 +198,96 @@ describe('IcmService', () => {
       expect(args[2]).toEqual(['2026-01-13T10:51:03'])
       // Date: calendar date stored as-is, no timezone conversion
       expect(args[3]).toEqual(['2012-01-01'])
+    })
+
+    it('should include data_changed_at in INSERT with NOW() for new records', async () => {
+      mockIcmDataSource.fetchAll.mockResolvedValue([{ 'Row Id': '1-ABC', 'Case Num': 'CS001' }])
+
+      await service.ingestResource(testConfig)
+
+      const sql: string = mockPrisma.$executeRawUnsafe.mock.calls[0][0]
+      // INSERT should include data_changed_at column
+      expect(sql).toMatch(/INSERT INTO stg_icm_cases \(.*data_changed_at\)/)
+      // SELECT should include NOW() for data_changed_at
+      expect(sql).toMatch(/SELECT.*NOW\(\), NOW\(\)/)
+    })
+
+    it('should use IS DISTINCT FROM for change detection on non-excluded fields', async () => {
+      mockIcmDataSource.fetchAll.mockResolvedValue([{ 'Row Id': '1-ABC', 'Case Num': 'CS001' }])
+
+      await service.ingestResource(testConfig)
+
+      const sql: string = mockPrisma.$executeRawUnsafe.mock.calls[0][0]
+      // CASE_NUM (non-PK, non-excluded) should be in the IS DISTINCT FROM comparison
+      expect(sql).toContain('(stg_icm_cases.CASE_NUM) IS DISTINCT FROM (EXCLUDED.CASE_NUM)')
+    })
+
+    it('should exclude fields marked excludeFromChangeDetection from IS DISTINCT FROM', async () => {
+      const fieldMapWithExclusion: FieldMapEntry[] = [
+        { sourceField: 'ROW_ID', sourceLabel: 'Row Id', masterField: 'case_row_id' },
+        { sourceField: 'CASE_NUM', sourceLabel: 'Case Num', masterField: 'case_number' },
+        {
+          sourceField: 'X_CSA_PAY_STATUS',
+          sourceLabel: 'CSA Status',
+          masterField: 'csa_status',
+          excludeFromChangeDetection: true,
+        },
+        {
+          sourceField: 'LAST_UPD',
+          sourceLabel: 'Last Updated',
+          masterField: 'last_upd',
+          dbType: 'timestamp',
+          excludeFromChangeDetection: true,
+        },
+      ]
+      const configWithExclusion: IcmApiConfig = { ...testConfig, fieldMap: fieldMapWithExclusion }
+
+      mockIcmDataSource.fetchAll.mockResolvedValue([
+        {
+          'Row Id': '1-ABC',
+          'Case Num': 'CS001',
+          'CSA Status': 'in_pay',
+          'Last Updated': '01/01/2026 10:00:00',
+        },
+      ])
+
+      await service.ingestResource(configWithExclusion)
+
+      const sql: string = mockPrisma.$executeRawUnsafe.mock.calls[0][0]
+
+      // Extract the IS DISTINCT FROM clause
+      const distinctMatch = sql.match(/WHEN \((.+?)\) IS DISTINCT FROM \((.+?)\)/)
+      expect(distinctMatch).not.toBeNull()
+
+      const oldTuple = distinctMatch![1]
+      const newTuple = distinctMatch![2]
+
+      // CASE_NUM should be in the comparison (not excluded, not PK)
+      expect(oldTuple).toContain('CASE_NUM')
+      expect(newTuple).toContain('EXCLUDED.CASE_NUM')
+
+      // Excluded fields should NOT be in the comparison
+      expect(oldTuple).not.toContain('X_CSA_PAY_STATUS')
+      expect(oldTuple).not.toContain('LAST_UPD')
+      expect(newTuple).not.toContain('EXCLUDED.X_CSA_PAY_STATUS')
+      expect(newTuple).not.toContain('EXCLUDED.LAST_UPD')
+
+      // PK should NOT be in the comparison
+      expect(oldTuple).not.toContain('ROW_ID')
+
+      // But excluded fields should still be in the UPDATE SET
+      expect(sql).toContain('X_CSA_PAY_STATUS = EXCLUDED.X_CSA_PAY_STATUS')
+      expect(sql).toContain('LAST_UPD = EXCLUDED.LAST_UPD')
+    })
+
+    it('should preserve existing data_changed_at when no real data changes', async () => {
+      mockIcmDataSource.fetchAll.mockResolvedValue([{ 'Row Id': '1-ABC', 'Case Num': 'CS001' }])
+
+      await service.ingestResource(testConfig)
+
+      const sql: string = mockPrisma.$executeRawUnsafe.mock.calls[0][0]
+      // The ELSE branch should preserve existing data_changed_at
+      expect(sql).toContain('ELSE stg_icm_cases.data_changed_at')
     })
 
     it('should pass null for empty date fields', async () => {

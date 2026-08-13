@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs'
 import path from 'path'
+import { Injectable } from '@nestjs/common'
 import { CRA_DATA_HANDLING_CONSTANT } from '../cra.constant'
 import { AppLogger } from 'src/common/logger/app-logger'
 import {
@@ -20,62 +21,53 @@ const { WEEKLY_FILE } = CRA_DATA_HANDLING_CONSTANT
 
 const { RECEIVE_MODE, RECORD_TYPE_CODE } = WEEKLY_FILE
 
-// TODO(weekly-state-transitions): parseWeeklyResponseFile mutates singleton instance fields
-// (detailRecords, headerRecord, trailerRecord, ...) instead of locals, so repeated or concurrent
-// calls leak/overwrite state across files. Move this state into locals before wiring up any
-// real state-transition logic for WKL files; also add @Injectable() for consistency.
+@Injectable()
 export class InboundWeeklyResponseService {
   protected readonly logger = new AppLogger(InboundWeeklyResponseService.name)
-  private totalDetailsRecords = 0
-  private readonly detailRecords: DetailRecord04[] = []
-  private headerRecord: HeaderRecord
-  private trailerRecord: TrailerRecord
-  private reporttitle1: string
-  private reporttitle2: string
-  private trailerMessage: string
 
   parseWeeklyResponseFile(filePath: string): {
     details: DetailRecord04[]
     header: HeaderRecord
     trailer: TrailerRecord
   } {
+    const detailRecords: DetailRecord04[] = []
+    let headerRecord!: HeaderRecord
+    let trailerRecord!: TrailerRecord
+    let reporttitle2 = ''
+    let trailerMessage = ''
+
     const content = readFileSync(filePath, 'utf8')
     const lines = content.split('\n').filter(Boolean)
-    for (const line of lines) {
-      const headerRecord = line.startsWith(RECORD_TYPE_CODE.HEADER_RECORD)
-      const reporttitle1 = line.startsWith(RECORD_TYPE_CODE.REPORT_TITLE_RECORD)
-      const reporttitle2 = line.startsWith(RECORD_TYPE_CODE.REPORT_DATE_RANGE_RECORD)
-      const detailDataRecord = line.startsWith(RECORD_TYPE_CODE.DATA_RECORD)
-      const trailerMessage = line.startsWith(RECORD_TYPE_CODE.TRAILER_MESSAGE)
-      const trailerRecord = line.startsWith(RECORD_TYPE_CODE.TRAILER_RECORD)
-      const elcetronicRecord = line.slice(14, 15) === RECEIVE_MODE.ELECTQRONIC
 
-      if (headerRecord) {
-        this.headerRecord = this.parseHeader(line)
-      } else if (reporttitle1) {
-        this.reporttitle1 = line
-      } else if (reporttitle2) {
-        this.reporttitle2 = line
-      } else if (detailDataRecord && elcetronicRecord) {
-        const eachDetail = this.parseDetail(line)
-        this.detailRecords.push(eachDetail)
-        this.totalDetailsRecords++
-      } else if (trailerMessage) {
-        this.trailerMessage = line
-      } else if (trailerRecord) {
-        this.trailerRecord = this.parseTrailer(line)
+    for (const line of lines) {
+      if (line.startsWith(RECORD_TYPE_CODE.HEADER_RECORD)) {
+        headerRecord = this.parseHeader(line)
+      } else if (line.startsWith(RECORD_TYPE_CODE.REPORT_DATE_RANGE_RECORD)) {
+        reporttitle2 = line
+      } else if (line.startsWith(RECORD_TYPE_CODE.DATA_RECORD)) {
+        detailRecords.push(this.parseDetail(line))
+      } else if (line.startsWith(RECORD_TYPE_CODE.TRAILER_MESSAGE)) {
+        trailerMessage = line
+      } else if (line.startsWith(RECORD_TYPE_CODE.TRAILER_RECORD)) {
+        trailerRecord = this.parseTrailer(line)
       }
     }
 
+    const electronicRecordCount = detailRecords.filter(
+      (record) => record.receiveMode === RECEIVE_MODE.ELECTQRONIC,
+    ).length
+
     this.logger.log(
-      `Weekly Response File Summary:\n   
-       Weekly Response File = ${path?.basename(filePath)}\n
-       Report Title2 = ${this.reporttitle2}\n 
-       Total Records in File = ${this.trailerRecord?.recordCount}\n
-       Total Electronic records = ${this.totalDetailsRecords}\n
-       Trailer Message = ${this.trailerMessage}`,
+      `Weekly Response File Summary:\n` +
+        `  File = ${path.basename(filePath)}\n` +
+        `  Report Range = ${reporttitle2}\n` +
+        `  Total Records in File = ${trailerRecord?.recordCount}\n` +
+        `  Total Detail records = ${detailRecords.length}\n` +
+        `  Total Electronic records = ${electronicRecordCount}\n` +
+        `  Trailer Message = ${trailerMessage}`,
     )
-    return { header: this.headerRecord, details: this.detailRecords, trailer: this.trailerRecord }
+
+    return { header: headerRecord, details: detailRecords, trailer: trailerRecord }
   }
 
   parseDetail(line: string): DetailRecord04 {
@@ -156,21 +148,21 @@ export class InboundWeeklyResponseService {
 
   parseHeader(line: string): HeaderRecord {
     return {
-      tranCode: line?.substring(0, 4) as TranCode.HEADER, // X(04)
-      recordTypeCode: line?.substring(4, 6) as RecordTypeCode.HEADER, // X(02)
-      filler1: line?.substring(6, 14), // X(08)
-      processDate: line?.substring(14, 22), // X(08) YYYYMMDD
-      filler2: line?.substring(22, 241), // X(219)
+      tranCode: line.substring(0, 4) as TranCode.HEADER, // X(04)
+      recordTypeCode: line.substring(4, 6) as RecordTypeCode.HEADER, // X(02)
+      filler1: line.substring(6, 14), // X(08)
+      processDate: line.substring(14, 22), // X(08) YYYYMMDD
+      filler2: line.substring(22, 241), // X(219)
     }
   }
 
   parseTrailer(line: string): TrailerRecord {
     return {
-      tranCode: line?.substring(0, 4) as TranCode.TRAILER, // X(04)
-      recordTypeCode: line?.substring(4, 6) as RecordTypeCode.HEADER, // X(02)
-      filler1: line?.substring(6, 15), // X(09)
-      recordCount: parseInt(line?.substring(15, 24), 10), // 9(09)
-      filler2: line?.substring(24, 241), // X(217)
+      tranCode: line.substring(0, 4) as TranCode.TRAILER, // X(04)
+      recordTypeCode: line.substring(4, 6) as RecordTypeCode.HEADER, // X(02)
+      filler1: line.substring(6, 15), // X(09)
+      recordCount: parseInt(line.substring(15, 24), 10), // 9(09)
+      filler2: line.substring(24, 241), // X(217)
     }
   }
 }

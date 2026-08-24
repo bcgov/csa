@@ -1,19 +1,26 @@
-import { NotFoundException, UnprocessableEntityException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
+import { USER_PROFILE } from 'src/api/admin/constants/user-profile.constants'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { StateMachineService } from 'src/common/state-machine/state-machine.service'
 import { EligibilityInputError } from 'src/sync/eligibility/eligibility.errors'
 import { EligibilityService } from 'src/sync/eligibility/eligibility.service'
 import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { ContactsService } from './contacts.service'
+import { CONTACT_DELETE_APPLICATION_TABLES, CONTACT_DELETE_STAGING_TABLES } from './constants'
 
 describe('ContactsService', () => {
   let service: ContactsService
   let prisma: PrismaService
 
   // Raw DB records (what Prisma returns)
-  const savedContact1 = {
+  const savedContact1: any = {
     id: 1,
     lastName: 'Doe',
     firstName: 'John',
@@ -50,7 +57,7 @@ describe('ContactsService', () => {
     orderAmount: null,
   }
 
-  const savedContactArray = [savedContact1, savedContact2]
+  const savedContactArray: any[] = [savedContact1, savedContact2]
 
   // Enriched records (what the service returns — includes csaStatusLabel)
   const enrichedContact1 = { ...savedContact1, csaStatusLabel: 'Eligible' }
@@ -81,6 +88,7 @@ describe('ContactsService', () => {
             contact: {
               findMany: vi.fn().mockResolvedValue(savedContactArray as any),
               findUnique: vi.fn().mockResolvedValue(savedContact1 as any),
+              findFirst: vi.fn().mockResolvedValue(null),
               create: vi.fn().mockResolvedValue(savedContact1 as any),
               update: vi.fn().mockResolvedValue(updatedContact as any),
               delete: vi.fn().mockResolvedValue(true),
@@ -91,6 +99,7 @@ describe('ContactsService', () => {
             },
             $queryRaw: vi.fn(),
             $transaction: vi.fn(),
+            $executeRaw: vi.fn(),
           },
         },
       ],
@@ -129,7 +138,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 50,
         take: 25,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {},
       })
     })
@@ -144,7 +153,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 200,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {},
       })
     })
@@ -163,7 +172,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: [{ lastName: 'asc' }],
+        orderBy: [{ lastName: 'asc' }, { id: 'asc' }],
         where: { lastName: { contains: 'Doe', mode: 'insensitive' } },
       })
       expect(result.data).toEqual([enrichedContact1])
@@ -178,9 +187,67 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: [{ firstName: 'desc' }],
+        orderBy: [{ firstName: 'desc' }, { id: 'asc' }],
         where: {},
       })
+    })
+
+    it('should sort by birthPlace using city/province/country backend fields', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
+
+      await service.findAll(1, 10, '[{"birthPlace":"asc"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: [
+          { birthCity: 'asc' },
+          { birthProvince: 'asc' },
+          { birthCountry: 'asc' },
+          { id: 'asc' },
+        ],
+        where: {},
+      })
+    })
+
+    it('should use stable default order when no sort is provided', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
+
+      await service.findAll()
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: [{ id: 'asc' }],
+        }),
+      )
+    })
+
+    it('should append id tie-breaker for user-selected sorts', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
+
+      await service.findAll(1, 10, '[{"lastName":"asc"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: [{ lastName: 'asc' }, { id: 'asc' }],
+        }),
+      )
+    })
+
+    it('should not duplicate id when sort already includes id', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(2)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue(savedContactArray)
+
+      await service.findAll(1, 10, '[{"id":"desc"}]')
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: [{ id: 'desc' }],
+        }),
+      )
     })
 
     it('should handle filter without sort', async () => {
@@ -192,7 +259,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { din: { contains: 'ABC', mode: 'insensitive' } },
       })
     })
@@ -206,7 +273,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { din: { contains: '100\\%', mode: 'insensitive' } },
       })
     })
@@ -225,11 +292,35 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {
           OR: [
             { searchText: { contains: 'smith', mode: 'insensitive' } },
             { personIdIcm: { contains: 'ICM123', mode: 'insensitive' } },
+          ],
+        },
+      })
+    })
+
+    it('should allow filtering and sorting on akaLastName and akaFirstName', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(
+        1,
+        10,
+        '[{"akaLastName":"asc"},{"akaFirstName":"desc"}]',
+        '[{"OR":[{"key":"akaLastName","op":"eq","value":"Smith"}]},{"OR":[{"key":"akaFirstName","op":"eq","value":"Jane"}]}]',
+      )
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: [{ akaLastName: 'asc' }, { akaFirstName: 'desc' }, { id: 'asc' }],
+        where: {
+          AND: [
+            { OR: [{ akaLastName: { equals: 'Smith' } }] },
+            { OR: [{ akaFirstName: { equals: 'Jane' } }] },
           ],
         },
       })
@@ -268,7 +359,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: [{ lastName: 'desc' }, { firstName: 'asc' }],
+        orderBy: [{ lastName: 'desc' }, { firstName: 'asc' }, { id: 'asc' }],
         where: {},
       })
     })
@@ -287,7 +378,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {
           AND: [{ lastName: { contains: 'Doe', mode: 'insensitive' } }, { age: { gte: 18 } }],
         },
@@ -308,7 +399,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {
           OR: [{ csaStatus: { equals: 'eligible' } }, { csaStatus: { equals: 'in_pay' } }],
         },
@@ -329,7 +420,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {
           AND: [
             { lastName: { contains: 'Doe', mode: 'insensitive' } },
@@ -337,6 +428,96 @@ describe('ContactsService', () => {
           ],
         },
       })
+    })
+
+    it('should handle birthPlace filter', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      const birthPlaceFilterValue = JSON.stringify({
+        birthCity: 'Toronto',
+        birthProvince: 'Ontario',
+        birthCountry: 'Canada',
+      })
+
+      await service.findAll(
+        1,
+        10,
+        undefined,
+        JSON.stringify([
+          {
+            key: 'birthPlace',
+            op: 'eq',
+            value: birthPlaceFilterValue,
+          },
+        ]),
+      )
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: [{ id: 'asc' }],
+        where: {
+          AND: [
+            { birthCity: { equals: 'Toronto' } },
+            { birthProvince: { equals: 'Ontario' } },
+            { birthCountry: { equals: 'Canada' } },
+          ],
+        },
+      })
+    })
+
+    it('should reject unsupported operation for birthPlace filter', async () => {
+      await expect(
+        service.findAll(
+          1,
+          10,
+          undefined,
+          JSON.stringify([
+            {
+              key: 'birthPlace',
+              op: 'like',
+              value: JSON.stringify({ birthCity: 'Toronto' }),
+            },
+          ]),
+        ),
+      ).rejects.toThrow('Unsupported operation for birthPlace filter')
+    })
+
+    it('should map a partial birthPlace filter to its own field, not by position', async () => {
+      vi.spyOn(prisma.contact, 'count').mockResolvedValue(1)
+      vi.spyOn(prisma.contact, 'findMany').mockResolvedValue([savedContact1])
+
+      await service.findAll(
+        1,
+        10,
+        undefined,
+        JSON.stringify([
+          {
+            key: 'birthPlace',
+            op: 'eq',
+            value: JSON.stringify({ birthCountry: 'Canada' }),
+          },
+        ]),
+      )
+
+      expect(prisma.contact.findMany).toHaveBeenCalledWith({
+        skip: 0,
+        take: 10,
+        orderBy: [{ id: 'asc' }],
+        where: { AND: [{ birthCountry: { equals: 'Canada' } }] },
+      })
+    })
+
+    it('should throw error for non-JSON birthPlace filter value', async () => {
+      await expect(
+        service.findAll(
+          1,
+          10,
+          undefined,
+          JSON.stringify([{ key: 'birthPlace', op: 'eq', value: 'Toronto, Ontario, Canada' }]),
+        ),
+      ).rejects.toThrow('Invalid birthPlace filter value')
     })
 
     it('should handle eq operation', async () => {
@@ -348,7 +529,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { csaStatus: { equals: 'eligible' } },
       })
     })
@@ -362,7 +543,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { csaStatus: { not: { equals: 'deleted' } } },
       })
     })
@@ -376,7 +557,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { age: { gt: 18 } },
       })
     })
@@ -390,7 +571,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { age: { gte: 18 } },
       })
     })
@@ -404,7 +585,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { age: { lt: 65 } },
       })
     })
@@ -418,7 +599,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { age: { lte: 65 } },
       })
     })
@@ -437,7 +618,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { csaStatus: { in: ['eligible', 'in_pay'] } },
       })
     })
@@ -456,7 +637,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { csaStatus: { not: { in: ['deleted', 'archived'] } } },
       })
     })
@@ -470,7 +651,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { din: null },
       })
     })
@@ -484,7 +665,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { din: { not: null } },
       })
     })
@@ -498,7 +679,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { OR: [{ din: null }, { din: '' }] },
       })
     })
@@ -512,7 +693,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: { NOT: { OR: [{ din: null }, { din: '' }] } },
       })
     })
@@ -526,7 +707,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {},
       })
     })
@@ -546,7 +727,7 @@ describe('ContactsService', () => {
       expect(prisma.contact.findMany).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
-        orderBy: undefined,
+        orderBy: [{ id: 'asc' }],
         where: {},
       })
     })
@@ -584,7 +765,7 @@ describe('ContactsService', () => {
         where: { searchText: { contains: 'smi', mode: 'insensitive' } },
         skip: 0,
         take: 10,
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
       })
       expect(result).toEqual({
         data: mockData,
@@ -641,7 +822,7 @@ describe('ContactsService', () => {
         where: { searchText: { contains: '100\\%', mode: 'insensitive' } },
         skip: 0,
         take: 10,
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
       })
     })
 
@@ -655,7 +836,7 @@ describe('ContactsService', () => {
         where: { searchText: { contains: 'test\\_user', mode: 'insensitive' } },
         skip: 0,
         take: 10,
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
       })
     })
   })
@@ -717,7 +898,7 @@ describe('ContactsService', () => {
         [2, contact2],
       ])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -733,7 +914,7 @@ describe('ContactsService', () => {
       const contact1 = { id: 1, csaStatus: 'eligible_tbd', holdBy: null, resumeStatus: null }
       const contactMap = new Map([[1, contact1]])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -752,7 +933,7 @@ describe('ContactsService', () => {
         [2, contact2],
       ])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -773,7 +954,7 @@ describe('ContactsService', () => {
         [3, contact3],
       ])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -808,7 +989,7 @@ describe('ContactsService', () => {
         [2, contact2],
       ])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -817,8 +998,12 @@ describe('ContactsService', () => {
 
       expect(result.success).toEqual([1, 2])
       expect(result.skipped).toEqual([])
-      // 2 calls per contact: 1 for status transition + 1 for clearing needsReview flag
-      expect(updateSpy).toHaveBeenCalledTimes(4)
+      expect(updateSpy).toHaveBeenCalledTimes(2)
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ needsReview: false }),
+        }),
+      )
     })
 
     it('should skip not found contacts', async () => {
@@ -830,7 +1015,7 @@ describe('ContactsService', () => {
       }
       const contactMap = new Map([[1, contact1]])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -854,7 +1039,7 @@ describe('ContactsService', () => {
         [2, contact2],
       ])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -878,7 +1063,7 @@ describe('ContactsService', () => {
         [2, contact2],
       ])
 
-      vi.spyOn(prisma.contact, 'findUnique').mockImplementation(({ where }: any) =>
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
         Promise.resolve(contactMap.get(where.id) as any),
       )
       vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
@@ -890,6 +1075,70 @@ describe('ContactsService', () => {
         { id: 2, reason: 'invalid_transition' },
         { id: 999, reason: 'not_found' },
       ])
+    })
+  })
+
+  describe('button bulk status handlers', () => {
+    it('should treat application/cancellation refused as eligible targets for ELIGIBLE action', async () => {
+      const contactMap = new Map([
+        [1, { id: 1, csaStatus: 'application_refused_cra' }],
+        [2, { id: 2, csaStatus: 'cancellation_refused_cra' }],
+      ])
+
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
+        Promise.resolve(contactMap.get(where.id) as any),
+      )
+      const updateSpy = vi
+        .spyOn(service, 'updateCsaStatus')
+        .mockResolvedValue({ success: true, from: 'x', to: 'y' } as any)
+
+      const result = await service.updateEligibilityStatus([1, 2], 'ELIGIBLE', 'user1')
+
+      expect(result.success).toEqual([1, 2])
+      expect(result.skipped).toEqual([])
+      expect(updateSpy).toHaveBeenCalledWith(
+        1,
+        'BECOME_ELIGIBLE',
+        'USER',
+        expect.objectContaining({ userId: 'user1' }),
+      )
+      expect(updateSpy).toHaveBeenCalledWith(
+        2,
+        'BECOME_ELIGIBLE',
+        'USER',
+        expect.objectContaining({ userId: 'user1' }),
+      )
+    })
+
+    it('should treat application/cancellation refused as valid sources for SET_NOT_ELIGIBLE action', async () => {
+      const contactMap = new Map([
+        [1, { id: 1, csaStatus: 'application_refused_cra' }],
+        [2, { id: 2, csaStatus: 'cancellation_refused_cra' }],
+      ])
+
+      ;(vi.spyOn(prisma.contact, 'findUnique') as any).mockImplementation(({ where }: any) =>
+        Promise.resolve(contactMap.get(where.id) as any),
+      )
+      const updateSpy = vi
+        .spyOn(service, 'updateCsaStatus')
+        .mockResolvedValue({ success: true, from: 'x', to: 'y' } as any)
+
+      const result = await service.updateNotEligibleStatus([1, 2], 'SET_NOT_ELIGIBLE', 'user1')
+
+      expect(result.success).toEqual([1, 2])
+      expect(result.skipped).toEqual([])
+      expect(updateSpy).toHaveBeenCalledWith(
+        1,
+        'SET_NOT_ELIGIBLE',
+        'USER',
+        expect.objectContaining({ userId: 'user1' }),
+      )
+      expect(updateSpy).toHaveBeenCalledWith(
+        2,
+        'SET_NOT_ELIGIBLE',
+        'USER',
+        expect.objectContaining({ userId: 'user1' }),
+      )
     })
   })
 
@@ -914,6 +1163,39 @@ describe('ContactsService', () => {
 
       expect(result.success).toBe(true)
       expect(result.to).toBe('eligible_tbd')
+    })
+
+    it('should clear needsReview when leaving on_hold via RESUME', async () => {
+      const contact = { id: 1, csaStatus: 'on_hold', resumeStatus: 'eligible_tbd' }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.updateCsaStatus(1, 'RESUME', 'USER', { userId: 'user1' })
+
+      expect(result.success).toBe(true)
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ needsReview: false }),
+        }),
+      )
+    })
+
+    it('should clear needsReview when leaving on_hold via SET_NOT_ELIGIBLE', async () => {
+      const contact = { id: 1, csaStatus: 'on_hold', resumeStatus: 'eligible_tbd' }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
+        userId: 'user1',
+      })
+
+      expect(result.success).toBe(true)
+      expect(result.to).toBe('not_eligible_out_of_pay')
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ needsReview: false }),
+        }),
+      )
     })
 
     it('should handle HOLD and save resumeStatus', async () => {
@@ -1223,8 +1505,18 @@ describe('ContactsService', () => {
 
     describe('cancellation fields on SET_NOT_ELIGIBLE', () => {
       it('should set cancelReasonCode and careEndDate from in_pay', async () => {
-        const contact = { id: 1, csaStatus: 'in_pay', cancelReasonCode: null, resumeStatus: null }
+        const contact = {
+          id: 1,
+          csaStatus: 'in_pay',
+          cancelReasonCode: null,
+          personIdIcm: 'ICM-1',
+          personIdMis: 'MIS-1',
+          resumeStatus: null,
+        }
         vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        vi.spyOn(prisma, '$queryRaw').mockResolvedValue([
+          { maxEndDate: new Date('2025-07-01') },
+        ] as any)
         const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
         const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
@@ -1235,7 +1527,7 @@ describe('ContactsService', () => {
         expect(result.to).toBe('not_eligible_ip_tbd')
         const updateCall = updateSpy.mock.calls[0][0] as any
         expect(updateCall.data.cancelReasonCode).toBe('21')
-        expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
+        expect(updateCall.data.careEndDate).toEqual(new Date('2025-07-01'))
       })
 
       it('should NOT set cancellation fields from eligible_tbd', async () => {
@@ -1281,8 +1573,16 @@ describe('ContactsService', () => {
       })
 
       it('should NOT overwrite cancelReasonCode when already set but still set careEndDate', async () => {
-        const contact = { id: 1, csaStatus: 'in_pay', cancelReasonCode: '14', resumeStatus: null }
+        const contact = {
+          id: 1,
+          csaStatus: 'in_pay',
+          cancelReasonCode: '14',
+          personIdIcm: 'ICM-1',
+          personIdMis: null,
+          resumeStatus: null,
+        }
         vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        vi.spyOn(prisma, '$queryRaw').mockResolvedValue([{ maxEndDate: null }] as any)
         const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
 
         const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
@@ -1293,6 +1593,52 @@ describe('ContactsService', () => {
         expect(result.to).toBe('not_eligible_ip_tbd')
         const updateCall = updateSpy.mock.calls[0][0] as any
         expect(updateCall.data).not.toHaveProperty('cancelReasonCode')
+        expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
+      })
+
+      it('should fall back to today when staging returns blank placement end dates', async () => {
+        const contact = {
+          id: 1,
+          csaStatus: 'in_pay',
+          cancelReasonCode: null,
+          personIdIcm: '1-10981225231',
+          personIdMis: '',
+          resumeStatus: null,
+        }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        vi.spyOn(prisma, '$queryRaw').mockResolvedValue([{ maxEndDate: '' }] as any)
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
+          userId: 'user1',
+        })
+
+        expect(result.success).toBe(true)
+        const updateCall = updateSpy.mock.calls[0][0] as any
+        expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
+        expect(Number.isNaN(updateCall.data.careEndDate.getTime())).toBe(false)
+      })
+
+      it('should skip staging lookup when both person ids are blank', async () => {
+        const contact = {
+          id: 1,
+          csaStatus: 'in_pay',
+          cancelReasonCode: null,
+          personIdIcm: '   ',
+          personIdMis: '',
+          resumeStatus: null,
+        }
+        vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+        const querySpy = vi.spyOn(prisma, '$queryRaw')
+        const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+        const result = await service.updateCsaStatus(1, 'SET_NOT_ELIGIBLE', 'USER', {
+          userId: 'user1',
+        })
+
+        expect(result.success).toBe(true)
+        expect(querySpy).not.toHaveBeenCalled()
+        const updateCall = updateSpy.mock.calls[0][0] as any
         expect(updateCall.data.careEndDate).toBeInstanceOf(Date)
       })
     })
@@ -1488,6 +1834,21 @@ describe('ContactsService', () => {
       expect(result.success).toBe(false)
       expect(result.reason).toBe('Contact not found')
     })
+
+    it('should clear needsReview when leaving on_hold', async () => {
+      const contact = { id: 1, csaStatus: 'on_hold', needsReview: true }
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(contact as any)
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({} as any)
+
+      const result = await service.forceUpdateCsaStatus(1, 'eligible')
+
+      expect(result.success).toBe(true)
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ needsReview: false }),
+        }),
+      )
+    })
   })
 
   describe('findContactBatches', () => {
@@ -1632,8 +1993,10 @@ describe('ContactsService', () => {
     it('should throw NotFoundException when contact does not exist', async () => {
       vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(null)
 
-      await expect(service.runContactEligibility(999)).rejects.toThrow(NotFoundException)
-      await expect(service.runContactEligibility(999)).rejects.toThrow('Contact 999 not found')
+      await expect(service.runContactEligibility(999, 'JSMITH')).rejects.toThrow(NotFoundException)
+      await expect(service.runContactEligibility(999, 'JSMITH')).rejects.toThrow(
+        'Contact 999 not found',
+      )
     })
 
     it('should map EligibilityInputError to UnprocessableEntityException', async () => {
@@ -1642,11 +2005,23 @@ describe('ContactsService', () => {
       eligibility.runForContact = vi
         .fn()
         .mockRejectedValue(new EligibilityInputError('Contact ICM-1 not found in staging tables'))
+      const errorSpy = vi.spyOn(service['logger'], 'error').mockImplementation(() => {})
 
-      await expect(service.runContactEligibility(1)).rejects.toThrow(UnprocessableEntityException)
-      await expect(service.runContactEligibility(1)).rejects.toThrow(
+      await expect(service.runContactEligibility(1, 'JSMITH')).rejects.toThrow(
+        UnprocessableEntityException,
+      )
+      await expect(service.runContactEligibility(1, 'JSMITH')).rejects.toThrow(
         'Contact ICM-1 not found in staging tables',
       )
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Manual eligibility failed for contact 1: Contact ICM-1 not found in staging tables',
+        {
+          activityType: 'DATA_QUALITY',
+          related:
+            'Manual eligibility contact 1 (ICM-1) by JSMITH: Contact ICM-1 not found in staging tables',
+        },
+      )
+      errorSpy.mockRestore()
     })
 
     it('should propagate generic Errors without wrapping (becomes 500 at HTTP layer)', async () => {
@@ -1655,9 +2030,9 @@ describe('ContactsService', () => {
       const dbError = new Error('connection terminated unexpectedly')
       eligibility.runForContact = vi.fn().mockRejectedValue(dbError)
 
-      await expect(service.runContactEligibility(1)).rejects.toBe(dbError)
+      await expect(service.runContactEligibility(1, 'JSMITH')).rejects.toBe(dbError)
       // Specifically must NOT have been rewrapped as a 422
-      await expect(service.runContactEligibility(1)).rejects.not.toBeInstanceOf(
+      await expect(service.runContactEligibility(1, 'JSMITH')).rejects.not.toBeInstanceOf(
         UnprocessableEntityException,
       )
     })
@@ -1669,7 +2044,7 @@ describe('ContactsService', () => {
         .fn()
         .mockResolvedValue({ previousStatus: 'eligible', newStatus: 'in_pay' })
 
-      await expect(service.runContactEligibility(1)).resolves.toEqual({
+      await expect(service.runContactEligibility(1, 'JSMITH')).resolves.toEqual({
         previousStatus: 'eligible',
         newStatus: 'in_pay',
       })
@@ -1684,7 +2059,7 @@ describe('ContactsService', () => {
         .mockResolvedValue({ previousStatus: 'eligible', newStatus: 'in_pay' })
       const icmSync = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
 
-      await service.runContactEligibility(1)
+      await service.runContactEligibility(1, 'JSMITH')
 
       expect(icmSync).toHaveBeenCalledWith(1)
     })
@@ -1697,7 +2072,7 @@ describe('ContactsService', () => {
         .mockResolvedValue({ previousStatus: 'eligible', newStatus: 'eligible' })
       const icmSync = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
 
-      await service.runContactEligibility(1)
+      await service.runContactEligibility(1, 'JSMITH')
 
       expect(icmSync).not.toHaveBeenCalled()
     })
@@ -1711,11 +2086,428 @@ describe('ContactsService', () => {
       vi.spyOn(service['icmSyncBackService'], 'syncSingleContact').mockRejectedValue(
         new Error('ICM down'),
       )
+      const warnSpy = vi.spyOn(service['logger'], 'warn').mockImplementation(() => {})
 
-      await expect(service.runContactEligibility(1)).resolves.toEqual({
+      await expect(service.runContactEligibility(1, 'JSMITH')).resolves.toEqual({
         previousStatus: 'eligible',
         newStatus: 'in_pay',
       })
+
+      await vi.waitFor(() => {
+        expect(warnSpy).toHaveBeenCalledWith('Immediate ICM sync failed for contact 1: ICM down', {
+          activityType: 'ICM',
+          related: 'ICM sync failed after manual eligibility contact 1 by JSMITH',
+        })
+      })
+      warnSpy.mockRestore()
+    })
+  })
+
+  describe('updateContact (BL-36)', () => {
+    it('should successfully update contact fields (DIN, status, dates)', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+      vi.spyOn(prisma.contact, 'findFirst').mockResolvedValue(null) // DIN unique check
+      const updateSpy = vi.spyOn(prisma.contact, 'update').mockResolvedValue({
+        id: 1,
+        din: '987654329',
+        csaStatus: 'in_pay',
+        csaStatusEffectiveDate: '2026-08-01',
+      } as any)
+      vi.spyOn(service as any, 'findOne').mockResolvedValue({ id: 1 })
+
+      const result = await service.updateContact(
+        1,
+        {
+          din: '987654329',
+          csaStatus: 'in_pay',
+          csaStatusEffectiveDate: '2026-08-01',
+        },
+        'dq.steward',
+        USER_PROFILE.DATA_QUALITY_STEWARD,
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.contact.id).toBe(1)
+      expect(updateSpy).toHaveBeenCalled()
+    })
+
+    it('should reject if user profile is null', async () => {
+      await expect(service.updateContact(1, { din: '123456789' }, 'user', null)).rejects.toThrow(
+        ForbiddenException,
+      )
+    })
+
+    it('should reject if user is not DATA_QUALITY_STEWARD', async () => {
+      await expect(
+        service.updateContact(1, { din: '123456789' }, 'user', USER_PROFILE.CSA_STANDARD),
+      ).rejects.toThrow(ForbiddenException)
+    })
+
+    it('should reject if contact not found', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(null)
+
+      await expect(
+        service.updateContact(
+          1,
+          { din: '123456789' },
+          'dq.steward',
+          USER_PROFILE.DATA_QUALITY_STEWARD,
+        ),
+      ).rejects.toThrow(NotFoundException)
+    })
+
+    it('should reject if contact in protected status', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'on_hold',
+        din: '123456789',
+      } as any)
+
+      await expect(
+        service.updateContact(
+          1,
+          { din: '987654329' },
+          'dq.steward',
+          USER_PROFILE.DATA_QUALITY_STEWARD,
+        ),
+      ).rejects.toThrow(UnprocessableEntityException)
+    })
+
+    it('should reject invalid DIN format (non-numeric or wrong length)', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+
+      await expect(
+        service.updateContact(
+          1,
+          { din: 'INVALID' },
+          'dq.steward',
+          USER_PROFILE.DATA_QUALITY_STEWARD,
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('should reject invalid CSA status', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+
+      await expect(
+        service.updateContact(
+          1,
+          { csaStatus: 'not_a_valid_status' },
+          'dq.steward',
+          USER_PROFILE.DATA_QUALITY_STEWARD,
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('should reject duplicate DIN', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+      vi.spyOn(prisma.contact, 'findFirst').mockResolvedValue({ id: 2 } as any)
+
+      await expect(
+        service.updateContact(
+          1,
+          { din: '987654329' },
+          'dq.steward',
+          USER_PROFILE.DATA_QUALITY_STEWARD,
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('should reject future effective date', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+
+      await expect(
+        service.updateContact(
+          1,
+          { csaStatusEffectiveDate: '2099-01-01' },
+          'dq.steward',
+          USER_PROFILE.DATA_QUALITY_STEWARD,
+        ),
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('should trigger ICM sync-back when DIN changes', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+      vi.spyOn(prisma.contact, 'findFirst').mockResolvedValue(null)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({ id: 1 } as any)
+      vi.spyOn(service as any, 'findOne').mockResolvedValue({ id: 1 })
+      const syncSpy = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
+
+      await service.updateContact(
+        1,
+        { din: '987654329' },
+        'dq.steward',
+        USER_PROFILE.DATA_QUALITY_STEWARD,
+      )
+
+      expect(syncSpy).toHaveBeenCalledWith(1)
+    })
+
+    it('should trigger ICM sync-back when status changes', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({ id: 1 } as any)
+      vi.spyOn(service as any, 'findOne').mockResolvedValue({ id: 1 })
+      const syncSpy = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
+
+      await service.updateContact(
+        1,
+        { csaStatus: 'in_pay' },
+        'dq.steward',
+        USER_PROFILE.DATA_QUALITY_STEWARD,
+      )
+
+      expect(syncSpy).toHaveBeenCalledWith(1)
+    })
+
+    it('should trigger ICM sync-back when status effective date changes', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({ id: 1 } as any)
+      vi.spyOn(service as any, 'findOne').mockResolvedValue({ id: 1 })
+      const syncSpy = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
+
+      await service.updateContact(
+        1,
+        { csaStatusEffectiveDate: '2026-08-01' },
+        'dq.steward',
+        USER_PROFILE.DATA_QUALITY_STEWARD,
+      )
+
+      expect(syncSpy).toHaveBeenCalledWith(1)
+    })
+
+    it('should not fail update if ICM sync-back fails', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        din: '123456789',
+      } as any)
+      vi.spyOn(prisma.contact, 'update').mockResolvedValue({ id: 1 } as any)
+      vi.spyOn(service as any, 'findOne').mockResolvedValue({ id: 1 })
+      vi.spyOn(service['icmSyncBackService'], 'syncSingleContact').mockRejectedValue(
+        new Error('ICM down'),
+      )
+
+      const result = await service.updateContact(
+        1,
+        { csaStatus: 'in_pay' },
+        'dq.steward',
+        USER_PROFILE.DATA_QUALITY_STEWARD,
+      )
+
+      expect(result.success).toBe(true)
+    })
+  })
+
+  describe('deleteContact (BL-37)', () => {
+    it('should successfully delete contact and cascade to all tables', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        personIdIcm: 'ICM-123',
+        contactIdIcm: 'CONTACT-123',
+        personIdMis: 'MIS-123',
+        firstName: 'John',
+        lastName: 'Doe',
+      } as any)
+
+      const transactionSpy = vi.fn(async (callback) => {
+        return callback({
+          $executeRaw: vi.fn(),
+          $queryRaw: vi
+            .fn()
+            .mockResolvedValue([{ batchDetails: 0n, auditTrail: 0n, wklRecords: 0n }]),
+          contact: { delete: vi.fn() },
+        } as any)
+      })
+      vi.spyOn(prisma, '$transaction').mockImplementation(transactionSpy as any)
+
+      const result = await service.deleteContact(1, 'dq.steward', USER_PROFILE.DATA_QUALITY_STEWARD)
+
+      expect(result.success).toBe(true)
+      expect(result.message).toContain('permanently deleted')
+      expect(transactionSpy).toHaveBeenCalled()
+    })
+
+    it('should reject if user profile is null', async () => {
+      await expect(service.deleteContact(1, 'user', null)).rejects.toThrow(ForbiddenException)
+    })
+
+    it('should reject if user is not DATA_QUALITY_STEWARD', async () => {
+      await expect(service.deleteContact(1, 'user', USER_PROFILE.CSA_STANDARD)).rejects.toThrow(
+        ForbiddenException,
+      )
+    })
+
+    it('should reject if contact not found', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue(null)
+
+      await expect(
+        service.deleteContact(1, 'dq.steward', USER_PROFILE.DATA_QUALITY_STEWARD),
+      ).rejects.toThrow(NotFoundException)
+    })
+
+    it('should reject if contact in protected status', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'on_hold',
+        personIdIcm: 'ICM-123',
+        contactIdIcm: 'CONTACT-123',
+        personIdMis: 'MIS-123',
+        firstName: 'John',
+        lastName: 'Doe',
+      } as any)
+
+      await expect(
+        service.deleteContact(1, 'dq.steward', USER_PROFILE.DATA_QUALITY_STEWARD),
+      ).rejects.toThrow(UnprocessableEntityException)
+    })
+
+    it('should delete from staging tables in correct order', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        personIdIcm: 'ICM-123',
+        contactIdIcm: 'CONTACT-123',
+        personIdMis: 'MIS-123',
+        firstName: 'John',
+        lastName: 'Doe',
+      } as any)
+
+      const executeRawCalls: string[] = []
+      const transactionSpy = vi.fn(async (callback) => {
+        return callback({
+          $executeRaw: vi.fn((query) => {
+            executeRawCalls.push(query[0])
+            return Promise.resolve()
+          }),
+          $queryRaw: vi
+            .fn()
+            .mockResolvedValue([{ batchDetails: 0n, auditTrail: 0n, wklRecords: 0n }]),
+          contact: { delete: vi.fn() },
+        } as any)
+      })
+      vi.spyOn(prisma, '$transaction').mockImplementation(transactionSpy as any)
+
+      await service.deleteContact(1, 'dq.steward', USER_PROFILE.DATA_QUALITY_STEWARD)
+
+      // Verify correct deletion order (children before parents)
+      expect(executeRawCalls.length).toBeGreaterThan(0)
+      for (const table of CONTACT_DELETE_STAGING_TABLES) {
+        expect(executeRawCalls.some((q) => q.includes(table))).toBe(true)
+      }
+      for (const table of CONTACT_DELETE_APPLICATION_TABLES) {
+        expect(executeRawCalls.some((q) => q.includes(table))).toBe(true)
+      }
+
+      const wklIndex = executeRawCalls.findIndex((q) =>
+        q.includes('DELETE FROM csa.wkl_file_records'),
+      )
+      const batchDetailIndex = executeRawCalls.findIndex((q) =>
+        q.includes('DELETE FROM csa.contact_batch_details'),
+      )
+      const auditTrailIndex = executeRawCalls.findIndex((q) =>
+        q.includes('DELETE FROM csa.contact_audit_trail'),
+      )
+      const casesIndex = executeRawCalls.findIndex((q) =>
+        q.includes('DELETE FROM csa.stg_icm_cases'),
+      )
+      const misPlacementsIndex = executeRawCalls.findIndex((q) =>
+        q.includes('DELETE FROM csa.stg_mis_placements'),
+      )
+
+      expect(wklIndex).toBeGreaterThan(-1)
+      expect(batchDetailIndex).toBeGreaterThan(-1)
+      expect(auditTrailIndex).toBeGreaterThan(-1)
+      expect(wklIndex).toBeLessThan(batchDetailIndex)
+      expect(batchDetailIndex).toBeLessThan(auditTrailIndex)
+      expect(misPlacementsIndex).toBeLessThan(casesIndex)
+    })
+
+    it('should fail when FK child rows remain after dependency cleanup', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        personIdIcm: 'ICM-123',
+        contactIdIcm: 'CONTACT-123',
+        personIdMis: 'MIS-123',
+        firstName: 'John',
+        lastName: 'Doe',
+      } as any)
+
+      vi.spyOn(prisma, '$transaction').mockImplementation(async (callback) => {
+        return callback({
+          $executeRaw: vi.fn(),
+          $queryRaw: vi
+            .fn()
+            .mockResolvedValue([{ batchDetails: 1n, auditTrail: 0n, wklRecords: 0n }]),
+          contact: { delete: vi.fn() },
+        } as any)
+      })
+
+      await expect(
+        service.deleteContact(1, 'dq.steward', USER_PROFILE.DATA_QUALITY_STEWARD),
+      ).rejects.toThrow('dependent rows remain')
+    })
+
+    it('should not trigger ICM sync-back on delete', async () => {
+      vi.spyOn(prisma.contact, 'findUnique').mockResolvedValue({
+        id: 1,
+        csaStatus: 'eligible',
+        personIdIcm: 'ICM-123',
+        contactIdIcm: 'CONTACT-123',
+        personIdMis: 'MIS-123',
+        firstName: 'John',
+        lastName: 'Doe',
+      } as any)
+
+      const transactionSpy = vi.fn(async (callback) => {
+        return callback({
+          $executeRaw: vi.fn(),
+          $queryRaw: vi
+            .fn()
+            .mockResolvedValue([{ batchDetails: 0n, auditTrail: 0n, wklRecords: 0n }]),
+          contact: { delete: vi.fn() },
+        } as any)
+      })
+      vi.spyOn(prisma, '$transaction').mockImplementation(transactionSpy as any)
+
+      const syncSpy = vi.spyOn(service['icmSyncBackService'], 'syncSingleContact')
+
+      await service.deleteContact(1, 'dq.steward', USER_PROFILE.DATA_QUALITY_STEWARD)
+
+      expect(syncSpy).not.toHaveBeenCalled()
     })
   })
 })

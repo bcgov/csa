@@ -11,7 +11,13 @@ import { CSAGuard } from '../common/guards/csa.guard'
 import { clearOpenshiftStatusCacheForTests } from './job-openshift-advisory'
 import { JobsController } from './jobs.controller'
 
-const mockCSAGuard = { canActivate: () => true }
+const mockCSAGuard = {
+  canActivate: (context: { switchToHttp: () => { getRequest: () => any } }) => {
+    const req = context.switchToHttp().getRequest()
+    req.username = 'JSMITH'
+    return true
+  },
+}
 
 describe('JobsController', () => {
   let app: INestApplication
@@ -25,6 +31,11 @@ describe('JobsController', () => {
     createJob: vi.fn(),
     getJob: vi.fn(),
     getJobs: vi.fn(),
+    getLatestJobsPerType: vi.fn(),
+    getJobHistory: vi.fn(),
+    getMonitoringTriggeredByValues: vi.fn(),
+    getRecentActivities: vi.fn(),
+    getActivities: vi.fn(),
     markFailed: vi.fn(),
   }
 
@@ -136,6 +147,7 @@ describe('JobsController', () => {
       expect(mockJobsService.createJob).toHaveBeenCalledWith({
         jobType: 'RUN_ELIGIBILITY',
         jobTrigger: 'END_USER',
+        triggeredByUser: 'JSMITH',
       })
       expect(mockOpenshiftJobLauncher.launchJob).toHaveBeenCalledWith('RUN_ELIGIBILITY', 42)
     })
@@ -312,6 +324,7 @@ describe('JobsController', () => {
       expect(mockJobsService.createJob).toHaveBeenCalledWith({
         jobType: 'SEND_CRA_FILE',
         jobTrigger: 'END_USER',
+        triggeredByUser: 'JSMITH',
       })
       expect(mockOpenshiftJobLauncher.launchJob).toHaveBeenCalledWith('SEND_CRA_FILE', 789)
     })
@@ -379,6 +392,148 @@ describe('JobsController', () => {
       expect(res.body.message).toContain('DEPLOY_ENV is dev')
       expect(mockJobsService.createJob).not.toHaveBeenCalled()
       expect(mockJobRunner.executeJob).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('GET /jobs/monitoring/latest', () => {
+    it('should return latest monitored jobs with mapped display name and triggeredBy', async () => {
+      const now = new Date('2026-07-01T12:00:00Z')
+      mockJobsService.getLatestJobsPerType.mockResolvedValue([
+        {
+          id: 41,
+          jobType: 'RUN_ELIGIBILITY',
+          status: 'SUCCESS',
+          jobTrigger: 'END_USER',
+          triggeredByUser: 'JSMITH',
+          startedAt: now,
+          completedAt: now,
+          metadata: { processed: 100, statusChanges: 2, newContacts: 1, skipped: 3 },
+        },
+      ])
+
+      const res = await request(app.getHttpServer()).get('/jobs/monitoring/latest').expect(200)
+
+      expect(res.body).toEqual([
+        {
+          id: 41,
+          jobId: 41,
+          jobName: 'Eligibility',
+          status: 'Success',
+          triggeredBy: 'JSMITH',
+          started: now.toISOString(),
+          finished: now.toISOString(),
+          summary: '100 processed, 2 updated, 1 new, 3 skipped',
+          warning: null,
+        },
+      ])
+    })
+  })
+
+  describe('GET /jobs/monitoring/history', () => {
+    it('should forward filters and return paginated mapped rows', async () => {
+      const now = new Date('2026-07-02T10:00:00Z')
+      mockJobsService.getJobHistory.mockResolvedValue({
+        data: [
+          {
+            id: 7,
+            jobType: 'SEND_CRA_FILE',
+            status: 'FAILED',
+            jobTrigger: 'CRON',
+            startedAt: now,
+            completedAt: now,
+            metadata: null,
+          },
+        ],
+        total: 1,
+        page: 1,
+        limit: 10,
+      })
+
+      const res = await request(app.getHttpServer())
+        .get('/jobs/monitoring/history')
+        .query({ status: 'FAILED', triggeredBy: 'SYSTEM', page: 1, limit: 10 })
+        .expect(200)
+
+      expect(mockJobsService.getJobHistory).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'FAILED',
+          triggeredBy: 'SYSTEM',
+          page: 1,
+          limit: 10,
+        }),
+      )
+      expect(res.body.data[0]).toMatchObject({
+        id: 7,
+        jobName: 'Send CRA File',
+        triggeredBy: 'SYSTEM',
+        summary: 'Job failed',
+      })
+    })
+  })
+
+  describe('GET /jobs/monitoring/triggered-by', () => {
+    it('should return distinct trigger values for monitoring filters', async () => {
+      mockJobsService.getMonitoringTriggeredByValues.mockResolvedValue(['SYSTEM', 'CGWRK22'])
+
+      const res = await request(app.getHttpServer())
+        .get('/jobs/monitoring/triggered-by')
+        .expect(200)
+
+      expect(mockJobsService.getMonitoringTriggeredByValues).toHaveBeenCalled()
+      expect(res.body).toEqual(['SYSTEM', 'CGWRK22'])
+    })
+  })
+
+  describe('GET /jobs/monitoring/activities', () => {
+    it('should return recent activities with pagination and filters', async () => {
+      mockJobsService.getRecentActivities.mockResolvedValue({
+        data: [
+          { id: 1, jobRunId: 5, severity: 'WARNING', type: 'CRA', related: 'Invalid file format' },
+        ],
+        total: 1,
+        page: 1,
+        limit: 10,
+      })
+
+      const res = await request(app.getHttpServer())
+        .get('/jobs/monitoring/activities')
+        .query({ severity: 'WARNING', type: 'CRA', page: 1, limit: 10 })
+        .expect(200)
+
+      expect(mockJobsService.getRecentActivities).toHaveBeenCalledWith(1, 10, {
+        severity: 'WARNING',
+        type: 'CRA',
+        sortBy: undefined,
+        sortOrder: undefined,
+      })
+      expect(res.body.total).toBe(1)
+    })
+  })
+
+  describe('GET /jobs/:id/activities', () => {
+    it('should return activities for selected job run', async () => {
+      mockJobsService.getActivities.mockResolvedValue({
+        data: [{ id: 11, jobRunId: 99, severity: 'ERROR', type: 'JOB', related: 'boom' }],
+        total: 1,
+        page: 1,
+        limit: 10,
+      })
+
+      const res = await request(app.getHttpServer())
+        .get('/jobs/99/activities')
+        .query({ page: 1, limit: 10, severity: 'ERROR', type: 'JOB' })
+        .expect(200)
+
+      expect(mockJobsService.getActivities).toHaveBeenCalledWith({
+        jobRunId: 99,
+        page: 1,
+        limit: 10,
+        severity: 'ERROR',
+        type: 'JOB',
+        sortBy: undefined,
+        sortOrder: undefined,
+      })
+      expect(res.body.data[0].jobRunId).toBe(99)
     })
   })
 })

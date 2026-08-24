@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/common/database/prisma.service'
 import { AppLogger } from 'src/common/logger/app-logger'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import {
   getAgeCutoffDate,
   isEligibleAge,
@@ -9,13 +10,13 @@ import {
   parseISODatePacific,
 } from 'src/common/utils'
 import { CANCEL_REASON } from './cancellation/cancellation-reason.constants'
+import { getPreviousMonth, isInMonth } from './eligibility-month'
 import {
   ELIGIBILITY_CONFIG,
   PROTECTED_STATUSES,
   PROTECTED_STATUSES_SQL,
 } from './eligibility.config'
 import { EligibilityInputError } from './eligibility.errors'
-import { getPreviousMonth, isInMonth } from './eligibility-month'
 import {
   buildContactHasStagingChangesSql,
   buildFindAgedOutContactIdsSql,
@@ -585,15 +586,22 @@ const UPDATE_SET = CONTACT_COLUMNS.filter((col) => col.conflictMode !== 'skip')
   )
   .join(',\n        ')
 
+const RECORD_ELIGIBILITY_RUN_SQL = `
+  UPDATE contacts
+  SET last_eligibility_run_at = NOW()
+  WHERE person_id_icm = ANY($1::text[])
+`
+
 const UPSERT_SQL = `
   INSERT INTO contacts (
     ${COL_LIST},
     icm_integration_status,
-    created_at, created_by, last_updated_at, last_updated_by, needs_review
+    created_at, created_by, last_updated_at, last_updated_by, needs_review,
+    last_eligibility_run_at
   )
   SELECT
     ${SELECT_LIST},
-    true, NOW(), 'SYSTEM', NOW(), 'SYSTEM', false
+    true, NOW(), 'SYSTEM', NOW(), 'SYSTEM', false, NOW()
   FROM unnest(${UNNEST_PARAMS})
   AS t(${COL_LIST})
   ON CONFLICT (person_id_icm) DO UPDATE SET
@@ -683,10 +691,16 @@ export class EligibilityService {
     }
 
     const updates: Array<{ profile: ContactProfile; result: EligibilityResult }> = []
+    const rulesRanIds: string[] = []
 
     for (const profile of profiles) {
       if (!profile.dateOfBirth) {
-        this.logger.warn(`Skipping contact ${profile.personIdIcm}: missing date of birth`)
+        this.logger.warn(`Skipping contact ${profile.personIdIcm}: missing date of birth`, {
+          activityType: JobActivityType.DATA_QUALITY,
+          aggregate: true,
+          aggregateKey: 'missing-dob',
+          related: 'Contact skipped: missing date of birth',
+        })
         stats.skipped++
         continue
       }
@@ -718,8 +732,8 @@ export class EligibilityService {
 
       // User-set status (BL-14B): skip rules and upsert when staging eligibility data is unchanged.
       if (isUserSetCsaStatus(profile.lastUpdatedBy)) {
-        if (!profile.csaStatusEffectiveDate) {
-          this.warnUserSetWithoutEffectiveDate(profile)
+        if (!profile.lastEligibilityRunAt) {
+          this.warnUserSetWithoutEligibilityRunAt(profile)
         }
         if (
           await this.shouldSkipUpsertForUnchangedStaging(profile, {
@@ -734,6 +748,8 @@ export class EligibilityService {
 
       const result = runEligibility(profile, RULES, referenceDate)
       if (!result) continue
+
+      rulesRanIds.push(profile.personIdIcm)
 
       if (
         result.newStatus === profile.csaStatus &&
@@ -765,6 +781,16 @@ export class EligibilityService {
     if (updates.length > 0) {
       const upsertResult = await this.upsertContacts(updates)
       stats.skipped = upsertResult.skipped
+      const upsertedIds = new Set(upsertResult.validRows.map((row) => row.profile.personIdIcm))
+      const updateIds = new Set(updates.map(({ profile }) => profile.personIdIcm))
+      const recordIds = rulesRanIds.filter(
+        (personIdIcm) => !updateIds.has(personIdIcm) || upsertedIds.has(personIdIcm),
+      )
+      if (recordIds.length > 0) {
+        await this.recordEligibilityRunAt(recordIds)
+      }
+    } else if (rulesRanIds.length > 0) {
+      await this.recordEligibilityRunAt(rulesRanIds)
     }
 
     this.logger.log(
@@ -774,21 +800,27 @@ export class EligibilityService {
     return stats
   }
 
-  private warnUserSetWithoutEffectiveDate(profile: ContactProfile): void {
+  private warnUserSetWithoutEligibilityRunAt(profile: ContactProfile): void {
     this.logger.warn(
-      `User-set CSA status for ${profile.personIdIcm} (last_updated_by=${profile.lastUpdatedBy}) but no csa_status_effective_date on master or ICM; running eligibility without BL-14B/14C skip`,
+      `User-set CSA status for ${profile.personIdIcm} (last_updated_by=${profile.lastUpdatedBy}) but no last_eligibility_run_at; running eligibility without BL-14C skip`,
+      {
+        activityType: JobActivityType.DATA_QUALITY,
+        aggregate: true,
+        aggregateKey: 'user-set-missing-eligibility-run-at',
+        related: 'User-set CSA status without last eligibility run timestamp',
+      },
     )
   }
 
   /**
-   * Skip upsert when staging eligibility data is unchanged since csa_status_effective_date.
+   * Skip upsert when staging eligibility data is unchanged since last_eligibility_run_at (BL-14C).
    * Age-out contacts are still processed when referenceDate/agedOutIds are provided.
    */
   private async shouldSkipUpsertForUnchangedStaging(
     profile: ContactProfile,
     options?: { referenceDate?: Date; agedOutIds?: string[] },
   ): Promise<boolean> {
-    const since = profile.csaStatusEffectiveDate
+    const since = profile.lastEligibilityRunAt
     if (!since) {
       return false
     }
@@ -804,7 +836,7 @@ export class EligibilityService {
     const unchanged = !(await this.hasStagingDataChanged(profile.personIdIcm, since))
     if (unchanged) {
       this.logger.log(
-        `Skipping upsert for ${profile.personIdIcm}: no staging data changes since ${since.toISOString()}`,
+        `Skipping upsert for ${profile.personIdIcm}: no staging data changes since last eligibility run at ${since.toISOString()}`,
       )
     }
     return unchanged
@@ -814,6 +846,14 @@ export class EligibilityService {
     const { sql, params } = buildContactHasStagingChangesSql(personIdIcm, since)
     const rows = await this.prisma.$queryRawUnsafe<{ hasChanges: boolean }[]>(sql, ...params)
     return rows[0]?.hasChanges === true
+  }
+
+  /** Record that eligibility rules ran on these contacts (after upsert when applicable). */
+  private async recordEligibilityRunAt(personIdIcms: string[]): Promise<void> {
+    if (personIdIcms.length === 0) {
+      return
+    }
+    await this.prisma.$executeRawUnsafe(RECORD_ELIGIBILITY_RUN_SQL, personIdIcms)
   }
 
   private async findAgedOutContactIds(referenceDate: Date): Promise<string[]> {
@@ -858,8 +898,8 @@ export class EligibilityService {
 
     // BL-14C: user-set status is kept unless staging eligibility data changed.
     if (isUserSetCsaStatus(profile.lastUpdatedBy)) {
-      if (!profile.csaStatusEffectiveDate) {
-        this.warnUserSetWithoutEffectiveDate(profile)
+      if (!profile.lastEligibilityRunAt) {
+        this.warnUserSetWithoutEligibilityRunAt(profile)
       }
       if (await this.shouldSkipUpsertForUnchangedStaging(profile, { referenceDate })) {
         const status = previousStatus ?? profile.csaStatus
@@ -880,17 +920,24 @@ export class EligibilityService {
     }
 
     const resolvedStatus = result.newStatus ?? previousStatus ?? profile.csaStatus
-    if (
+    const skipUpsert =
       result.newStatus === profile.csaStatus &&
       (await this.shouldSkipUpsertForUnchangedStaging(profile, { referenceDate }))
-    ) {
-      if (!resolvedStatus) {
-        throw new EligibilityInputError(`Contact ${personIdIcm} has no CSA status`)
-      }
-      return { previousStatus, newStatus: resolvedStatus }
+
+    if (skipUpsert && !resolvedStatus) {
+      throw new EligibilityInputError(`Contact ${personIdIcm} has no CSA status`)
     }
 
-    await this.upsertContacts([{ profile, result }])
+    if (!skipUpsert) {
+      await this.upsertContacts([{ profile, result }])
+    }
+
+    await this.recordEligibilityRunAt([personIdIcm])
+
+    if (skipUpsert) {
+      return { previousStatus, newStatus: resolvedStatus! }
+    }
+
     return { previousStatus, newStatus: result.newStatus }
   }
 
@@ -1043,6 +1090,7 @@ export class EligibilityService {
         csaStatusEffectiveDate: raw.csaStatusEffectiveDate
           ? new Date(raw.csaStatusEffectiveDate)
           : null,
+        lastEligibilityRunAt: raw.lastEligibilityRunAt ? new Date(raw.lastEligibilityRunAt) : null,
         existingContactId: raw.existingContactId,
         lastUpdatedBy: raw.lastUpdatedBy ?? null,
         din: raw.din ?? null,

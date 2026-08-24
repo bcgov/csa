@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { AppLogger } from 'src/common/logger/app-logger'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { Prisma } from '@prisma/client'
 import { PrismaService } from 'src/common/database/prisma.service'
 import {
@@ -22,6 +24,7 @@ import { IcmSyncBackService } from 'src/sync/icm/icm-sync-back.service'
 import { BULK_OPERATION_SKIP_REASONS, TRANSACTION_TYPES } from '../contacts/constants'
 import { ContactsService } from '../contacts/contacts.service'
 import { BulkOperationResponse } from '../contacts/interfaces'
+import { validateCraRequiredFields } from './cra-fields-validator'
 
 const { BATCH_INITIATED_BY, UPDATED_BY } = CRA_DATA_HANDLING_CONSTANT
 
@@ -49,6 +52,11 @@ class TransitionSkipError extends Error {
   }
 }
 
+export interface IncompleteRecord {
+  id: number
+  missingFields: string[]
+}
+
 export interface BatchOperationResult extends BulkOperationResponse {
   batch: {
     id: number
@@ -59,6 +67,8 @@ export interface BatchOperationResult extends BulkOperationResponse {
     createdAt: Date
     systemComments: string | null
   }
+  /** Contacts that failed CRA mandatory-field validation and were NOT added to the batch. */
+  incomplete: IncompleteRecord[]
 }
 
 export interface UpdateBatchStatusOptions {
@@ -67,7 +77,7 @@ export interface UpdateBatchStatusOptions {
 
 @Injectable()
 export class BatchesService {
-  private readonly logger = new Logger(BatchesService.name)
+  private readonly logger = new AppLogger(BatchesService.name)
 
   constructor(
     private prisma: PrismaService,
@@ -82,6 +92,44 @@ export class BatchesService {
         `Immediate ICM sync failed for contact ${contactId}: ${(err as Error).message}`,
       )
     })
+  }
+
+  private logBatchOperationIssues(
+    operation: 'add' | 'remove',
+    userId: string,
+    batchId: number,
+    result: Pick<BatchOperationResult, 'skipped' | 'incomplete'>,
+  ): void {
+    const batchLabel = `batch ${batchId}`
+    const isAutoBatch = userId === 'SYSTEM'
+    const trigger = isAutoBatch ? 'Auto-batch' : `Manual ${operation} to batch by ${userId}`
+
+    if (result.incomplete.length > 0) {
+      const count = result.incomplete.length
+      const detail = isAutoBatch
+        ? `${count} contacts auto-held due to missing CRA mandatory fields`
+        : `${count} contacts skipped due to missing CRA mandatory fields`
+      this.logger.warn(`${trigger}: ${detail} (${batchLabel})`, {
+        activityType: JobActivityType.BATCH,
+        related: `${detail} (${batchLabel})`,
+      })
+    }
+
+    const errors = result.skipped.filter((entry) => entry.reason === 'error')
+    if (errors.length > 0) {
+      this.logger.error(`${trigger}: ${errors.length} contacts failed (${batchLabel})`, {
+        activityType: JobActivityType.BATCH,
+        related: `${errors.length} contacts failed during ${operation} (${batchLabel})`,
+      })
+    }
+
+    const otherSkipped = result.skipped.filter((entry) => entry.reason !== 'error')
+    if (otherSkipped.length > 0) {
+      this.logger.warn(`${trigger}: ${otherSkipped.length} contacts skipped (${batchLabel})`, {
+        activityType: JobActivityType.BATCH,
+        related: `${otherSkipped.length} contacts skipped during ${operation} (${batchLabel})`,
+      })
+    }
   }
 
   private async nextBatchNumber(tx: Prisma.TransactionClient): Promise<number> {
@@ -368,6 +416,7 @@ export class BatchesService {
   async addContactsToPendingBatch(
     contactIds: number[],
     userId: string,
+    actor: 'USER' | 'SYSTEM' = 'USER',
   ): Promise<BatchOperationResult> {
     const pendingBatch = await this.findOrCreatePendingBatch()
 
@@ -375,6 +424,7 @@ export class BatchesService {
       batch: pendingBatch,
       success: [],
       skipped: [],
+      incomplete: [],
     }
 
     const existingContacts = await this.prisma.contact.findMany({
@@ -386,6 +436,14 @@ export class BatchesService {
         cancelReasonCode: true,
         careEndDate: true,
         effectiveDate: true,
+        // Fields required for CRA mandatory-field validation (US-40101)
+        firstName: true,
+        lastName: true,
+        gender: true,
+        dateOfBirth: true,
+        birthCity: true,
+        birthCountry: true,
+        birthProvince: true,
       },
     })
     const existingContactMap = new Map(existingContacts.map((c) => [c.id, c]))
@@ -411,12 +469,44 @@ export class BatchesService {
         continue
       }
 
+      // --- CRA mandatory-field validation (user-sourced fields only) ---
+      const craValidation = validateCraRequiredFields(contact)
+      if (!craValidation.isValid) {
+        this.logger.log(
+          `Contact ${contactId}: skipped — missing CRA mandatory fields: ${craValidation.missingFields.join(', ')}`,
+        )
+
+        // S2: If actor is SYSTEM (auto-batch), automatically put on hold with specific missing fields
+        if (actor === 'SYSTEM') {
+          const holdReason = `Missing: ${craValidation.missingFields.join(', ')}`
+          try {
+            await this.contactsService.updateCsaStatus(contactId, CSA_EVENT.HOLD, 'SYSTEM', {
+              userId,
+              origin:
+                'BatchesService.addContactsToPendingBatch — auto-hold for incomplete CRA fields',
+              additionalData: { holdReason },
+            })
+            this.logger.log(`Contact ${contactId}: auto-held with reason: ${holdReason}`)
+          } catch (error) {
+            this.logger.warn(
+              `Contact ${contactId}: failed to auto-hold — ${error instanceof Error ? error.message : 'unknown error'}`,
+            )
+          }
+        }
+
+        result.incomplete.push({
+          id: contactId,
+          missingFields: craValidation.missingFields,
+        })
+        continue
+      }
+
       try {
         await this.prisma.$transaction(async (tx) => {
           const transition = await this.contactsService.updateCsaStatus(
             contactId,
             CSA_EVENT.ADD_TO_BATCH,
-            'USER',
+            actor,
             { userId, tx, origin: 'BatchesService.addContactsToPendingBatch' },
           )
 
@@ -435,8 +525,9 @@ export class BatchesService {
           if (transactionType === TRANSACTION_TYPES.CANCELLATION) {
             const updates: Record<string, unknown> = {}
             if (!contact.careEndDate) {
-              updates.careEndDate = pacificToday()
-              contact.careEndDate = pacificToday()
+              const today = pacificToday()
+              updates.careEndDate = today
+              contact.careEndDate = today
             }
             if (!contact.cancelReasonCode) {
               updates.cancelReasonCode = CANCEL_REASON.CHILD_LEFT
@@ -498,6 +589,8 @@ export class BatchesService {
         data: { recordCount: actualCount },
       }),
     )
+
+    this.logBatchOperationIssues('add', userId, result.batch.id, result)
 
     return result
   }
@@ -645,6 +738,13 @@ export class BatchesService {
       )
 
       if (!transition.success) {
+        this.logger.error(
+          `Manual remove from batch failed for contact ${contactId}: ${transition.reason}`,
+          {
+            activityType: JobActivityType.BATCH,
+            related: `Manual remove from batch contact ${contactId} by ${userId ?? 'unknown'}: ${transition.reason}`,
+          },
+        )
         throw new BadRequestException(
           `Failed to transition contact ${contactId} on REMOVE_FROM_BATCH: ${transition.reason}`,
         )
@@ -681,6 +781,7 @@ export class BatchesService {
       batch: enrichLabels(pendingBatch),
       success: [],
       skipped: [],
+      incomplete: [],
     }
 
     for (const contactId of contactIds) {
@@ -736,6 +837,8 @@ export class BatchesService {
         data: { recordCount: actualCount },
       }),
     )
+
+    this.logBatchOperationIssues('remove', userId, result.batch.id, result)
 
     return result
   }

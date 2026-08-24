@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common'
 import { BaseJob } from 'src/jobs/base-job'
 import { JobType } from 'src/jobs/enums/job-type.enum'
+import { JobActivityType } from 'src/jobs/enums/job-activity-type.enum'
 import { JobResult } from 'src/jobs/interfaces/job-result.interface'
 import { JobContext } from 'src/jobs/interfaces/job.interface'
 import { IcmSyncBackService, SyncBackResult } from '../icm/icm-sync-back.service'
-import { AutoBatchService } from '../eligibility/auto-batch.service'
+import { AutoBatchService, formatAutoBatchSummary } from '../eligibility/auto-batch.service'
 
 /*
  * Finds eligible contacts, adds them via BatchesService (same as UI), then syncs
@@ -29,13 +30,16 @@ export class AutoBatchHandler extends BaseJob {
       try {
         syncResult = await this.icmSyncBackService.syncFlaggedWithRetry()
       } catch (err) {
-        this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`)
+        this.logger.warn(`ICM sync-back failed: ${(err as Error).message}`, {
+          activityType: JobActivityType.ICM,
+          related: `ICM sync-back failed: ${(err as Error).message}`,
+        })
       }
     }
 
     return {
       success: true,
-      message: `Auto-batch complete: ${result.application} application, ${result.cancellation} cancellation`,
+      message: formatAutoBatchSummary(result),
       metadata: { ...result, syncResult } as unknown as Record<string, unknown>,
     }
   }

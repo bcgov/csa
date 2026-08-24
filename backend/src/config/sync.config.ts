@@ -1,29 +1,61 @@
 import { registerAs } from '@nestjs/config'
+import { getDeployEnv } from './app.config'
 
 export const syncConfig = registerAs('sync', () => {
-  const useMockData = process.env.USE_MOCK_DATA === 'true'
-  const icmCursorLookbackDays = parseInt(process.env.ICM_CURSOR_LOOKBACK_DAYS || '2', 10)
-  const eligibilityLookbackDays = parseInt(process.env.ELIGIBILITY_LOOKBACK_DAYS || '2', 10)
-  const rawTimeout = parseInt(process.env.ICM_REQUEST_TIMEOUT_MS || '30000', 10)
-  const icmRequestTimeoutMs = Number.isNaN(rawTimeout) ? 30000 : rawTimeout
-  // S3/MinIO config
-  // only required when not using mock data
-  if (!useMockData) {
+  const isLocal = getDeployEnv() === 'local'
+
+  const icmCursorLookbackDaysRaw = process.env.ICM_CURSOR_LOOKBACK_DAYS
+  if (!icmCursorLookbackDaysRaw) {
+    throw new Error('ICM_CURSOR_LOOKBACK_DAYS is required')
+  }
+  const icmCursorLookbackDays = parseInt(icmCursorLookbackDaysRaw, 10)
+  if (Number.isNaN(icmCursorLookbackDays)) {
+    throw new Error('ICM_CURSOR_LOOKBACK_DAYS must be an integer')
+  }
+
+  const eligibilityLookbackDaysRaw = process.env.ELIGIBILITY_LOOKBACK_DAYS
+  if (!eligibilityLookbackDaysRaw) {
+    throw new Error('ELIGIBILITY_LOOKBACK_DAYS is required')
+  }
+  const eligibilityLookbackDays = parseInt(eligibilityLookbackDaysRaw, 10)
+  if (Number.isNaN(eligibilityLookbackDays)) {
+    throw new Error('ELIGIBILITY_LOOKBACK_DAYS must be an integer')
+  }
+
+  const icmRequestTimeoutMsRaw = process.env.ICM_REQUEST_TIMEOUT_MS
+  if (!icmRequestTimeoutMsRaw) {
+    throw new Error('ICM_REQUEST_TIMEOUT_MS is required')
+  }
+  const icmRequestTimeoutMs = parseInt(icmRequestTimeoutMsRaw, 10)
+  if (Number.isNaN(icmRequestTimeoutMs)) {
+    throw new Error('ICM_REQUEST_TIMEOUT_MS must be an integer')
+  }
+
+  const misS3Prefix = process.env.MIS_S3_PREFIX
+  if (!misS3Prefix) {
+    throw new Error('MIS_S3_PREFIX is required')
+  }
+
+  let s3Uri = ''
+  let s3Bucket = ''
+  if (!isLocal) {
     if (!process.env.s3URI) {
-      throw new Error('s3URI is required when USE_MOCK_DATA is not true')
+      throw new Error('s3URI is required when DEPLOY_ENV is not local')
     }
     if (!process.env.s3BucketName) {
-      throw new Error('s3BucketName is required when USE_MOCK_DATA is not true')
+      throw new Error('s3BucketName is required when DEPLOY_ENV is not local')
     }
+    s3Uri = process.env.s3URI
+    s3Bucket = process.env.s3BucketName
   }
 
   return {
-    useMockData,
+    isLocal,
     icmCursorLookbackDays,
     icmRequestTimeoutMs,
     eligibilityLookbackDays,
-    s3Uri: process.env.s3URI || '',
-    s3Bucket: process.env.s3BucketName || '',
-    misS3Prefix: process.env.MIS_S3_PREFIX || 'csas3/',
+    s3Uri,
+    s3Bucket,
+    misS3Prefix,
   }
 })

@@ -45,6 +45,10 @@ describe('IngestDataHandler', () => {
 
       expect(result.success).toBe(true)
       expect(result.message).toBe('Data ingestion completed successfully')
+      expect(result.metadata).toEqual({
+        icmResult: { success: true },
+        misResult: { success: true },
+      })
       expect(runJobTypeSpy).toHaveBeenCalledTimes(2)
       expect(runJobTypeSpy).toHaveBeenCalledWith(JobType.INGEST_ICM, JobTrigger.CRON, {
         parentJobId: 1,

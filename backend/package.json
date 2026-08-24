@@ -25,6 +25,8 @@
     "job:backfill-icm-case-close-dates": "node dist/jobs/entrypoints/backfill-icm-case-close-dates",
     "job:backfill-wkl-file-records": "node dist/jobs/entrypoints/backfill-wkl-file-records",
     "job:backfill-batch-effective-date-reason": "node dist/jobs/entrypoints/backfill-batch-effective-date-reason",
+    "local:generate-cra-response": "ts-node prisma/local-dev/generate-cra-response.ts",
+    "local:generate-cra-wkl": "ts-node prisma/local-dev/generate-cra-wkl.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "make-badges": "istanbul-badges-readme --logo=vitest --exitCode=1",

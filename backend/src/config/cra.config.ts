@@ -17,7 +17,7 @@ export const craConfig = registerAs('cra', () => {
   }
 
   const lastSequenceNumber = process.env.CRA_LAST_SEQUENCE_NUMBER
-  if (!lastSequenceNumber && lastSequenceNumber !== '0') {
+  if (lastSequenceNumber === undefined || lastSequenceNumber === '') {
     throw new Error('CRA_LAST_SEQUENCE_NUMBER is required')
   }
   const parsedSequenceNumber = parseInt(lastSequenceNumber, 10)

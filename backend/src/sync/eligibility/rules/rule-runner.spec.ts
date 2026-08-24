@@ -1,14 +1,14 @@
-import { describe, it, expect } from 'vitest'
-import { runEligibility } from './rule-runner'
-import { EligibilityRule, EligibilityContext } from './rule.interface'
+import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
+import { describe, expect, it } from 'vitest'
 import { EligibilityResult } from '../eligibility.types'
-import { makeContact, makePlacement, makeOrder } from '../test-helpers'
+import { makeContact, makeOrder, makePlacement } from '../test-helpers'
+import { runEligibility } from './rule-runner'
+import { EligibilityContext, EligibilityRule } from './rule.interface'
 import { step1B_CancellationCheck } from './steps/step1b-cancellation-determination'
 import { step2_LegalStatusCheck } from './steps/step2-legal-status-check'
 import { step3_PlacementCheck } from './steps/step3-placement-check'
 import { step4_FetchAgreementContract } from './steps/step4-fetch-agreement-contract'
 import { step6_OrderPaymentCheck } from './steps/step6-order-payment-check'
-import { CSA_STATUS } from 'src/common/state-machine/constants/csa-status.constants'
 
 const REF_DATE = new Date('2026-02-10')
 

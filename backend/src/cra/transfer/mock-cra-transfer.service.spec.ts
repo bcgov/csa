@@ -1,5 +1,6 @@
 import * as fs from 'fs'
 import * as fsp from 'fs/promises'
+import * as path from 'path'
 import { MockCraTransferService } from './mock-cra-transfer.service'
 
 vi.mock('fs')
@@ -21,9 +22,11 @@ describe('MockCraTransferService', () => {
 
       const result = await service.sendFile('test.dat', Buffer.from('file content'))
 
-      expect(fsp.mkdir).toHaveBeenCalledWith('/tmp/mock-cra/outbound', { recursive: true })
+      expect(fsp.mkdir).toHaveBeenCalledWith(path.join(basePath, 'outbound'), {
+        recursive: true,
+      })
       expect(fsp.writeFile).toHaveBeenCalledWith(
-        '/tmp/mock-cra/outbound/test.dat',
+        path.join(basePath, 'outbound', 'test.dat'),
         Buffer.from('file content'),
       )
       expect(result).toEqual({ success: true, fileName: 'test.dat' })
@@ -86,7 +89,7 @@ describe('MockCraTransferService', () => {
 
       const result = await service.downloadInboundFile('response1.dat')
 
-      expect(fsp.readFile).toHaveBeenCalledWith('/tmp/mock-cra/inbound/response1.dat')
+      expect(fsp.readFile).toHaveBeenCalledWith(path.join(basePath, 'inbound', 'response1.dat'))
       expect(result).toEqual(fileContent)
     })
 

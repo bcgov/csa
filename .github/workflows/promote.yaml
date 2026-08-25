@@ -2,7 +2,7 @@ name: Promote (Build Images + Update GitOps)
 
 on:
   push:
-    branches: [dev, test, main]
+    branches: [dev, test, pre-prod, main]
     paths:
       - "frontend/**"
       - "backend/**"
@@ -116,9 +116,10 @@ jobs:
           # --- push (normal promotions) ---
           if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
             case "${GITHUB_REF_NAME}" in
-              dev)  ENVNAME="dev"  ;;
-              test) ENVNAME="test" ;;
-              main) ENVNAME="prod" ;;
+              dev)      ENVNAME="dev"      ;;
+              test)     ENVNAME="test"     ;;
+              pre-prod) ENVNAME="pre-prod" ;;
+              main)     ENVNAME="prod"     ;;
               *) echo "Unsupported branch for promotion: ${GITHUB_REF_NAME}" ; exit 1 ;;
             esac
 

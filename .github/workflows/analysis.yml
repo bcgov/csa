@@ -140,6 +140,13 @@ jobs:
           scanners: vuln,secret,config
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+          # This action's default Trivy version (v0.65.0, baked into the
+          # pinned action SHA) no longer has a published GitHub Release —
+          # the tag exists but its release/assets are gone, so installation
+          # 404s every run. Pinning explicitly to a current, verified-real
+          # release (confirmed via the GitHub API to have published assets)
+          # instead of relying on the action's stale default.
+          version: v0.74.0
 
       - name: Upload Trivy SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
